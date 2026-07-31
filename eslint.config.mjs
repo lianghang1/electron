@@ -31,11 +31,8 @@ export default antfu(
         },
       ],
       'unused-imports/no-unused-imports': 'error',
-
       'no-useless-return': 'warn',
-
       'vue/no-unused-refs': 'warn',
-
       'eslint-comments/no-unlimited-disable': 'error',
     },
   },
