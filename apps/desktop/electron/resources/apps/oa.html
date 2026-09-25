@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
+<title>OA · 测试页</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    color: #14532d;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 48px 24px; gap: 28px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #16a34a; color: #fff;
+    padding: 8px 20px; border-radius: 999px;
+    font-size: 14px; font-weight: 600; letter-spacing: 1px;
+  }
+  .badge .dot { width: 8px; height: 8px; border-radius: 50%; background: #bbf7d0; }
+  h1 { font-size: 44px; letter-spacing: 4px; }
+  .clock {
+    font-variant-numeric: tabular-nums;
+    font-size: 34px; font-weight: 700; color: #15803d;
+    background: #fff; border: 1px solid #bbf7d0; border-radius: 16px;
+    padding: 20px 40px; box-shadow: 0 2px 8px rgb(22 163 74 / 8%);
+  }
+  .clock small { display: block; font-size: 13px; font-weight: 400; color: #64748b; margin-top: 6px; }
+  .card {
+    width: 100%; max-width: 560px; background: #fff;
+    border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px 24px;
+  }
+  .card h2 { font-size: 15px; color: #475569; margin-bottom: 12px; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 14px; }
+  .row .k { color: #64748b; }
+  .row .v { font-variant-numeric: tabular-nums; font-weight: 600; max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .count { font-size: 28px; color: #16a34a; }
+  button {
+    border: none; border-radius: 8px; padding: 9px 18px;
+    font-size: 14px; cursor: pointer; color: #fff; background: #16a34a;
+  }
+  button.ghost { background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
+  button + button { margin-left: 10px; }
+</style>
+</head>
+<body>
+  <span class="badge"><span class="dot"></span>OA 测试页 · App ID: oa</span>
+  <h1>OA 协同办公</h1>
+
+  <div class="clock">
+    <span id="loaded-at">--:--:--</span>
+    <small>本次页面加载时间 —— 点击 Tab 栏刷新按钮，此处时间会变化</small>
+  </div>
+
+  <div class="card">
+    <h2>Session 隔离验证（localStorage 按 App 独立持久化）</h2>
+    <div class="row">
+      <span class="k">OA 页累计加载次数</span>
+      <span class="v count" id="count">-</span>
+    </div>
+    <div style="margin-top: 12px">
+      <button id="reset">清零计数</button>
+      <button class="ghost" id="log">输出 console 日志</button>
+      <button class="ghost" id="error">输出 console 异常</button>
+      <button class="ghost" id="clipboard">读取剪贴板</button>
+    </div>
+    <div class="row" style="margin-top: 8px">
+      <span class="k">剪贴板（OA 未声明 clipboard.read → 应拒绝）</span>
+      <span class="v" id="clip-result">-</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>运行环境</h2>
+    <div class="row"><span class="k">URL</span><span class="v" id="href">-</span></div>
+    <div class="row"><span class="k">平台</span><span class="v" id="platform">-</span></div>
+    <div class="row"><span class="k">渲染进程</span><span class="v">sandbox + 独立 partition: persist:app-oa</span></div>
+  </div>
+
+<script>
+  const now = () => {
+    const d = new Date()
+    const p = (n, l = 2) => String(n).padStart(l, '0')
+    return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`
+  }
+  document.getElementById('loaded-at').textContent = now()
+
+  const KEY = 'oa-load-count'
+  const count = Number(localStorage.getItem(KEY) ?? '0') + 1
+  localStorage.setItem(KEY, String(count))
+  document.getElementById('count').textContent = `${count} 次`
+
+  document.getElementById('reset').onclick = () => {
+    localStorage.setItem(KEY, '0')
+    document.getElementById('count').textContent = '0 次'
+  }
+  document.getElementById('log').onclick = () => console.log(`[oa] 测试日志 ${now()}`)
+  document.getElementById('error').onclick = () => console.error(`[oa] 测试异常输出 ${now()}`)
+  document.getElementById('clipboard').onclick = async () => {
+    const el = document.getElementById('clip-result')
+    try {
+      const text = await navigator.clipboard.readText()
+      el.textContent = text ? `已读取: ${text.slice(0, 24)}` : '剪贴板为空'
+      console.log(`[oa] clipboard.readText 成功`)
+    }
+    catch (err) {
+      el.textContent = `被拒绝: ${err.name}`
+      console.error(`[oa] clipboard.readText 被拒绝:`, err)
+    }
+  }
+
+  document.getElementById('href').textContent = location.href
+  document.getElementById('platform').textContent = navigator.platform
+  console.log(`[oa] 页面加载完成，第 ${count} 次`)
+</script>
+</body>
+</html>

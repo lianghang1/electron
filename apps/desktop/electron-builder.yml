@@ -1,0 +1,29 @@
+appId: com.company.desktop
+productName: Desktop
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json,contracts.d.ts}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+asarUnpack:
+  - resources/**
+win:
+  target: nsis
+nsis:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  unicode: true
+  language: 2052
+mac:
+  target: dmg
+  notarize: false
+linux:
+  target: AppImage
+  category: Utility
+npmRebuild: false
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/

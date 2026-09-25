@@ -4,15 +4,19 @@
   "private": true,
   "description": "",
   "scripts": {
-    "dev": "pnpm --filter @app/client dev",
-    "build": "pnpm --filter @app/client build",
-    "build:win": "pnpm --filter @app/client build:win",
+    "dev": "pnpm --filter @app/desktop dev",
+    "dev:client": "pnpm --filter @app/client dev",
+    "dev:kiosk": "pnpm --filter @app/kiosk dev",
+    "build": "pnpm --filter @app/desktop build",
+    "build:client": "pnpm --filter @app/client build",
+    "build:kiosk": "pnpm --filter @app/kiosk build",
+    "build:win": "pnpm --filter @app/desktop build:win",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "catalog:",
+    "@desktop/config": "workspace:*",
     "eslint": "catalog:",
     "typescript": "catalog:"
   },

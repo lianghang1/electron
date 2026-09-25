@@ -1,0 +1,14 @@
+{
+  "name": "@desktop/config",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    "./eslint": "./eslint/index.mjs",
+    "./typescript/*": "./typescript/*"
+  },
+  "dependencies": {
+    "@antfu/eslint-config": "catalog:",
+    "eslint": "catalog:"
+  }
+}

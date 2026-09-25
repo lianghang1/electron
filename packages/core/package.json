@@ -1,0 +1,23 @@
+{
+  "name": "@desktop/core",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./preload": "./src/preload/index.ts"
+  },
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "electron-log": "^5.4.4",
+    "electron-store": "^10.0.0"
+  },
+  "devDependencies": {
+    "@desktop/shared": "workspace:*",
+    "@electron-toolkit/utils": "catalog:",
+    "@types/node": "catalog:",
+    "electron": "catalog:",
+    "typescript": "catalog:"
+  }
+}

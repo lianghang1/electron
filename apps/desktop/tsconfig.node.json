@@ -1,0 +1,8 @@
+{
+  "extends": "../../packages/config/typescript/tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "types": ["electron-vite/node"]
+  },
+  "include": ["contracts.d.ts", "electron.vite.config.*", "electron/**/*"]
+}
