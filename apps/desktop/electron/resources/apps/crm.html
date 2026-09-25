@@ -66,10 +66,22 @@
       <button class="ghost" id="log">输出 console 日志</button>
       <button class="ghost" id="error">输出 console 异常</button>
       <button class="ghost" id="clipboard">读取剪贴板</button>
+      <button class="ghost" id="notify">请求通知权限</button>
+      <button class="ghost" id="popup">打开弹窗（Origin 内 → 平台受管）</button>
+      <button class="ghost" id="popup-external">打开弹窗（外部 → 应拦截）</button>
+      <button class="ghost" id="download">发起下载（CRM 声明 download → 应放行）</button>
     </div>
     <div class="row" style="margin-top: 8px">
       <span class="k">剪贴板（CRM 声明 clipboard.read → 应放行）</span>
       <span class="v" id="clip-result">-</span>
+    </div>
+    <div class="row" style="margin-top: 8px">
+      <span class="k">通知（CRM 声明 notification → 应静默放行）</span>
+      <span class="v" id="notify-result">-</span>
+    </div>
+    <div class="row" style="margin-top: 8px">
+      <span class="k">弹窗（window.open 策略验证）</span>
+      <span class="v" id="popup-result">-</span>
     </div>
   </div>
 
@@ -110,6 +122,47 @@
       el.textContent = `被拒绝: ${err.name}`
       console.error(`[crm] clipboard.readText 被拒绝:`, err)
     }
+  }
+  document.getElementById('notify').onclick = async () => {
+    const el = document.getElementById('notify-result')
+    try {
+      const result = await Notification.requestPermission()
+      el.textContent = `结果: ${result}`
+      console.log(`[crm] notification permission:`, result)
+    }
+    catch (err) {
+      el.textContent = `失败: ${err.name}`
+      console.error(`[crm] notification permission failed:`, err)
+    }
+  }
+
+  document.getElementById('popup').onclick = () => {
+    const el = document.getElementById('popup-result')
+    const win = window.open(location.pathname + '?popup=1', '_blank', 'width=520,height=420')
+    el.textContent = win ? '已发起（Origin 内，平台应创建受管弹窗）' : '被浏览器层拦截'
+    console.log(`[crm] window.open(origin 内) 发起`)
+  }
+  document.getElementById('popup-external').onclick = () => {
+    const el = document.getElementById('popup-result')
+    window.open('https://example.com', '_blank', 'width=520,height=420')
+    el.textContent = '已发起（外部 Origin，应被拦截并转系统浏览器）'
+    console.log(`[crm] window.open(外部) 发起`)
+  }
+  if (location.search.includes('popup=1')) {
+    document.title = 'CRM 弹窗'
+    console.log(`[crm] 弹窗已加载（受管弹窗，同 App Session）`)
+  }
+
+  document.getElementById('download').onclick = () => {
+    const content = `CRM 下载测试 ${new Date().toISOString()}\n`
+    const blob = new Blob([content.repeat(100)], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `crm-test-${Date.now()}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+    console.log(`[crm] 下载已发起`)
   }
 
   document.getElementById('href').textContent = location.href

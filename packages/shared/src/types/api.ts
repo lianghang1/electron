@@ -1,9 +1,8 @@
 import type { AppContext } from './context'
 import type { DesktopIpc } from './ipc'
-import type { DesktopAppManifest } from './manifest'
-import type { Permission } from './permission'
+import type { DesktopAppManifest, RegisteredApp } from './manifest'
+import type { AppPermissionState, Permission } from './permission'
 import type { DesktopTab, OpenTabOptions, WorkAreaRect } from './tab'
-
 /**
  * Renderer 可监听的平台推送事件：从契约中数组形态的 channel 自动推导，
  * 与 Main 侧 emit 保持单一来源。
@@ -27,7 +26,7 @@ export interface DesktopApi {
     isMaximized: () => Promise<boolean>
   }
   app: {
-    list: () => Promise<DesktopAppManifest[]>
+    list: () => Promise<RegisteredApp[]>
     getManifest: (appId: string) => Promise<DesktopAppManifest | undefined>
     getCurrent: () => Promise<AppContext>
   }
@@ -41,11 +40,23 @@ export interface DesktopApi {
   }
   permission: {
     check: (permission: Permission) => Promise<boolean>
+    /** 对运行时权限请求做出用户决策 */
+    respond: (requestId: string, granted: boolean) => Promise<void>
+    /** App 权限状态列表（声明 + 运行时决策合成视图） */
+    list: (appId: string) => Promise<AppPermissionState[]>
   }
   storage: {
     get: <T>(key: string) => Promise<T | undefined>
     set: <T>(key: string, value: T) => Promise<void>
     remove: (key: string) => Promise<void>
+    /** 清空调用者 App 的全部本地存储 */
+    clear: () => Promise<void>
+  }
+  update: {
+    /** 手动触发检查更新 */
+    check: () => Promise<void>
+    /** 下载完成后重启安装 */
+    install: () => Promise<void>
   }
   events: {
     /** 监听平台推送事件，返回取消监听函数 */

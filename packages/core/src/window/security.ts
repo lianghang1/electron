@@ -1,5 +1,5 @@
 import type { Permission } from '@desktop/shared'
-import type { BrowserWindow, WebContentsView } from 'electron'
+import type { BrowserWindow } from 'electron'
 import { shell } from 'electron'
 
 /**
@@ -18,6 +18,14 @@ export function toSessionPermissions(permissions: readonly Permission[]): string
   return permissions
     .map(p => PLATFORM_TO_SESSION[p])
     .filter((v): v is string => Boolean(v))
+}
+
+/** 反查：Chromium session 权限名 → 平台权限（运行时授权推送用），无对应物的返回 undefined */
+export function sessionToPlatformPermission(permission: string): Permission | undefined {
+  const entry = (Object.entries(PLATFORM_TO_SESSION) as [Permission, string][]).find(
+    ([, sessionName]) => sessionName === permission,
+  )
+  return entry?.[0]
 }
 
 /**
@@ -57,10 +65,16 @@ export function applyWebContentsGuards(
 
 /**
  * Web App 容器的导航策略：只允许 manifest 声明的 Origin 内跳转
- * （缺省 = entry.url 的 Origin），外部域名拦截并转交系统浏览器；新窗口一律拒绝。
+ * （缺省 = entry.url 的 Origin），外部域名拦截并转交系统浏览器。
+ * 新窗口策略：目标在允许 Origin 内 → 交给 openPopup 由平台创建受管弹窗；
+ * 其余一律拒绝（外链转系统浏览器）。Shell 页面不挂此策略（永远拒绝弹窗）。
  */
-export function applyWebAppGuards(view: WebContentsView, allowedOrigins: string[]): void {
-  view.webContents.on('will-navigate', (event, url) => {
+export function applyWebAppGuards(
+  webContents: Electron.WebContents,
+  allowedOrigins: string[],
+  openPopup?: (url: string, features?: string) => void,
+): void {
+  webContents.on('will-navigate', (event, url) => {
     if (isAllowedOrigin(url, allowedOrigins))
       return
     event.preventDefault()
@@ -68,7 +82,11 @@ export function applyWebAppGuards(view: WebContentsView, allowedOrigins: string[
       shell.openExternal(url)
   })
 
-  view.webContents.setWindowOpenHandler((details) => {
+  webContents.setWindowOpenHandler((details) => {
+    if (isAllowedOrigin(details.url, allowedOrigins)) {
+      openPopup?.(details.url, details.features)
+      return { action: 'deny' }
+    }
     if (/^https?:\/\//.test(details.url))
       shell.openExternal(details.url)
     return { action: 'deny' }
@@ -77,19 +95,26 @@ export function applyWebAppGuards(view: WebContentsView, allowedOrigins: string[
 
 /**
  * Session 级权限白名单：基础项（复制粘贴）+ 声明（'all' 或数组），其余一律拒绝。
+ * 声明之外但提供 requestApproval 的（Web App 容器），转运行时授权请用户决策；
+ * callback 支持异步调用，决策回来前页面请求挂起。
  * Web App 的 Session 由 WebService 挂 guard，同一 Session 只挂一次。
  */
 export function applySessionPermissionGuards(
   session: Electron.Session,
   allowedPermissions: 'all' | string[] = [],
+  requestApproval?: (wc: Electron.WebContents, permission: string) => Promise<boolean>,
 ): void {
   const isAllowed = (permission: string) =>
     permission === 'clipboard-sanitized-write'
     || allowedPermissions === 'all'
     || (Array.isArray(allowedPermissions) && allowedPermissions.includes(permission))
-  session.setPermissionRequestHandler((_wc, permission, callback) => {
+  session.setPermissionRequestHandler((wc, permission, callback) => {
     if (isAllowed(permission))
       return callback(true)
+    if (requestApproval) {
+      void requestApproval(wc, permission).then(granted => callback(granted))
+      return
+    }
     console.warn(`[security] denied permission request: ${permission}`)
     callback(false)
   })

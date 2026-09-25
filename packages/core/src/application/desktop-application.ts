@@ -1,19 +1,28 @@
+import type { AppSource, DesktopAppManifest } from '@desktop/shared'
 import type { Logger } from '../logger/logger'
+import type { PermissionStoreSchema } from '../permission/permission-service'
 import type { BootstrapOptions } from '../types'
 import process from 'node:process'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow } from 'electron'
+import Store from 'electron-store'
 import { AppRegistry } from '../app/app-registry'
 import { AppService } from '../app/app-service'
+import { loadLocalAppManifests, loadRemoteAppManifests } from '../app/app-source'
+import { AuditService } from '../audit/audit-service'
+import { DownloadService } from '../download/download-service'
 import { EventBus } from '../event/event-bus'
 import { CallerResolver } from '../ipc/caller-context'
 import { registerPlatformIpc } from '../ipc/register'
 import { createRootLogger } from '../logger/logger'
 import { attachSystemLogging } from '../logger/system'
 import { PermissionService } from '../permission/permission-service'
+import { ResilienceService } from '../resilience/resilience'
 import { SessionService } from '../session/session-service'
 import { StorageService } from '../storage/storage-service'
 import { TabService } from '../tab/tab-service'
+import { AsarUpdateService } from '../updater/asar-update-service'
+import { UpdateService } from '../updater/update-service'
 import { WebService } from '../web/web-service'
 import { WindowService } from '../window/window-service'
 
@@ -30,9 +39,15 @@ export class DesktopApplication {
   private sessionService!: SessionService
   private storageService!: StorageService
   private permissionService!: PermissionService
-  private appService!: AppService
-  private webService!: WebService
-  private tabService!: TabService
+  private downloadService!: DownloadService
+  private updateService!: UpdateService
+  private asarUpdateService!: AsarUpdateService
+  private auditService!: AuditService
+  private resilienceService!: ResilienceService
+  /** features.tabs = false 时为空：单应用形态不装配 Tab 体系 */
+  private appService?: AppService
+  private webService?: WebService
+  private tabService?: TabService
   private windowService!: WindowService
 
   constructor(private readonly options: BootstrapOptions) {}
@@ -51,6 +66,8 @@ export class DesktopApplication {
       })
 
       this.windowService.createMainWindow(this.options)
+      // 运行韧性（无人值守场景，默认全关）：主窗口就绪后挂载
+      this.resilienceService.attach(this.options, () => this.windowService.getMainWindow())
 
       app.on('activate', () => {
         // On macOS re-create a window when the dock icon is clicked
@@ -77,9 +94,13 @@ export class DesktopApplication {
       // 日志根作用域跟随启动的 App：com.company.kiosk → kiosk
       scope: this.options.app.id.split('.').pop() ?? 'desktop',
     })
-    // 系统级日志：未捕获异常 / 子进程与渲染进程崩溃 / renderer 控制台
-    attachSystemLogging(this.logger, this.resolver)
+    // 系统级日志：未捕获异常 / 子进程与渲染进程崩溃 / renderer 控制台（崩溃同时上抛事件供审计）
+    attachSystemLogging(this.logger, this.resolver, this.events)
     this.logger.info('desktop application starting', { appId: this.options.app.id })
+
+    // 审计日志：权限决策 / 崩溃 / App 生命周期的 append-only 留痕（与运行日志分离）
+    this.auditService = new AuditService(this.events, this.logger.scope('audit'), app.getPath('userData'))
+    this.auditService.start()
 
     this.sessionService = new SessionService()
     this.storageService = new StorageService()
@@ -87,32 +108,83 @@ export class DesktopApplication {
       this.registry,
       this.events,
       this.logger.scope('permission'),
+      // 运行时权限决策持久化：重启后不再重复询问（平台级存储）
+      new Store<PermissionStoreSchema>({ name: 'platform-permissions' }),
     )
-    this.appService = new AppService(this.registry, this.options, this.events)
     this.windowService = new WindowService(
       this.events,
       this.resolver,
       this.logger.scope('window'),
     )
-    this.webService = new WebService(
-      this.windowService,
+    this.resilienceService = new ResilienceService(this.events, this.logger.scope('resilience'))
+    // 下载管理：App 首次取得 Session 时挂 will-download guard（按 manifest.download 权限放行）
+    this.downloadService = new DownloadService(
       this.sessionService,
-      this.resolver,
-      this.logger.scope('web'),
-    )
-    this.tabService = new TabService(
-      this.registry,
-      this.appService,
-      this.webService,
+      this.permissionService,
       this.events,
-      this.logger.scope('tab'),
+      this.logger.scope('download'),
+    )
+    this.sessionService.onCreated((appId, appSession) => {
+      this.downloadService.attach(appId, appSession)
+    })
+
+    // Tab 体系按形态装配：Kiosk 等单应用形态关掉后不初始化 Tab/App/Web 服务
+    const features = { tabs: true, ...this.options.features }
+    if (features.tabs) {
+      this.appService = new AppService(this.registry, this.options, this.events)
+      this.webService = new WebService(
+        this.windowService,
+        this.sessionService,
+        this.resolver,
+        this.permissionService,
+        this.logger.scope('web'),
+      )
+      this.tabService = new TabService(
+        this.registry,
+        this.appService,
+        this.webService,
+        this.events,
+        this.logger.scope('tab'),
+      )
+    }
+    else {
+      this.logger.info('features.tabs disabled, tab services skipped')
+    }
+
+    // 自动更新（整包 electron-updater）：未配置 updates.url 或 dev 时整体关闭
+    this.updateService = new UpdateService(
+      this.options.updates?.url,
+      this.events,
+      this.logger.scope('update'),
+    )
+    // asar 热更（引导器模式）：清单未配置则关闭；与整包共用 updates.url 解析相对清单地址
+    this.asarUpdateService = new AsarUpdateService(
+      this.options.updates?.asar,
+      this.options.updates?.url,
+      this.events,
+      this.logger.scope('update'),
     )
 
-    // 第一阶段代码注册内置 App（未来扩展为远程配置 / 应用中心）
-    for (const manifest of this.options.apps.manifests ?? []) {
-      this.registry.register(manifest)
-      this.events.emit('app:registered', manifest)
-      this.logger.info(`app registered: ${manifest.id}`)
+    // 多源注册：代码注册内置 App（保底、优先），外部配置文件注册扩展 App。
+    // 冲突以代码注册为准（外部同名 App 跳过并告警），外部配置不能拖垮平台启动
+    const registerApps = (manifests: DesktopAppManifest[], source: AppSource): void => {
+      for (const manifest of manifests) {
+        try {
+          this.registry.register(manifest, source)
+          this.events.emit('app:registered', manifest)
+          this.logger.info(`app registered: ${manifest.id} (from ${source})`)
+        }
+        catch (error) {
+          this.logger.warn(`app skipped: ${manifest.id}`, { source, error: String(error) })
+        }
+      }
+    }
+    registerApps(this.options.apps.manifests ?? [], 'code')
+    registerApps(loadLocalAppManifests(app.getPath('userData'), this.logger), 'apps.json')
+    // 远程源异步拉取：失败不拖垮启动，注册成功后经事件正常流转
+    if (this.options.apps.remoteUrl) {
+      void loadRemoteAppManifests(this.options.apps.remoteUrl, this.logger)
+        .then(manifests => registerApps(manifests, 'remote'))
     }
 
     registerPlatformIpc({
@@ -123,22 +195,46 @@ export class DesktopApplication {
       webService: this.webService,
       storageService: this.storageService,
       permissionService: this.permissionService,
+      updateService: this.options.updates?.url ? this.updateService : undefined,
+      asarService: this.options.updates?.asar ? this.asarUpdateService : undefined,
       resolver: this.resolver,
     })
 
     this.forwardEventsToShell()
+    this.updateService.start()
+    void this.asarUpdateService.start()
   }
 
   /** 平台事件 → Shell 推送桥：Tab 列表全量推，UI 无需逐条 diff */
   private forwardEventsToShell(): void {
     const pushTabs = () => {
-      this.windowService.getMainWindow()?.webContents.send('tabs:updated', this.tabService.list())
+      this.windowService.getMainWindow()?.webContents.send('tabs:updated', this.tabService?.list() ?? [])
     }
     this.events.on('tab:created', pushTabs)
     this.events.on('tab:activated', pushTabs)
-    this.events.on('tab:closed', pushTabs)
+    this.events.on('tab:closed', (tab) => {
+      pushTabs()
+      // App 已关闭，挂起的运行时授权请求失去意义：按拒绝结束，Shell 侧同步移除授权条
+      this.permissionService.cancelForApp(tab.appId)
+    })
     this.events.on('window:maximizedChanged', (maximized) => {
       this.windowService.getMainWindow()?.webContents.send('window:maximizedChanged', maximized)
+    })
+    // 运行时权限请求 → Shell 授权条 UI，用户决策经 permission:respond 回传
+    this.events.on('permission:request', (request) => {
+      this.windowService.getMainWindow()?.webContents.send('permission:request', request)
+    })
+    // 下载任务状态 → Shell 底部横幅
+    this.events.on('download:updated', (tasks) => {
+      this.windowService.getMainWindow()?.webContents.send('download:updated', tasks)
+    })
+    // 更新流程状态 → Shell 底部横幅
+    this.events.on('update:state', (state) => {
+      this.windowService.getMainWindow()?.webContents.send('update:state', state)
+    })
+    // asar 热更状态 → Shell 更新横幅（pending = 重启应用生效）
+    this.events.on('update:asarState', (state) => {
+      this.windowService.getMainWindow()?.webContents.send('update:asarState', state)
     })
   }
 
@@ -146,6 +242,8 @@ export class DesktopApplication {
   private dispose(): void {
     this.webService?.dispose()
     this.storageService?.dispose()
+    this.resilienceService?.dispose()
+    this.auditService?.dispose()
     this.events.clear()
     this.logger?.info('desktop application disposed')
   }

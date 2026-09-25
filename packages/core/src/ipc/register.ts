@@ -5,6 +5,8 @@ import type { AppService } from '../app/app-service'
 import type { PermissionService } from '../permission/permission-service'
 import type { StorageService } from '../storage/storage-service'
 import type { TabService } from '../tab/tab-service'
+import type { AsarUpdateService } from '../updater/asar-update-service'
+import type { UpdateService } from '../updater/update-service'
 import type { WebService } from '../web/web-service'
 import type { CallerResolver } from './caller-context'
 import { DesktopError } from '@desktop/shared'
@@ -15,11 +17,16 @@ import { handle } from './handle'
 export interface PlatformIpcDeps {
   config: DesktopConfig
   registry: AppRegistry
-  appService: AppService
-  tabService: TabService
-  webService: WebService
+  /** features.tabs = false 时为空：Tab 体系整体不启用 */
+  appService?: AppService
+  tabService?: TabService
+  webService?: WebService
   storageService: StorageService
   permissionService: PermissionService
+  /** updates.url 未配置时为空：整包更新通道不注册 */
+  updateService?: UpdateService
+  /** updates.asar 未配置时为空：asar 热更通道不注册 */
+  asarService?: AsarUpdateService
   resolver: CallerResolver
 }
 
@@ -44,27 +51,53 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   handle('app:getManifest', (_e, appId) => deps.registry.get(appId))
   handle('app:getCurrent', e => buildAppContext(deps.resolver.resolve(e.sender), deps))
 
-  // ---- Tabs ----
-  handle('tabs:list', () => deps.tabService.list())
-  handle('tabs:open', (_e, options) => deps.tabService.open(options))
-  handle('tabs:close', (_e, tabId) => deps.tabService.close(tabId))
-  handle('tabs:activate', (_e, tabId) => deps.tabService.activate(tabId))
-  handle('tabs:reload', (_e, tabId) => deps.tabService.reload(tabId))
-  // 容器区域只允许 Shell 声明，Web App 无权改 Shell 布局
-  handle('tabs:setWorkArea', (e, rect) => {
-    assertShell(deps.resolver.resolve(e.sender))
-    deps.webService.setWorkArea(rect)
-  })
+  // ---- Tabs：仅在 features.tabs 启用时注册（单应用形态不暴露 Tab 通道） ----
+  if (deps.tabService && deps.webService) {
+    const { tabService, webService } = deps
+    handle('tabs:list', () => tabService.list())
+    handle('tabs:open', (_e, options) => tabService.open(options))
+    handle('tabs:close', (_e, tabId) => tabService.close(tabId))
+    handle('tabs:activate', (_e, tabId) => tabService.activate(tabId))
+    handle('tabs:reload', (_e, tabId) => tabService.reload(tabId))
+    // 容器区域只允许 Shell 声明，Web App 无权改 Shell 布局
+    handle('tabs:setWorkArea', (e, rect) => {
+      assertShell(deps.resolver.resolve(e.sender))
+      webService.setWorkArea(rect)
+    })
+  }
 
   // ---- Permission：仅用于 UI 展示，实际授权以 Main 的 assert 为准 ----
   handle('permission:check', (e, permission) =>
     deps.permissionService.check(deps.resolver.resolve(e.sender), permission))
+  handle('permission:list', (_e, appId) => deps.permissionService.listPermissionStates(appId))
+  // 决策回传是 Shell 的职责：只有 Shell 用户能对运行时授权表态
+  handle('permission:respond', (e, requestId, granted) => {
+    assertShell(deps.resolver.resolve(e.sender))
+    deps.permissionService.respond(requestId, granted)
+  })
 
   // ---- Storage：解析身份 + 校验 storage 权限后按 App 隔离读写 ----
   handle('storage:get', (e, key) => deps.storageService.get(authorized(deps, e.sender), key))
   handle('storage:set', (e, key, value) =>
     deps.storageService.set(authorized(deps, e.sender), key, value))
   handle('storage:remove', (e, key) => deps.storageService.remove(authorized(deps, e.sender), key))
+  handle('storage:clear', e => deps.storageService.clear(authorized(deps, e.sender)))
+
+  // ---- Update：任一更新方式配置即注册；install 为统一入口（asar pending 优先） ----
+  const { updateService, asarService } = deps
+  if (updateService || asarService) {
+    handle('update:check', () => {
+      void asarService?.check()
+      updateService?.check()
+    })
+    handle('update:install', () => {
+      if (asarService?.hasPending()) {
+        asarService.install()
+        return
+      }
+      updateService?.install()
+    })
+  }
 }
 
 /** Shell 专属通道的身份关卡 */
@@ -102,7 +135,7 @@ function buildAppContext(context: CallerContext, deps: PlatformIpcDeps): AppCont
       createdAt: Date.now(),
     }
   }
-  const instance = deps.appService.get(context.instanceId)
+  const instance = deps.appService?.get(context.instanceId)
   return {
     appId: manifest.id,
     instanceId: context.instanceId,

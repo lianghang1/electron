@@ -19,9 +19,14 @@ const channels = {
   tabsReload: 'tabs:reload',
   tabsSetWorkArea: 'tabs:setWorkArea',
   permissionCheck: 'permission:check',
+  permissionRespond: 'permission:respond',
+  permissionList: 'permission:list',
   storageGet: 'storage:get',
   storageSet: 'storage:set',
   storageRemove: 'storage:remove',
+  storageClear: 'storage:clear',
+  updateCheck: 'update:check',
+  updateInstall: 'update:install',
 } as const satisfies Record<string, keyof DesktopIpc>
 
 // 最小平台桥：只暴露 DesktopApi 声明的方法，不暴露裸 ipcRenderer。
@@ -49,11 +54,18 @@ const desktop: DesktopApi = {
   },
   permission: {
     check: permission => ipcRenderer.invoke(channels.permissionCheck, permission),
+    respond: (requestId, granted) => ipcRenderer.invoke(channels.permissionRespond, requestId, granted),
+    list: appId => ipcRenderer.invoke(channels.permissionList, appId),
   },
   storage: {
     get: key => ipcRenderer.invoke(channels.storageGet, key),
     set: (key, value) => ipcRenderer.invoke(channels.storageSet, key, value),
     remove: key => ipcRenderer.invoke(channels.storageRemove, key),
+    clear: () => ipcRenderer.invoke(channels.storageClear),
+  },
+  update: {
+    check: () => ipcRenderer.invoke(channels.updateCheck),
+    install: () => ipcRenderer.invoke(channels.updateInstall),
   },
   events: {
     on: (channel, listener) => {

@@ -66,10 +66,15 @@
       <button class="ghost" id="log">输出 console 日志</button>
       <button class="ghost" id="error">输出 console 异常</button>
       <button class="ghost" id="clipboard">读取剪贴板</button>
+      <button class="ghost" id="notify">请求通知权限</button>
     </div>
     <div class="row" style="margin-top: 8px">
       <span class="k">剪贴板（OA 未声明 clipboard.read → 应拒绝）</span>
       <span class="v" id="clip-result">-</span>
+    </div>
+    <div class="row" style="margin-top: 8px">
+      <span class="k">通知（OA 未声明 notification → 应弹出授权条）</span>
+      <span class="v" id="notify-result">-</span>
     </div>
   </div>
 
@@ -109,6 +114,18 @@
     catch (err) {
       el.textContent = `被拒绝: ${err.name}`
       console.error(`[oa] clipboard.readText 被拒绝:`, err)
+    }
+  }
+  document.getElementById('notify').onclick = async () => {
+    const el = document.getElementById('notify-result')
+    try {
+      const result = await Notification.requestPermission()
+      el.textContent = `结果: ${result}`
+      console.log(`[oa] notification permission:`, result)
+    }
+    catch (err) {
+      el.textContent = `失败: ${err.name}`
+      console.error(`[oa] notification permission failed:`, err)
     }
   }
 

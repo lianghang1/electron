@@ -29,6 +29,9 @@ export function createElectronViteConfig(options: CreateElectronViteConfigOption
       build: {
         rollupOptions: {
           input: { index: resolve(cwd, mainEntry) },
+          // Electron 内置模块不在 electron-vite 默认 external 列表里，显式声明
+          // （运行时由 Electron 提供，删真实 .asar 文件必须用它绕过 asar fs 补丁）
+          external: ['original-fs'],
         },
       },
     },

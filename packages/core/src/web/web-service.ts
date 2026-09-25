@@ -1,16 +1,35 @@
 import type { CallerContext, DesktopAppManifest, WorkAreaRect } from '@desktop/shared'
 import type { CallerResolver } from '../ipc/caller-context'
 import type { Logger } from '../logger/logger'
+import type { PermissionService } from '../permission/permission-service'
 import type { SessionService } from '../session/session-service'
 import type { WindowService } from '../window/window-service'
-import { WebContentsView } from 'electron'
-import { applySessionPermissionGuards, applyWebAppGuards, toSessionPermissions } from '../window/security'
+import { BrowserWindow, WebContentsView } from 'electron'
+import {
+  applySessionPermissionGuards,
+  applyWebAppGuards,
+  sessionToPlatformPermission,
+  toSessionPermissions,
+} from '../window/security'
 
 /** Web App 运行时：一个 Tab 对应一个 WebContentsView（第一阶段 1:1） */
 export interface WebAppRuntime {
   runtimeId: string
   view: WebContentsView
 }
+
+/** 平台受管弹窗的 webPreferences 安全基线（与 Web 容器一致，写死不配置） */
+const SECURE_WEB_PREFERENCES = {
+  sandbox: true,
+  contextIsolation: true,
+  webSecurity: true,
+  nodeIntegration: false,
+  nodeIntegrationInWorker: false,
+  nodeIntegrationInSubFrames: false,
+  webviewTag: false,
+  allowRunningInsecureContent: false,
+  experimentalFeatures: false,
+} as const
 
 /**
  * Web App 容器：负责 WebContentsView 的创建 / 加载 / 显示 / 销毁。
@@ -28,6 +47,7 @@ export class WebService {
     private readonly windowService: WindowService,
     private readonly sessionService: SessionService,
     private readonly resolver: CallerResolver,
+    private readonly permissionService: PermissionService,
     private readonly logger: Logger,
   ) {}
 
@@ -41,15 +61,7 @@ export class WebService {
       webPreferences: {
         session: this.sessionService.getSession(context.appId),
         // 与主窗口一致的安全基线：写死不配置；Web 容器不注入 preload
-        sandbox: true,
-        contextIsolation: true,
-        webSecurity: true,
-        nodeIntegration: false,
-        nodeIntegrationInWorker: false,
-        nodeIntegrationInSubFrames: false,
-        webviewTag: false,
-        allowRunningInsecureContent: false,
-        experimentalFeatures: false,
+        ...SECURE_WEB_PREFERENCES,
       },
     })
 
@@ -145,14 +157,91 @@ export class WebService {
   /** 导航策略按 manifest 限定；Electron 权限挂在 App Session 上（默认全拒） */
   private applyGuards(appId: string, view: WebContentsView, manifest: DesktopAppManifest): void {
     const defaultOrigin = new URL(manifest.entry.url).origin
-    applyWebAppGuards(view, manifest.security?.allowedOrigins ?? [defaultOrigin])
+    applyWebAppGuards(
+      view.webContents,
+      manifest.security?.allowedOrigins ?? [defaultOrigin],
+      (url, features) => this.createPopupWindow(view.webContents, manifest, url, features),
+    )
 
     const appSession = view.webContents.session
     if (this.guardedSessions.has(appSession))
       return
     this.guardedSessions.add(appSession)
-    // session 按 App 隔离（persist:app-<appId>），guard 挂 manifest 声明的权限
-    applySessionPermissionGuards(appSession, toSessionPermissions(manifest.permissions ?? []))
+    // session 按 App 隔离（persist:app-<appId>）：声明权限直接放行，
+    // 未声明权限走运行时授权（推送 Shell 请用户决策）
+    applySessionPermissionGuards(appSession, toSessionPermissions(manifest.permissions ?? []), (wc, sessionPermission) => {
+      const permission = sessionToPlatformPermission(sessionPermission)
+      if (!permission)
+        return Promise.resolve(false)
+      return this.permissionService.requestRuntime(this.resolver.resolve(wc), permission)
+    })
     this.logger.debug('session permission guards applied', { appId })
   }
+
+  /**
+   * 平台受管弹窗：window.open 的目标在允许 Origin 内时由平台创建。
+   * 安全基线与 Web 容器一致；Session 继承父 App（登录态延续）；
+   * 身份继承父容器（appId/instanceId），契约参数永不携带身份。
+   * 弹窗自身的导航 / 再弹窗走同一套策略（递归受管）。
+   */
+  private createPopupWindow(
+    opener: Electron.WebContents,
+    manifest: DesktopAppManifest,
+    url: string,
+    features?: string,
+  ): void {
+    const parent = this.windowService.getMainWindow()
+    if (!parent) {
+      this.logger.warn('popup dropped: main window is not ready', { url })
+      return
+    }
+    const parentContext = this.resolver.resolve(opener)
+    const allowedOrigins = manifest.security?.allowedOrigins ?? [new URL(manifest.entry.url).origin]
+    const { width, height } = parseWindowFeatures(features)
+
+    const popup = new BrowserWindow({
+      width,
+      height,
+      parent,
+      autoHideMenuBar: true,
+      title: manifest.name,
+      webPreferences: {
+        session: this.sessionService.getSession(parentContext.appId),
+        ...SECURE_WEB_PREFERENCES,
+      },
+    })
+    popup.setMenuBarVisibility(false)
+
+    // 弹窗与父容器同一套导航 / 弹窗策略：Origin 内可再开受管弹窗
+    applyWebAppGuards(popup.webContents, allowedOrigins, (childUrl, childFeatures) =>
+      this.createPopupWindow(popup.webContents, manifest, childUrl, childFeatures))
+
+    this.resolver.register(popup.webContents, {
+      appId: parentContext.appId,
+      instanceId: parentContext.instanceId,
+    })
+    popup.on('closed', () => {
+      this.resolver.unregister(popup.webContents)
+      this.logger.debug('popup closed', { appId: parentContext.appId, url })
+    })
+
+    void popup.loadURL(url).catch((error) => {
+      this.logger.error(`failed to load popup url: ${url}`, { error: String(error) })
+    })
+    this.logger.info('popup window created', { appId: parentContext.appId, url })
+  }
+}
+
+/** window.open 的 features 串（width=600,height=400）→ 尺寸，缺省 900x600 */
+function parseWindowFeatures(features?: string): { width: number, height: number } {
+  const result = { width: 900, height: 600 }
+  for (const part of features?.split(',') ?? []) {
+    const [key, raw] = part.split('=')
+    const value = Number.parseInt(raw ?? '', 10)
+    if (key === 'width' && Number.isFinite(value))
+      result.width = value
+    if (key === 'height' && Number.isFinite(value))
+      result.height = value
+  }
+  return result
 }

@@ -20,6 +20,16 @@ bootstrap({
   apps: {
     allowThirdParty: false,
   },
+  // 单应用形态：不装配 Tab 体系（Tab/App/Web 服务不实例化，tabs:* 通道不注册）
+  features: {
+    tabs: false,
+  },
+  // 无人值守韧性：崩溃自恢复 + 开机自启 + 防退出（有人值守形态不配置即全关）
+  resilience: {
+    crashReload: true,
+    autoLaunch: true,
+    exitGuard: true,
+  },
   icon,
   browserWindowOptions: {
     fullscreen: true,

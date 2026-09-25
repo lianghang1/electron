@@ -1,4 +1,5 @@
 import type { DesktopAppManifest } from '@desktop/shared'
+import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import crmUrl from '../resources/apps/crm.html?asset'
 import oaUrl from '../resources/apps/oa.html?asset'
@@ -16,7 +17,7 @@ const builtinApps: DesktopAppManifest[] = [
     version: '1.0.0',
     type: 'internal',
     entry: { type: 'web', url: crmUrl },
-    permissions: ['storage', 'clipboard.read'],
+    permissions: ['storage', 'clipboard.read', 'download'],
   },
   {
     id: 'oa',
@@ -40,9 +41,17 @@ bootstrap({
     minWidth: 960,
     minHeight: 640,
   },
+  // 飞书式沉浸顶栏：隐藏系统标题栏（自绘窗口控制是唯一入口），backgroundColor 防启动闪白
+  browserWindowOptions: { titleBarStyle: 'hidden', backgroundColor: '#f6f7f9' },
   apps: {
     allowThirdParty: false,
     manifests: builtinApps,
+    // 远程源联调开关：DESKTOP_APPS_REMOTE 指向返回 DesktopAppManifest 数组的 URL（生产部署改成应用中心地址）
+    ...(process.env.DESKTOP_APPS_REMOTE ? { remoteUrl: process.env.DESKTOP_APPS_REMOTE } : {}),
   },
+  // 更新体系联调开关：设置 DESKTOP_UPDATE_FEED 环境变量后启用（生产部署改成真实更新服务器地址）
+  updates: process.env.DESKTOP_UPDATE_FEED
+    ? { url: process.env.DESKTOP_UPDATE_FEED, asar: 'asar-manifest.json' }
+    : undefined,
   icon,
 })

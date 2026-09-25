@@ -1,9 +1,13 @@
 import type {
   AppInstance,
+  AsarUpdateState,
   CallerContext,
   DesktopAppManifest,
   DesktopTab,
+  DownloadTask,
   Permission,
+  PermissionRequest,
+  UpdateState,
 } from '@desktop/shared'
 
 /** 平台内部事件：Service 之间解耦通信，仅 Main 进程内使用，不直接跨 IPC */
@@ -15,7 +19,13 @@ export interface PlatformEventMap {
   'tab:activated': [DesktopTab]
   'tab:closed': [DesktopTab]
   'permission:denied': [{ context: CallerContext, permission: Permission }]
+  'permission:request': [PermissionRequest]
+  'permission:decided': [{ appId: string, permission: Permission, granted: boolean }]
+  'renderer:crashed': [{ appId: string, reason: string }]
   'window:maximizedChanged': [boolean]
+  'download:updated': [DownloadTask[]]
+  'update:state': [UpdateState]
+  'update:asarState': [AsarUpdateState]
 }
 
 type Handler = (...args: unknown[]) => void

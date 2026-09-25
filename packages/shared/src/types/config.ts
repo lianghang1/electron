@@ -28,10 +28,45 @@ export interface DesktopConfig {
   apps: {
     /** 是否允许接入第三方 App；第一阶段平台只跑 internal App */
     allowThirdParty: boolean
-    /**
-     * 内置 App 清单（第一阶段代码注册）。
-     * 未来 AppRegistry 可从这里扩展到远程配置中心 / 企业应用中心 / 应用市场。
-     */
+    /** 内置 App 清单（代码注册，保底、优先） */
     manifests?: DesktopAppManifest[]
+    /**
+     * 远程 App 清单源（HTTP URL，返回 DesktopAppManifest 数组）。
+     * 异步拉取、失败静默跳过，与代码注册 / apps.json 共用冲突策略（代码注册优先）。
+     */
+    remoteUrl?: string
+  }
+  /** 平台能力开关：单应用形态（如 Kiosk）可关闭 Tab 体系，避免初始化无用服务 */
+  features?: {
+    /** Tab 多应用承载体系（默认 true）。关闭后 tabs:* IPC 通道不注册、Tab/App/Web 服务不实例化 */
+    tabs?: boolean
+  }
+  /** 自动更新：不配置 url 则更新体系整体关闭 */
+  updates?: {
+    /** 更新服务器地址（latest.yml 所在目录，整包更新 electron-updater 用） */
+    url: string
+    /**
+     * asar 热更清单地址（相对 url 解析，也可绝对地址），不配置则关闭 asar 热更。
+     * 清单协议见 UpdateManifest；下载校验通过后写 pending 标记，重启应用由引导器完成替换。
+     */
+    asar?: string
+  }
+  /**
+   * 运行韧性：自助机（Kiosk）等无人值守场景的平台级行为，默认全关。
+   * Desktop 等有人值守形态不需要配置。
+   */
+  resilience?: {
+    /**
+     * 渲染进程崩溃自动重载：指数退避（1s 起步，上限 30s），
+     * 60s 内连续崩溃超过 5 次熔断停止重载并告警，防崩溃死循环
+     */
+    crashReload?: boolean
+    /** 开机自启（系统登录项）：仅生产环境生效，dev 挂的是 electron.exe 无意义 */
+    autoLaunch?: boolean
+    /**
+     * 防退出：拦截用户发起的窗口关闭（Alt+F4 等）；app.quit()（更新安装、代码退出）不受影响。
+     * 任务管理器结束进程是自助机部署的最后兜底
+     */
+    exitGuard?: boolean
   }
 }

@@ -2,6 +2,8 @@ appId: com.company.desktop
 productName: Desktop
 directories:
   buildResources: build
+# asar 热更引导器结构：app.asar → app.core.asar（真实代码），app.asar 重写为 KB 级引导器
+afterPack: scripts/after-pack.cjs
 files:
   - '!**/.vscode/*'
   - '!src/*'

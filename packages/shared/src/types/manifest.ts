@@ -20,3 +20,12 @@ export interface DesktopAppManifest {
   permissions?: Permission[]
   security?: AppSecurityPolicy
 }
+
+/** App 注册来源：代码内置 / 本地 apps.json / 远程应用中心 */
+export type AppSource = 'code' | 'apps.json' | 'remote'
+
+/** 注册表条目：App 定义 + 来源（应用中心 UI 展示用） */
+export interface RegisteredApp {
+  manifest: DesktopAppManifest
+  source: AppSource
+}

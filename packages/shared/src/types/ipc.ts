@@ -1,7 +1,9 @@
 import type { AppContext } from './context'
-import type { DesktopAppManifest } from './manifest'
-import type { Permission } from './permission'
+import type { DownloadTask } from './download'
+import type { DesktopAppManifest, RegisteredApp } from './manifest'
+import type { AppPermissionState, Permission, PermissionRequest } from './permission'
 import type { DesktopTab, OpenTabOptions, WorkAreaRect } from './tab'
+import type { AsarUpdateState, UpdateState } from './update'
 
 /**
  * 平台 IPC 契约：Main / Preload / Renderer 三端共享的唯一类型来源。
@@ -26,7 +28,7 @@ export type DesktopIpc = {
   'window:close': () => void
 
   // ---- App：应用定义与调用者上下文 ----
-  'app:list': () => DesktopAppManifest[]
+  'app:list': () => RegisteredApp[]
   'app:getManifest': (appId: string) => DesktopAppManifest | undefined
   'app:getCurrent': () => AppContext
 
@@ -40,17 +42,36 @@ export type DesktopIpc = {
 
   // ---- Permission：仅用于 UI 展示，授权以 Main 为准 ----
   'permission:check': (permission: Permission) => boolean
+  /** 用户对运行时权限请求的决策回传（仅 Shell 可调用） */
+  'permission:respond': (requestId: string, granted: boolean) => void
+  /** App 权限状态列表（声明 + 运行时决策合成视图，决策已平台级持久化） */
+  'permission:list': (appId: string) => AppPermissionState[]
 
   // ---- Storage：按调用者 App 隔离，值统一走 unknown ----
   'storage:get': (key: string) => unknown
   'storage:set': (key: string, value: unknown) => void
   'storage:remove': (key: string) => void
+  'storage:clear': () => void
+
+  // ---- Update ----
+  /** 触发检查更新（dev 下为空操作） */
+  'update:check': () => void
+  /** 重启应用以生效更新：有 asar 热更 pending → 重启替换；有整包已下载 → 安装器重启 */
+  'update:install': () => void
 
   // ---- Main → Renderer 推送 ----
   /** Tab 列表任何变化（创建 / 激活 / 关闭）后推送全量列表，UI 直接渲染 */
   'tabs:updated': [DesktopTab[]]
   /** 窗口最大化状态变化（含标题栏双击等系统触发的场景） */
   'window:maximizedChanged': [boolean]
+  /** App 请求未声明权限，请用户决策（允许 / 拒绝，会话内记忆） */
+  'permission:request': [PermissionRequest]
+  /** 下载任务列表变化（开始 / 进度 / 完成 / 中断）后推送全量列表 */
+  'download:updated': [DownloadTask[]]
+  /** 更新流程状态变化 */
+  'update:state': [UpdateState]
+  /** asar 热更状态变化（pending = 重启应用生效） */
+  'update:asarState': [AsarUpdateState]
 }
 
 /** 契约中 invoke 形态的 channel 子集：Main 侧 handle 包装 / Preload invoke 只看这里 */

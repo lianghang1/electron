@@ -15,6 +15,7 @@ out
 unpackage/release
 packages/*/lib/
 .univa
+.eb-cache
 
 # Editor directories and files
 .idea
