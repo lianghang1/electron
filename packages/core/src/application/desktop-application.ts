@@ -88,16 +88,35 @@ export class DesktopApplication {
     })
   }
 
+  /**
+   * 组装序列（线性可读，各阶段职责单一）：
+   * 日志 → 服务 → Tab 体系 → 更新 → App 注册 → IPC 与 Shell 桥 → 启动检查
+   */
   private setup(): void {
+    this.setupLogging()
+    this.setupServices()
+    this.setupTabServices()
+    this.setupUpdaters()
+    this.setupAppRegistry()
+    this.setupIpcAndShellBridge()
+
+    this.updateService.start()
+    void this.asarUpdateService.start()
+  }
+
+  /** 日志根 + 系统级日志（未捕获异常 / 进程崩溃 / renderer 控制台桥接） */
+  private setupLogging(): void {
     this.logger = createRootLogger({
       debug: is.dev,
       // 日志根作用域跟随启动的 App：com.company.kiosk → kiosk
       scope: this.options.app.id.split('.').pop() ?? 'desktop',
     })
-    // 系统级日志：未捕获异常 / 子进程与渲染进程崩溃 / renderer 控制台（崩溃同时上抛事件供审计）
     attachSystemLogging(this.logger, this.resolver, this.events)
     this.logger.info('desktop application starting', { appId: this.options.app.id })
+  }
 
+  /** 形态无关的基础服务：审计 / 会话 / 存储 / 权限 / 窗口 / 韧性 / 下载 */
+  private setupServices(): void {
     // 审计日志：权限决策 / 崩溃 / App 生命周期的 append-only 留痕（与运行日志分离）
     this.auditService = new AuditService(this.events, this.logger.scope('audit'), app.getPath('userData'))
     this.auditService.start()
@@ -127,45 +146,49 @@ export class DesktopApplication {
     this.sessionService.onCreated((appId, appSession) => {
       this.downloadService.attach(appId, appSession)
     })
+  }
 
-    // Tab 体系按形态装配：Kiosk 等单应用形态关掉后不初始化 Tab/App/Web 服务
+  /** Tab 体系按形态装配：Kiosk 等单应用形态关掉后不初始化 Tab/App/Web 服务 */
+  private setupTabServices(): void {
     const features = { tabs: true, ...this.options.features }
-    if (features.tabs) {
-      this.appService = new AppService(this.registry, this.options, this.events)
-      this.webService = new WebService(
-        this.windowService,
-        this.sessionService,
-        this.resolver,
-        this.permissionService,
-        this.logger.scope('web'),
-      )
-      this.tabService = new TabService(
-        this.registry,
-        this.appService,
-        this.webService,
-        this.events,
-        this.logger.scope('tab'),
-      )
-    }
-    else {
+    if (!features.tabs) {
       this.logger.info('features.tabs disabled, tab services skipped')
+      return
     }
+    this.appService = new AppService(this.registry, this.options, this.events)
+    this.webService = new WebService(
+      this.windowService,
+      this.sessionService,
+      this.resolver,
+      this.permissionService,
+      this.logger.scope('web'),
+    )
+    this.tabService = new TabService(
+      this.registry,
+      this.appService,
+      this.webService,
+      this.events,
+      this.logger.scope('tab'),
+    )
+  }
 
-    // 自动更新（整包 electron-updater）：未配置 updates.url 或 dev 时整体关闭
+  /** 双通道更新：整包 electron-updater + asar 热更（引导器模式），未配置即各自关闭 */
+  private setupUpdaters(): void {
     this.updateService = new UpdateService(
       this.options.updates?.url,
       this.events,
       this.logger.scope('update'),
     )
-    // asar 热更（引导器模式）：清单未配置则关闭；与整包共用 updates.url 解析相对清单地址
     this.asarUpdateService = new AsarUpdateService(
       this.options.updates?.asar,
       this.options.updates?.url,
       this.events,
       this.logger.scope('update'),
     )
+  }
 
-    // 多源注册：代码注册内置 App（保底、优先），外部配置文件注册扩展 App。
+  /** 多源注册：代码注册内置 App（保底、优先），外部配置文件注册扩展 App */
+  private setupAppRegistry(): void {
     // 冲突以代码注册为准（外部同名 App 跳过并告警），外部配置不能拖垮平台启动
     const registerApps = (manifests: DesktopAppManifest[], source: AppSource): void => {
       for (const manifest of manifests) {
@@ -186,7 +209,10 @@ export class DesktopApplication {
       void loadRemoteAppManifests(this.options.apps.remoteUrl, this.logger)
         .then(manifests => registerApps(manifests, 'remote'))
     }
+  }
 
+  /** IPC 通道注册 + 平台事件 → Shell 推送桥 */
+  private setupIpcAndShellBridge(): void {
     registerPlatformIpc({
       config: this.options,
       registry: this.registry,
@@ -199,10 +225,7 @@ export class DesktopApplication {
       asarService: this.options.updates?.asar ? this.asarUpdateService : undefined,
       resolver: this.resolver,
     })
-
     this.forwardEventsToShell()
-    this.updateService.start()
-    void this.asarUpdateService.start()
   }
 
   /** 平台事件 → Shell 推送桥：Tab 列表全量推，UI 无需逐条 diff */

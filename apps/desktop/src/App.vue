@@ -5,7 +5,7 @@ import AppCenter from './components/AppCenter.vue'
 import AppLauncher from './components/AppLauncher.vue'
 import DownloadsBar from './components/DownloadsBar.vue'
 import PermissionRequests from './components/PermissionRequests.vue'
-import TabBar from './components/TabBar.vue'
+import TopBar from './components/TopBar.vue'
 import UpdateBar from './components/UpdateBar.vue'
 import { useApps } from './composables/use-apps'
 import { useTabs } from './composables/use-tabs'
@@ -85,7 +85,7 @@ onBeforeUnmount(() => {
         />
       </Transition>
       <main class="dt-main">
-        <TabBar
+        <TopBar
           :tabs="tabs"
           :maximized="maximized"
           :app-center-open="appCenterOpen"

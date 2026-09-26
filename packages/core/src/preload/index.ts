@@ -27,6 +27,15 @@ const channels = {
   storageClear: 'storage:clear',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
+  deviceIdcardRead: 'device:idcard:read',
+  devicePrinterPrint: 'device:printer:print',
+  hospitalConfigGet: 'hospital:config:get',
+  fhConfigGet: 'fh:config:get',
+  fhOrderQuery: 'fh:order:query',
+  fhPayCreate: 'fh:pay:create',
+  fhPayStatus: 'fh:pay:status',
+  fhInvoiceList: 'fh:invoice:list',
+  fhInvoiceIssue: 'fh:invoice:issue',
 } as const satisfies Record<string, keyof DesktopIpc>
 
 // 最小平台桥：只暴露 DesktopApi 声明的方法，不暴露裸 ipcRenderer。
@@ -66,6 +75,21 @@ const desktop: DesktopApi = {
   update: {
     check: () => ipcRenderer.invoke(channels.updateCheck),
     install: () => ipcRenderer.invoke(channels.updateInstall),
+  },
+  device: {
+    readIdCard: () => ipcRenderer.invoke(channels.deviceIdcardRead),
+    print: ticket => ipcRenderer.invoke(channels.devicePrinterPrint, ticket),
+  },
+  hospital: {
+    getConfig: () => ipcRenderer.invoke(channels.hospitalConfigGet),
+  },
+  funeral: {
+    getConfig: () => ipcRenderer.invoke(channels.fhConfigGet),
+    queryOrders: query => ipcRenderer.invoke(channels.fhOrderQuery, query),
+    createPay: orderNo => ipcRenderer.invoke(channels.fhPayCreate, orderNo),
+    payStatus: orderNo => ipcRenderer.invoke(channels.fhPayStatus, orderNo),
+    listInvoices: query => ipcRenderer.invoke(channels.fhInvoiceList, query),
+    issueInvoice: input => ipcRenderer.invoke(channels.fhInvoiceIssue, input),
   },
   events: {
     on: (channel, listener) => {

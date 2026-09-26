@@ -1,5 +1,8 @@
 import type { AppContext } from './context'
+import type { DeviceIdCard, DevicePrintTicket } from './device'
 import type { DownloadTask } from './download'
+import type { FhBusinessConfig, FhInvoice, FhInvoiceTitle, FhOrder, FhPaySession, FhPayStatus, FhQuery } from './funeral'
+import type { HospitalBusinessConfig } from './hospital'
 import type { DesktopAppManifest, RegisteredApp } from './manifest'
 import type { AppPermissionState, Permission, PermissionRequest } from './permission'
 import type { DesktopTab, OpenTabOptions, WorkAreaRect } from './tab'
@@ -58,6 +61,21 @@ export type DesktopIpc = {
   'update:check': () => void
   /** 重启应用以生效更新：有 asar 热更 pending → 重启替换；有整包已下载 → 安装器重启 */
   'update:install': () => void
+
+  // ---- 通用外设通道（读卡器/打印机，各 Kiosk App 复用，handler 在 app 侧注册） ----
+  'device:idcard:read': () => DeviceIdCard | null
+  'device:printer:print': (ticket: DevicePrintTicket) => void
+
+  // ---- App 自有业务通道（kiosk/hospital 等单应用形态，handler 在 app 侧注册） ----
+  'hospital:config:get': () => HospitalBusinessConfig
+
+  // ---- 殡仪馆自助终端业务通道（apps/funeral，handler 在 app 侧注册） ----
+  'fh:config:get': () => FhBusinessConfig
+  'fh:order:query': (query: FhQuery) => FhOrder[]
+  'fh:pay:create': (orderNo: string) => FhPaySession
+  'fh:pay:status': (orderNo: string) => FhPayStatus
+  'fh:invoice:list': (query: FhQuery) => FhInvoice[]
+  'fh:invoice:issue': (input: { orderNo: string, title: FhInvoiceTitle }) => FhInvoice
 
   // ---- Main → Renderer 推送 ----
   /** Tab 列表任何变化（创建 / 激活 / 关闭）后推送全量列表，UI 直接渲染 */

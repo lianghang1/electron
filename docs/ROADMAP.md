@@ -50,6 +50,8 @@
 | 12 | 应用中心远程源 | ✅ | apps.remoteUrl 异步拉取 DesktopAppManifest 数组（超时 10s、失败静默跳过不拖垮启动），结构校验与本地源同一标准，代码注册优先；本地服务器联调通过 |
 | 13 | 应用中心 UI | ✅ | Shell 左侧推开式面板（flex 成员让位，Web 容器经 ResizeObserver 自动跟随）：App 卡片（名称/版本/来源 内置·本地·远程/类型）、运行状态点（tabs:updated 联动）、点击打开（防重复）、卡片展开权限详情（permission.list 声明+授权合成视图）；配套 app:list 契约升级为 RegisteredApp（manifest + source），AppRegistry 记录注册来源 |
 | 14 | Shell UI 视觉精修（飞书感） | ✅ | titleBarStyle: hidden 去掉系统标题栏（自绘窗口控制唯一入口，backgroundColor 防闪白）；标题栏与 TabBar 合并 40px 沉浸顶栏（品牌+应用中心入口 / Tab / 窗口控制三段式，整栏 -webkit-app-region: drag 拖拽区、控件 no-drag，顺带修复整窗不可拖动）；左侧栏 168px 文字列表 → 68px 飞书式图标导航（图标上文字下，激活项随 Tab 蓝色高亮）；主色统一飞书蓝 #3370ff（横幅/按钮/进度条/图标方块），hover 灰 #f2f3f5 |
+| 15 | 医院自助终端（apps/hospital） | ✅ 骨架 | Kiosk 形态第二个落地应用（dev:hospital / build:hospital）：业务页（挂号/报告打印/导诊演示级，mock 已标替换位）+ 扫码枪 HID 键盘流监听 + 打印机/读卡器 mock 通道 + userData/config.json 业务配置覆盖；框架侧唯一改动 = core 导出 handle 原语（App 自有业务通道注册），契约 hospital:* 段扩展 preload/renderer 自动获得。方案与进度见 docs/hospital-kiosk-plan.md |
+| 16 | 殡仪馆自助终端（apps/funeral） | ✅ 骨架 | 真实业务项目（dev:funeral / build:funeral），照 hospital 模式。业务闭环演示级：业务缴费（扫码/读卡/手动输身份证查询业务单 → qrcode 真二维码 → 轮询支付状态 mock 15s 成功 → 打印凭条）、发票服务（待开票/已开票双 tab → 个人/企业抬头表单 → 开票 → 打印）、服务介绍/政策指引静态页；外设通道平台化：hospital 的 printer/idcard 升级为通用 device:* 段（读卡器/打印机跨 Kiosk App 复用），fh:* 业务段独立；触屏数字键盘 NumPad（18 位身份证，X 仅末位校验）；素雅庄重风（暖白 #f7f6f3 + 墨青 #3a4a5a），fk-/fp-/fi- 前缀；真实接入位均标注（业务系统/支付下单/发票平台/中文软键盘） |
 
 ### 打包备注（Windows）
 
