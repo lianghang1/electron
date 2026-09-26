@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import type { DevicePrintTicket, FhInvoice, FhInvoiceTitle, FhOrder, FhQuery } from '@desktop/shared'
+import type { DevicePrintTicket } from '@desktop/shared'
+import type { FhInvoice, FhInvoiceTitle, FhOrder, FhQuery } from '../types/funeral'
 import { computed, ref } from 'vue'
+import { fh } from '../api/fh'
 import { useScanner } from '../composables/use-scanner'
 import NumPad from './NumPad.vue'
 
@@ -56,8 +58,8 @@ function onNumpadConfirm(idNumber: string): void {
 
 async function identify(query: FhQuery): Promise<void> {
   const [orderList, invoiceList] = await Promise.all([
-    window.desktop.funeral.queryOrders(query),
-    window.desktop.funeral.listInvoices(query),
+    fh.queryOrders(query),
+    fh.listInvoices(query),
   ])
   if (orderList.length === 0 && invoiceList.length === 0) {
     emptyTip.value = '该凭据下暂无业务记录，请核对后重试或到服务台处理'
@@ -103,7 +105,7 @@ async function submit(): Promise<void> {
       ...(titleType.value === 'company' ? { taxId: taxId.value.trim() } : {}),
       ...(email.value.trim() ? { email: email.value.trim() } : {}),
     }
-    issued.value = await window.desktop.funeral.issueInvoice({
+    issued.value = await fh.issueInvoice({
       orderNo: formOrder.value.orderNo,
       title,
     })

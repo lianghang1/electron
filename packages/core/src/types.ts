@@ -1,5 +1,6 @@
 import type { DesktopConfig } from '@desktop/shared'
 import type { BrowserWindowConstructorOptions, WebPreferences } from 'electron'
+import type { CardReaderDriver, PrinterDriver } from './device/driver'
 
 /**
  * Electron 原生层的「逃生口」：普通业务用不到，用于覆盖 core 的窗口默认值。
@@ -21,6 +22,14 @@ export interface WindowOverrides {
    * 'display-capture'（录屏）、'clipboard-read'（读剪贴板）
    */
   permissions?: 'all' | string[]
+  /**
+   * 硬件驱动注入（设备通用层 device:*）：缺省用平台内置 mock。
+   * 对接真实设备 SDK 时在此注入对应 Driver 实现，契约与业务页不动。
+   */
+  devices?: {
+    cardReader?: CardReaderDriver
+    printer?: PrinterDriver
+  }
 }
 
 /**

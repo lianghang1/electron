@@ -1,4 +1,4 @@
-import type { HospitalBusinessConfig } from '@desktop/shared'
+import type { HospitalBusinessConfig } from '../../src/types/hospital'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { app } from 'electron'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { FhBusinessConfig } from '@desktop/shared'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { fh } from './api/fh'
 import InvoicePage from './components/InvoicePage.vue'
 import PayPage from './components/PayPage.vue'
 import PolicyPage from './components/PolicyPage.vue'
@@ -17,7 +17,7 @@ let timer: ReturnType<typeof setInterval> | null = null
 
 onMounted(async () => {
   try {
-    const config: FhBusinessConfig = await window.desktop.funeral.getConfig()
+    const config = await fh.getConfig()
     machineId.value = config.machineId
     hallName.value = config.hallName
   }

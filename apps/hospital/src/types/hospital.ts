@@ -1,5 +1,5 @@
 /**
- * 医院自助终端（apps/hospital）业务契约类型。
+ * 医院自助终端（apps/hospital）业务类型：App 本地，不进平台包（@desktop/shared）。
  */
 
 /** 自助机业务配置：部署时按机器写 userData/config.json 覆盖默认值 */

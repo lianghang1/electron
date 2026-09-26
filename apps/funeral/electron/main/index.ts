@@ -1,13 +1,12 @@
-import { bootstrap, handle } from '@desktop/core'
+import { bootstrap } from '@desktop/core'
 import { loadBusinessConfig } from './config'
-import { registerBusiness } from './peripherals/business'
-import { registerIdCardReader } from './peripherals/idcard-reader'
-import { registerPrinter } from './peripherals/printer'
+import { registerFhBusiness } from './peripherals/business'
 
 /**
  * 殡仪馆自助服务终端：Kiosk 形态（单应用全屏，无 Tab Shell）。
  * 自有受信业务，session 权限 'all'；进程级安全基线由 core 写死生效。
  * 韧性三项全开：大厅无人值守场景，崩溃自恢复 + 开机自启 + 防误关机。
+ * 设备通道（读卡器/打印机）由平台通用层提供（内置 mock），业务通道见 peripherals/business.ts。
  */
 bootstrap({
   app: {
@@ -42,9 +41,5 @@ bootstrap({
   permissions: 'all',
 })
 
-// ---- 业务通道：通用外设 + 殡仪馆业务（契约 device:* / fh:* 段，handler 在 app 侧注册） ----
-const businessConfig = loadBusinessConfig()
-registerIdCardReader()
-registerPrinter()
-registerBusiness()
-handle('fh:config:get', () => businessConfig)
+// ---- 殡仪馆业务通道（app 本地契约 fh:*，handler 在 app 侧注册） ----
+registerFhBusiness(loadBusinessConfig())

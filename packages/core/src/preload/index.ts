@@ -2,7 +2,7 @@ import type { DesktopApi, DesktopIpc } from '@desktop/shared'
 import type { IpcRendererEvent } from 'electron'
 import { contextBridge, ipcRenderer } from 'electron'
 
-// channel 常量表：字符串拼写受 DesktopIpc 契约约束，写错 channel 直接编译报错
+// channel 常量表（平台 invoke 通道）：字符串拼写受 DesktopIpc 契约约束，写错直接编译报错
 const channels = {
   minimize: 'window:minimize',
   maximize: 'window:maximize',
@@ -29,82 +29,91 @@ const channels = {
   updateInstall: 'update:install',
   deviceIdcardRead: 'device:idcard:read',
   devicePrinterPrint: 'device:printer:print',
-  hospitalConfigGet: 'hospital:config:get',
-  fhConfigGet: 'fh:config:get',
-  fhOrderQuery: 'fh:order:query',
-  fhPayCreate: 'fh:pay:create',
-  fhPayStatus: 'fh:pay:status',
-  fhInvoiceList: 'fh:invoice:list',
-  fhInvoiceIssue: 'fh:invoice:issue',
 } as const satisfies Record<string, keyof DesktopIpc>
 
-// 最小平台桥：只暴露 DesktopApi 声明的方法，不暴露裸 ipcRenderer。
-// 身份不经过参数：Main 侧按 event.sender 反查 CallerContext。
-const desktop: DesktopApi = {
-  window: {
-    minimize: () => ipcRenderer.invoke(channels.minimize),
-    maximize: () => ipcRenderer.invoke(channels.maximize),
-    restore: () => ipcRenderer.invoke(channels.restore),
-    close: () => ipcRenderer.invoke(channels.close),
-    isMaximized: () => ipcRenderer.invoke(channels.isMaximized),
-  },
-  app: {
-    list: () => ipcRenderer.invoke(channels.appList),
-    getManifest: appId => ipcRenderer.invoke(channels.appGetManifest, appId),
-    getCurrent: () => ipcRenderer.invoke(channels.appGetCurrent),
-  },
-  tabs: {
-    list: () => ipcRenderer.invoke(channels.tabsList),
-    open: options => ipcRenderer.invoke(channels.tabsOpen, options),
-    close: tabId => ipcRenderer.invoke(channels.tabsClose, tabId),
-    activate: tabId => ipcRenderer.invoke(channels.tabsActivate, tabId),
-    reload: tabId => ipcRenderer.invoke(channels.tabsReload, tabId),
-    setWorkArea: rect => ipcRenderer.invoke(channels.tabsSetWorkArea, rect),
-  },
-  permission: {
-    check: permission => ipcRenderer.invoke(channels.permissionCheck, permission),
-    respond: (requestId, granted) => ipcRenderer.invoke(channels.permissionRespond, requestId, granted),
-    list: appId => ipcRenderer.invoke(channels.permissionList, appId),
-  },
-  storage: {
-    get: key => ipcRenderer.invoke(channels.storageGet, key),
-    set: (key, value) => ipcRenderer.invoke(channels.storageSet, key, value),
-    remove: key => ipcRenderer.invoke(channels.storageRemove, key),
-    clear: () => ipcRenderer.invoke(channels.storageClear),
-  },
-  update: {
-    check: () => ipcRenderer.invoke(channels.updateCheck),
-    install: () => ipcRenderer.invoke(channels.updateInstall),
-  },
-  device: {
-    readIdCard: () => ipcRenderer.invoke(channels.deviceIdcardRead),
-    print: ticket => ipcRenderer.invoke(channels.devicePrinterPrint, ticket),
-  },
-  hospital: {
-    getConfig: () => ipcRenderer.invoke(channels.hospitalConfigGet),
-  },
-  funeral: {
-    getConfig: () => ipcRenderer.invoke(channels.fhConfigGet),
-    queryOrders: query => ipcRenderer.invoke(channels.fhOrderQuery, query),
-    createPay: orderNo => ipcRenderer.invoke(channels.fhPayCreate, orderNo),
-    payStatus: orderNo => ipcRenderer.invoke(channels.fhPayStatus, orderNo),
-    listInvoices: query => ipcRenderer.invoke(channels.fhInvoiceList, query),
-    issueInvoice: input => ipcRenderer.invoke(channels.fhInvoiceIssue, input),
-  },
-  events: {
-    on: (channel, listener) => {
-      // 推送事件的监听包装：剥掉 Electron event 首参，只透传契约负载数据
-      const wrapped = (_event: IpcRendererEvent, ...args: unknown[]) =>
-        (listener as (...args: unknown[]) => void)(...args)
-      ipcRenderer.on(channel, wrapped)
-      return () => ipcRenderer.removeListener(channel, wrapped)
-    },
-  },
+/** 平台 invoke 通道白名单（$invoke 之外的强类型方法不受此表约束） */
+const PLATFORM_CHANNELS = new Set<string>(Object.values(channels))
+
+export interface DesktopBridgeOptions {
+  /**
+   * App 业务通道白名单（app 本地契约，如 'fh:order:query'）。
+   * 与 Main 侧 createHandle<AppIpc>() 注册的通道保持一致；
+   * 白名单外的 channel 在 $invoke 处直接拒绝，保持最小桥。
+   */
+  appChannels?: readonly string[]
 }
 
-try {
-  contextBridge.exposeInMainWorld('desktop', desktop)
-}
-catch (error) {
-  console.error(error)
+/**
+ * 暴露 window.desktop 平台桥：只暴露 DesktopApi 声明的方法，不暴露裸 ipcRenderer。
+ * 身份不经过参数：Main 侧按 event.sender 反查 CallerContext。
+ * 无业务通道的 App 直接 exposeDesktop()；有业务通道的 App 声明白名单。
+ */
+export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
+  const allowedChannels = new Set<string>([
+    ...PLATFORM_CHANNELS,
+    ...(options.appChannels ?? []),
+  ])
+
+  const desktop: DesktopApi = {
+    window: {
+      minimize: () => ipcRenderer.invoke(channels.minimize),
+      maximize: () => ipcRenderer.invoke(channels.maximize),
+      restore: () => ipcRenderer.invoke(channels.restore),
+      close: () => ipcRenderer.invoke(channels.close),
+      isMaximized: () => ipcRenderer.invoke(channels.isMaximized),
+    },
+    app: {
+      list: () => ipcRenderer.invoke(channels.appList),
+      getManifest: appId => ipcRenderer.invoke(channels.appGetManifest, appId),
+      getCurrent: () => ipcRenderer.invoke(channels.appGetCurrent),
+    },
+    tabs: {
+      list: () => ipcRenderer.invoke(channels.tabsList),
+      open: opts => ipcRenderer.invoke(channels.tabsOpen, opts),
+      close: tabId => ipcRenderer.invoke(channels.tabsClose, tabId),
+      activate: tabId => ipcRenderer.invoke(channels.tabsActivate, tabId),
+      reload: tabId => ipcRenderer.invoke(channels.tabsReload, tabId),
+      setWorkArea: rect => ipcRenderer.invoke(channels.tabsSetWorkArea, rect),
+    },
+    permission: {
+      check: permission => ipcRenderer.invoke(channels.permissionCheck, permission),
+      respond: (requestId, granted) => ipcRenderer.invoke(channels.permissionRespond, requestId, granted),
+      list: appId => ipcRenderer.invoke(channels.permissionList, appId),
+    },
+    storage: {
+      get: key => ipcRenderer.invoke(channels.storageGet, key),
+      set: (key, value) => ipcRenderer.invoke(channels.storageSet, key, value),
+      remove: key => ipcRenderer.invoke(channels.storageRemove, key),
+      clear: () => ipcRenderer.invoke(channels.storageClear),
+    },
+    update: {
+      check: () => ipcRenderer.invoke(channels.updateCheck),
+      install: () => ipcRenderer.invoke(channels.updateInstall),
+    },
+    device: {
+      readIdCard: () => ipcRenderer.invoke(channels.deviceIdcardRead),
+      print: ticket => ipcRenderer.invoke(channels.devicePrinterPrint, ticket),
+    },
+    $invoke: (channel, ...args) => {
+      if (!allowedChannels.has(channel))
+        throw new Error(`ipc channel not exposed: ${channel}`)
+      return ipcRenderer.invoke(channel, ...args)
+    },
+    events: {
+      on: (channel, listener) => {
+        // 推送事件的监听包装：剥掉 Electron event 首参，只透传契约负载数据
+        const wrapped = (_event: IpcRendererEvent, ...args: unknown[]) =>
+          (listener as (...args: unknown[]) => void)(...args)
+        ipcRenderer.on(channel, wrapped)
+        return () => ipcRenderer.removeListener(channel, wrapped)
+      },
+    },
+  }
+
+  try {
+    contextBridge.exposeInMainWorld('desktop', desktop)
+  }
+  catch (error) {
+    console.error(error)
+  }
 }

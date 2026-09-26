@@ -1,15 +1,5 @@
 import type { AppContext } from './context'
 import type { DeviceIdCard, DevicePrintTicket } from './device'
-import type {
-  FhBusinessConfig,
-  FhInvoice,
-  FhInvoiceTitle,
-  FhOrder,
-  FhPaySession,
-  FhPayStatus,
-  FhQuery,
-} from './funeral'
-import type { HospitalBusinessConfig } from './hospital'
 import type { DesktopIpc } from './ipc'
 import type { DesktopAppManifest, RegisteredApp } from './manifest'
 import type { AppPermissionState, Permission } from './permission'
@@ -69,33 +59,21 @@ export interface DesktopApi {
     /** 下载完成后重启安装 */
     install: () => Promise<void>
   }
-  /** 通用外设通道（handler 在 app 侧注册，各 Kiosk App 复用） */
+  /**
+   * 设备通用层（读卡器/打印机等硬件，各 App 复用）。
+   * handler 由 core 设备服务注册：缺省内置 mock，可通过 bootstrap.devices 注入真实 Driver。
+   */
   device: {
-    /** 读身份证/就诊卡，无卡时返回 null */
+    /** 读身份证/接触式卡，无卡或读卡失败返回 null */
     readIdCard: () => Promise<DeviceIdCard | null>
-    /** 打印票据 */
+    /** 打印票据（份数与行数超限会被平台钳制/拒绝） */
     print: (ticket: DevicePrintTicket) => Promise<void>
   }
-  /** App 自有业务通道（单应用形态，handler 在 app 侧注册） */
-  hospital: {
-    /** 业务配置（userData/config.json 覆盖后的合成值） */
-    getConfig: () => Promise<HospitalBusinessConfig>
-  }
-  /** 殡仪馆自助终端业务通道（handler 在 app 侧注册） */
-  funeral: {
-    /** 业务配置（userData/config.json 覆盖后的合成值） */
-    getConfig: () => Promise<FhBusinessConfig>
-    /** 按业务单条码或身份证查询业务单（代收费） */
-    queryOrders: (query: FhQuery) => Promise<FhOrder[]>
-    /** 创建支付会话（返回二维码内容与有效期） */
-    createPay: (orderNo: string) => Promise<FhPaySession>
-    /** 轮询支付状态 */
-    payStatus: (orderNo: string) => Promise<FhPayStatus>
-    /** 按业务单条码或身份证查询已开发票 */
-    listInvoices: (query: FhQuery) => Promise<FhInvoice[]>
-    /** 为业务单开发票 */
-    issueInvoice: (input: { orderNo: string, title: FhInvoiceTitle }) => Promise<FhInvoice>
-  }
+  /**
+   * App 业务通道统一入口：调用 bootstrap 时经 preload 白名单声明的业务通道
+   * （app 本地契约，如 fh:order:query）。平台不感知业务词汇，类型由 App 侧封装收口。
+   */
+  $invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
   events: {
     /** 监听平台推送事件，返回取消监听函数 */
     on: <K extends keyof DesktopEvents>(channel: K, listener: DesktopEvents[K]) => () => void

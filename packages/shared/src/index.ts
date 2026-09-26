@@ -12,16 +12,6 @@ export type { DesktopConfig } from './types/config'
 export type { AppContext, AppInstance, AppLifecycleState, CallerContext } from './types/context'
 export type { DeviceIdCard, DevicePrintTicket } from './types/device'
 export type { DownloadTask, DownloadTaskStatus } from './types/download'
-export type {
-  FhBusinessConfig,
-  FhInvoice,
-  FhInvoiceTitle,
-  FhOrder,
-  FhPaySession,
-  FhPayStatus,
-  FhQuery,
-} from './types/funeral'
-export type { HospitalBusinessConfig } from './types/hospital'
 export type { DesktopInvoke, DesktopIpc } from './types/ipc'
 export type { AppSource, DesktopAppManifest, RegisteredApp } from './types/manifest'
 export { PERMISSIONS } from './types/permission'

@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import type { DevicePrintTicket, FhOrder, FhQuery } from '@desktop/shared'
+import type { DevicePrintTicket } from '@desktop/shared'
+import type { FhOrder, FhQuery } from '../types/funeral'
 import QRCode from 'qrcode'
 import { computed, onBeforeUnmount, ref } from 'vue'
+import { fh } from '../api/fh'
 import { useScanner } from '../composables/use-scanner'
 import NumPad from './NumPad.vue'
 
@@ -51,7 +53,7 @@ function onNumpadConfirm(idNumber: string): void {
 }
 
 async function identify(query: FhQuery): Promise<void> {
-  const result = await window.desktop.funeral.queryOrders(query)
+  const result = await fh.queryOrders(query)
   if (result.length === 0) {
     emptyTip.value = query.code
       ? `未查询到业务单 ${query.code}，请核对条码或到服务台处理`
@@ -67,12 +69,12 @@ const paidOrders = computed(() => orders.value.filter(order => order.status === 
 
 async function startPay(order: FhOrder): Promise<void> {
   payingOrder.value = order
-  const session = await window.desktop.funeral.createPay(order.orderNo)
+  const session = await fh.createPay(order.orderNo)
   qrDataUrl.value = await QRCode.toDataURL(session.qrContent, { width: 300, margin: 1 })
   payStatusText.value = '等待扫码支付'
   state.value = 'paying'
   pollTimer = setInterval(async () => {
-    const status = await window.desktop.funeral.payStatus(order.orderNo)
+    const status = await fh.payStatus(order.orderNo)
     if (status === 'paid') {
       order.status = 'paid'
       stopPoll()

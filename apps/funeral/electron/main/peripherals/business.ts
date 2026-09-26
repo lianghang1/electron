@@ -1,17 +1,23 @@
 import type {
+  FhBusinessConfig,
   FhInvoice,
   FhInvoiceTitle,
   FhOrder,
   FhPaySession,
   FhPayStatus,
-} from '@desktop/shared'
-import { handle } from '@desktop/core'
+  FhQuery,
+} from '../../../src/types/funeral'
+import type { FhIpc } from '../../../src/types/ipc'
+import { createHandle } from '@desktop/core'
+
+/** 业务通道包装：channel / 入参 / 返回值全部受 FhIpc 契约约束 */
+const handle = createHandle<FhIpc>()
 
 /**
  * 殡仪馆业务服务（mock）：业务单查询 / 支付会话 / 发票。
  *
  * 真实接入位：各 handler 替换为殡仪馆业务系统与支付、发票平台接口
- * （对接时仅改本文件与 idcard-reader/printer，契约与业务页不动）。
+ * （对接时仅改本文件，契约与业务页不动）。
  * 支付 mock 规则：创建支付会话 15 秒后状态自动变为 paid（模拟家属扫码成功）。
  */
 
@@ -59,7 +65,8 @@ const MOCK_ID_NUMBER = '110101196203054567'
 const PAY_SESSIONS = new Map<string, number>()
 const PAY_SUCCESS_DELAY_MS = 15_000
 
-export function registerBusiness(): void {
+export function registerFhBusiness(businessConfig: FhBusinessConfig): void {
+  handle('fh:config:get', () => businessConfig)
   handle('fh:order:query', (_event, query) => queryOrders(query))
   handle('fh:pay:create', (_event, orderNo) => createPay(orderNo))
   handle('fh:pay:status', (_event, orderNo) => payStatus(orderNo))
@@ -67,7 +74,7 @@ export function registerBusiness(): void {
   handle('fh:invoice:issue', (_event, input) => issueInvoice(input))
 }
 
-function queryOrders(query: { code?: string, idNumber?: string }): FhOrder[] {
+function queryOrders(query: FhQuery): FhOrder[] {
   if (query.code)
     return ORDERS.filter(order => order.orderNo === query.code)
   if (query.idNumber && query.idNumber === MOCK_ID_NUMBER)
@@ -92,7 +99,7 @@ function payStatus(orderNo: string): FhPayStatus {
   return Date.now() - createdAt >= PAY_SUCCESS_DELAY_MS ? 'paid' : 'pending'
 }
 
-function listInvoices(query: { code?: string, idNumber?: string }): FhInvoice[] {
+function listInvoices(query: FhQuery): FhInvoice[] {
   // mock：有任意查询凭据即返回全部 mock 发票 + 本会话新开的发票
   if (query.code || query.idNumber)
     return [...INVOICES]

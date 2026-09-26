@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { HospitalBusinessConfig } from '@desktop/shared'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { hospital } from './api/hospital'
 import GuidePage from './components/GuidePage.vue'
 import RegisterPage from './components/RegisterPage.vue'
 import ReportPage from './components/ReportPage.vue'
@@ -15,7 +15,7 @@ let timer: ReturnType<typeof setInterval> | null = null
 
 onMounted(async () => {
   try {
-    const config: HospitalBusinessConfig = await window.desktop.hospital.getConfig()
+    const config = await hospital.getConfig()
     machineId.value = config.machineId
   }
   catch {

@@ -1,4 +1,4 @@
-import type { FhBusinessConfig } from '@desktop/shared'
+import type { FhBusinessConfig } from '../../src/types/funeral'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { app } from 'electron'

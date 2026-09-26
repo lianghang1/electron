@@ -1,12 +1,12 @@
-import { bootstrap, handle } from '@desktop/core'
+import { bootstrap } from '@desktop/core'
 import { loadBusinessConfig } from './config'
-import { registerIdCardReader } from './peripherals/idcard-reader'
-import { registerPrinter } from './peripherals/printer'
+import { registerHospitalBusiness } from './peripherals/business'
 
 /**
  * 医院自助服务终端：Kiosk 形态（单应用全屏，无 Tab Shell）。
  * 自有受信业务，session 权限 'all'；进程级安全基线由 core 写死生效。
  * 韧性三项全开：大厅无人值守场景，崩溃自恢复 + 开机自启 + 防误关机。
+ * 设备通道（读卡器/打印机）由平台通用层提供（内置 mock），业务通道见 peripherals/business.ts。
  */
 bootstrap({
   app: {
@@ -41,8 +41,5 @@ bootstrap({
   permissions: 'all',
 })
 
-// ---- 业务通道：外设服务 + 业务配置（契约 hospital:* 段，handler 在 app 侧注册） ----
-const businessConfig = loadBusinessConfig()
-registerIdCardReader()
-registerPrinter()
-handle('hospital:config:get', () => businessConfig)
+// ---- 医院业务通道（app 本地契约 hospital:*，handler 在 app 侧注册） ----
+registerHospitalBusiness(loadBusinessConfig())
