@@ -1,0 +1,38 @@
+﻿appId: com.company.funeral
+# productName 决定安装目录与主 exe 名：必须 ASCII（electron-builder 对非 ASCII productName
+# 强制回退 sanitized name，@app/funeral 会变成难看的 @appfuneral 目录）；
+# 面向用户的名称（快捷方式/卸载列表）用中文，见 nsis.shortcutName / uninstallDisplayName
+productName: FhKiosk
+directories:
+  buildResources: build
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!scripts/*'
+  - '!shots*/**'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+win:
+  target: nsis
+nsis:
+  # 英文文件名便于部署脚本/网盘分发
+  artifactName: FhKiosk-Setup-${version}.${ext}
+  # 面向用户的中文名：桌面快捷方式与「应用和功能」卸载列表
+  shortcutName: 智慧殡仪自助终端
+  uninstallDisplayName: 智慧殡仪自助终端
+  # 一键安装（Notion/Discord 式无边框品牌浮窗 + 进度条，无老式向导），双击即装完自动启动；
+  # 协议确认页保留；运维批量部署走 /S 静默（kiosk 固定 perMachine 目录，路径可预测）
+  oneClick: true
+  perMachine: true
+  runAfterFinish: true
+  createDesktopShortcut: always
+  unicode: true
+  language: 2052
+  installerLanguages: zh_CN
+  license: build/license.txt
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+npmRebuild: false
+electronDownload:
+  mirror: https://npmmirror.com/mirrors/electron/

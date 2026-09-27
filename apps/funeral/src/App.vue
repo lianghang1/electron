@@ -257,8 +257,9 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
       </RouterView>
     </main>
 
-    <!-- 底栏：设备号 | 版权 | 版本 -->
+    <!-- 底栏：服务热线 | 设备号 | 版权 | 版本 -->
     <footer class="fk-footer">
+      <span class="fk-footer__hotline">服务热线：0000-0000-000</span>
       <span>设备号：{{ machineId || '—' }}</span>
       <span>© {{ now.getFullYear() }} {{ hallName }}</span>
       <span>版本号：{{ appVersion }}</span>
@@ -369,13 +370,13 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
 }
 
 .fk-header__date {
-  font-size: 15px;
-  opacity: 0.82;
+  font-size: 16px;
+  opacity: 0.85;
 }
 
 .fk-header__clock {
   font-family: var(--fh-font-serif);
-  font-size: 25px;
+  font-size: 28px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   letter-spacing: 1px;
@@ -411,21 +412,22 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
 .fk-backbar__back {
   display: inline-flex;
   align-items: center;
-  height: 44px;
-  padding: 0 22px;
+  height: 48px;
+  padding: 0 24px;
   background: linear-gradient(160deg, var(--fh-cta-from) 0%, var(--fh-cta-to) 100%);
   color: var(--fh-cta-ink);
   border: none;
   border-radius: var(--fh-radius-sm);
   font-family: inherit;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   transition: filter 0.15s ease;
 }
 
-.fk-backbar__back:hover {
-  filter: brightness(1.08);
+.fk-backbar__back:active {
+  transform: scale(0.97);
+  filter: brightness(0.94);
 }
 
 .fk-backbar__arrow {
@@ -435,11 +437,11 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
 }
 
 .fk-backbar__title {
-  margin: 0 0 0 20px;
+  margin: 0 0 0 22px;
   font-family: var(--fh-font-serif);
-  font-size: 20px;
+  font-size: 26px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   color: var(--fh-text);
 }
 
@@ -503,9 +505,15 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
   align-items: center;
   justify-content: space-between;
   padding: 0 36px;
-  font-size: 13px;
-  color: var(--fh-text-3);
+  font-size: 14px;
+  color: var(--fh-text-2);
   background: rgb(255 255 255 / 65%);
   border-top: 1px solid var(--fh-line);
+}
+
+/* 服务热线：部署时替换为真实号码 */
+.fk-footer__hotline {
+  font-weight: 600;
+  color: var(--fh-text);
 }
 </style>

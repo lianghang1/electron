@@ -6,58 +6,92 @@ interface ModuleCard {
   title: string
   desc: string
   icon: string
-  /** 主推卡（鎏金描边强调） */
-  primary?: boolean
 }
 
 const router = useRouter()
 
-// 9 张等大卡 3×3 九宫格（业务缴费金色描边强调）
-const MODULES: ModuleCard[] = [
-  { path: '/payment', title: '业务缴费', desc: '扫码或身份证查询，快速完成缴费', icon: 'pay', primary: true },
-  { path: '/invoice', title: '扫码开票', desc: '便捷开票，无需等待', icon: 'invoice' },
-  { path: '/electronic', title: '电子火化证', desc: '在线查询与打印证照', icon: 'cert' },
-  { path: '/retail', title: '丧葬用品', desc: '自助选购，品质保证', icon: 'bag' },
-  { path: '/hall', title: '礼厅预定情况', desc: '查询礼厅预定状态', icon: 'hall' },
-  { path: '/cremation', title: '火化预定情况', desc: '查询火化炉排班', icon: 'flame' },
-  { path: '/faq', title: '常见问题解答', desc: '办事流程常见疑问', icon: 'faq' },
-  { path: '/policy', title: '惠民政策', desc: '了解相关惠民政策', icon: 'policy' },
-  { path: '/activity', title: '服务介绍', desc: '馆情简介与核心服务', icon: 'about' },
+// 任务驱动布局：主任务全宽大卡 + 办理类宽卡 + 查询类卡 + 低频信息压底条（行业自助终端通行模式）
+const PRIMARY = { path: '/payment', title: '业务缴费', desc: '扫码或刷身份证查询待缴费用，扫码支付后自动打印凭条', icon: 'pay' }
+
+// 办理类：横向宽卡（打印/办理动线）
+const TASKS: ModuleCard[] = [
+  { path: '/invoice', title: '发票服务', desc: '扫码开具 / 打印发票', icon: 'invoice' },
+  { path: '/electronic', title: '电子证照', desc: '火化证明在线查询打印', icon: 'cert' },
 ]
 
-let serial = 0
+// 查询选购类：竖卡
+const SERVICES: ModuleCard[] = [
+  { path: '/retail', title: '丧葬用品', desc: '自助选购结算', icon: 'bag' },
+  { path: '/hall', title: '礼厅班次', desc: '礼厅预定情况查询', icon: 'hall' },
+  { path: '/cremation', title: '火化班次', desc: '火化炉排班查询', icon: 'flame' },
+]
 
-function nextSerial(): string {
-  serial += 1
-  return String(serial).padStart(2, '0')
-}
+const FOOTER_LINKS: ModuleCard[] = [
+  { path: '/activity', title: '服务介绍', desc: '', icon: 'about' },
+  { path: '/policy', title: '惠民政策', desc: '', icon: 'policy' },
+  { path: '/faq', title: '常见问题', desc: '', icon: 'faq' },
+]
+
+const PRIMARY_TAGS = ['扫码支付', '证件查询', '电子发票']
 </script>
 
 <template>
   <div class="fh-home">
-    <div class="fh-home__hero">
-      <div class="fh-home__hero-rule" aria-hidden="true">
-        <i class="fh-home__hero-line" />
-        <i class="fh-home__hero-diamond" />
-        <i class="fh-home__hero-line" />
-      </div>
-      <h2 class="fh-home__hero-title">
-        智能自助服务系统
-      </h2>
-      <p class="fh-home__hero-desc">
-        为您提供便捷、高效、有温度的服务体验
-      </p>
-    </div>
+    <!-- 主任务卡：业务缴费 -->
+    <button class="fh-home__primary" @click="router.push(PRIMARY.path)">
+      <span class="fh-home__primary-icon">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <use :href="`#fh-icon-${PRIMARY.icon}`" />
+        </svg>
+      </span>
+      <span class="fh-home__primary-body">
+        <span class="fh-home__primary-title">{{ PRIMARY.title }}</span>
+        <span class="fh-home__primary-desc">{{ PRIMARY.desc }}</span>
+        <span class="fh-home__primary-tags">
+          <i v-for="tag in PRIMARY_TAGS" :key="tag">{{ tag }}</i>
+        </span>
+      </span>
+      <span class="fh-home__primary-go">
+        立即办理
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+      </span>
+    </button>
 
-    <div class="fh-home__grid">
+    <!-- 办理类宽卡：横向布局，一排 2 个 -->
+    <div class="fh-home__grid fh-home__grid--tasks">
       <button
-        v-for="item in MODULES"
+        v-for="item in TASKS"
         :key="item.path"
-        class="fh-module"
-        :class="{ 'fh-module--primary': item.primary }"
+        class="fh-module fh-module--wide"
         @click="router.push(item.path)"
       >
-        <span class="fh-module__serial">{{ nextSerial() }}</span>
+        <span class="fh-module__icon">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <use :href="`#fh-icon-${item.icon}`" />
+          </svg>
+        </span>
+        <span class="fh-module__text">
+          <span class="fh-module__title">{{ item.title }}</span>
+          <span class="fh-module__desc">{{ item.desc }}</span>
+        </span>
+        <span class="fh-module__arrow" aria-hidden="true">
+          <svg viewBox="0 0 16 16">
+            <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+      </button>
+    </div>
+
+    <!-- 查询选购类卡：一排 3 个 -->
+    <div class="fh-home__grid fh-home__grid--services">
+      <button
+        v-for="item in SERVICES"
+        :key="item.path"
+        class="fh-module"
+        @click="router.push(item.path)"
+      >
         <span class="fh-module__icon">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <use :href="`#fh-icon-${item.icon}`" />
@@ -65,16 +99,25 @@ function nextSerial(): string {
         </span>
         <span class="fh-module__title">{{ item.title }}</span>
         <span class="fh-module__desc">{{ item.desc }}</span>
-        <span v-if="item.primary" class="fh-module__go">
-          点击进入
-          <svg viewBox="0 0 16 16" aria-hidden="true">
-            <path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </span>
       </button>
     </div>
 
-    <!-- 图标 symbol 定义：线性风格，与玄蓝/鎏金体系一致 -->
+    <!-- 低频信息条 -->
+    <nav class="fh-home__links">
+      <button
+        v-for="item in FOOTER_LINKS"
+        :key="item.path"
+        class="fh-home__link"
+        @click="router.push(item.path)"
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <use :href="`#fh-icon-${item.icon}`" />
+        </svg>
+        {{ item.title }}
+      </button>
+    </nav>
+
+    <!-- 图标 symbol 定义：线性风格，与蓝白体系一致 -->
     <svg width="0" height="0" style="position: absolute" aria-hidden="true">
       <defs>
         <g id="fh-icon-pay" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -129,199 +172,305 @@ function nextSerial(): string {
   padding: 4px 8px 0;
 }
 
-/* ---- 欢迎区：线 · 菱 · 线 中式对称装饰 ---- */
+/* ---- 主任务卡：业务缴费（全宽，最高视觉权重） ---- */
 
-.fh-home__hero {
+.fh-home__primary {
   flex: none;
-  text-align: center;
-  padding: 8px 0 16px;
-}
-
-.fh-home__hero-rule {
   display: flex;
   align-items: center;
+  padding: 0 44px 0 40px;
+  background: linear-gradient(135deg, #ffffff 0%, rgb(240 246 255 / 92%) 100%);
+  border: 2px solid rgb(36 86 184 / 38%);
+  border-radius: var(--fh-radius-lg);
+  box-shadow: var(--fh-shadow-card);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.fh-home__primary:hover {
+  border-color: var(--fh-ink);
+  box-shadow: var(--fh-shadow-float);
+  transform: translateY(-2px);
+}
+
+.fh-home__primary:active {
+  transform: translateY(0) scale(0.99);
+}
+
+.fh-home__primary-icon {
+  flex: none;
+  width: 104px;
+  height: 104px;
+  margin: 22px 0;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 12px;
-}
-
-.fh-home__hero-line {
-  width: 120px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgb(214 178 118 / 80%));
-}
-
-.fh-home__hero-line:last-child {
-  background: linear-gradient(270deg, transparent, rgb(214 178 118 / 80%));
-}
-
-.fh-home__hero-diamond {
-  width: 7px;
-  height: 7px;
-  background: var(--fh-gold-bright);
-  transform: rotate(45deg);
-  margin: 0 14px;
-}
-
-.fh-home__hero-title {
-  margin: 0;
-  font-family: var(--fh-font-serif);
-  font-size: 33px;
-  font-weight: 700;
-  letter-spacing: 10px;
-  text-indent: 10px; /* 抵消末字间距，保持视觉居中 */
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--fh-cta-from) 0%, var(--fh-cta-to) 100%);
   color: #fff;
+  box-shadow: 0 10px 24px rgb(36 86 184 / 30%);
 }
 
-.fh-home__hero-desc {
-  margin: 8px 0 0;
-  font-size: 15px;
+.fh-home__primary-icon svg {
+  width: 52px;
+  height: 52px;
+}
+
+.fh-home__primary-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: 36px;
+}
+
+.fh-home__primary-title {
+  font-family: var(--fh-font-serif);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  color: var(--fh-text);
+}
+
+.fh-home__primary-desc {
+  margin-top: 8px;
+  font-size: 16px;
+  color: var(--fh-text-2);
+}
+
+.fh-home__primary-tags {
+  display: flex;
+  margin-top: 12px;
+}
+
+.fh-home__primary-tags i {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--fh-ink);
+  background: rgb(36 86 184 / 8%);
+  border: 1px solid rgb(36 86 184 / 22%);
+  border-radius: 999px;
+  padding: 3px 14px;
+  margin-right: 10px;
+}
+
+.fh-home__primary-go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 60px;
+  padding: 0 38px;
+  border-radius: 999px;
+  background: linear-gradient(160deg, var(--fh-cta-from) 0%, var(--fh-cta-to) 100%);
+  color: var(--fh-cta-ink);
+  font-size: 19px;
+  font-weight: 700;
   letter-spacing: 3px;
-  color: rgb(255 255 255 / 78%);
+  box-shadow: 0 8px 20px rgb(36 86 184 / 28%);
+  transition: filter 0.15s ease;
 }
 
-/* ---- 模块网格：3×3 等大九宫格，撑满不滚动 ---- */
+.fh-home__primary:hover .fh-home__primary-go {
+  filter: brightness(1.07);
+}
+
+.fh-home__primary-go svg {
+  width: 16px;
+  height: 16px;
+  margin-left: 10px;
+}
+
+/* ---- 次任务区：办理类宽卡 + 查询类卡，共同撑满剩余高度 ---- */
 
 .fh-home__grid {
-  flex: 1;
   min-height: 0;
-  width: 100%;
+  margin: 16px -14px 0 0; /* 抵消末列右 margin */
+}
+
+.fh-home__grid--tasks {
+  flex: 5;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.fh-home__grid--services {
+  flex: 6;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  grid-template-rows: repeat(3, 1fr);
-  margin-right: -14px; /* 抵消末列右 margin */
+}
+
+/* 查询类竖卡：内容纵向排列 */
+.fh-home__grid--services .fh-module {
+  flex-direction: column;
 }
 
 .fh-module {
   position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin: 0 14px 14px 0;
-  padding: 16px 24px;
-  background: rgb(255 255 255 / 88%);
+  margin-right: 14px;
+  padding: 20px 32px;
+  background: rgb(255 255 255 / 90%);
   border: 1px solid var(--fh-line);
   border-radius: var(--fh-radius-lg);
   box-shadow: var(--fh-shadow-card);
   font-family: inherit;
   text-align: center;
   cursor: pointer;
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
 
 .fh-module:hover {
   transform: translateY(-3px);
   border-color: rgb(36 86 184 / 45%);
-  background: rgb(255 255 255 / 96%);
+  background: #ffffff;
   box-shadow: var(--fh-shadow-float);
 }
 
 .fh-module:active {
-  transform: translateY(-1px);
+  transform: translateY(0) scale(0.98);
 }
 
-/* ---- 衬线序号（鎏金） ---- */
-
-.fh-module__serial {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  font-family: var(--fh-font-serif);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  color: rgb(168 130 60 / 60%);
-  font-variant-numeric: tabular-nums;
+/* 办理类宽卡：横向布局 */
+.fh-module--wide {
+  justify-content: flex-start;
+  text-align: left;
+  padding: 20px 40px;
 }
 
-/* ---- 卡内容 ---- */
+.fh-module__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  margin-left: 30px;
+}
 
-.fh-module__icon {
-  width: 64px;
-  height: 64px;
+.fh-module--wide .fh-module__title {
+  margin-top: 0;
+}
+
+.fh-module--wide .fh-module__desc {
+  margin-top: 8px;
+}
+
+.fh-module__arrow {
+  flex: none;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: rgb(36 86 184 / 12%);
-  border: 1px solid rgb(36 86 184 / 26%);
+  background: rgb(36 86 184 / 8%);
   color: var(--fh-ink);
-  transition: transform 0.18s ease;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fh-module__arrow svg {
+  width: 18px;
+  height: 18px;
+}
+
+.fh-module--wide:hover .fh-module__arrow {
+  background: var(--fh-ink);
+  color: #fff;
+}
+
+.fh-module__icon {
+  width: 84px;
+  height: 84px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgb(36 86 184 / 10%);
+  border: 1px solid rgb(36 86 184 / 24%);
+  color: var(--fh-ink);
+  transition: transform 0.15s ease;
 }
 
 .fh-module__icon svg {
-  width: 32px;
-  height: 32px;
+  width: 42px;
+  height: 42px;
 }
 
 .fh-module:hover .fh-module__icon {
-  transform: scale(1.08);
+  transform: scale(1.06);
 }
 
 .fh-module__title {
-  margin-top: 14px;
+  margin-top: 18px;
   font-family: var(--fh-font-serif);
-  font-size: 21px;
+  font-size: 25px;
   font-weight: 700;
   letter-spacing: 3px;
   color: var(--fh-text);
 }
 
 .fh-module__desc {
-  margin-top: 6px;
-  font-size: 13.5px;
+  margin-top: 8px;
+  font-size: 14px;
   color: var(--fh-text-2);
 }
 
-/* ---- 主推卡（业务缴费，鎏金强调） ---- */
+/* ---- 低频信息条 ---- */
 
-.fh-module--primary {
-  background: rgb(255 255 255 / 92%);
-  border-color: rgb(36 86 184 / 42%);
+.fh-home__links {
+  flex: none;
+  display: flex;
+  margin: 16px 0 0;
+  background: rgb(255 255 255 / 78%);
+  border: 1px solid var(--fh-line);
+  border-radius: var(--fh-radius);
+  overflow: hidden;
 }
 
-.fh-module--primary:hover {
-  border-color: var(--fh-ink);
-  background: #ffffff;
-}
-
-.fh-module--primary .fh-module__icon {
-  width: 72px;
-  height: 72px;
-  background: rgb(36 86 184 / 10%);
-  border-color: rgb(36 86 184 / 40%);
-  color: var(--fh-ink);
-}
-
-.fh-module--primary .fh-module__icon svg {
-  width: 36px;
-  height: 36px;
-}
-
-.fh-module--primary .fh-module__serial {
-  color: var(--fh-gold-deep);
-}
-
-.fh-module__go {
+.fh-home__link {
+  flex: 1;
+  height: 64px;
   display: inline-flex;
   align-items: center;
-  margin-top: 12px;
-  padding: 6px 16px;
-  border: 1px solid rgb(36 86 184 / 42%);
-  border-radius: 999px;
-  color: var(--fh-ink);
-  font-size: 13px;
+  justify-content: center;
+  border: none;
+  border-right: 1px solid var(--fh-line);
+  background: none;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 600;
   letter-spacing: 2px;
-  transition: background 0.18s ease;
+  color: var(--fh-text-2);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.fh-module__go svg {
-  width: 12px;
-  height: 12px;
-  margin-left: 6px;
+.fh-home__link:last-child {
+  border-right: none;
 }
 
-.fh-module--primary:hover .fh-module__go {
-  background: rgb(36 86 184 / 10%);
+.fh-home__link:hover {
+  background: rgb(36 86 184 / 6%);
+  color: var(--fh-ink);
+}
+
+.fh-home__link:active {
+  background: rgb(36 86 184 / 12%);
+}
+
+.fh-home__link svg {
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+}
+
+/* ---- 图标 symbol 容器隐藏 ---- */
+
+.fh-home > svg[style] {
+  display: none;
 }
 </style>

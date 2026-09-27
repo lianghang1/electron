@@ -3,6 +3,8 @@
   "type": "module",
   "version": "1.0.0",
   "private": true,
+  "description": "殡仪服务场所自助服务终端：业务缴费、发票开具、电子证照打印、班次查询",
+  "author": "FhKiosk",
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
@@ -12,12 +14,8 @@
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
     "build": "pnpm run typecheck && electron-vite build",
     "build:win": "pnpm run build && electron-builder --win",
-    "postinstall": "electron-builder install-app-deps"
-  },
-  "build": {
-    "appId": "com.company.funeral",
-    "productName": "FhKiosk",
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
+    "postinstall": "electron-builder install-app-deps",
+    "icon": "node scripts/generate-icon.mjs && node scripts/generate-installer-bmp.mjs"
   },
   "dependencies": {
     "@electron-toolkit/utils": "catalog:",
