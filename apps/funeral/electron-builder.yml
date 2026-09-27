@@ -1,4 +1,4 @@
-﻿appId: com.company.funeral
+appId: com.company.funeral
 # productName 决定安装目录与主 exe 名：必须 ASCII（electron-builder 对非 ASCII productName
 # 强制回退 sanitized name，@app/funeral 会变成难看的 @appfuneral 目录）；
 # 面向用户的名称（快捷方式/卸载列表）用中文，见 nsis.shortcutName / uninstallDisplayName
@@ -65,12 +65,12 @@ nsis:
   # 安装/卸载程序 exe 自身显示的图标（资源管理器里 FhKiosk-Setup.exe 的图标）
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
-  # 品牌图集中维护于 packages/config/brand（全应用共享一套，改一处全生效）；
+  # 品牌图集中维护于仓库根 resources/brand（全应用共享一套，改一处全生效）；
   # 尺寸是 NSIS MUI2 固定规格：sidebar 164×314、header 150×57。
   # 若不配置这三项，builder 才会按文件名约定自动查找 build/ 下同名文件
-  installerHeader: ../../packages/config/brand/installerHeader.bmp
-  installerSidebar: ../../packages/config/brand/installerSidebar.bmp
-  uninstallerSidebar: ../../packages/config/brand/uninstallerSidebar.bmp
+  installerHeader: ../../resources/brand/installerHeader.bmp
+  installerSidebar: ../../resources/brand/installerSidebar.bmp
+  uninstallerSidebar: ../../resources/brand/uninstallerSidebar.bmp
 npmRebuild: false
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

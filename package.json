@@ -5,18 +5,17 @@
   "description": "",
   "scripts": {
     "dev": "pnpm --filter @app/desktop dev",
-    "dev:client": "pnpm --filter @app/client dev",
     "dev:kiosk": "pnpm --filter @app/kiosk dev",
     "dev:hospital": "pnpm --filter @app/hospital dev",
     "dev:funeral": "pnpm --filter @app/funeral dev",
     "build": "pnpm --filter @app/desktop build",
-    "build:client": "pnpm --filter @app/client build",
     "build:kiosk": "pnpm --filter @app/kiosk build",
     "build:hospital": "pnpm --filter @app/hospital build",
     "build:funeral": "pnpm --filter @app/funeral build",
     "build:win": "pnpm --filter @app/desktop build:win",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "gen:brand": "tsx resources/brand/generate.ts",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

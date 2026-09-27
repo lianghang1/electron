@@ -1,5 +1,5 @@
 {
-  "extends": "../../packages/config/typescript/tsconfig.base.json",
+  "extends": "@desktop/config/tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
     "types": ["electron-vite/node"]

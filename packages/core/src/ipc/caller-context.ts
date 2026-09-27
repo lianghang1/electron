@@ -1,6 +1,7 @@
 import type { CallerContext } from '@desktop/shared'
 import type { WebContents } from 'electron'
 import { DesktopError } from '@desktop/shared'
+import { SHELL_APP_ID } from '../constants'
 
 /**
  * IPC 调用者身份表：webContents.id → CallerContext。
@@ -28,5 +29,14 @@ export class CallerResolver {
   /** 反查身份但不抛错：系统级事件（崩溃 / 控制台）可能来自未登记的 webContents（如 DevTools） */
   tryResolve(sender: WebContents): CallerContext | undefined {
     return this.contexts.get(sender.id)
+  }
+}
+
+/** Shell 专属通道的身份关卡 */
+export function assertShell(context: CallerContext): void {
+  if (context.appId !== SHELL_APP_ID) {
+    throw new DesktopError('PERMISSION_DENIED', 'This channel is shell-only', {
+      appId: context.appId,
+    })
   }
 }

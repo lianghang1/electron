@@ -1,14 +1,26 @@
 {
   "name": "@desktop/config",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "exports": {
-    "./eslint": "./eslint/index.mjs",
-    "./typescript/*": "./typescript/*"
+    "./vite": {
+      "types": "./dist/vite/index.d.ts",
+      "default": "./dist/vite/index.js"
+    },
+    "./eslint": "./eslint/index.ts",
+    "./tsconfig.base.json": "./tsconfig.base.json"
   },
-  "dependencies": {
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
     "@antfu/eslint-config": "catalog:",
-    "eslint": "catalog:"
+    "@types/node": "catalog:",
+    "electron-vite": "catalog:",
+    "eslint": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
   }
 }

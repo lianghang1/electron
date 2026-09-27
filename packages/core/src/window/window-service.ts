@@ -34,7 +34,7 @@ export class WindowService {
       ...(process.platform === 'linux' && options.icon ? { icon: options.icon } : {}),
       ...options.browserWindowOptions,
       webPreferences: {
-        // CJS preload（.cjs，由 @desktop/vite-config 强制输出）：沙箱环境的 preload 不支持 ESM，
+        // CJS preload（.cjs，由 @desktop/config 强制输出）：沙箱环境的 preload 不支持 ESM，
         // 二者必须配套。若改为 ESM preload 需同步设置 sandbox: false（见 Electron ESM 文档）
         preload: join(__dirname, '../preload/index.cjs'),
         // Electron 安全清单（安全默认显式声明，防止上游默认值变化或误配）。

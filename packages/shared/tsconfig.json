@@ -1,4 +1,4 @@
 {
-  "extends": "../config/typescript/tsconfig.base.json",
+  "extends": "@desktop/config/tsconfig.base.json",
   "include": ["src"]
 }

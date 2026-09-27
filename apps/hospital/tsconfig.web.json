@@ -1,5 +1,5 @@
 {
-  "extends": "../../packages/config/typescript/tsconfig.base.json",
+  "extends": "@desktop/config/tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"]

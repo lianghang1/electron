@@ -55,12 +55,11 @@ export class AppService {
     this.events.emit('app:opened', instance)
   }
 
-  /** 关闭实例：第一阶段 Web 运行时由 TabService 同步销毁后再调到这里 */
+  /** 关闭实例：第一阶段 Web 运行时由 TabService 同步销毁后再调到这里（closing 态留给未来异步关闭） */
   async close(instanceId: string): Promise<void> {
     const instance = this.instances.get(instanceId)
     if (!instance || instance.state === 'closing' || instance.state === 'closed')
       return
-    instance.state = 'closing'
     instance.state = 'closed'
     this.activeByApp.delete(instance.appId)
     this.events.emit('app:closed', instance)

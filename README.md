@@ -27,7 +27,7 @@ electron/
 │   ├── core/                 # 平台核心（不含任何业务）
 │   │   └── src/
 │   │       ├── app/          #   AppRegistry / AppService（App 生命周期）
-│   │       ├── application/  #   DesktopApplication（组装根）+ bootstrap 入口
+│   │       ├── runtime/      #   DesktopRuntime（组装根）+ bootstrap 入口
 │   │       ├── event/        #   EventBus（进程内事件）
 │   │       ├── ipc/          #   handle 包装 / CallerResolver / 通道注册
 │   │       ├── logger/       #   electron-log：文件轮转 / 崩溃捕获 / renderer 控制台桥接

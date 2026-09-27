@@ -23,9 +23,9 @@
     "@electron-toolkit/utils": "catalog:"
   },
   "devDependencies": {
+    "@desktop/config": "workspace:*",
     "@desktop/core": "workspace:*",
     "@desktop/shared": "workspace:*",
-    "@desktop/vite-config": "workspace:*",
     "@types/node": "catalog:",
     "@vitejs/plugin-vue": "catalog:",
     "electron": "catalog:",

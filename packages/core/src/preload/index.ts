@@ -36,7 +36,7 @@ const PLATFORM_CHANNELS = new Set<string>(Object.values(channels))
 
 export interface DesktopBridgeOptions {
   /**
-   * App 业务通道白名单（app 本地契约，如 'fh:order:query'）。
+   * App 业务通道白名单（app 本地契约，如 'crm:query'）。
    * 与 Main 侧 createHandle<AppIpc>() 注册的通道保持一致；
    * 白名单外的 channel 在 $invoke 处直接拒绝，保持最小桥。
    */
