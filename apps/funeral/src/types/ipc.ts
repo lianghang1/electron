@@ -33,6 +33,12 @@ import type {
 export type FhIpc = {
   /** 自助机业务配置（userData/config.json 覆盖后的合成值） */
   'fh:config:get': () => FhBusinessConfig
+  /** 更新业务配置（设置面板保存，写回 userData/config.json） */
+  'fh:config:update': (input: Partial<FhBusinessConfig>) => FhBusinessConfig
+  /** 运维授权密码校验（设置面板入口，密码存 config.json 的 adminPassword 字段） */
+  'fh:auth:verify': (input: { password: string }) => boolean
+  /** 退出自助终端应用（app.quit()，exitGuard 放行退出流程） */
+  'fh:app:exit': () => void
   /** 扫码解码：prefix 决定跳转分发 */
   'fh:qrcode:decode': (input: { content: string, bizCodeToId?: boolean }) => DecodeQrcodeResponse
 

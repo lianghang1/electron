@@ -5,6 +5,9 @@ import { exposeDesktop } from '@desktop/core/preload'
 exposeDesktop({
   appChannels: [
     'fh:config:get',
+    'fh:config:update',
+    'fh:auth:verify',
+    'fh:app:exit',
     'fh:qrcode:decode',
     'fh:payment:methods',
     'fh:payment:settlementInit',

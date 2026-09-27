@@ -94,5 +94,51 @@ if (!skip.has('payment-idcard')) {
   writeFileSync(path.join(outDir, 'payment-idcard.png'), Buffer.from(shot.data, 'base64'))
   console.log('captured payment-idcard')
 }
+
+// 附加：运维设置面板（馆名连点 3 次 → 授权门，验收 FhSettings）
+if (!skip.has('settings-auth')) {
+  await send('Runtime.evaluate', { expression: `location.hash = '/'` })
+  await new Promise(r => setTimeout(r, 1400))
+  await send('Runtime.evaluate', { expression: `for (let i = 0; i < 3; i++) document.querySelector('.fk-header__title').click()` })
+  await new Promise(r => setTimeout(r, 600))
+  const shot = await send('Page.captureScreenshot', { format: 'png' })
+  writeFileSync(path.join(outDir, 'settings-auth.png'), Buffer.from(shot.data, 'base64'))
+  console.log('captured settings-auth')
+}
+
+// 附加：支付成功态 + 单据预览（零售单无电子发票不会跳发票页；15s 到账后截图，验收 FhPdfViewer）
+if (!skip.has('payment-pay-success')) {
+  await send('Runtime.evaluate', { expression: `location.hash = '/'` })
+  await new Promise(r => setTimeout(r, 1000))
+  const expr = `(async () => {
+    const retail = await window.desktop.$invoke('fh:product:retail', {
+      counterName: '自助结算柜台',
+      businessSource: '2',
+      items: [{ itemId: 'P001', itemType: '01', itemName: '菊花花束（白）', qty: 1, price: 99, sortId: '01' }],
+    })
+    const init = await window.desktop.$invoke('fh:payment:settlementInit', { businessId: retail.id, businessType: retail.payBusinessType })
+    const resp = await window.desktop.$invoke('fh:payment:settlement', {
+      businessId: retail.id,
+      businessType: retail.payBusinessType,
+      payItems: init.billItems,
+      settlementMethods: [],
+      counterId: 'FH-0001',
+    })
+    return JSON.stringify({ serialNo: resp.payResponse.serialNo, businessId: retail.id, businessType: retail.payBusinessType })
+  })()`
+  const { result } = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true })
+  const { serialNo, businessId, businessType } = JSON.parse(result.value)
+  await send('Runtime.evaluate', { expression: `location.hash = '/payment/pay?serialNo=${serialNo}&businessId=${businessId}&businessType=${businessType}'` })
+  await new Promise(r => setTimeout(r, 16000))
+  let shot = await send('Page.captureScreenshot', { format: 'png' })
+  writeFileSync(path.join(outDir, 'payment-pay-success.png'), Buffer.from(shot.data, 'base64'))
+  console.log('captured payment-pay-success')
+  // 打开单据预览浮层
+  await send('Runtime.evaluate', { expression: `document.querySelector('.fp-pay__preview').click()` })
+  await new Promise(r => setTimeout(r, 1200))
+  shot = await send('Page.captureScreenshot', { format: 'png' })
+  writeFileSync(path.join(outDir, 'payment-pay-viewer.png'), Buffer.from(shot.data, 'base64'))
+  console.log('captured payment-pay-viewer')
+}
 ws.close()
 process.exit(0)

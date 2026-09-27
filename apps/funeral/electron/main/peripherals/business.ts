@@ -24,6 +24,8 @@ import type {
 } from '../../../src/types/funeral'
 import type { FhIpc } from '../../../src/types/ipc'
 import { createHandle } from '@desktop/core'
+import { app } from 'electron'
+import { loadAdminPassword, saveBusinessConfig } from '../config'
 import { buildDemoPdf } from './demo-pdf'
 
 /** 业务通道包装：channel / 入参 / 返回值全部受 FhIpc 契约约束 */
@@ -218,7 +220,17 @@ const QR_PREFIXES = ['PB', 'dzhhz', 'dzjcz', 'NPE'] as const
 // ===== 注册 =====
 
 export function registerFhBusiness(businessConfig: FhBusinessConfig): void {
-  handle('fh:config:get', () => businessConfig)
+  let config = businessConfig
+  handle('fh:config:get', () => config)
+  handle('fh:config:update', (_event, input) => {
+    config = saveBusinessConfig(input)
+    return config
+  })
+  handle('fh:auth:verify', (_event, input) => input.password === loadAdminPassword())
+  handle('fh:app:exit', () => {
+    // kiosk 霸屏唯一合法退出入口：app.quit() 先触发 before-quit，resilience exitGuard 放行退出流程
+    app.quit()
+  })
   handle('fh:qrcode:decode', (_event, input) => decodeQrcode(input.content))
   handle('fh:payment:methods', () => settlementMethods())
   handle('fh:payment:settlementInit', (_event, input) => settlementInit(input))

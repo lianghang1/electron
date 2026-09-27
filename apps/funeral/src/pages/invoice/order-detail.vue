@@ -4,10 +4,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fh } from '../../api/fh'
 import FhModal from '../../components/FhModal.vue'
+import FhPdfViewer from '../../components/FhPdfViewer.vue'
 import { playSpeech } from '../../composables/use-speech'
 
 /**
- * 发票清单：展示该业务单全部发票，开票中自动轮询，已开票可打印。
+ * 发票清单：展示该业务单全部发票，开票中自动轮询，已开票可打印/预览。
  */
 const route = useRoute()
 const router = useRouter()
@@ -15,6 +16,10 @@ const router = useRouter()
 const invoices = ref<InvoiceApply[]>([])
 const payBusiness = ref<PayBusiness | undefined>()
 const printing = ref(false)
+const previewing = ref(false)
+const viewerVisible = ref(false)
+const previewUrl = ref('')
+const previewTitle = ref('电子发票')
 
 const modalVisible = ref(false)
 const modalType = ref<'success' | 'error'>('success')
@@ -83,6 +88,30 @@ async function handlePrint(invoice: InvoiceApply): Promise<void> {
   }
   finally {
     printing.value = false
+  }
+}
+
+async function handlePreview(invoice: InvoiceApply): Promise<void> {
+  if (previewing.value)
+    return
+  previewing.value = true
+  try {
+    const base64 = await fh.downloadReport({
+      code: 'paymentInvoice',
+      extParams: {
+        invoiceCode: invoice.invoiceCode || '',
+        invoiceId: invoice.id,
+        invoiceNo: invoice.invoiceNo || '',
+      },
+    })
+    previewUrl.value = `data:application/pdf;base64,${base64}#toolbar=0&navpanes=0`
+    viewerVisible.value = true
+  }
+  catch {
+    showModal('error', '发票预览加载失败，请稍后重试')
+  }
+  finally {
+    previewing.value = false
   }
 }
 
@@ -176,6 +205,13 @@ onBeforeUnmount(stopPolling)
           <div class="fi-list__card-actions">
             <button
               v-if="invoice.payTaxInvoiceStatus === '3'"
+              class="fh-btn fh-btn--ghost fi-list__print"
+              @click="handlePreview(invoice)"
+            >
+              预览发票
+            </button>
+            <button
+              v-if="invoice.payTaxInvoiceStatus === '3'"
               class="fh-btn fh-btn--primary fi-list__print"
               :disabled="printing"
               @click="handlePrint(invoice)"
@@ -196,6 +232,8 @@ onBeforeUnmount(stopPolling)
       :message="modalMessage"
       :duration="modalDuration"
     />
+
+    <FhPdfViewer v-model:visible="viewerVisible" :title="previewTitle" :url="previewUrl" />
   </div>
 </template>
 

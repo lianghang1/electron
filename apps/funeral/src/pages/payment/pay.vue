@@ -4,6 +4,7 @@ import QRCode from 'qrcode'
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fh } from '../../api/fh'
+import FhPdfViewer from '../../components/FhPdfViewer.vue'
 import { fhResetCountdownKey } from '../../composables/use-countdown'
 import { playSpeech } from '../../composables/use-speech'
 
@@ -25,6 +26,12 @@ const paymentMethods = ref<SettlementMethod[]>([])
 const hasElectronicInvoice = ref(false)
 const printBillLock = ref(false)
 const redirectCountdown = ref(10)
+
+/** 成功态单据预览：打开时暂停自动返回倒计时，关闭后恢复 */
+const payGroupId = ref('')
+const previewLoading = ref(false)
+const viewerVisible = ref(false)
+const previewUrl = ref('')
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let redirectTimer: ReturnType<typeof setInterval> | null = null
@@ -79,6 +86,7 @@ async function handleGetOrder(): Promise<boolean> {
     status.value = 'fail'
 
   if (status.value === 'success' && data.paymentGroupId) {
+    payGroupId.value = data.paymentGroupId
     hasElectronicInvoice.value = data.hasElectronicInvoice === true
     void handlePrintBill(data.paymentGroupId)
     if (hasElectronicInvoice.value) {
@@ -112,6 +120,30 @@ function stopRedirect(): void {
     clearInterval(redirectTimer)
     redirectTimer = null
   }
+}
+
+async function handlePreviewBill(): Promise<void> {
+  if (previewLoading.value || !payGroupId.value)
+    return
+  previewLoading.value = true
+  try {
+    const base64 = await fh.downloadReport({ code: 'PaymentFinishBean', extParams: { groupId: payGroupId.value } })
+    previewUrl.value = `data:application/pdf;base64,${base64}#toolbar=0&navpanes=0`
+    stopRedirect()
+    viewerVisible.value = true
+  }
+  catch {
+    // 单据获取失败不打断支付完成流程
+  }
+  finally {
+    previewLoading.value = false
+  }
+}
+
+function handleViewerVisible(val: boolean): void {
+  viewerVisible.value = val
+  if (!val)
+    startRedirect()
 }
 
 async function handleCancel(): Promise<void> {
@@ -207,6 +239,9 @@ onBeforeUnmount(() => {
         <p class="fp-pay__desc">
           支付凭条正在打印，请从机器下方出口取走
         </p>
+        <button class="fh-btn fh-btn--ghost fp-pay__preview" :disabled="previewLoading" @click="handlePreviewBill">
+          {{ previewLoading ? '正在加载单据...' : '预览缴费单据' }}
+        </button>
         <p class="fp-pay__redirect">
           {{ redirectCountdown }} 秒后自动返回首页
         </p>
@@ -233,6 +268,13 @@ onBeforeUnmount(() => {
         </button>
       </template>
     </div>
+
+    <FhPdfViewer
+      title="缴费单据"
+      :visible="viewerVisible"
+      :url="previewUrl"
+      @update:visible="handleViewerVisible"
+    />
   </div>
 </template>
 
@@ -333,6 +375,12 @@ onBeforeUnmount(() => {
   margin: 12px 0 0;
   font-size: 17px;
   color: var(--fh-text-2);
+}
+
+.fp-pay__preview {
+  height: 46px;
+  margin-top: 18px;
+  padding: 0 44px;
 }
 
 .fp-pay__redirect {

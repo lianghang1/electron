@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fh } from './api/fh'
+import FhSettings from './components/FhSettings.vue'
 import { fhResetCountdownKey } from './composables/use-countdown'
 import { useScanner } from './composables/use-scanner'
 
@@ -78,6 +79,47 @@ watch(() => route.fullPath, () => {
   expireSecond.value = DEFAULT_EXPIRE_SECOND
   startCountdown()
 }, { immediate: true })
+
+// ===== 运维设置：馆名 5s 内连点 3 次进入（升级自参考项目，连点时有进度点提示） =====
+
+const settingsVisible = ref(false)
+const hallClickCount = ref(0)
+let hallClickTimer: ReturnType<typeof setTimeout> | null = null
+let hallFirstClickTime = 0
+
+function handleHallClick(): void {
+  const now = Date.now()
+  if (now - hallFirstClickTime > 5000) {
+    hallClickCount.value = 1
+    hallFirstClickTime = now
+  }
+  else {
+    hallClickCount.value++
+  }
+  if (hallClickTimer)
+    clearTimeout(hallClickTimer)
+  hallClickTimer = setTimeout(() => {
+    hallClickCount.value = 0
+    hallFirstClickTime = 0
+  }, 5000)
+  if (hallClickCount.value >= 3) {
+    hallClickCount.value = 0
+    hallFirstClickTime = 0
+    if (hallClickTimer) {
+      clearTimeout(hallClickTimer)
+      hallClickTimer = null
+    }
+    settingsVisible.value = true
+  }
+}
+
+// 设置面板打开时暂停全局「无操作回首页」倒计时（面板自带 30s 自动关闭），关闭后恢复
+watch(settingsVisible, (val) => {
+  if (val)
+    stopCountdown()
+  else
+    startCountdown()
+})
 
 // ===== 扫码分发：PB 结算业务 / dzhhz 电子火化证 / NPE 业务码 =====
 
@@ -169,9 +211,14 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
           <path d="M13.5 19c-1.4 2.8-.8 6.2 1.8 8.4M26.5 19c1.4 2.8.8 6.2-1.8 8.4" fill="none" stroke="currentColor" stroke-width="1.4" opacity="0.8" />
           <path d="M13 31h14" stroke="currentColor" stroke-width="1.4" opacity="0.55" />
         </svg>
-        <h1 class="fk-header__title">
-          {{ hallName }}
-        </h1>
+        <div class="fk-header__brand-text">
+          <h1 class="fk-header__title" @click="handleHallClick">
+            {{ hallName }}
+          </h1>
+          <span class="fk-header__unlock" :class="{ 'is-on': hallClickCount > 0 }" aria-hidden="true">
+            <i v-for="n in 3" :key="n" :class="{ 'is-lit': n <= hallClickCount }" />
+          </span>
+        </div>
       </div>
       <div class="fk-header__time">
         <div class="fk-header__date">
@@ -216,6 +263,9 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
       <span>© {{ now.getFullYear() }} {{ hallName }}</span>
       <span>版本号：{{ appVersion }}</span>
     </footer>
+
+    <!-- 运维设置：馆名连点 3 次进入 -->
+    <FhSettings v-model:visible="settingsVisible" />
   </div>
 </template>
 
@@ -268,6 +318,10 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
   align-items: center;
 }
 
+.fk-header__brand-text {
+  position: relative;
+}
+
 .fk-header__logo {
   width: 44px;
   height: 44px;
@@ -282,6 +336,32 @@ const pageTitle = computed(() => (route.meta.title as string | undefined) ?? '')
   font-weight: 700;
   letter-spacing: 5px;
   white-space: nowrap;
+}
+
+/* 连点解锁进度点：仅点击后短暂浮现，平时不可见 */
+.fk-header__unlock {
+  position: absolute;
+  left: 2px;
+  bottom: -7px;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.fk-header__unlock.is-on {
+  opacity: 1;
+}
+
+.fk-header__unlock i {
+  width: 5px;
+  height: 5px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 30%);
+}
+
+.fk-header__unlock i.is-lit {
+  background: var(--fh-gold-bright);
 }
 
 .fk-header__time {

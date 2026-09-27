@@ -1,4 +1,5 @@
 import type {
+  FhBusinessConfig,
   GetCertificateRequest,
   GetProductListRequest,
   InvoiceListRequest,
@@ -26,6 +27,12 @@ export const fh = {
   // ===== 配置 =====
   /** 自助机业务配置 */
   getConfig: () => invoke('fh:config:get'),
+  /** 更新业务配置（设置面板保存，写回 userData/config.json） */
+  updateConfig: (input: Partial<FhBusinessConfig>) => invoke('fh:config:update', input),
+  /** 运维授权密码校验（设置面板入口） */
+  verifyAuth: (password: string) => invoke('fh:auth:verify', { password }),
+  /** 退出自助终端应用 */
+  exitApp: () => invoke('fh:app:exit'),
   /** 扫码解码：prefix 决定跳转分发 */
   decodeQrcode: (content: string) => invoke('fh:qrcode:decode', { content }),
 
