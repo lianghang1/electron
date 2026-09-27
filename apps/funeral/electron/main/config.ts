@@ -6,6 +6,7 @@ import { app } from 'electron'
 const DEFAULT_CONFIG: FhBusinessConfig = {
   machineId: 'FH-0001',
   hallName: '市殡仪馆',
+  counterName: '自助结算柜台',
 }
 
 /**

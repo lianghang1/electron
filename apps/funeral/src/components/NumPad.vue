@@ -1,177 +1,81 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+/**
+ * 纯数字键盘网格：1-9 / 占位 / 0 / X（X 暖金高亮，身份证校验位）。
+ * 不持有状态，按键事件完全交给父级处理。
+ */
+const emit = defineEmits<{ key: [key: string] }>()
 
-const emit = defineEmits<{ confirm: [idNumber: string], close: [] }>()
-
-const MAX_LENGTH = 18
-
-const value = ref('')
-const error = ref('')
+const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'X']
 
 function press(key: string): void {
-  error.value = ''
-  if (value.value.length >= MAX_LENGTH)
-    return
-  // X 只能作为最后一位（身份证校验位）
-  if (key === 'X')
-    value.value = `${value.value.replace('X', '')}X`
-  else
-    value.value = `${value.value.replace('X', '')}${key}`
-}
-
-function backspace(): void {
-  value.value = value.value.slice(0, -1)
-}
-
-function clear(): void {
-  value.value = ''
-  error.value = ''
-}
-
-function confirm(): void {
-  if (!/^(?:\d{15}|\d{17}[\dX])$/.test(value.value)) {
-    error.value = '请输入完整身份证号'
-    return
-  }
-  emit('confirm', value.value)
-  clear()
+  if (key)
+    emit('key', key)
 }
 </script>
 
 <template>
-  <div class="fn-numpad">
-    <div class="fn-numpad__head">
-      <span class="fn-numpad__title">输入身份证号</span>
-      <button class="fn-numpad__close" @click="emit('close')">
-        关闭
-      </button>
-    </div>
-    <div class="fn-numpad__display" :class="{ 'is-error': error }">
-      {{ value || error || '请输入 18 位身份证号' }}
-    </div>
-    <div class="fn-numpad__keys">
-      <button v-for="n in 9" :key="n" class="fn-numpad__key" @click="press(String(n))">
-        {{ n }}
-      </button>
-      <button class="fn-numpad__key" @click="press('X')">
-        X
-      </button>
-      <button class="fn-numpad__key" @click="press('0')">
-        0
-      </button>
-      <button class="fn-numpad__key" @click="backspace">
-        退格
-      </button>
-    </div>
-    <div class="fn-numpad__actions">
-      <button class="fn-numpad__action" @click="clear">
-        清空
-      </button>
-      <button class="fn-numpad__action fn-numpad__action--primary" @click="confirm">
-        确认查询
-      </button>
-    </div>
+  <div class="fh-numpad">
+    <button
+      v-for="(key, i) in KEYS"
+      :key="i"
+      class="fh-numpad__key"
+      :class="{ 'fh-numpad__key--x': key === 'X', 'fh-numpad__key--blank': !key }"
+      :disabled="!key"
+      @click="press(key)"
+    >
+      {{ key }}
+    </button>
   </div>
 </template>
 
 <style scoped>
-.fn-numpad {
-  width: 460px;
-  background: #ffffff;
-  border: 1px solid #e3e0db;
-  border-radius: 14px;
-  padding: 20px;
-  box-shadow: 0 8px 30px rgba(43, 53, 64, 0.14);
-}
-.fn-numpad__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.fn-numpad__title {
-  font-size: 17px;
-  font-weight: 600;
-  color: #2b3540;
-}
-.fn-numpad__close {
-  border: 1px solid #d9d5cf;
-  background: #f7f6f3;
-  border-radius: 8px;
-  color: #6b7684;
-  font-size: 14px;
-  padding: 6px 14px;
-  cursor: pointer;
-  font-family: inherit;
-}
-.fn-numpad__display {
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #e3e0db;
-  border-radius: 10px;
-  background: #fafaf8;
-  font-size: 22px;
-  letter-spacing: 2px;
-  color: #2b3540;
-  margin-bottom: 14px;
-  font-family: 'Consolas', monospace;
-}
-.fn-numpad__display.is-error {
-  color: #b0483a;
-  font-size: 16px;
-  letter-spacing: 0;
-  font-family: inherit;
-}
-.fn-numpad__keys {
+.fh-numpad {
+  width: 432px;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
 }
-.fn-numpad__key {
-  height: 58px;
-  border: 1px solid #e3e0db;
-  border-radius: 10px;
-  background: #fafaf8;
-  font-size: 22px;
-  color: #2b3540;
-  margin: 0 8px 8px 0;
-  cursor: pointer;
+
+.fh-numpad__key {
+  height: 64px;
+  margin: 0 12px 12px 0;
+  border: 1px solid var(--fh-line-strong);
+  border-radius: var(--fh-radius-sm);
+  background: var(--fh-surface-2);
+  color: var(--fh-text);
   font-family: inherit;
+  font-size: 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
 }
-.fn-numpad__key:nth-child(3n) {
+
+.fh-numpad__key:nth-child(3n) {
   margin-right: 0;
 }
-.fn-numpad__key:hover {
-  background: #efedea;
+
+.fh-numpad__key:nth-last-child(-n + 3) {
+  margin-bottom: 0;
 }
-.fn-numpad__key:active {
-  background: #e5e2dd;
+
+.fh-numpad__key:hover {
+  background: #eef1f6;
 }
-.fn-numpad__actions {
-  display: flex;
-  margin-top: 6px;
+
+.fh-numpad__key:active {
+  background: #e2e8f2;
 }
-.fn-numpad__action {
-  flex: 1;
-  height: 54px;
-  border: 1px solid #d9d5cf;
-  border-radius: 10px;
-  background: #f7f6f3;
-  color: #2b3540;
-  font-size: 18px;
-  cursor: pointer;
-  font-family: inherit;
+
+.fh-numpad__key--x {
+  background: var(--fh-gold-soft);
+  border-color: var(--fh-gold);
+  color: var(--fh-gold);
 }
-.fn-numpad__action + .fn-numpad__action {
-  margin-left: 12px;
+
+.fh-numpad__key--x:hover {
+  background: rgb(168 130 60 / 18%);
 }
-.fn-numpad__action--primary {
-  background: #3a4a5a;
-  border-color: #3a4a5a;
-  color: #ffffff;
-}
-.fn-numpad__action--primary:hover {
-  background: #2e3b48;
+
+.fh-numpad__key--blank {
+  visibility: hidden;
 }
 </style>

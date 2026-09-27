@@ -36,6 +36,7 @@
     "typescript": "catalog:",
     "vite": "catalog:",
     "vue": "catalog:",
+    "vue-router": "^4.5.0",
     "vue-tsc": "catalog:"
   }
 }
