@@ -3,6 +3,7 @@ productName: Desktop
 directories:
   buildResources: build
 # asar 热更引导器结构：app.asar → app.core.asar（真实代码），app.asar 重写为 KB 级引导器
+# 钩子与引导器为全 app 共享（packages/core），接入方式见钩子头注释
 afterPack: scripts/after-pack.cjs
 files:
   - '!**/.vscode/*'

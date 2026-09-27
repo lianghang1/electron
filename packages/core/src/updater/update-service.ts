@@ -13,6 +13,7 @@ import electronUpdater from 'electron-updater'
 export class UpdateService {
   private readonly autoUpdater = electronUpdater.autoUpdater
   private installed = false
+  private downloaded = false
 
   constructor(
     private readonly feedUrl: string | undefined,
@@ -32,14 +33,20 @@ export class UpdateService {
     }
 
     this.autoUpdater.setFeedURL({ provider: 'generic', url: this.feedUrl })
-    this.autoUpdater.autoDownload = true
     this.autoUpdater.autoInstallOnAppQuit = true
 
     const push = (state: UpdateState) => this.events.emit('update:state', state)
+    // 下载 promise 显式接管：autoDownload 的内置 promise 是 fire-and-forget，
+    // 缺 app-update.yml（win-unpacked 直跑）等场景会 unhandled rejection
+    this.autoUpdater.autoDownload = false
     this.autoUpdater.on('checking-for-update', () => push({ status: 'checking' }))
     this.autoUpdater.on('update-available', (info) => {
       this.logger.info(`update available: ${info.version}`)
       push({ status: 'available', version: info.version })
+      void this.autoUpdater.downloadUpdate().catch((error) => {
+        this.logger.error('update download failed', { error: String(error) })
+        push({ status: 'error', message: String(error) })
+      })
     })
     this.autoUpdater.on('update-not-available', info =>
       push({ status: 'not-available', version: info.version }))
@@ -47,6 +54,7 @@ export class UpdateService {
       push({ status: 'downloading', percent: progress.percent }))
     this.autoUpdater.on('update-downloaded', (info) => {
       this.logger.info(`update downloaded: ${info.version}`)
+      this.downloaded = true
       push({ status: 'downloaded', version: info.version })
     })
     this.autoUpdater.on('error', (error) => {
@@ -67,6 +75,11 @@ export class UpdateService {
     void this.autoUpdater.checkForUpdates().catch((error) => {
       this.logger.error('update check failed', { error: String(error) })
     })
+  }
+
+  /** 整包是否已下载完成（定时重启决策用） */
+  isDownloaded(): boolean {
+    return this.downloaded
   }
 
   /** 下载完成后重启安装 */

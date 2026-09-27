@@ -7,6 +7,9 @@ productName: FhKiosk
 executableName: FhKiosk
 directories:
   buildResources: build
+# asar 热更引导器结构：app.asar → app.core.asar（真实代码），app.asar 重写为 KB 级引导器
+# 钩子与引导器为全 app 共享（packages/core），接入方式见钩子头注释
+afterPack: scripts/after-pack.cjs
 files:
   - '!**/.vscode/*'
   - '!src/*'
@@ -45,13 +48,10 @@ nsis:
   # 面向用户的中文名：桌面快捷方式名称与「应用和功能」卸载列表里显示的名称
   shortcutName: 智慧殡仪自助终端
   uninstallDisplayName: 智慧殡仪自助终端
-  # true = 一键安装（无向导，双击直接装完）；false = 分步向导（欢迎页 → 选目录 → 安装 → 完成）
-  oneClick: false
-  # true = 为这台电脑所有用户安装：装进 Program Files、写 HKLM 注册表，安装时弹 UAC 管理员授权；
-  # false = 仅当前用户：装进 %LocalAppData%，不需要管理员权限
-  perMachine: true
-  # 向导目录页显示「浏览」按钮，允许用户自行修改安装位置（仅 oneClick: false 时有意义）
-  allowToChangeInstallationDirectory: true
+  # true = 一键安装（无向导，双击直接装完，无任何确认按钮）；false = 分步向导
+  oneClick: true
+  # false = 仅当前用户：装进 %LocalAppData%，安装与更新全程零 UAC（无人值守更新链路的前提）
+  perMachine: false
   # 完成页显示「运行 应用」复选框，装完可直接勾选启动
   runAfterFinish: true
   # 桌面快捷方式：always = 每次安装/升级都确保存在；true = 仅首次安装创建；false = 不创建

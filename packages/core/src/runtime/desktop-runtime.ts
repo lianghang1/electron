@@ -68,8 +68,21 @@ export class DesktopRuntime {
       })
 
       this.windowService.createMainWindow(this.options)
-      // 运行韧性（无人值守场景，默认全关）：主窗口就绪后挂载
-      this.resilienceService.attach(this.options, () => this.windowService.getMainWindow())
+      // 运行韧性（无人值守场景，默认全关）：主窗口就绪后挂载；
+      // 定时重启的更新决策走闭包（调用时求值，规避服务创建顺序）
+      this.resilienceService.attach(
+        this.options,
+        () => this.windowService.getMainWindow(),
+        {
+          hasPendingAsar: () => this.asarUpdateService.hasPending(),
+          installPendingPackage: () => {
+            if (!this.updateService.isDownloaded())
+              return false
+            this.updateService.install()
+            return true
+          },
+        },
+      )
 
       app.on('activate', () => {
         // On macOS re-create a window when the dock icon is clicked
@@ -210,10 +223,13 @@ export class DesktopRuntime {
     }
     registerApps(this.options.apps.manifests ?? [], 'code')
     registerApps(loadLocalAppManifests(app.getPath('userData'), this.logger), 'apps.json')
-    // 远程源异步拉取：失败不拖垮启动，注册成功后经事件正常流转
+    // 远程源异步拉取：origin 白名单把关（默认空 = 禁用），失败不拖垮启动，注册成功后经事件正常流转
     if (this.options.apps.remoteUrl) {
-      void loadRemoteAppManifests(this.options.apps.remoteUrl, this.logger)
-        .then(manifests => registerApps(manifests, 'remote'))
+      void loadRemoteAppManifests(
+        this.options.apps.remoteUrl,
+        this.logger,
+        this.options.apps.remoteOrigins ?? [],
+      ).then(manifests => registerApps(manifests, 'remote'))
     }
   }
 

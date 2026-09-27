@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import { loadBusinessConfig } from './config'
 import { registerHospitalBusiness } from './peripherals/business'
@@ -22,6 +23,11 @@ bootstrap({
   apps: {
     allowThirdParty: false,
   },
+  // 更新体系开关：DESKTOP_UPDATE_FEED 指向更新服务器（整包 latest.yml + asar 清单同源），
+  // 生产部署写进部署环境；未配置则两种更新都禁用
+  updates: process.env.DESKTOP_UPDATE_FEED
+    ? { url: process.env.DESKTOP_UPDATE_FEED, asar: 'asar-manifest.json' }
+    : undefined,
   // 单应用形态：不装配 Tab 体系
   features: {
     tabs: false,
@@ -30,6 +36,7 @@ bootstrap({
     crashReload: true,
     autoLaunch: true,
     exitGuard: true,
+    scheduledRestart: {},
   },
   browserWindowOptions: {
     fullscreen: true,

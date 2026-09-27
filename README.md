@@ -19,27 +19,23 @@ electron/
 │   │   ├── electron/main/    # bootstrap：注册 App、窗口配置
 │   │   ├── electron/preload/ # 薄壳：re-export core preload
 │   │   └── src/              # Shell renderer：TabBar / AppLauncher / 窗口控制
-│   └── kiosk/                # 形态二：自助机（单应用全屏，无 Tab Shell）
-│       ├── electron/main/    # bootstrap：kiosk 窗口（fullscreen + kiosk: true）
-│       └── src/              # 自有业务 UI，直接渲染
+│   ├── kiosk|hospital|funeral/ # 形态二：自助机（单应用全屏，无 Tab Shell）
+│   │   ├── electron/main/    # bootstrap：kiosk 窗口（fullscreen + kiosk: true）
+│   │   └── src/              # 自有业务 UI，直接渲染
 ├── packages/
-│   ├── shared/               # IPC 契约与全部类型（DesktopIpc / DesktopApi / 权限）
-│   ├── core/                 # 平台核心（不含任何业务）
+│   ├── shared/               # 跨端契约（纯类型 + 唯一运行时值 DesktopError）
+│   │   └── src/types/ipc/    #   IPC 契约按能力域拆分，与 core/src/ipc/ 同名对应
+│   ├── core/                 # 主进程平台运行时（不含任何业务）
 │   │   └── src/
-│   │       ├── app/          #   AppRegistry / AppService（App 生命周期）
 │   │       ├── runtime/      #   DesktopRuntime（组装根）+ bootstrap 入口
-│   │       ├── event/        #   EventBus（进程内事件）
-│   │       ├── ipc/          #   handle 包装 / CallerResolver / 通道注册
-│   │       ├── logger/       #   electron-log：文件轮转 / 崩溃捕获 / renderer 控制台桥接
-│   │       ├── permission/   #   PermissionService（默认全拒）
-│   │       ├── session/      #   SessionService（persist:app-<appId> 隔离）
-│   │       ├── storage/      #   StorageService（electron-store，每 App 一个文件）
-│   │       ├── tab/          #   TabService（创建/激活/关闭）
-│   │       ├── web/          #   WebService（WebContentsView 容器）
-│   │       ├── window/       #   WindowService + 安全防护
-│   │       └── preload/      #   最小桥 window.desktop
-│   ├── config/               # tsconfig.base.json / eslint factory
-│   └── vite-config/          # electron-vite 配置工厂（强制 preload 输出 .cjs）
+│   │       ├── ipc/          #   IPC 域注册文件（window/app/tabs/...）+ handle 原语
+│   │       ├── app|window|tab|web|device|permission|storage|session|download|updater/
+│   │       │                 #   平台能力域（一域一目录，Service 构造器注入）
+│   │       ├── event/        #   EventBus（域间解耦，仅 Main 进程内）
+│   │       └── preload/      #   最小桥 window.desktop + 通道白名单
+│   └── config/               # 工程配置唯一入口：vite 工厂（dist）/ eslint 工厂 / tsconfig.base
+├── resources/brand/          # 安装器品牌图（NSIS sidebar/header）+ 生成脚本
+├── scripts/                  # gen:app 脚手架 / hotfix 热更打包
 └── pnpm-workspace.yaml
 ```
 
@@ -65,7 +61,7 @@ Web App (WebContentsView)       不注入 preload，安全基线写死，与 She
 
 ### IPC 契约
 
-全部 IPC 通道定义在 `packages/shared/src/types/ipc.ts` 的 `DesktopIpc`（type alias），双形态：
+全部 IPC 通道定义在 `packages/shared/src/types/ipc/`（按能力域拆分）并集为 `DesktopIpc`（type alias），双形态：
 
 - `(...args) => result` — Renderer → Main 的 invoke
 - `[...args]` — Main → Renderer 的推送事件（如 `tabs:updated`）
@@ -90,9 +86,12 @@ pnpm install        # 安装依赖
 pnpm dev            # 启动桌面应用（dev 模式，HMR）
 pnpm dev:kiosk      # 启动自助机应用（全屏 kiosk 形态）
 pnpm build          # 生产构建（main + preload + renderer）
+pnpm test           # 平台单测（packages/core，vitest）
 pnpm typecheck      # 全 workspace 类型检查
 pnpm lint           # 代码检查
 pnpm lint:fix       # 代码检查 + 格式化（antfu eslint 即 formatter）
+pnpm gen:app <slug> <中文名>   # 生成新 App 骨架（kiosk 形态）
+pnpm hotfix <app>   # 打包 asar 热更发布物（asar + 清单）
 ```
 
 ## 开发指南
@@ -152,6 +151,45 @@ Shell 用 `ResizeObserver` 观察内容区，把矩形传给平台，激活的 W
 ```ts
 window.desktop.tabs.setWorkArea({ x, y, width, height })
 ```
+
+### 新增一个平台能力（以「剪贴板」为例）
+
+固定三步，目录一一对应，看完任意现有域照抄即可：
+
+1. **契约**：`packages/shared/src/types/ipc/` 新建 `clipboard.ts`（type alias，双形态），并在 `ipc/index.ts` 的并集里追加 `& ClipboardIpc`
+2. **注册**：`packages/core/src/ipc/` 新建同名 `clipboard.ts`（`registerClipboardIpc(deps)`，只依赖本域 Service），并在 `ipc/index.ts` 编排器里追加一行
+3. **实现**：能力逻辑放 `packages/core/src/<domain>/`（一域一目录，构造器注入，域间用 EventBus 或装配根解耦）
+
+配好 `DesktopApi`（`shared/src/types/api.ts`）后 Renderer 侧 `window.desktop` 即可调用；preload 通道白名单 `satisfies` 契约约束拼写。跑 `pnpm --filter @desktop/core test` 补一个域测试。
+
+### 创建一个新 App
+
+```bash
+pnpm gen:app census 人口普查自助终端
+pnpm install                                  # 建立 workspace 链接
+pnpm --filter @app/census dev                 # 启动
+```
+
+生成的是 kiosk 形态骨架（全屏单应用 + 韧性 + 三件套：入口 `bootstrap` / 配置 `bootstrap 参数` / 脚本 `dev|build|typecheck`）。Tab Shell 形态请复制 `apps/desktop` 改造。
+
+### 更新体系（全 app 支持：整包 + asar 热更双通道）
+
+打包产物为引导器两层结构（`packages/core/scripts/after-pack.cjs` 全 app 共享）：
+
+```
+resources/app.asar        ← KB 级引导器，永不更新，启动时裁决加载哪份代码
+resources/app.core.asar   ← 真实全部代码，热更换的就是它
+```
+
+更新判据：改了业务代码/UI → asar 热更（1.4MB 级，重启生效）；升级 Electron / 新增原生依赖 / 改安装配置 → 整包。安装均配置 `perMachine: false`（用户级目录），更新链路全程零 UAC。
+
+```bash
+pnpm --filter @app/funeral build:win    # 产出 dist/win-unpacked/resources/app.core.asar
+pnpm hotfix funeral                     # 生成 apps/funeral/dist/hotfix/
+#   core-<version>.asar + update-manifest.json（version / url / sha256）
+```
+
+热更两个文件上传到 `updates.asar` 指向的服务器目录即完成发布；客户端下载后 sha256 强校验、写 pending 标记，重启由引导器完成指针切换（运行中绝不替换 asar——规避 Windows 文件锁，指针切换 + 60s 判活回滚防变砖）。整包走 electron-updater（`latest.yml` + exe 上传到 `updates.url`），退出时自动安装。端到端验证服务器：`pnpm exec tsx scripts/e2e-update-server.ts`。
 
 ## 约定
 

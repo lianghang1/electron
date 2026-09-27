@@ -5,10 +5,15 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./preload": "./src/preload/index.ts"
+    "./preload": "./src/preload/index.ts",
+    "./scripts/after-pack.cjs": "./scripts/after-pack.cjs"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "electron-log": "^5.4.4",
     "electron-store": "^10.0.0",
@@ -19,6 +24,7 @@
     "@electron-toolkit/utils": "catalog:",
     "@types/node": "catalog:",
     "electron": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

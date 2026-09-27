@@ -14,11 +14,6 @@
     "build:win": "pnpm run build && electron-builder --win",
     "postinstall": "electron-builder install-app-deps"
   },
-  "build": {
-    "appId": "com.company.hospital",
-    "productName": "HospitalKiosk",
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
-  },
   "dependencies": {
     "@electron-toolkit/utils": "catalog:"
   },

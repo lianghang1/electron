@@ -16,11 +16,15 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "gen:brand": "tsx resources/brand/generate.ts",
+    "gen:app": "tsx scripts/generate-app.ts",
+    "hotfix": "tsx scripts/pack-hotfix.ts",
+    "test": "pnpm --filter @desktop/core test",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
     "@desktop/config": "workspace:*",
     "eslint": "catalog:",
+    "tsx": "catalog:",
     "typescript": "catalog:"
   },
   "pnpm": {

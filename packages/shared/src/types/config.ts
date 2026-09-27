@@ -33,8 +33,15 @@ export interface DesktopConfig {
     /**
      * 远程 App 清单源（HTTP URL，返回 DesktopAppManifest 数组）。
      * 异步拉取、失败静默跳过，与代码注册 / apps.json 共用冲突策略（代码注册优先）。
+     * 仅当 origin 命中 remoteOrigins 白名单时才会真正拉取。
      */
     remoteUrl?: string
+    /**
+     * 远程清单源的 origin 白名单（如 'https://apps.company.com'）。
+     * 平台安全基线：不配置 = 远程源整体禁用；配置后 remoteUrl 的 origin
+     * 必须精确命中（含协议与端口），否则拒绝拉取。显式信任语义，协议不再二次限制。
+     */
+    remoteOrigins?: string[]
   }
   /** 平台能力开关：单应用形态（如 Kiosk）可关闭 Tab 体系，避免初始化无用服务 */
   features?: {
@@ -68,5 +75,16 @@ export interface DesktopConfig {
      * 任务管理器结束进程是自助机部署的最后兜底
      */
     exitGuard?: boolean
+    /**
+     * 定时重启（无人值守长跑标配）：每天指定时刻重启进程，动作按更新状态择优——
+     * 有热更 pending → 重启即生效；有已下载整包 → 退出并安装；都没有 → 纯重启释放内存。
+     * 同一天只触发一次，休眠/关机跨过时刻则跳过当天
+     */
+    scheduledRestart?: {
+      /** 24 小时制小时（0-23），默认 3（凌晨） */
+      hour?: number
+      /** 分钟（0-59），默认 0 */
+      minute?: number
+    }
   }
 }

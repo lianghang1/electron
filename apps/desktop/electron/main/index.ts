@@ -46,8 +46,14 @@ bootstrap({
   apps: {
     allowThirdParty: false,
     manifests: builtinApps,
-    // 远程源联调开关：DESKTOP_APPS_REMOTE 指向返回 DesktopAppManifest 数组的 URL（生产部署改成应用中心地址）
-    ...(process.env.DESKTOP_APPS_REMOTE ? { remoteUrl: process.env.DESKTOP_APPS_REMOTE } : {}),
+    // 远程源联调开关：DESKTOP_APPS_REMOTE 指向返回 DesktopAppManifest 数组的 URL，
+    // DESKTOP_APPS_ORIGINS 为其 origin 白名单（逗号分隔，生产部署改成应用中心地址与域名）
+    ...(process.env.DESKTOP_APPS_REMOTE
+      ? {
+          remoteUrl: process.env.DESKTOP_APPS_REMOTE,
+          remoteOrigins: process.env.DESKTOP_APPS_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [],
+        }
+      : {}),
   },
   // 更新体系联调开关：设置 DESKTOP_UPDATE_FEED 环境变量后启用（生产部署改成真实更新服务器地址）
   updates: process.env.DESKTOP_UPDATE_FEED

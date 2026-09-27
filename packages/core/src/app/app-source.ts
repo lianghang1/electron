@@ -45,9 +45,18 @@ export function loadLocalAppManifests(userDataPath: string, logger: Logger): Des
 
 /**
  * 远程配置源：HTTP(S) 拉取 DesktopAppManifest 数组（应用中心 / 企业应用商店）。
- * 超时与解析失败都不拖垮平台启动；结构校验与本地源同一标准。
+ * 安全基线：url 的 origin 必须命中 allowedOrigins 白名单（默认空 = 远程源禁用），
+ * 未命中时静默拒绝并告警。超时与解析失败都不拖垮平台启动；结构校验与本地源同一标准。
  */
-export async function loadRemoteAppManifests(url: string, logger: Logger): Promise<DesktopAppManifest[]> {
+export async function loadRemoteAppManifests(
+  url: string,
+  logger: Logger,
+  allowedOrigins: string[] = [],
+): Promise<DesktopAppManifest[]> {
+  if (!isOriginAllowed(url, allowedOrigins)) {
+    logger.warn(`remote app source blocked: origin not in remoteOrigins allowlist`, { url })
+    return []
+  }
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(10_000) })
     if (!response.ok) {
@@ -68,5 +77,17 @@ export async function loadRemoteAppManifests(url: string, logger: Logger): Promi
   catch (error) {
     logger.error('failed to load remote app source', { url, error: String(error) })
     return []
+  }
+}
+
+/** origin 白名单比对：url 解析失败（非法 URL）一律不允许；origin 精确匹配含协议与端口 */
+export function isOriginAllowed(url: string, allowedOrigins: string[]): boolean {
+  if (allowedOrigins.length === 0)
+    return false
+  try {
+    return allowedOrigins.includes(new URL(url).origin)
+  }
+  catch {
+    return false
   }
 }

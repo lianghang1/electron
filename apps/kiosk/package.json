@@ -16,11 +16,6 @@
     "build:linux": "pnpm run build && electron-builder --linux",
     "postinstall": "electron-builder install-app-deps"
   },
-  "build": {
-    "appId": "com.company.kiosk",
-    "productName": "Kiosk",
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
-  },
   "dependencies": {
     "@electron-toolkit/utils": "catalog:"
   },
