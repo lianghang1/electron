@@ -25,6 +25,8 @@ const channels = {
   storageSet: 'storage:set',
   storageRemove: 'storage:remove',
   storageClear: 'storage:clear',
+  cacheClear: 'cache:clear',
+  cacheClearSite: 'cache:clearSite',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   deviceIdcardRead: 'device:idcard:read',
@@ -85,6 +87,10 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
       set: (key, value) => ipcRenderer.invoke(channels.storageSet, key, value),
       remove: key => ipcRenderer.invoke(channels.storageRemove, key),
       clear: () => ipcRenderer.invoke(channels.storageClear),
+    },
+    cache: {
+      clear: appId => ipcRenderer.invoke(channels.cacheClear, appId),
+      clearSite: appId => ipcRenderer.invoke(channels.cacheClearSite, appId),
     },
     update: {
       check: () => ipcRenderer.invoke(channels.updateCheck),

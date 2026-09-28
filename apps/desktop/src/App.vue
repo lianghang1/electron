@@ -33,6 +33,15 @@ async function closeWindow(): Promise<void> {
   await window.desktop.window.close()
 }
 
+// ---- 缓存清理（Tab 右键菜单发起，作用域为该 Tab 对应的容器） ----
+async function cacheClear(appId: string): Promise<void> {
+  await window.desktop.cache.clear(appId)
+}
+
+async function cacheClearSite(appId: string): Promise<void> {
+  await window.desktop.cache.clearSite(appId)
+}
+
 // ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----
 // 权限横幅等 Shell 元素进入布局时 viewport 自动收缩，ResizeObserver 感知后同步给 Main
 function syncWorkArea(): void {
@@ -96,6 +105,8 @@ onBeforeUnmount(() => {
           @minimize="minimize"
           @toggle-maximize="toggleMaximize"
           @close-window="closeWindow"
+          @cache-clear="cacheClear"
+          @cache-clear-site="cacheClearSite"
         />
         <div ref="viewport" class="dt-viewport">
           <div v-if="tabs.length === 0" class="dt-empty">

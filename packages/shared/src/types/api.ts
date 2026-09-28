@@ -53,6 +53,16 @@ export interface DesktopApi {
     /** 清空调用者 App 的全部本地存储 */
     clear: () => Promise<void>
   }
+  /**
+   * 缓存清理（Shell 专属管理动作）：对应浏览器「清除浏览数据」，作用域为单个容器。
+   * 目标 appId 由 Shell 指定，App 无权发起清理。
+   */
+  cache: {
+    /** 清容器可再生缓存（HTTP / 图片缓存），不影响登录态 */
+    clear: (appId: string) => Promise<void>
+    /** 清容器站点数据（cookie / localStorage 等），等于该容器登出，完成后容器自动重载 */
+    clearSite: (appId: string) => Promise<void>
+  }
   update: {
     /** 手动触发检查更新 */
     check: () => Promise<void>

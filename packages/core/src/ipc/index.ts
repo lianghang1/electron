@@ -1,6 +1,7 @@
 import type { DesktopConfig } from '@desktop/shared'
 import type { AppRegistry } from '../app/app-registry'
 import type { AppService } from '../app/app-service'
+import type { CacheService } from '../cache/cache-service'
 import type { PermissionService } from '../permission/permission-service'
 import type { StorageService } from '../storage/storage-service'
 import type { TabService } from '../tab/tab-service'
@@ -9,6 +10,7 @@ import type { UpdateService } from '../updater/update-service'
 import type { WebService } from '../web/web-service'
 import type { CallerResolver } from './caller-context'
 import { registerAppIpc } from './app'
+import { registerCacheIpc } from './cache'
 import { registerPermissionIpc } from './permission'
 import { registerStorageIpc } from './storage'
 import { registerTabsIpc } from './tabs'
@@ -23,6 +25,7 @@ export interface PlatformIpcDeps {
   tabService?: TabService
   webService?: WebService
   storageService: StorageService
+  cacheService: CacheService
   permissionService: PermissionService
   /** updates.url 未配置时为空：整包更新通道不注册 */
   updateService?: UpdateService
@@ -49,5 +52,6 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   registerTabsIpc({ tabService: deps.tabService, webService: deps.webService, resolver: deps.resolver })
   registerPermissionIpc({ permissionService: deps.permissionService, resolver: deps.resolver })
   registerStorageIpc({ storageService: deps.storageService, permissionService: deps.permissionService, resolver: deps.resolver })
+  registerCacheIpc({ cacheService: deps.cacheService, registry: deps.registry, tabService: deps.tabService, resolver: deps.resolver })
   registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService })
 }

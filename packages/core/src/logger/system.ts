@@ -10,7 +10,8 @@ import log from 'electron-log/main'
  * - 子进程异常退出（GPU / utility / renderer 宿主）
  * - 渲染进程崩溃：按 CallerResolver 反查 App 身份，统一覆盖 Shell 窗口与全部 Web 容器，
  *   并上抛 renderer:crashed 事件（审计留痕 / 韧性联动）
- * - renderer 控制台输出：console-message 桥接进日志（Electron ≥32 为单参数 event 对象）
+ * 注意：网页 console 不桥接进日志——App 网页内部的报错归其自身 DevTools / 前端监控，
+ * 平台日志只记平台视角的事件（崩溃、异常退出等），避免第三方网页噪音刷爆日志文件
  */
 export function attachSystemLogging(logger: Logger, resolver: CallerResolver, events: EventBus): void {
   const system = logger.scope('system')
@@ -35,16 +36,5 @@ export function attachSystemLogging(logger: Logger, resolver: CallerResolver, ev
       exitCode: details.exitCode,
     })
     events.emit('renderer:crashed', { appId, reason: details.reason })
-  })
-
-  // 4. renderer 控制台 → 日志（Shell 与 Web App 全部捕获，含来源文件定位）
-  app.on('web-contents-created', (_event, contents) => {
-    contents.on('console-message', (event) => {
-      const appId = resolver.tryResolve(contents)?.appId
-      const scoped = logger.scope(appId ? `renderer:${appId}` : 'renderer:unknown')
-      const level = event.level === 'warning' ? 'warn' : event.level ?? 'info'
-      const where = event.sourceId ? ` (${event.sourceId}:${event.lineNumber ?? 0})` : ''
-      scoped[level](`${event.message}${where}`)
-    })
   })
 }

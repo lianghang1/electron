@@ -10,6 +10,7 @@ import { AppRegistry } from '../app/app-registry'
 import { AppService } from '../app/app-service'
 import { loadLocalAppManifests, loadRemoteAppManifests } from '../app/app-source'
 import { AuditService } from '../audit/audit-service'
+import { CacheService } from '../cache/cache-service'
 import { DeviceService } from '../device/device-service'
 import { DownloadService } from '../download/download-service'
 import { EventBus } from '../event/event-bus'
@@ -39,6 +40,7 @@ export class DesktopRuntime {
   private logger!: Logger
   private sessionService!: SessionService
   private storageService!: StorageService
+  private cacheService!: CacheService
   private permissionService!: PermissionService
   private downloadService!: DownloadService
   private updateService!: UpdateService
@@ -138,6 +140,7 @@ export class DesktopRuntime {
 
     this.sessionService = new SessionService()
     this.storageService = new StorageService()
+    this.cacheService = new CacheService(this.sessionService, this.logger.scope('cache'))
     this.permissionService = new PermissionService(
       this.registry,
       this.events,
@@ -242,6 +245,7 @@ export class DesktopRuntime {
       tabService: this.tabService,
       webService: this.webService,
       storageService: this.storageService,
+      cacheService: this.cacheService,
       permissionService: this.permissionService,
       updateService: this.options.updates?.url ? this.updateService : undefined,
       asarService: this.options.updates?.asar ? this.asarUpdateService : undefined,

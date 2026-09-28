@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https:;">
+<title>平台功能实验室</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    min-height: 100vh;
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: #f6f7f9;
+    color: #1f2328;
+    display: flex;
+    padding: 24px;
+    gap: 20px;
+  }
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+  .side {
+    width: 380px; flex: none;
+    display: flex; flex-direction: column;
+    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px;
+    overflow: hidden;
+  }
+  header.top { display: flex; align-items: center; gap: 10px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: #0f766e; color: #fff;
+    padding: 6px 16px; border-radius: 999px;
+    font-size: 13px; font-weight: 600;
+  }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: #5eead4; }
+  h1 { font-size: 20px; letter-spacing: 1px; }
+  .meta { font-size: 12px; color: #6b7280; }
+  .meta b { color: #0f766e; font-variant-numeric: tabular-nums; }
+
+  .card {
+    background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px;
+    padding: 14px 16px;
+  }
+  .card h2 { font-size: 13px; color: #374151; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .card h2 .tip { font-weight: 400; color: #9ca3af; font-size: 12px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 8px; }
+  button.op {
+    border: 1px solid #d1d5db; border-radius: 8px; background: #ffffff;
+    padding: 8px 14px; font-size: 13px; color: #1f2328; cursor: pointer;
+    font-family: inherit; transition: background .12s, border-color .12s;
+  }
+  button.op:hover { background: #f0fdfa; border-color: #0f766e; }
+  button.op.warn:hover { background: #fffbeb; border-color: #d97706; }
+
+  .fields { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .field { display: flex; gap: 10px; align-items: baseline; }
+  .field .k { color: #6b7280; flex: none; width: 120px; }
+  .field .v { font-variant-numeric: tabular-nums; word-break: break-all; }
+
+  .loghead { padding: 10px 14px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; }
+  .loghead b { font-size: 13px; color: #374151; }
+  .loghead button { border: none; background: none; color: #9ca3af; font-size: 12px; cursor: pointer; }
+  #log { flex: 1; overflow-y: auto; padding: 10px 12px; font-size: 12.5px; line-height: 1.7; }
+  .line { padding: 2px 0; border-bottom: 1px dashed #f3f4f6; word-break: break-all; }
+  .line .t { color: #9ca3af; font-variant-numeric: tabular-nums; margin-right: 6px; }
+  .line.ok { color: #067647; }
+  .line.fail { color: #b42318; }
+  .line.block { color: #b54708; }
+  .line.info { color: #475569; }
+</style>
+</head>
+<body>
+  <div class="main">
+    <header class="top">
+      <span class="badge"><span class="dot"></span>APP ID: lab</span>
+      <h1>平台功能实验室</h1>
+      <span class="meta">本次加载 <b id="loaded-at">--:--:--</b> · persist:app-lab · <b>全部权限已声明</b>（应用中心可见）</span>
+    </header>
+
+    <div class="card">
+      <h2>存储 <span class="tip">web 容器无平台 preload —— 业务数据走网页 localStorage / cookie，同样按 App 持久隔离；重启应用后数值保留即验证通过</span></h2>
+      <div class="grid">
+        <button class="op" data-op="storage-add">localStorage +1</button>
+        <button class="op" data-op="storage-reset">localStorage 清零</button>
+        <button class="op" data-op="cookie-add">cookie 写入</button>
+        <button class="op" data-op="cookie-read">cookie 读取</button>
+      </div>
+      <div class="fields" style="margin-top:10px">
+        <div class="field"><span class="k">localStorage 计数</span><span class="v" id="v-ls">-</span></div>
+        <div class="field"><span class="k">cookie</span><span class="v" id="v-cookie">-</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>权限能力 <span class="tip">lab 已声明 clipboard / notification —— 点击应直接放行（应用中心显示「已声明」）；FSY 未声明，同操作会弹出授权条</span></h2>
+      <div class="grid">
+        <button class="op" data-op="clip-write">写剪贴板</button>
+        <button class="op" data-op="clip-read">读剪贴板</button>
+        <button class="op" data-op="notify">发送系统通知</button>
+        <button class="op" data-op="perm-query">permissions 状态自检</button>
+      </div>
+      <div class="fields" style="margin-top:10px">
+        <div class="field"><span class="k">剪贴板最近读写</span><span class="v" id="v-clip">-</span></div>
+        <div class="field"><span class="k">通知</span><span class="v" id="v-notify">-</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>下载 <span class="tip">lab 声明 download → will-download 放行，任务进入平台下载条（DownloadsBar）；OA 未声明 → 同操作直接拒绝</span></h2>
+      <div class="grid">
+        <button class="op" data-op="download">发起下载（应放行）</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>网络请求 <span class="tip">渲染进程直发 fetch（平台不做 HTTP 代理）；跨域取决于目标服务器的 CORS 头</span></h2>
+      <div class="grid">
+        <button class="op" data-op="fetch-ok">fetch 公开 API（CORS 开放 → 应成功）</button>
+        <button class="op warn" data-op="fetch-cors">fetch 无 CORS 的站点（应被浏览器拦截）</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>导航与弹窗拦截 <span class="tip">外部导航 → 拦截并转交系统浏览器（本页面不跳走）；origin 内弹窗 → 平台受管弹窗；外部弹窗 → 拒绝</span></h2>
+      <div class="grid">
+        <button class="op warn" data-op="nav-external">导航到外部网站（应被拦截）</button>
+        <button class="op" data-op="popup-internal">window.open 本站弹窗（应受管创建）</button>
+        <button class="op warn" data-op="popup-external">window.open 外部弹窗（应拒绝）</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>运行环境</h2>
+      <div class="fields">
+        <div class="field"><span class="k">URL</span><span class="v" id="v-href">-</span></div>
+        <div class="field"><span class="k">UA</span><span class="v" id="v-ua">-</span></div>
+        <div class="field"><span class="k">console 输出</span><span class="v">网页 console 已不进平台日志（平台只记崩溃/异常）——DevTools 里看</span></div>
+      </div>
+    </div>
+  </div>
+
+  <aside class="side">
+    <div class="loghead"><b>测试结果（最新在下）</b><button id="log-clear">清空</button></div>
+    <div id="log"></div>
+  </aside>
+
+<script>
+  const now = () => {
+    const d = new Date()
+    const p = (n, l = 2) => String(n).padStart(l, '0')
+    return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+  }
+  document.getElementById('loaded-at').textContent = now()
+  document.getElementById('v-href').textContent = location.href
+  document.getElementById('v-ua').textContent = navigator.userAgent.slice(0, 60) + '…'
+
+  const logEl = document.getElementById('log')
+  function log(msg, type = 'info') {
+    const line = document.createElement('div')
+    line.className = `line ${type}`
+    line.innerHTML = `<span class="t">${now()}</span>${msg}`
+    logEl.appendChild(line)
+    logEl.scrollTop = logEl.scrollHeight
+    while (logEl.children.length > 80) logEl.removeChild(logEl.firstChild)
+  }
+  document.getElementById('log-clear').onclick = () => { logEl.innerHTML = '' }
+  log('页面加载完成。绿色=符合预期，红色=不符合预期，橙色=预期被拦截', 'info')
+
+  // ---------- 存储 ----------
+  const LS = 'lab-count'
+  function renderLs() {
+    document.getElementById('v-ls').textContent = `${localStorage.getItem(LS) ?? 0} 次`
+  }
+  function renderCookie() {
+    document.getElementById('v-cookie').textContent = document.cookie.split('; ').find(c => c.startsWith('lab=')) ?? '(无)'
+  }
+  renderLs(); renderCookie()
+
+  // ---------- 权限 ----------
+  function clipEl() { return document.getElementById('v-clip') }
+  function notifyEl() { return document.getElementById('v-notify') }
+
+  const ops = {
+    'storage-add': () => {
+      const n = Number(localStorage.getItem(LS) ?? '0') + 1
+      localStorage.setItem(LS, String(n)); renderLs()
+      log(`localStorage 写入成功，当前 ${n} 次（重启应用后应保留）`, 'ok')
+    },
+    'storage-reset': () => { localStorage.setItem(LS, '0'); renderLs(); log('localStorage 已清零', 'ok') },
+    'cookie-add': () => {
+      document.cookie = `lab=${Date.now()}; max-age=31536000; path=/`
+      renderCookie()
+      const saved = document.cookie.split('; ').find(c => c.startsWith('lab='))
+      log(saved ? 'cookie 写入成功（持久化一年，重启保留）' : 'file:// 源下浏览器限制 cookie 写入（正常现象，http/https 源才可用）', saved ? 'ok' : 'info')
+    },
+    'cookie-read': () => { renderCookie(); log(`cookie 读取：${document.getElementById('v-cookie').textContent}`, 'ok') },
+
+    'clip-write': async () => {
+      const text = `lab-${Date.now()}`
+      try { await navigator.clipboard.writeText(text); clipEl().textContent = text; log(`剪贴板写入成功: ${text}（已声明 → 直接放行）`, 'ok') }
+      catch (err) { clipEl().textContent = `失败: ${err.name}`; log(`剪贴板写入被拒: ${err.name}`, 'fail') }
+    },
+    'clip-read': async () => {
+      try { const text = await navigator.clipboard.readText(); clipEl().textContent = text || '(剪贴板为空)'; log(`剪贴板读取成功: ${(text || '(空)').slice(0, 30)}（已声明 → 直接放行）`, 'ok') }
+      catch (err) { clipEl().textContent = `失败: ${err.name}`; log(`剪贴板读取被拒: ${err.name}`, 'fail') }
+    },
+    'notify': async () => {
+      try {
+        const p = await Notification.requestPermission()
+        notifyEl().textContent = p
+        if (p === 'granted') {
+          new Notification('平台功能实验室', { body: `系统通知测试 ${now()}（已声明 → 放行）` })
+          log('系统通知已发出，权限 granted', 'ok')
+        } else { log(`通知权限结果: ${p}`, 'fail') }
+      }
+      catch (err) { notifyEl().textContent = `失败: ${err.name}`; log(`通知请求失败: ${err.name}`, 'fail') }
+    },
+    'perm-query': async () => {
+      for (const name of ['clipboard-read', 'clipboard-write', 'notifications']) {
+        try {
+          const st = await navigator.permissions.query({ name })
+          log(`permissions.${name}: ${st.state}`, 'info')
+        } catch (err) { log(`permissions.${name}: 查询不支持`, 'info') }
+      }
+    },
+
+    'download': () => {
+      const blob = new Blob([`lab download test ${new Date().toISOString()}\n`.repeat(200)], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `lab-test-${Date.now()}.txt`; a.click()
+      URL.revokeObjectURL(url)
+      log('下载已发起 → 应出现在底部下载条（download 已声明 → 放行）', 'ok')
+    },
+
+    'fetch-ok': async () => {
+      log('fetch https://httpbin.org/get …', 'info')
+      try {
+        const res = await fetch('https://httpbin.org/get', { signal: AbortSignal.timeout(8000) })
+        log(`fetch 成功: HTTP ${res.status}（目标 CORS 开放）`, 'ok')
+      } catch (err) { log(`fetch 失败: ${err.name} ${err.message}`, 'fail') }
+    },
+    'fetch-cors': async () => {
+      log('fetch https://www.baidu.com（未配 CORS）…', 'info')
+      try {
+        await fetch('https://www.baidu.com', { mode: 'cors', signal: AbortSignal.timeout(8000) })
+        log('fetch 意外成功', 'fail')
+      } catch (err) { log(`fetch 被拦截: ${err.name}（浏览器同源策略，符合预期）`, 'block') }
+    },
+
+    'nav-external': () => {
+      location.href = 'https://example.com'
+      log('已发起外部导航 → 平台应拦截并转系统浏览器，本页不应跳走', 'block')
+      setTimeout(() => log('3 秒后本页仍在 → 导航拦截生效 ✓（跳走了则说明拦截失效）', 'ok'), 3000)
+    },
+    'popup-internal': () => {
+      const win = window.open(location.pathname + '?popup=1', '_blank', 'width=520,height=420')
+      log(win ? '本站弹窗已创建（平台受管，同 App Session）' : '本站弹窗被拦截', win ? 'ok' : 'fail')
+    },
+    'popup-external': () => {
+      const win = window.open('https://example.com', '_blank', 'width=520,height=420')
+      log(win ? '外部弹窗意外创建（应拒绝！）' : '外部弹窗已拒绝（转系统浏览器），符合预期', win ? 'fail' : 'block')
+    },
+  }
+
+  document.querySelectorAll('button.op').forEach((btn) => {
+    btn.addEventListener('click', () => ops[btn.dataset.op]?.())
+  })
+
+  if (location.search.includes('popup=1')) document.title = 'lab 受管弹窗'
+</script>
+</body>
+</html>

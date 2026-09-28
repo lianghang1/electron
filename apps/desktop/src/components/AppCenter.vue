@@ -23,6 +23,34 @@ const expandedId = ref<string | null>(null)
 const permissionStates = ref<AppPermissionState[]>([])
 const permissionLoading = ref(false)
 
+/** 清除站点数据需二次点击确认（等于该容器登出），3s 不点则复原 */
+const pendingKey = ref<string | null>(null)
+/** 清理完成后的按钮成功提示 */
+const doneKey = ref<string | null>(null)
+
+function clearKey(appId: string, kind: 'cache' | 'site'): string {
+  return `${appId}:${kind}`
+}
+
+async function clearApp(appId: string, kind: 'cache' | 'site'): Promise<void> {
+  const key = clearKey(appId, kind)
+  if (kind === 'site' && pendingKey.value !== key) {
+    pendingKey.value = key
+    setTimeout(() => {
+      if (pendingKey.value === key)
+        pendingKey.value = null
+    }, 3000)
+    return
+  }
+  pendingKey.value = null
+  await window.desktop.cache[kind === 'cache' ? 'clear' : 'clearSite'](appId)
+  doneKey.value = key
+  setTimeout(() => {
+    if (doneKey.value === key)
+      doneKey.value = null
+  }, 2000)
+}
+
 async function toggleExpand(appId: string): Promise<void> {
   if (expandedId.value === appId) {
     expandedId.value = null
@@ -127,6 +155,24 @@ function isRunning(appId: string): boolean {
               <span class="ac-perm__state" :class="stateClass(state)">{{ stateText(state) }}</span>
             </div>
           </template>
+
+          <div class="ac-clear">
+            <button
+              class="ac-clear__btn"
+              :class="{ 'ac-clear__btn--done': doneKey === clearKey(app.manifest.id, 'cache') }"
+              @click.stop="clearApp(app.manifest.id, 'cache')"
+            >
+              {{ doneKey === clearKey(app.manifest.id, 'cache') ? '已清理' : '清理缓存' }}
+            </button>
+            <button
+              class="ac-clear__btn ac-clear__btn--danger"
+              @click.stop="clearApp(app.manifest.id, 'site')"
+            >
+              {{ pendingKey === clearKey(app.manifest.id, 'site')
+                ? '将退出登录，再点一次确认'
+                : doneKey === clearKey(app.manifest.id, 'site') ? '已清理' : '清除站点数据' }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -307,5 +353,36 @@ function isRunning(appId: string): boolean {
 }
 .ac-perm__state--pending {
   color: #9ca3af;
+}
+.ac-clear {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f3f4f6;
+}
+.ac-clear__btn {
+  flex: 1;
+  height: 26px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 12px;
+  color: #4b5563;
+  cursor: pointer;
+}
+.ac-clear__btn:hover {
+  background: #f3f4f6;
+}
+.ac-clear__btn--danger {
+  color: #ef4444;
+  border-color: #fecaca;
+}
+.ac-clear__btn--danger:hover {
+  background: #fef2f2;
+}
+.ac-clear__btn--done {
+  color: #0d9f6e;
+  border-color: #a7f3d0;
 }
 </style>

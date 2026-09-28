@@ -2,6 +2,7 @@ import type { DesktopAppManifest } from '@desktop/shared'
 import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import crmUrl from '../resources/apps/crm.html?asset'
+import labUrl from '../resources/apps/lab.html?asset'
 import oaUrl from '../resources/apps/oa.html?asset'
 import icon from '../resources/icon.png?asset'
 
@@ -26,6 +27,35 @@ const builtinApps: DesktopAppManifest[] = [
     type: 'internal',
     entry: { type: 'web', url: oaUrl },
     permissions: ['storage'],
+  },
+  {
+    id: 'fsy',
+    name: 'FSY',
+    version: '1.0.0',
+    type: 'internal',
+    entry: { type: 'web', url: 'https://gmuat.fsygroup.com/' },
+    permissions: ['storage'],
+  },
+  {
+    // 平台功能实验室：声明全部权限，与 FSY（仅 storage）对照——
+    // 应用中心里对比「已声明」与「按需询问」，lab 页面逐项点出放行/拦截效果
+    id: 'lab',
+    name: '平台实验室',
+    version: '1.0.0',
+    type: 'internal',
+    entry: { type: 'web', url: labUrl },
+    permissions: [
+      'storage',
+      'clipboard.read',
+      'clipboard.write',
+      'notification',
+      'network',
+      'download',
+      'upload',
+      'filesystem.read',
+      'filesystem.write',
+      'window',
+    ],
   },
 ]
 
