@@ -184,9 +184,10 @@ resources/app.core.asar   ← 真实全部代码，热更换的就是它
 更新判据：改了业务代码/UI → asar 热更（1.4MB 级，重启生效）；升级 Electron / 新增原生依赖 / 改安装配置 → 整包。安装均配置 `perMachine: false`（用户级目录），更新链路全程零 UAC。
 
 ```bash
-pnpm --filter @app/funeral build:win    # 产出 dist/win-unpacked/resources/app.core.asar
-pnpm hotfix funeral                     # 生成 apps/funeral/dist/hotfix/
-#   core-<version>.asar + update-manifest.json（version / url / sha256）
+pnpm hotfix               # 交互引导（选 App → 确认版本 → 自动打包出发布物）
+pnpm hotfix funeral       # 直通模式（非交互，CI 用），自动先打包
+#   产物: apps/<app>/dist/hotfix/ 下 core-<version>.asar + update-manifest.json
+#   可选: --version 1.0.1 指定发布版本；--no-build 跳过打包（仅调试）
 ```
 
 热更两个文件上传到 `updates.asar` 指向的服务器目录即完成发布；客户端下载后 sha256 强校验、写 pending 标记，重启由引导器完成指针切换（运行中绝不替换 asar——规避 Windows 文件锁，指针切换 + 60s 判活回滚防变砖）。整包走 electron-updater（`latest.yml` + exe 上传到 `updates.url`），退出时自动安装。端到端验证服务器：`pnpm exec tsx scripts/e2e-update-server.ts`。
