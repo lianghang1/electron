@@ -18,6 +18,7 @@ const channels = {
   tabsActivate: 'tabs:activate',
   tabsReload: 'tabs:reload',
   tabsSetWorkArea: 'tabs:setWorkArea',
+  tabsSetViewSuppressed: 'tabs:setViewSuppressed',
   permissionCheck: 'permission:check',
   permissionRespond: 'permission:respond',
   permissionList: 'permission:list',
@@ -28,16 +29,18 @@ const channels = {
   storageClear: 'storage:clear',
   cacheClear: 'cache:clear',
   cacheClearSite: 'cache:clearSite',
-  overlayShowMenu: 'overlay:showMenu',
-  overlayHideMenu: 'overlay:hideMenu',
-  overlayAction: 'overlay:action',
   overlayResize: 'overlay:resize',
   overlaySync: 'overlay:sync',
+  overlayDismiss: 'overlay:dismiss',
+  overlayIgnoreMouse: 'overlay:ignoreMouse',
+  downloadOpen: 'download:open',
+  downloadReveal: 'download:reveal',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   deviceIdcardRead: 'device:idcard:read',
   devicePrinterPrint: 'device:printer:print',
   notificationShow: 'notification:show',
+  notificationDismiss: 'notification:dismiss',
 } as const satisfies Record<string, keyof DesktopIpc>
 
 /** 平台 invoke 通道白名单（$invoke 之外的强类型方法不受此表约束） */
@@ -83,6 +86,7 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
       activate: tabId => ipcRenderer.invoke(channels.tabsActivate, tabId),
       reload: tabId => ipcRenderer.invoke(channels.tabsReload, tabId),
       setWorkArea: rect => ipcRenderer.invoke(channels.tabsSetWorkArea, rect),
+      setViewSuppressed: suppressed => ipcRenderer.invoke(channels.tabsSetViewSuppressed, suppressed),
     },
     permission: {
       check: permission => ipcRenderer.invoke(channels.permissionCheck, permission),
@@ -101,11 +105,14 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
       clearSite: appId => ipcRenderer.invoke(channels.cacheClearSite, appId),
     },
     overlay: {
-      showMenu: config => ipcRenderer.invoke(channels.overlayShowMenu, config),
-      hideMenu: () => ipcRenderer.invoke(channels.overlayHideMenu),
-      action: itemId => ipcRenderer.invoke(channels.overlayAction, itemId),
       resize: height => ipcRenderer.invoke(channels.overlayResize, height),
       sync: () => ipcRenderer.invoke(channels.overlaySync),
+      dismiss: () => ipcRenderer.invoke(channels.overlayDismiss),
+      ignoreMouse: ignore => ipcRenderer.invoke(channels.overlayIgnoreMouse, ignore),
+    },
+    download: {
+      open: taskId => ipcRenderer.invoke(channels.downloadOpen, taskId),
+      reveal: taskId => ipcRenderer.invoke(channels.downloadReveal, taskId),
     },
     update: {
       check: () => ipcRenderer.invoke(channels.updateCheck),
@@ -117,6 +124,7 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
     },
     notification: {
       show: notification => ipcRenderer.invoke(channels.notificationShow, notification),
+      dismiss: toastId => ipcRenderer.invoke(channels.notificationDismiss, toastId),
     },
     $invoke: (channel, ...args) => {
       if (!allowedChannels.has(channel))

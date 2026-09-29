@@ -48,6 +48,11 @@ export interface DesktopConfig {
     /** Tab 多应用承载体系（默认 true）。关闭后 tabs:* IPC 通道不注册、Tab/App/Web 服务不实例化 */
     tabs?: boolean
   }
+  /** 下载行为：默认静默保存到系统下载目录（Kiosk 无人值守友好） */
+  download?: {
+    /** 每次下载弹系统另存对话框让用户选目录（桌面形态可开）；默认 false */
+    saveAs?: boolean
+  }
   /** 自动更新：不配置 url 则更新体系整体关闭 */
   updates?: {
     /** 更新服务器地址（latest.yml 所在目录，整包更新 electron-updater 用） */

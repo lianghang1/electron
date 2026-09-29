@@ -29,4 +29,9 @@ export function registerTabsIpc(deps: TabsIpcDeps): void {
     assertShell(deps.resolver.resolve(e.sender))
     webService.setWorkArea(rect)
   })
+  // 视图抑制只允许 Shell 发起（Shell DOM 浮层期间让位），App 无权操控视图显示
+  handle('tabs:setViewSuppressed', (e, suppressed) => {
+    assertShell(deps.resolver.resolve(e.sender))
+    webService.setSuppressed(suppressed === true)
+  })
 }

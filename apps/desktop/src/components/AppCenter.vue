@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AppPermissionState, DesktopTab, RegisteredApp } from '@desktop/shared'
-import { AccordionContent, AccordionHeader, AccordionItem, AccordionRoot, AccordionTrigger } from 'reka-ui'
+import { AccordionContent, AccordionHeader, AccordionItem, AccordionRoot, AccordionTrigger, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogOverlay, AlertDialogRoot, AlertDialogTitle } from 'reka-ui'
 import { computed, ref, watch } from 'vue'
 import { permissionLabel } from '../composables/use-permission-labels'
 
@@ -38,8 +38,6 @@ watch(expandedId, async (appId) => {
   }
 })
 
-/** 清除站点数据需二次点击确认（等于该容器登出），3s 不点则复原 */
-const pendingKey = ref<string | null>(null)
 /** 清理完成后的按钮成功提示 */
 const doneKey = ref<string | null>(null)
 
@@ -48,20 +46,10 @@ function clearKey(appId: string, kind: 'cache' | 'site' | 'perm'): string {
 }
 
 async function clearApp(appId: string, kind: 'cache' | 'site'): Promise<void> {
-  const key = clearKey(appId, kind)
-  if (kind === 'site' && pendingKey.value !== key) {
-    pendingKey.value = key
-    setTimeout(() => {
-      if (pendingKey.value === key)
-        pendingKey.value = null
-    }, 3000)
-    return
-  }
-  pendingKey.value = null
   await window.desktop.cache[kind === 'cache' ? 'clear' : 'clearSite'](appId)
-  doneKey.value = key
+  doneKey.value = clearKey(appId, kind)
   setTimeout(() => {
-    if (doneKey.value === key)
+    if (doneKey.value === clearKey(appId, kind))
       doneKey.value = null
   }, 2000)
 }
@@ -80,6 +68,25 @@ async function resetPerms(appId: string): Promise<void> {
     if (doneKey.value === key)
       doneKey.value = null
   }, 2000)
+}
+
+// ---- 敏感操作确认（reka AlertDialog）：清除站点数据 = 登出、重置授权 = 撤销决策 ----
+// 面板宽度有限，弹窗不 Portal，控制在面板区域内模态（aside 为定位基准）
+const confirmTarget = ref<{ appId: string, name: string, kind: 'site' | 'perm' } | null>(null)
+
+function askConfirm(appId: string, kind: 'site' | 'perm'): void {
+  const app = props.apps.find(item => item.manifest.id === appId)
+  confirmTarget.value = { appId, name: app?.manifest.name ?? appId, kind }
+}
+
+async function onConfirm(): Promise<void> {
+  const target = confirmTarget.value
+  confirmTarget.value = null
+  if (!target)
+    return
+  if (target.kind === 'site')
+    await clearApp(target.appId, 'site')
+  else await resetPerms(target.appId)
 }
 
 /** 权限状态文案：声明 = 平台直接放行；未声明看运行时用户决策 */
@@ -184,7 +191,7 @@ function isRunning(appId: string): boolean {
                 v-if="hasRuntimeDecisions"
                 class="ac-clear__btn"
                 :class="{ 'ac-clear__btn--done': doneKey === clearKey(app.manifest.id, 'perm') }"
-                @click.stop="resetPerms(app.manifest.id)"
+                @click.stop="askConfirm(app.manifest.id, 'perm')"
               >
                 {{ doneKey === clearKey(app.manifest.id, 'perm') ? '已重置' : '重置授权' }}
               </button>
@@ -197,22 +204,50 @@ function isRunning(appId: string): boolean {
               </button>
               <button
                 class="ac-clear__btn ac-clear__btn--danger"
-                @click.stop="clearApp(app.manifest.id, 'site')"
+                @click.stop="askConfirm(app.manifest.id, 'site')"
               >
-                {{ pendingKey === clearKey(app.manifest.id, 'site')
-                  ? '将退出登录，再点一次确认'
-                  : doneKey === clearKey(app.manifest.id, 'site') ? '已清理' : '清除站点数据' }}
+                {{ doneKey === clearKey(app.manifest.id, 'site') ? '已清理' : '清除站点数据' }}
               </button>
             </div>
           </div>
         </AccordionContent>
       </AccordionItem>
     </AccordionRoot>
+
+    <!-- 敏感操作确认：reka AlertDialog 承担模态语义 / 焦点圈养 / ESC；
+         面板区域有限，不 Portal，控制在 360px 面板内模态（aside 为定位基准） -->
+    <AlertDialogRoot
+      :open="confirmTarget !== null"
+      @update:open="(value) => !value && (confirmTarget = null)"
+    >
+      <AlertDialogContent class="ac-confirm">
+        <AlertDialogOverlay class="ac-confirm__scrim" />
+        <div class="ac-confirm__card">
+          <AlertDialogTitle class="ac-confirm__title">
+            {{ confirmTarget?.kind === 'site' ? '清除站点数据？' : '重置授权？' }}
+          </AlertDialogTitle>
+          <AlertDialogDescription class="ac-confirm__desc">
+            {{ confirmTarget?.kind === 'site'
+              ? `将清除「${confirmTarget?.name}」的全部站点数据（Cookie / 登录态等），效果等于退出登录。`
+              : `将撤销「${confirmTarget?.name}」的全部运行时授权决策，下次使用时会重新询问。` }}
+          </AlertDialogDescription>
+          <div class="ac-confirm__actions">
+            <AlertDialogCancel class="ac-confirm__btn">
+              取消
+            </AlertDialogCancel>
+            <AlertDialogAction class="ac-confirm__btn ac-confirm__btn--danger" @click="onConfirm">
+              {{ confirmTarget?.kind === 'site' ? '确认清除' : '确认重置' }}
+            </AlertDialogAction>
+          </div>
+        </div>
+      </AlertDialogContent>
+    </AlertDialogRoot>
   </aside>
 </template>
 
 <style scoped>
 .ac-panel {
+  position: relative;
   width: 360px;
   flex: none;
   display: flex;
@@ -434,5 +469,83 @@ function isRunning(appId: string): boolean {
 .ac-clear__btn--done {
   color: var(--dt-success);
   border-color: color-mix(in srgb, var(--dt-success) 35%, transparent);
+}
+
+/* 敏感操作确认弹窗：面板内模态（不 Portal），遮罩 + 居中卡片 */
+.ac-confirm {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ac-confirm__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(15 23 42 / 32%);
+  animation: ac-fade 0.16s ease;
+}
+.ac-confirm__card {
+  position: relative;
+  width: 300px;
+  box-sizing: border-box;
+  padding: 16px;
+  background: var(--dt-surface);
+  border: 1px solid var(--dt-line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(2 8 20 / 18%);
+  animation: ac-pop 0.18s var(--dt-ease);
+}
+.ac-confirm__title {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dt-text);
+}
+.ac-confirm__desc {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--dt-text-2);
+}
+.ac-confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.ac-confirm__btn {
+  height: 28px;
+  margin-left: 8px;
+  padding: 0 14px;
+  border: 1px solid var(--dt-line);
+  border-radius: var(--dt-radius-1);
+  background: var(--dt-surface);
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--dt-text-2);
+  cursor: pointer;
+  transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
+}
+.ac-confirm__btn:hover {
+  background: var(--dt-hover);
+}
+.ac-confirm__btn--danger {
+  border-color: var(--dt-danger);
+  background: var(--dt-danger);
+  color: #ffffff;
+}
+.ac-confirm__btn--danger:hover {
+  background: color-mix(in srgb, var(--dt-danger) 88%, #000);
+}
+@keyframes ac-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ac-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
 }
 </style>

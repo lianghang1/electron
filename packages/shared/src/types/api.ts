@@ -1,7 +1,7 @@
 import type { AppContext } from './context'
 import type { DeviceIdCard, DevicePrintTicket } from './device'
 import type { DesktopIpc } from './ipc'
-import type { OverlayMenuConfig, OverlaySyncState } from './ipc/overlay'
+import type { OverlaySyncState } from './ipc/overlay'
 import type { DesktopAppManifest, RegisteredApp } from './manifest'
 import type { AppPermissionState, Permission } from './permission'
 import type { DesktopTab, OpenTabOptions, WorkAreaRect } from './tab'
@@ -40,6 +40,8 @@ export interface DesktopApi {
     activate: (tabId: string) => Promise<void>
     reload: (tabId: string) => Promise<void>
     setWorkArea: (rect: WorkAreaRect) => Promise<void>
+    /** Shell DOM 浮层（Tab 右键菜单）打开期间抑制激活视图显示，关闭后恢复 */
+    setViewSuppressed: (suppressed: boolean) => Promise<void>
   }
   permission: {
     check: (permission: Permission) => Promise<boolean>
@@ -84,20 +86,28 @@ export interface DesktopApi {
     print: (ticket: DevicePrintTicket) => Promise<void>
   }
   /**
-   * 浮层域：全局菜单/弹窗渲染进独立透明原生窗（OverlayWindow），
-   * 原生层级永远盖过 WebContentsView，Shell DOM 不再承载全局浮层。
+   * 浮层域：消息窗（通知 toast / 下载面板）与授权弹窗渲染进独立透明原生窗
+   * （OverlayWindow），原生层级盖过 WebContentsView。仅供浮层窗页面调用。
    */
   overlay: {
-    /** Shell 发起：在视口坐标处弹出浮层菜单（Main 换算屏幕坐标并显示） */
-    showMenu: (config: OverlayMenuConfig) => Promise<void>
-    /** 收起浮层菜单 */
-    hideMenu: () => Promise<void>
-    /** 仅供 OverlayWindow 页面回传用户动作（Main 校验来源，Shell 调用无效） */
-    action: (itemId: string) => Promise<void>
-    /** 仅供 OverlayWindow 页面量高回报（Main 据此调整浮层窗尺寸） */
+    /** 仅供消息窗页面量高回报（Main 据此调整浮层窗尺寸） */
     resize: (height: number) => Promise<void>
-    /** 仅供 OverlayWindow 页面 mounted 后拉取当前状态（菜单 / toast / 下载 / 挂起授权请求） */
+    /** 仅供浮层窗页面 mounted 后拉取当前状态（toast / 下载 / 挂起授权请求） */
     sync: () => Promise<OverlaySyncState>
+    /** 仅供消息窗页面回传：用户主动关闭面板（清空通知与下载面板，新事件到达时重新弹出） */
+    dismiss: () => Promise<void>
+    /** 仅供消息窗页面回传：按命中元素切换窗口鼠标穿透（透明区不遮挡下层页面点击） */
+    ignoreMouse: (ignore: boolean) => Promise<void>
+  }
+  /**
+   * 下载：任务进度经浮层面板展示，完成后可打开文件 / 所在文件夹（浏览器级体验）。
+   * 仅浮层窗与 Shell 可调用（Main 校验来源），App 无权触达文件系统。
+   */
+  download: {
+    /** 用系统默认程序打开已完成的下载文件 */
+    open: (taskId: string) => Promise<void>
+    /** 在资源管理器中定位已完成的下载文件 */
+    reveal: (taskId: string) => Promise<void>
   }
   /**
    * 平台通知：App 发起后由平台以浮层 toast 呈现（右下角，全局统一可定制 UI，
@@ -105,6 +115,8 @@ export interface DesktopApi {
    */
   notification: {
     show: (notification: { title: string, body?: string }) => Promise<void>
+    /** 仅供浮层面板回传：关闭单条通知（滑动 / 关闭按钮），仅浮层窗调用有效 */
+    dismiss: (toastId: string) => Promise<void>
   }
   /**
    * App 业务通道统一入口：调用 bootstrap 时经 preload 白名单声明的业务通道

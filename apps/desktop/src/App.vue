@@ -33,47 +33,13 @@ async function closeWindow(): Promise<void> {
   await window.desktop.window.close()
 }
 
-// ---- 缓存清理（浮层菜单发起，作用域为该 Tab 对应的容器） ----
+// ---- 缓存清理（Tab 右键菜单发起，作用域为该 Tab 对应的容器） ----
 async function cacheClear(appId: string): Promise<void> {
   await window.desktop.cache.clear(appId)
 }
 
 async function cacheClearSite(appId: string): Promise<void> {
   await window.desktop.cache.clearSite(appId)
-}
-
-// ---- Tab 浮层菜单：渲染进独立透明原生窗（OverlayWindow），
-//      原生层级永远压过 WebContentsView，不再受 Shell DOM 层级限制 ----
-let menuTarget: { tabId: string, appId: string } | null = null
-
-async function openTabMenu(payload: { tabId: string, appId: string, x: number, y: number }): Promise<void> {
-  menuTarget = { tabId: payload.tabId, appId: payload.appId }
-  await window.desktop.overlay.showMenu({
-    x: payload.x,
-    y: payload.y,
-    theme: theme.value,
-    items: [
-      { id: 'reload', label: '刷新页面' },
-      { id: 'cache', label: '清理缓存' },
-      { id: 'site', label: '清除站点数据（退出登录）', danger: true },
-      { id: 'close', label: '关闭标签页', separatorBefore: true },
-    ],
-  })
-}
-
-function onMenuAction(itemId: string): void {
-  const target = menuTarget
-  menuTarget = null
-  if (!target)
-    return
-  if (itemId === 'reload')
-    reload(target.tabId)
-  else if (itemId === 'close')
-    close(target.tabId)
-  else if (itemId === 'cache')
-    void cacheClear(target.appId)
-  else if (itemId === 'site')
-    void cacheClearSite(target.appId)
 }
 
 // ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----
@@ -93,7 +59,6 @@ function syncWorkArea(): void {
 
 let resizeObserver: ResizeObserver | null = null
 let unsubMaximized: (() => void) | null = null
-let unsubMenuAction: (() => void) | null = null
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(syncWorkArea)
@@ -103,7 +68,6 @@ onMounted(() => {
   unsubMaximized = window.desktop.events.on('window:maximizedChanged', (value) => {
     maximized.value = value
   })
-  unsubMenuAction = window.desktop.events.on('overlay:menuAction', onMenuAction)
   void window.desktop.window.isMaximized().then((value) => {
     maximized.value = value
   })
@@ -112,7 +76,6 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   unsubMaximized?.()
-  unsubMenuAction?.()
 })
 </script>
 
@@ -137,7 +100,9 @@ onBeforeUnmount(() => {
           :theme="theme"
           @activate="activate"
           @close="close"
-          @tab-menu="openTabMenu"
+          @reload="reload"
+          @clear-cache="cacheClear"
+          @clear-site="cacheClearSite"
           @toggle-theme="toggleTheme"
           @toggle-center="appCenterOpen = !appCenterOpen"
           @minimize="minimize"

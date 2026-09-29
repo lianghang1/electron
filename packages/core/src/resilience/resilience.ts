@@ -2,6 +2,7 @@ import type { BrowserWindow, Event } from 'electron'
 import type { EventBus } from '../event/event-bus'
 import type { Logger } from '../logger/logger'
 import type { BootstrapOptions } from '../types'
+import process from 'node:process'
 import { is } from '@electron-toolkit/utils'
 import { app } from 'electron'
 import { SHELL_APP_ID } from '../constants'
@@ -108,14 +109,26 @@ export class ResilienceService {
     })
   }
 
-  /** 开机自启：显式 true 开启（仅生产），显式 false 移除，未配置不触碰系统状态 */
+  /**
+   * 开机自启：dev 跳过（登录项指向 electron.exe 无意义）；打包测试版同样默认不自启，
+   * 仅交付构建注入 DESKTOP_AUTO_LAUNCH=1 时生效——本机测试不再被自启骚扰，
+   * 显式 false 仍移除登录项（清理历史注册）。
+   */
   private attachAutoLaunch(enabled: boolean): void {
-    if (is.dev) {
-      this.logger.debug('autoLaunch skipped in dev (login item would point to electron.exe)')
+    // 显式 false：无条件移除登录项（清理历史注册）
+    if (!enabled) {
+      app.setLoginItemSettings({ openAtLogin: false })
+      this.logger.info('autoLaunch removed')
       return
     }
-    app.setLoginItemSettings({ openAtLogin: enabled })
-    this.logger.info(`autoLaunch ${enabled ? 'enabled' : 'removed'}`)
+    // 开启仅在交付构建生效：dev 跳过（登录项指向 electron.exe 无意义），
+    // 本机打包测试默认不自启，交付构建注入 DESKTOP_AUTO_LAUNCH=1
+    if (is.dev || process.env.DESKTOP_AUTO_LAUNCH !== '1') {
+      this.logger.debug(`autoLaunch skipped (dev=${is.dev}, DESKTOP_AUTO_LAUNCH=${process.env.DESKTOP_AUTO_LAUNCH ?? 'unset'})`)
+      return
+    }
+    app.setLoginItemSettings({ openAtLogin: true })
+    this.logger.info('autoLaunch enabled')
   }
 
   /** 防退出：用户发起的 close 全部拦截，app.quit() 的退出流程放行 */

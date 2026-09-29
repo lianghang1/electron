@@ -43,6 +43,8 @@ export class WebService {
   private focusedId: string | null = null
   /** 激活视图处于 HTML5 全屏（view 铺满整窗，忽略容器区域） */
   private htmlFullscreen = false
+  /** Shell DOM 浮层（Tab 右键菜单等）打开期间抑制激活视图显示 */
+  private suppressed = false
   /** 已挂权限 guard 的 Session，避免同一 App Session 重复挂 */
   private readonly guardedSessions = new WeakSet<Electron.Session>()
 
@@ -115,6 +117,17 @@ export class WebService {
     this.applyBounds()
   }
 
+  /**
+   * Shell DOM 浮层（Tab 右键菜单等）需要盖住容器区域时调用：
+   * true = 激活视图归零让位（Shell DOM 压不过 WebContentsView 原生层），false = 恢复。
+   */
+  setSuppressed(value: boolean): void {
+    if (this.suppressed === value)
+      return
+    this.suppressed = value
+    this.applyBounds()
+  }
+
   destroy(runtimeId: string): void {
     const runtime = this.runtimes.get(runtimeId)
     if (!runtime)
@@ -145,12 +158,12 @@ export class WebService {
     if (!win)
       return
     for (const [id, runtime] of this.runtimes) {
-      if (id === this.focusedId && this.htmlFullscreen) {
+      if (id === this.focusedId && !this.suppressed && this.htmlFullscreen) {
         const content = win.getContentBounds()
         runtime.view.setBounds({ x: 0, y: 0, width: content.width, height: content.height })
         continue
       }
-      const area = id === this.focusedId ? this.workArea : null
+      const area = id === this.focusedId && !this.suppressed ? this.workArea : null
       runtime.view.setBounds(
         area
           ? {
@@ -167,6 +180,8 @@ export class WebService {
   /**
    * HTML5 全屏跟随：WebContentsView 不响应页面全屏请求，必须显式放大。
    * 语义贴近浏览器：窗口进入 OS 全屏，视图铺满整窗；退出后恢复容器区域。
+   * 注意：不做 maximize 兜底——它会让窗口停在最大化而非全屏（工作区高 ≠ 屏幕高），
+   * 还会拖慢页面 fullscreen promise 的 resolve，连带页面侧的全屏定时器一起顺延。
    */
   private attachHtmlFullscreen(view: WebContentsView): void {
     view.webContents.on('enter-html-full-screen', () => {
@@ -175,20 +190,21 @@ export class WebService {
       if (!win)
         return
       win.setFullScreen(true)
-      // setFullScreen 是异步布局：立即设一次，窗口 resize 完成后再校准
-      const maximize = () => {
+      // setFullScreen 是异步布局：窗口真正进入全屏后再铺 view（getContentBounds 此时 = 屏幕尺寸）
+      win.once('enter-full-screen', () => {
         if (!this.htmlFullscreen)
           return
-        const content = win.getContentBounds()
-        view.setBounds({ x: 0, y: 0, width: content.width, height: content.height })
-      }
-      maximize()
-      win.once('resize', maximize)
+        this.applyBounds()
+      })
     })
     view.webContents.on('leave-html-full-screen', () => {
       this.htmlFullscreen = false
-      this.windowService.getMainWindow()?.setFullScreen(false)
-      this.applyBounds()
+      const win = this.windowService.getMainWindow()
+      if (!win)
+        return
+      win.setFullScreen(false)
+      // 退出全屏完成后再恢复容器区域，避免与全屏布局收尾竞态
+      win.once('leave-full-screen', () => this.applyBounds())
     })
   }
 
@@ -208,6 +224,7 @@ export class WebService {
     // session 按 App 隔离（persist:app-<appId>）：声明权限直接放行，
     // 未声明权限走运行时授权（推送 Shell 请用户决策）
     applySessionPermissionGuards(appSession, toSessionPermissions(manifest.permissions ?? []), (wc, sessionPermission) => {
+      this.logger.debug('runtime permission approval requested', { appId, sessionPermission, wcId: wc.id })
       const permission = sessionToPlatformPermission(sessionPermission)
       if (!permission)
         return Promise.resolve(false)

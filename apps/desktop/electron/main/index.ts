@@ -95,6 +95,7 @@ const builtinApps: DesktopAppManifest[] = [
       'filesystem.read',
       'filesystem.write',
       'window',
+      'fullscreen',
     ],
   },
 ]

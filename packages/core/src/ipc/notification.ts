@@ -1,6 +1,7 @@
 import type { AppRegistry } from '../app/app-registry'
 import type { EventBus } from '../event/event-bus'
 import type { PermissionService } from '../permission/permission-service'
+import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
 import { randomUUID } from 'node:crypto'
 import { handle } from './handle'
@@ -10,6 +11,8 @@ export interface NotificationIpcDeps {
   permissionService: PermissionService
   events: EventBus
   resolver: CallerResolver
+  /** 浮层窗口服务：dismiss 仅浮层面板自身可回传 */
+  overlayService: OverlayWindowService
 }
 
 /** 通知文案的展示钳制：防止超长内容撑破 Shell toast */
@@ -38,5 +41,12 @@ export function registerNotificationIpc(deps: NotificationIpcDeps): void {
       body: body.slice(0, BODY_MAX),
       shownAt: Date.now(),
     })
+  })
+
+  // 浮层面板内关闭单条通知（reka Toast 滑动 / 关闭按钮回传）：仅浮层窗身份有效
+  handle('notification:dismiss', (e, toastId) => {
+    if (!deps.overlayService.isOverlay(e.sender))
+      return
+    deps.overlayService.dismissToast(String(toastId))
   })
 }

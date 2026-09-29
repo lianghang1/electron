@@ -150,7 +150,7 @@
     </div>
 
     <div class="card">
-      <h2>下载 <span class="tip">lab 声明 download → will-download 放行，任务进入右下角下载浮窗，保存到系统下载目录；OA 未声明 → 同操作直接取消</span></h2>
+      <h2>下载 <span class="tip">lab 声明 download → will-download 放行，任务进入右上角下载浮窗（可关闭，完成后可打开文件/定位文件夹），保存到系统下载目录；OA/FSY 未声明 → 弹运行时授权卡，允许后下载（记忆不再询问），拒绝或超时取消本次</span></h2>
       <div class="grid">
         <button class="op" data-op="download-blob">小文件下载（blob，瞬时完成）</button>
         <button class="op" data-op="download-remote">远程文件下载（约 3MB，看进度）</button>
@@ -166,7 +166,7 @@
     </div>
 
     <div class="card">
-      <h2>弹窗与导航 <span class="tip">外部导航 → 拦截转系统浏览器；origin 内弹窗 → 平台受管弹窗（同 Session 登录态）；外部弹窗 → 拒绝；原生对话框由 Chromium 渲染</span></h2>
+      <h2>弹窗与导航 <span class="tip">外部导航 → 拦截转系统浏览器；origin 内弹窗 → 平台受管弹窗（同 Session 登录态）；外部弹窗 → 拒绝；alert/confirm 由 Chromium 渲染，prompt 为 Electron 平台限制不可用</span></h2>
       <div class="grid">
         <button class="op" data-op="popup-internal">window.open 本站弹窗（应受管创建）</button>
         <button class="op warn" data-op="popup-external">window.open 外部弹窗（应拒绝）</button>
@@ -174,7 +174,6 @@
         <a class="link" href="https://example.com" target="_blank">target=_blank 外链（应转系统浏览器）</a>
         <button class="op" data-op="dialog-alert">alert</button>
         <button class="op" data-op="dialog-confirm">confirm</button>
-        <button class="op" data-op="dialog-prompt">prompt</button>
       </div>
     </div>
 
@@ -202,8 +201,8 @@
     <div class="card">
       <h2>安全边界 <span class="tip">App 无权执行的平台动作应全部被拒（橙色=预期拦截）——任何一条「意外成功」都是越权漏洞</span></h2>
       <div class="grid">
-        <button class="op warn" data-op="deny-overlay-menu">overlay.showMenu（Shell 专属）</button>
-        <button class="op warn" data-op="deny-overlay-action">overlay.action 伪造动作</button>
+        <button class="op warn" data-op="deny-tabs-suppress">tabs.setViewSuppressed（Shell 专属）</button>
+        <button class="op warn" data-op="deny-overlay-removed">overlay.showMenu/action 已移除</button>
         <button class="op warn" data-op="deny-cache">cache.clear 清缓存（Shell 专属）</button>
         <button class="op warn" data-op="deny-cache-site">cache.clearSite 清站点数据</button>
         <button class="op warn" data-op="deny-perm-reset">permission.reset 撤销授权</button>
@@ -440,11 +439,22 @@
       URL.revokeObjectURL(url)
       log('下载已发起 → 应出现在右下角下载浮窗（download 已声明 → 放行）', 'ok')
     },
-    'download-remote': () => {
-      const a = document.createElement('a')
-      a.href = 'https://httpbin.org/bytes/3000000'
-      a.download = 'lab-remote-3mb.bin'; a.click()
-      log('远程下载已发起 → 浮窗应出现进度条并走完 0→100%', 'ok')
+    'download-remote': async () => {
+      // 跨域 <a download> 的 download 属性被 Chromium 忽略（安全限制），直链点击会触发导航、
+      // 被平台外链策略转系统浏览器；先 fetch 成 blob 再经同源 blob 链接下载才能进平台下载流程
+      // （真实业务同理：下载接口用 fetch / 同源直链）
+      try {
+        log('正在拉取远程文件（约 3MB）…', 'info')
+        const res = await fetch('https://registry.npmmirror.com/vue/-/vue-3.5.13.tgz')
+        if (!res.ok)
+          throw new Error(`HTTP ${res.status}`)
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url; a.download = 'lab-remote-vue.tgz'; a.click()
+        URL.revokeObjectURL(url)
+        log(`远程文件已取得（${(blob.size / 1024 / 1024).toFixed(1)}MB）→ 进入平台下载流程，右下角浮窗显示进度`, 'ok')
+      } catch (err) { log(`远程下载失败: ${err.message}（需外网访问 registry.npmmirror.com）`, 'fail') }
     },
 
     // ---- 网络 ----
@@ -479,7 +489,6 @@
     },
     'dialog-alert': () => { alert(`alert 对话框 ${now()}`); log('alert 已弹出并关闭', 'ok') },
     'dialog-confirm': () => { const ok = confirm('confirm 对话框：确定吗？'); log(`confirm 返回 ${ok}`, 'ok') },
-    'dialog-prompt': () => { const v = prompt('prompt 对话框：随便输入点什么', 'hello'); log(`prompt 返回 ${JSON.stringify(v)}`, 'ok') },
 
     // ---- 平台 API ----
     'app-list': async () => {
@@ -538,19 +547,19 @@
     },
 
     // ---- 安全边界（App 无权动作，应全部被拒） ----
-    'deny-overlay-menu': async () => {
+    'deny-tabs-suppress': async () => {
       try {
-        await window.desktop.overlay.showMenu({ x: 10, y: 10, theme: 'light', items: [{ id: 'x', label: '越权菜单' }] })
-        log('overlay.showMenu 意外成功——越权漏洞！', 'fail')
+        await window.desktop.tabs.setViewSuppressed(true)
+        log('tabs.setViewSuppressed 意外成功——越权漏洞！', 'fail')
       }
-      catch (err) { log(`overlay.showMenu 被拒 ✓（${err.message}）`, 'block') }
+      catch (err) { log(`tabs.setViewSuppressed 被拒 ✓（${err.message}）`, 'block') }
     },
-    'deny-overlay-action': async () => {
-      try {
-        await window.desktop.overlay.action('reload')
-        log('overlay.action 未报错但被静默忽略 ✓（非浮层窗无权回传动作，Shell 不会收到）', 'block')
-      }
-      catch (err) { log(`overlay.action 被拒 ✓（${err.message}）`, 'block') }
+    'deny-overlay-removed': async () => {
+      const gone = typeof window.desktop.overlay.showMenu === 'undefined'
+        && typeof window.desktop.overlay.action === 'undefined'
+      gone
+        ? log('overlay.showMenu/action 不再暴露 ✓（Tab 右键菜单回归 Shell DOM，浮层菜单链路已清理）', 'block')
+        : log('overlay.showMenu/action 仍暴露——浮层菜单链路未清理干净！', 'fail')
     },
     'deny-cache': async () => {
       try {

@@ -100,12 +100,18 @@ export function applyWebAppGuards(
 
 /**
  * 运行时授权类 session 权限：同步 check 先放行，异步 request 才真正把关。
- * Chromium 对这类能力（媒体 / 定位 / 全屏 / 鼠标锁定 / 屏幕捕获）在发起请求前
+ * Chromium 对这类能力（媒体 / 定位 / 鼠标锁定 / 屏幕捕获）在发起请求前
  * 先做同步 permission check——check 不过连 request 都不触发，运行时授权弹窗
  * 链路会整体失效；而通知 / 剪贴板读取只走同步 check、没有 request 环节，
  * 必须保持声明制，不可放进这里。
+ *
+ * fullscreen 故意不在其中：实测 Electron 39 对全屏权限的异步拒绝（用户拒绝 /
+ * 超时）会让该 Session 后续的 requestFullscreen 永不再派发且 Promise 永挂
+ * （页面卡死，刷新也无法恢复），异步授权路径不可用。全屏在浏览器本就不询问
+ * 用户，因此按声明制处理——声明了才启用（request 同步放行），未声明
+ * fullscreenEnabled=false，页面立即得到干净拒绝。
  */
-const RUNTIME_CHECK_THROUGH = new Set(['media', 'geolocation', 'fullscreen', 'pointerLock', 'display-capture'])
+const RUNTIME_CHECK_THROUGH = new Set(['media', 'geolocation', 'pointerLock', 'display-capture'])
 
 /**
  * Session 级权限白名单：基础项（复制粘贴）+ 声明（'all' 或数组），其余一律拒绝。
@@ -125,7 +131,22 @@ export function applySessionPermissionGuards(
     if (permission === 'clipboard-sanitized-write' || isDeclared(permission))
       return callback(true)
     if (requestApproval) {
-      void requestApproval(wc, permission).then(granted => callback(granted))
+      // callback 必达保证：审批链路任何异常（同步抛 / Promise 拒绝）都按拒绝落定，
+      // 否则页面请求永久挂起（requestFullscreen 等Promise 永不 settle）且无任何日志
+      let answered = false
+      const answer = (granted: boolean) => {
+        if (answered)
+          return
+        answered = true
+        callback(granted)
+      }
+      Promise.resolve()
+        .then(() => requestApproval(wc, permission))
+        .then(granted => answer(granted))
+        .catch((error) => {
+          console.warn(`[security] permission approval failed, denied: ${permission}`, error)
+          answer(false)
+        })
       return
     }
     console.warn(`[security] denied permission request: ${permission}`)

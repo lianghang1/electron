@@ -27,7 +27,9 @@ interface RuntimeRequest {
  * 权限的唯一授权方：check / assert 都只在 Main 进程执行。
  * Shell 是平台自身，全量放行；普通 App 按 manifest.permissions 判定。
  * manifest 未声明的权限走运行时授权：推送 Shell 询问用户，
- * 用户决策持久化到平台存储（userData/platform-permissions.json），重启后不再重复询问。
+ * 仅允许持久化到平台存储（重启后不再询问，对齐浏览器「记住决定」语义）；
+ * 拒绝 / 超时 / App 关闭都只按拒绝处理本次请求，下次仍重新询问——
+ * 用户没看到弹窗（超时）或想再试（拒绝过）都不该被永久挡住。
  */
 export class PermissionService {
   /** 运行时决策内存缓存（读穿持久化存储） */
@@ -43,8 +45,11 @@ export class PermissionService {
     private readonly logger: Logger,
     private readonly store?: Store<PermissionStoreSchema>,
   ) {
-    for (const [key, granted] of Object.entries(store?.get('decisions') ?? {}))
-      this.runtimeDecisions.set(key, granted)
+    // 仅装载允许决策；过滤历史版本持久化的拒绝记录（拒绝不再记忆，下次仍询问）
+    for (const [key, granted] of Object.entries(store?.get('decisions') ?? {})) {
+      if (granted)
+        this.runtimeDecisions.set(key, granted)
+    }
   }
 
   check(context: CallerContext, permission: Permission): boolean {
@@ -73,7 +78,8 @@ export class PermissionService {
 
   /**
    * 运行时授权：manifest 未声明的权限，推送 Shell 请用户决策。
-   * - 决策持久化（平台存储）：同 App 同权限重启后不再询问
+   * - 仅允许持久化（平台存储）：同 App 同权限重启后不再询问；
+   *   拒绝 / 超时只处理本次，下次请求重新询问
    * - 决策进行中重复触发复用同一次询问（页面不产生第二张授权卡）
    * - 超时按拒绝处理
    */
@@ -92,9 +98,8 @@ export class PermissionService {
       const timer = setTimeout(() => {
         const pending = this.pendingRuntime.get(requestId)
         if (pending)
-          this.finishRuntimeRequest(pending, false)
+          this.finishRuntimeRequest(pending, false, false)
         this.logger.warn(`runtime permission request timed out: ${permission}`, { appId: context.appId })
-        resolve(false)
       }, RUNTIME_REQUEST_TIMEOUT_MS)
       this.pendingRuntime.set(requestId, {
         requestId,
@@ -114,7 +119,6 @@ export class PermissionService {
     this.runtimeInflight.set(cacheKey, request)
     const granted = await request
     this.runtimeInflight.delete(cacheKey)
-    this.setRuntimeDecision(cacheKey, granted)
     this.logger.info(`runtime permission ${granted ? 'granted' : 'denied'}: ${permission}`, {
       appId: context.appId,
     })
@@ -131,12 +135,17 @@ export class PermissionService {
     })
   }
 
-  /** Shell 用户决策回传：结束挂起的请求 */
+  /** 运行时已持久化允许（不再询问）的判定：will-download 等必须同步决策的点用 */
+  hasRuntimeDecision(appId: string, permission: Permission): boolean {
+    return this.runtimeDecisions.get(`${appId}:${permission}`) === true
+  }
+
+  /** Shell 用户决策回传：允许持久化记忆（下次免询问），拒绝只影响本次（下次仍询问） */
   respond(requestId: string, granted: boolean): void {
     const pending = this.pendingRuntime.get(requestId)
     if (!pending)
       return
-    this.finishRuntimeRequest(pending, granted)
+    this.finishRuntimeRequest(pending, granted, granted)
   }
 
   /** 撤销 App 的全部运行时授权决策（应用中心「重置授权」）：清内存与持久化，下次请求重新询问 */
@@ -156,17 +165,17 @@ export class PermissionService {
     this.store.set('decisions', decisions)
   }
 
-  /** App 退出（Tab 关闭）时取消其全部挂起请求：页面已不存在，按拒绝处理并清缓存 */
+  /** App 退出（Tab 关闭）时取消其全部挂起请求：页面已不存在，按拒绝处理本次且不持久化 */
   cancelForApp(appId: string): void {
     for (const pending of [...this.pendingRuntime.values()]) {
       if (pending.appId !== appId)
         continue
-      this.finishRuntimeRequest(pending, false)
+      this.finishRuntimeRequest(pending, false, false)
     }
   }
 
-  /** 结束运行时请求：按给定决策 resolve，并广播决策结果（审计订阅） */
-  private finishRuntimeRequest(pending: RuntimeRequest, granted: boolean): void {
+  /** 结束运行时请求：按给定决策 resolve；persist 表示用户明确决策，写透持久化存储（审计订阅照常广播） */
+  private finishRuntimeRequest(pending: RuntimeRequest, granted: boolean, persist: boolean): void {
     for (const [key, entry] of this.pendingRuntime) {
       if (entry !== pending)
         continue
@@ -175,6 +184,8 @@ export class PermissionService {
     }
     clearTimeout(pending.timer)
     pending.resolve(granted)
+    if (persist)
+      this.setRuntimeDecision(`${pending.appId}:${pending.permission}`, granted)
     this.events.emit('permission:decided', {
       requestId: pending.requestId,
       appId: pending.appId,

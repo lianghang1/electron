@@ -2,6 +2,7 @@ import type { DesktopConfig } from '@desktop/shared'
 import type { AppRegistry } from '../app/app-registry'
 import type { AppService } from '../app/app-service'
 import type { CacheService } from '../cache/cache-service'
+import type { DownloadService } from '../download/download-service'
 import type { EventBus } from '../event/event-bus'
 import type { PermissionService } from '../permission/permission-service'
 import type { StorageService } from '../storage/storage-service'
@@ -13,6 +14,7 @@ import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
 import { registerAppIpc } from './app'
 import { registerCacheIpc } from './cache'
+import { registerDownloadIpc } from './download'
 import { registerNotificationIpc } from './notification'
 import { registerOverlayIpc } from './overlay'
 import { registerPermissionIpc } from './permission'
@@ -37,6 +39,8 @@ export interface PlatformIpcDeps {
   asarService?: AsarUpdateService
   /** 浮层窗口服务：全局菜单/弹窗独立原生窗渲染 */
   overlayService: OverlayWindowService
+  /** 下载管理：任务面板操作（打开文件 / 定位文件夹）与面板关闭联动 */
+  downloadService: DownloadService
   /** 平台事件总线：通知等域经它把 Main 侧事件转推 Shell */
   events: EventBus
   resolver: CallerResolver
@@ -64,13 +68,15 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService })
   registerOverlayIpc({
     overlayService: deps.overlayService,
-    getShell: () => deps.overlayService.getShellWindow(),
+    downloadService: deps.downloadService,
     resolver: deps.resolver,
   })
+  registerDownloadIpc({ downloadService: deps.downloadService, resolver: deps.resolver })
   registerNotificationIpc({
     registry: deps.registry,
     permissionService: deps.permissionService,
     events: deps.events,
     resolver: deps.resolver,
+    overlayService: deps.overlayService,
   })
 }

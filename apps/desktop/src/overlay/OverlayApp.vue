@@ -1,19 +1,33 @@
 <script setup lang="ts">
-import type { DownloadTask, OverlayMenuConfig, OverlayMenuItem, PermissionRequest, PlatformNotification } from '@desktop/shared'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { DownloadTask, PermissionRequest, PlatformNotification } from '@desktop/shared'
+import {
+  DialogContent,
+  DialogDescription,
+  DialogOverlay,
+  DialogRoot,
+  DialogTitle,
+  ToastClose,
+  ToastDescription,
+  ToastProvider,
+  ToastRoot,
+  ToastTitle,
+  ToastViewport,
+} from 'reka-ui'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { formatBytes } from '../composables/use-downloads'
 import { permissionLabel } from '../composables/use-permission-labels'
 
 /**
  * 浮层页（OverlayWindow 的 renderer，经 #/overlay 路由挂载）：
- * 原生层级压过 WebContentsView，Shell DOM 不再承载全局浮层。
- * 同一份页面服务三类浮层窗（每窗同时只收一种消息，互斥渲染）：
- * - 菜单窗：overlay:show 菜单（Main 预算好窗口尺寸，无需量高回报）
- * - 消息窗：download:updated 下载面板 + notification:received 通知 toast（右下角）
- * - 弹窗窗：permission:pending 运行时授权决策卡（屏幕居中）
- * 内容高度动态的浮层窗（消息/弹窗），渲染后量高回报（overlay:resize），Main 据此调整窗口。
+ * 原生层级压过 WebContentsView。仅承载必须盖住 Web 容器区域的浮层——
+ * Tab 右键菜单等 Shell 域内浮层在 Shell DOM 渲染（reka-ui + 视图抑制），不经过本页。
+ * 同一份页面服务两类浮层窗（每窗同时只收一种消息，互斥渲染）：
+ * - 消息窗：download:updated 下载面板 + notification:received 通知 toast（右上角）
+ * - 弹窗窗：permission:pending 运行时授权决策卡（全屏遮罩模态，居中）
+ *
+ * 交互语义交给 reka-ui 原语（Toast 滑动关闭/悬停暂停/无障碍、Dialog 焦点圈养/ESC），
+ * 外观用 UnoCSS 工具类自绘；卡片样式固定高对比配色（不随 Shell 主题），保证任意背景下清晰可读。
  */
-const menu = ref<OverlayMenuConfig | null>(null)
 const toasts = ref<PlatformNotification[]>([])
 const downloads = ref<DownloadTask[]>([])
 const dialogs = ref<PermissionRequest[]>([])
@@ -28,8 +42,79 @@ const STATUS_TEXT: Record<DownloadTask['status'], string> = {
 /** 弹窗窗可见 = 有挂起请求；消息窗内容 = 下载面板 + 通知堆叠 */
 const hasPanelContent = computed(() => downloads.value.length > 0 || toasts.value.length > 0)
 
-async function onMenuItem(item: OverlayMenuItem): Promise<void> {
-  await window.desktop.overlay.action(item.id)
+/** 决策卡逐条处理：只渲染队首请求，决策后 Main 推送余下请求 */
+const currentRequest = computed(() => dialogs.value[0] ?? null)
+
+/** 决策卡倒计时秒数（与 Main 的 30s 超时一致，归零由 Main 按拒绝收尾） */
+const REQUEST_TIMEOUT_S = 30
+const countdowns = reactive<Record<string, number>>({})
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+/** 弹窗列表变化 → 为新请求起 30s 倒计时，移除已决策请求的计时（用户要求超时倒数可见） */
+function syncCountdowns(): void {
+  for (const r of dialogs.value) {
+    if (countdowns[r.requestId] == null)
+      countdowns[r.requestId] = REQUEST_TIMEOUT_S
+  }
+  for (const id of Object.keys(countdowns)) {
+    if (!dialogs.value.some(r => r.requestId === id))
+      delete countdowns[id]
+  }
+  if (dialogs.value.length && !countdownTimer) {
+    countdownTimer = setInterval(() => {
+      for (const r of dialogs.value) {
+        if ((countdowns[r.requestId] ?? 0) > 0)
+          countdowns[r.requestId] = (countdowns[r.requestId] ?? 0) - 1
+      }
+      if (!dialogs.value.length && countdownTimer) {
+        clearInterval(countdownTimer)
+        countdownTimer = null
+      }
+    }, 1000)
+  }
+}
+
+watch(dialogs, syncCountdowns, { deep: true })
+
+/**
+ * 遮罩动画只在窗口可见后播放：窗口隐藏期间页面已把内容渲染就绪（Main 数据先行），
+ * show 瞬间直接呈现——若动画在隐藏期就播完/播了一半，显窗时内容会「跳帧闪一下」。
+ */
+const dialogLive = ref(false)
+function syncDialogLive(): void {
+  dialogLive.value = document.visibilityState === 'visible'
+}
+
+watch(dialogs, () => {
+  void nextTick(syncDialogLive)
+}, { deep: true })
+
+/**
+ * 透明窗鼠标穿透联动：Windows 透明窗整个 bounds 命中鼠标，面板视觉只占右上角——
+ * 按命中元素切换穿透（命中 body = 透明区 → 穿透），透明区不遮挡下层页面点击。
+ * 面板容器本身 pointer-events:none，命中卡片/按钮才接管（阴影余量也能点穿）。
+ * ignore 模式下 forward:true 让页面仍收 mousemove，可感知重新进入卡片。
+ */
+let lastIgnore: boolean | null = null
+function onMouseMove(e: MouseEvent): void {
+  const transparent = e.target === document.body || e.target === document.documentElement
+  if (transparent === lastIgnore)
+    return
+  lastIgnore = transparent
+  void window.desktop.overlay.ignoreMouse(transparent)
+}
+
+async function dismissPanel(): Promise<void> {
+  // 清空与刷新由 Main 统一推送（通知清空 + 下载展示清空）
+  await window.desktop.overlay.dismiss()
+}
+
+async function openTask(taskId: string): Promise<void> {
+  await window.desktop.download.open(taskId)
+}
+
+async function revealTask(taskId: string): Promise<void> {
+  await window.desktop.download.reveal(taskId)
 }
 
 async function respond(requestId: string, granted: boolean): Promise<void> {
@@ -37,24 +122,54 @@ async function respond(requestId: string, granted: boolean): Promise<void> {
   // 列表更新由 Main 统一推送（permission:pending），页面无需本地移除
 }
 
-function reportHeight(): void {
-  // 12px 阴影余量含在页面高度内（内容块 margin），Main 直接用回报值设窗口高
-  void window.desktop.overlay.resize(document.documentElement.scrollHeight)
+/** 用户滑动/单条关闭 toast：回传 Main 移除（列表更新由 Main 推送） */
+function dismissToast(toastId: string): void {
+  void window.desktop.notification.dismiss(toastId)
 }
 
-function onKeydown(e: KeyboardEvent): void {
-  if (e.key === 'Escape')
-    void window.desktop.overlay.hideMenu()
+/** reka Toast 的关闭事件统一走 Main（控制态由 Main 数据推导，页面不私存） */
+function onToastOpenChange(toastId: string, value: boolean): void {
+  if (!value)
+    dismissToast(toastId)
+}
+
+/** 遮罩/卡片外点击不关闭（模态语义：必须显式决策或等待超时） */
+function keepDialogOpen(event: Event): void {
+  event.preventDefault()
+}
+
+/** ESC = 本次拒绝（贴近浏览器权限弹窗习惯，超时不持久化的语义一致） */
+function onDialogEscape(event: KeyboardEvent): void {
+  event.preventDefault()
+  if (currentRequest.value)
+    void respond(currentRequest.value.requestId, false)
+}
+
+/**
+ * 面板高度回报：量「自然内容高度」而非裁剪后高度——
+ * 面板超高时内部滚动（max-h + overflow），若回报裁剪值窗口会收缩死循环
+ */
+const PANEL_MARGIN = 12
+const panelRef = ref<HTMLElement | null>(null)
+
+function reportHeight(): void {
+  const panel = panelRef.value
+  if (!panel)
+    return
+  void window.desktop.overlay.resize(panel.scrollHeight + PANEL_MARGIN * 2)
+}
+
+/** 面板超高内部滚动时新 toast 在底部：追加后自动滚到底，保证最新通知可见 */
+function scrollPanelToBottom(): void {
+  const panel = panelRef.value
+  if (panel)
+    panel.scrollTop = panel.scrollHeight
 }
 
 const unsubs: Array<() => void> = []
 
 onMounted(async () => {
   unsubs.push(
-    window.desktop.events.on('overlay:show', (value) => {
-      menu.value = value
-      document.documentElement.dataset.theme = value.theme
-    }),
     window.desktop.events.on('notification:received', (list) => {
       toasts.value = list
     }),
@@ -65,13 +180,10 @@ onMounted(async () => {
       dialogs.value = list
     }),
   )
-  window.addEventListener('keydown', onKeydown)
+  window.addEventListener('mousemove', onMouseMove)
+  document.addEventListener('visibilitychange', syncDialogLive)
   // 主动拉取当前状态：Main 推送可能早于本页事件订阅（did-finish-load ≠ Vue mounted）
   const state = await window.desktop.overlay.sync()
-  if (state.menu) {
-    menu.value = state.menu
-    document.documentElement.dataset.theme = state.menu.theme
-  }
   toasts.value = state.toasts
   downloads.value = state.downloads
   dialogs.value = state.dialogs
@@ -79,85 +191,158 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   for (const off of unsubs) off()
-  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('mousemove', onMouseMove)
+  document.removeEventListener('visibilitychange', syncDialogLive)
+  if (countdownTimer)
+    clearInterval(countdownTimer)
 })
 
-// 内容变化 → 量高回报（菜单窗尺寸由 Main 预算，不参与）
-watch([toasts, downloads, dialogs], () => {
-  void nextTick(reportHeight)
+// 消息窗内容变化 → 量高回报 + 滚到底（弹窗窗全屏铺开，不参与）
+watch([toasts, downloads], () => {
+  void nextTick(() => {
+    reportHeight()
+    scrollPanelToBottom()
+  })
 }, { deep: true })
+
+const DL_DOT_STATUS: Record<DownloadTask['status'], string> = {
+  progressing: 'bg-[#0f766e]',
+  completed: 'bg-[#16a34a]',
+  cancelled: 'bg-[#dc2626]',
+  interrupted: 'bg-[#dc2626]',
+}
+
+/** 决策按钮外观：主次按钮共用形状，颜色各给一份（避免同属性类级联冲突） */
+function dialogBtnClass(primary: boolean): string {
+  const base = 'ov-btn h-[32px] cursor-pointer rounded-[8px] border px-[18px] ml-[8px] text-[13px] font-500 font-[inherit] transition-colors duration-[120ms]'
+  return primary
+    ? `${base} ov-btn--primary border-[#0f766e] bg-[#0f766e] text-white hover:border-[#0d6a63] hover:bg-[#0d6a63]`
+    : `${base} border-[#d5dae1] bg-white text-[#1f2328] hover:bg-[#f3f6f9]`
+}
 </script>
 
 <template>
-  <!-- 菜单浮层：窗口本体透明；菜单块留 12px 外边距承载阴影（与 Main 的 SHADOW 一一对应） -->
-  <Transition name="ov-menu" appear>
-    <div v-if="menu" class="ov-menu">
-      <template v-for="item in menu.items" :key="item.id">
-        <div v-if="item.separatorBefore" class="ov-menu__sep" />
-        <button
-          class="ov-menu__item"
-          :class="{ 'ov-menu__item--danger': item.danger }"
-          @click="onMenuItem(item)"
+  <ToastProvider :duration="8000" label="平台通知">
+    <!-- 权限弹窗：reka Dialog 承担模态遮罩 / 焦点圈养 / ESC；
+         逐条决策（只渲染队首），ESC = 本次拒绝，遮罩点击不关闭 -->
+    <DialogRoot :open="currentRequest !== null">
+      <DialogOverlay
+        class="ov-dialog fixed inset-0 z-[10] bg-[rgba(15,23,42,0.28)]"
+        :class="dialogLive ? 'ov-anim-fade' : ''"
+      />
+      <DialogContent
+        class="fixed inset-0 z-[20] flex flex-col items-center justify-center"
+        @escape-key-down="onDialogEscape"
+        @pointer-down-outside="keepDialogOpen"
+        @interact-outside="keepDialogOpen"
+      >
+        <div
+          v-if="currentRequest"
+          class="ov-dialog__card box-border w-[400px] rounded-[12px] border-x border-b border-x-[rgba(2,8,20,0.1)] border-b-[rgba(2,8,20,0.1)] bg-white px-[18px] pb-[14px] pt-[16px] shadow-[0_8px_24px_rgba(2,8,20,0.16)]"
+          :class="dialogLive ? 'ov-anim-pop' : ''"
         >
-          {{ item.label }}
-        </button>
-      </template>
-    </div>
-  </Transition>
-
-  <!-- 权限弹窗：居中决策卡，逐条决策或 30 秒超时按拒绝 -->
-  <div v-if="dialogs.length" class="ov-dialog">
-    <p class="ov-dialog__title">
-      权限请求
-    </p>
-    <div v-for="request in dialogs" :key="request.requestId" class="ov-dialog__row">
-      <p class="ov-dialog__text">
-        <strong>{{ request.appName }}</strong> 请求使用「{{ permissionLabel(request.permission) }}」
-      </p>
-      <div class="ov-dialog__actions">
-        <button class="ov-btn" @click="respond(request.requestId, false)">
-          拒绝
-        </button>
-        <button class="ov-btn ov-btn--primary" @click="respond(request.requestId, true)">
-          允许
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 右下角消息区：下载面板 + 通知 toast 堆叠 -->
-  <div v-if="hasPanelContent" class="ov-panel">
-    <div v-if="downloads.length" class="ov-panel__block">
-      <p class="ov-panel__head">
-        下载
-      </p>
-      <div v-for="task in downloads" :key="task.id" class="ov-dl" :title="task.path">
-        <span class="ov-dl__dot" :class="`ov-dl__dot--${task.status}`" />
-        <div class="ov-dl__info">
-          <span class="ov-dl__name">{{ task.filename }}</span>
-          <span class="ov-dl__desc">
-            {{ STATUS_TEXT[task.status] }}
-            <template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template>
-            <template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
-          </span>
+          <div class="ov-dialog__head mb-[10px] flex items-center">
+            <span class="ov-dialog__icon mr-[8px] flex h-[28px] w-[28px] flex-none items-center justify-center rounded-[8px] bg-[#0f766e] text-white">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+            </span>
+            <DialogTitle class="ov-dialog__title m-0 text-[14px] font-600 text-[#1f2328]">
+              权限请求
+            </DialogTitle>
+          </div>
+          <DialogDescription class="ov-dialog__text m-0 mb-[6px] text-[13px] leading-[1.6] text-[#57606a] [&_strong]:font-600 [&_strong]:text-[#1f2328]">
+            <strong>{{ currentRequest.appName }}</strong> 请求使用「{{ permissionLabel(currentRequest.permission) }}」，请确认是否允许。
+          </DialogDescription>
+          <p class="ov-dialog__hint m-0 mb-[12px] text-[11.5px] text-[#8a919c]">
+            <b class="ov-dialog__count font-600 text-[#0f766e] tabular-nums">{{ countdowns[currentRequest.requestId] ?? REQUEST_TIMEOUT_S }}</b> 秒内未处理将按本次拒绝，不影响下次使用
+          </p>
+          <div class="ov-dialog__actions flex justify-end">
+            <button :class="dialogBtnClass(false)" @click="respond(currentRequest.requestId, false)">
+              拒绝
+            </button>
+            <button :class="dialogBtnClass(true)" @click="respond(currentRequest.requestId, true)">
+              允许
+            </button>
+          </div>
         </div>
-        <div v-if="task.status === 'progressing' && task.percent >= 0" class="ov-dl__track">
-          <div class="ov-dl__bar" :style="{ width: `${task.percent}%` }" />
+      </DialogContent>
+    </DialogRoot>
+
+    <!-- 右上角消息区：下载面板 + 通知 toast（reka Toast：悬停暂停 / 滑动关闭 / 单条 ×）。
+         容器穿透（pointer-events-none），命中卡片才接管；超高内部滚动不超出软件区域 -->
+    <div
+      v-if="hasPanelContent"
+      ref="panelRef"
+      class="ov-panel relative m-[12px] flex max-h-[calc(100vh-24px)] w-[320px] flex-col overflow-y-auto pointer-events-none"
+    >
+      <button
+        class="ov-panel__close pointer-events-auto absolute right-0 top-0 z-[1] h-[26px] w-[26px] cursor-pointer border-none bg-transparent p-0 text-[15px] leading-[26px] text-[#8a919c] transition-colors duration-[120ms] hover:text-[#1f2328]"
+        title="关闭"
+        @click="dismissPanel"
+      >
+        ×
+      </button>
+      <div
+        v-if="downloads.length"
+        class="ov-panel__block pointer-events-auto overflow-hidden rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
+      >
+        <p class="ov-panel__head m-0 px-[12px] pb-[6px] pt-[8px] text-[12px] font-600 text-[#57606a]">
+          下载
+        </p>
+        <div v-for="task in downloads" :key="task.id" class="ov-dl pointer-events-auto flex flex-wrap items-center px-[12px] py-[8px]" :title="task.path">
+          <span class="ov-dl__dot mr-[10px] h-[8px] w-[8px] flex-none rounded-full" :class="DL_DOT_STATUS[task.status]" />
+          <div class="ov-dl__info flex w-[210px] flex-none flex-col overflow-hidden">
+            <span class="ov-dl__name truncate text-[12.5px] font-500 text-[#1f2328]">{{ task.filename }}</span>
+            <span class="ov-dl__desc text-[11.5px] text-[#57606a]">
+              {{ STATUS_TEXT[task.status] }}
+              <template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template>
+              <template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
+            </span>
+          </div>
+          <div
+            v-if="task.status === 'progressing' && task.percent >= 0"
+            class="ov-dl__track ml-[12px] h-[4px] flex-1 overflow-hidden rounded-[2px] bg-[#e8ecf1]"
+          >
+            <div class="ov-dl__bar h-full rounded-[2px] bg-[#0f766e] transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
+          </div>
+          <div v-if="task.status === 'completed'" class="ov-dl__ops mt-[5px] flex w-full justify-end">
+            <button class="ov-dl__op cursor-pointer rounded-[6px] border border-[#d5dae1] bg-white px-[10px] py-[3px] text-[11px] text-[#1f2328] transition-colors duration-[120ms] hover:border-[#0f766e] hover:text-[#0f766e]" @click="openTask(task.id)">
+              打开
+            </button>
+            <button class="ov-dl__op cursor-pointer rounded-[6px] border border-[#d5dae1] bg-white px-[10px] py-[3px] text-[11px] text-[#1f2328] transition-colors duration-[120ms] hover:border-[#0f766e] hover:text-[#0f766e]" @click="revealTask(task.id)">
+              文件夹
+            </button>
+          </div>
         </div>
       </div>
+      <ToastViewport
+        class="ov-panel__toasts m-0 list-none p-0 [&>*+*]:mt-2"
+      >
+        <ToastRoot
+          v-for="toast in toasts"
+          :key="toast.id"
+          :open="true"
+          :duration="8000"
+          class="ov-toast ov-anim-slide pointer-events-auto relative rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white px-[12px] pb-[10px] pt-[9px] shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
+          @update:open="value => onToastOpenChange(toast.id, value)"
+        >
+          <p class="ov-toast__app m-0 text-[11px] text-[#8a919c]">
+            {{ toast.appName }}
+          </p>
+          <ToastTitle class="ov-toast__title m-0 mt-[2px] text-[12.5px] font-600 text-[#1f2328]">
+            {{ toast.title }}
+          </ToastTitle>
+          <ToastDescription v-if="toast.body" class="ov-toast__body m-0 mt-[2px] text-[11.5px] leading-[1.5] text-[#57606a]">
+            {{ toast.body }}
+          </ToastDescription>
+          <ToastClose
+            class="absolute right-[6px] top-[6px] h-[18px] w-[18px] cursor-pointer border-none bg-transparent p-0 text-[12px] leading-[18px] text-[#8a919c] transition-colors duration-[120ms] hover:text-[#1f2328]"
+          >
+            ×
+          </ToastClose>
+        </ToastRoot>
+      </ToastViewport>
     </div>
-    <div v-for="toast in toasts" :key="toast.id" class="ov-toast">
-      <p class="ov-toast__app">
-        {{ toast.appName }}
-      </p>
-      <p class="ov-toast__title">
-        {{ toast.title }}
-      </p>
-      <p v-if="toast.body" class="ov-toast__body">
-        {{ toast.body }}
-      </p>
-    </div>
-  </div>
+  </ToastProvider>
 </template>
 
 <style>
@@ -169,220 +354,34 @@ body {
   background: transparent;
   overflow: hidden;
 }
-</style>
 
-<style scoped>
-.ov-menu {
-  width: 180px;
-  margin: 12px;
-  padding: 4px;
-  background: var(--dt-surface);
-  border: 1px solid var(--dt-line);
-  border-radius: var(--dt-radius-3);
-  box-shadow: var(--dt-shadow-menu);
-  box-sizing: border-box;
+/* ---- 动画（Uno 工具类不便表达的 keyframes，类名由模板按窗口可见性/挂载时机挂载） ---- */
+@keyframes ov-fade {
+  from { opacity: 0; }
 }
-.ov-menu__item {
-  display: block;
-  width: 100%;
-  height: 28px;
-  padding: 0 10px;
-  border: none;
-  background: transparent;
-  border-radius: var(--dt-radius-1);
-  font-size: 12.5px;
-  font-family: inherit;
-  color: var(--dt-text);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
+@keyframes ov-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
 }
-.ov-menu__item:hover {
-  background: var(--dt-hover);
+@keyframes ov-slide {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
 }
-.ov-menu__item--danger {
-  color: var(--dt-danger-text);
-}
-.ov-menu__sep {
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--dt-line-soft);
+.ov-anim-fade { animation: ov-fade 0.32s ease-out; }
+.ov-anim-pop { animation: ov-pop 0.24s ease-out; }
+.ov-anim-slide { animation: ov-slide 0.2s ease; }
+
+/* 决策卡顶部品牌色描边（其余三边由 Uno 的 border-x/border-b 负责，避免同属性级联） */
+.ov-dialog__card {
+  border-top: 3px solid #0f766e;
 }
 
-/* ---- 权限弹窗 ---- */
-.ov-dialog {
-  width: 400px;
-  margin: 12px;
-  background: var(--dt-surface);
-  border: 1px solid var(--dt-line);
-  border-radius: var(--dt-radius-3);
-  box-shadow: var(--dt-shadow-menu);
-  box-sizing: border-box;
-  padding: 14px 16px;
-}
-.ov-dialog__title {
-  margin: 0 0 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--dt-text);
-}
-.ov-dialog__row {
-  padding: 10px 0 0;
-  border-top: 1px solid var(--dt-line-soft);
-}
-.ov-dialog__text {
-  margin: 0 0 10px;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--dt-text-2);
-}
-.ov-dialog__text strong {
-  color: var(--dt-text);
-  font-weight: 600;
-}
-.ov-dialog__actions {
-  display: flex;
-  justify-content: flex-end;
-}
-.ov-btn {
-  height: 28px;
-  padding: 0 14px;
-  margin-left: 8px;
-  border: 1px solid var(--dt-line);
-  border-radius: var(--dt-radius-2);
-  background: var(--dt-surface);
-  font-size: 12px;
-  font-family: inherit;
-  color: var(--dt-text);
-  cursor: pointer;
-  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
-}
-.ov-btn:hover {
-  background: var(--dt-hover);
-}
-.ov-btn--primary {
-  background: var(--dt-brand);
-  border-color: var(--dt-brand);
-  color: #fff;
-}
-.ov-btn--primary:hover {
-  opacity: 0.9;
-  background: var(--dt-brand);
-}
-
-/* ---- 右下角消息区 ---- */
-.ov-panel {
-  width: 320px;
-  margin: 12px;
-  display: flex;
-  flex-direction: column;
-}
-.ov-panel__block {
-  background: var(--dt-surface);
-  border: 1px solid var(--dt-line);
-  border-radius: var(--dt-radius-3);
-  box-shadow: var(--dt-shadow-menu);
-  overflow: hidden;
-}
-.ov-panel__block + .ov-toast {
-  margin-top: 8px;
-}
-.ov-panel__head {
-  margin: 0;
-  padding: 8px 12px 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--dt-text-2);
-}
-.ov-dl {
-  display: flex;
-  align-items: center;
-  padding: 8px 12px;
-}
-.ov-dl__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-right: 10px;
-  flex: none;
-  background: var(--dt-text-3);
-}
-.ov-dl__dot--progressing {
-  background: var(--dt-brand);
-}
-.ov-dl__dot--completed {
-  background: var(--dt-success);
-}
-.ov-dl__dot--interrupted,
-.ov-dl__dot--cancelled {
-  background: var(--dt-danger);
-}
-.ov-dl__info {
-  width: 210px;
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.ov-dl__name {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--dt-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ov-dl__desc {
-  font-size: 11.5px;
-  color: var(--dt-text-2);
-}
-.ov-dl__track {
-  flex: 1;
-  height: 4px;
-  margin-left: 12px;
-  border-radius: 2px;
-  background: var(--dt-hover);
-  overflow: hidden;
-}
-.ov-dl__bar {
-  height: 100%;
-  border-radius: 2px;
-  background: var(--dt-brand);
-  transition: width var(--dt-dur) var(--dt-ease);
-}
-.ov-toast {
-  background: var(--dt-surface);
-  border: 1px solid var(--dt-line);
-  border-radius: var(--dt-radius-3);
-  box-shadow: var(--dt-shadow-menu);
-  padding: 9px 12px 10px;
-}
-.ov-toast + .ov-toast {
-  margin-top: 8px;
-}
-.ov-toast__app {
-  margin: 0;
-  font-size: 11px;
-  color: var(--dt-text-3);
-}
-.ov-toast__title {
-  margin: 2px 0 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--dt-text);
-}
-.ov-toast__body {
-  margin: 2px 0 0;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--dt-text-2);
-}
-
-.ov-menu-enter-active {
-  transition: opacity var(--dt-dur) var(--dt-ease), transform var(--dt-dur) var(--dt-ease);
-}
-.ov-menu-enter-from {
-  opacity: 0;
-  transform: translateY(-4px) scale(0.98);
+/* 相邻操作按钮间距（保留 margin 方案，不使用 gap） */
+.ov-dl__op + .ov-dl__op {
+  margin-left: 6px;
 }
 </style>

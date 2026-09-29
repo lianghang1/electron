@@ -73,6 +73,8 @@ export class DesktopRuntime {
       })
 
       this.windowService.createMainWindow(this.options)
+      // 主窗就绪后预创建浮层窗：页面提前加载完成，首次弹出/授权弹窗即时呈现（免加载卡顿）
+      this.overlayService.prewarm()
       // 运行韧性（无人值守场景，默认全关）：主窗口就绪后挂载；
       // 定时重启的更新决策走闭包（调用时求值，规避服务创建顺序）
       this.resilienceService.attach(
@@ -168,6 +170,8 @@ export class DesktopRuntime {
       this.permissionService,
       this.events,
       this.logger.scope('download'),
+      this.resolver,
+      this.options,
     )
     this.sessionService.onCreated((appId, appSession) => {
       this.downloadService.attach(appId, appSession)
@@ -259,6 +263,7 @@ export class DesktopRuntime {
       updateService: this.options.updates?.url ? this.updateService : undefined,
       asarService: this.options.updates?.asar ? this.asarUpdateService : undefined,
       overlayService: this.overlayService,
+      downloadService: this.downloadService,
       events: this.events,
       resolver: this.resolver,
     })
