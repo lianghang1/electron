@@ -3,8 +3,6 @@ import type { WorkAreaRect } from '@desktop/shared'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import AppCenter from './components/AppCenter.vue'
 import AppLauncher from './components/AppLauncher.vue'
-import DownloadPopup from './components/DownloadPopup.vue'
-import PermissionRequests from './components/PermissionRequests.vue'
 import TopBar from './components/TopBar.vue'
 import UpdateBar from './components/UpdateBar.vue'
 import { useApps } from './composables/use-apps'
@@ -79,7 +77,6 @@ function onMenuAction(itemId: string): void {
 }
 
 // ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----
-// 权限横幅等 Shell 元素进入布局时 viewport 自动收缩，ResizeObserver 感知后同步给 Main
 function syncWorkArea(): void {
   const el = viewport.value
   if (!el)
@@ -157,8 +154,6 @@ onBeforeUnmount(() => {
             </p>
           </div>
         </div>
-        <PermissionRequests />
-        <DownloadPopup />
         <UpdateBar />
       </main>
     </div>

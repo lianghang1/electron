@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AppPermissionState, DesktopTab, RegisteredApp } from '@desktop/shared'
 import { AccordionContent, AccordionHeader, AccordionItem, AccordionRoot, AccordionTrigger } from 'reka-ui'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { permissionLabel } from '../composables/use-permission-labels'
 
 const props = defineProps<{
@@ -43,7 +43,7 @@ const pendingKey = ref<string | null>(null)
 /** 清理完成后的按钮成功提示 */
 const doneKey = ref<string | null>(null)
 
-function clearKey(appId: string, kind: 'cache' | 'site'): string {
+function clearKey(appId: string, kind: 'cache' | 'site' | 'perm'): string {
   return `${appId}:${kind}`
 }
 
@@ -59,6 +59,22 @@ async function clearApp(appId: string, kind: 'cache' | 'site'): Promise<void> {
   }
   pendingKey.value = null
   await window.desktop.cache[kind === 'cache' ? 'clear' : 'clearSite'](appId)
+  doneKey.value = key
+  setTimeout(() => {
+    if (doneKey.value === key)
+      doneKey.value = null
+  }, 2000)
+}
+
+/** 有按需授权决策时才显示「重置授权」：无决策 = 无可撤销 */
+const hasRuntimeDecisions = computed(() =>
+  permissionStates.value.some(state => !state.declared && state.granted !== null))
+
+/** 撤销该 App 的全部运行时授权：决策清空后，下次请求会重新弹授权条 */
+async function resetPerms(appId: string): Promise<void> {
+  await window.desktop.permission.reset(appId)
+  permissionStates.value = await window.desktop.permission.list(appId)
+  const key = clearKey(appId, 'perm')
   doneKey.value = key
   setTimeout(() => {
     if (doneKey.value === key)
@@ -164,6 +180,14 @@ function isRunning(appId: string): boolean {
             </template>
 
             <div class="ac-clear">
+              <button
+                v-if="hasRuntimeDecisions"
+                class="ac-clear__btn"
+                :class="{ 'ac-clear__btn--done': doneKey === clearKey(app.manifest.id, 'perm') }"
+                @click.stop="resetPerms(app.manifest.id)"
+              >
+                {{ doneKey === clearKey(app.manifest.id, 'perm') ? '已重置' : '重置授权' }}
+              </button>
               <button
                 class="ac-clear__btn"
                 :class="{ 'ac-clear__btn--done': doneKey === clearKey(app.manifest.id, 'cache') }"

@@ -1,25 +1,4 @@
-import type { DownloadTask } from '@desktop/shared'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-
-/** 下载任务：订阅 Main 全量推送（开始 / 进度 / 完成 / 中断） */
-export function useDownloads() {
-  const tasks = ref<DownloadTask[]>([])
-  let unsubscribe: (() => void) | null = null
-
-  onMounted(() => {
-    unsubscribe = window.desktop.events.on('download:updated', (list) => {
-      tasks.value = list
-    })
-  })
-
-  onBeforeUnmount(() => {
-    unsubscribe?.()
-  })
-
-  return { tasks }
-}
-
-/** 字节数 → 可读大小 */
+/** 字节数 → 可读大小（浮层下载面板用） */
 export function formatBytes(bytes: number): string {
   if (bytes <= 0)
     return '0 B'

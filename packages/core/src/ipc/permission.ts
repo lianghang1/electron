@@ -20,4 +20,9 @@ export function registerPermissionIpc(deps: PermissionIpcDeps): void {
     assertShell(deps.resolver.resolve(e.sender))
     deps.permissionService.respond(requestId, granted)
   })
+  // 撤销决策同样是 Shell 用户的管理动作（应用中心「重置授权」）
+  handle('permission:reset', (e, appId) => {
+    assertShell(deps.resolver.resolve(e.sender))
+    deps.permissionService.resetRuntime(appId)
+  })
 }

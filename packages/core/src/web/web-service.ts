@@ -4,6 +4,7 @@ import type { Logger } from '../logger/logger'
 import type { PermissionService } from '../permission/permission-service'
 import type { SessionService } from '../session/session-service'
 import type { WindowService } from '../window/window-service'
+import { join } from 'node:path'
 import { BrowserWindow, WebContentsView } from 'electron'
 import {
   applySessionPermissionGuards,
@@ -40,6 +41,8 @@ export class WebService {
   /** Shell 声明的 Web App 容器区域（窗口内容区坐标） */
   private workArea: WorkAreaRect | null = null
   private focusedId: string | null = null
+  /** 激活视图处于 HTML5 全屏（view 铺满整窗，忽略容器区域） */
+  private htmlFullscreen = false
   /** 已挂权限 guard 的 Session，避免同一 App Session 重复挂 */
   private readonly guardedSessions = new WeakSet<Electron.Session>()
 
@@ -60,12 +63,14 @@ export class WebService {
     const view = new WebContentsView({
       webPreferences: {
         session: this.sessionService.getSession(context.appId),
-        // 与主窗口一致的安全基线：写死不配置；Web 容器不注入 preload
+        // internal App 注入平台 preload（无业务通道的最小桥）；第三方 App 不注入
+        ...internalPreload(manifest),
         ...SECURE_WEB_PREFERENCES,
       },
     })
 
     this.applyGuards(context.appId, view, manifest)
+    this.attachHtmlFullscreen(view)
     this.resolver.register(view.webContents, context)
 
     const runtime: WebAppRuntime = { runtimeId: tabId, view }
@@ -134,12 +139,17 @@ export class WebService {
     return runtime
   }
 
-  /** 激活视图占满容器区域，其余归零隐藏 */
+  /** 激活视图占满容器区域，其余归零隐藏；HTML5 全屏时铺满整窗 */
   private applyBounds(): void {
     const win = this.windowService.getMainWindow()
     if (!win)
       return
     for (const [id, runtime] of this.runtimes) {
+      if (id === this.focusedId && this.htmlFullscreen) {
+        const content = win.getContentBounds()
+        runtime.view.setBounds({ x: 0, y: 0, width: content.width, height: content.height })
+        continue
+      }
       const area = id === this.focusedId ? this.workArea : null
       runtime.view.setBounds(
         area
@@ -152,6 +162,34 @@ export class WebService {
           : { x: 0, y: 0, width: 0, height: 0 },
       )
     }
+  }
+
+  /**
+   * HTML5 全屏跟随：WebContentsView 不响应页面全屏请求，必须显式放大。
+   * 语义贴近浏览器：窗口进入 OS 全屏，视图铺满整窗；退出后恢复容器区域。
+   */
+  private attachHtmlFullscreen(view: WebContentsView): void {
+    view.webContents.on('enter-html-full-screen', () => {
+      this.htmlFullscreen = true
+      const win = this.windowService.getMainWindow()
+      if (!win)
+        return
+      win.setFullScreen(true)
+      // setFullScreen 是异步布局：立即设一次，窗口 resize 完成后再校准
+      const maximize = () => {
+        if (!this.htmlFullscreen)
+          return
+        const content = win.getContentBounds()
+        view.setBounds({ x: 0, y: 0, width: content.width, height: content.height })
+      }
+      maximize()
+      win.once('resize', maximize)
+    })
+    view.webContents.on('leave-html-full-screen', () => {
+      this.htmlFullscreen = false
+      this.windowService.getMainWindow()?.setFullScreen(false)
+      this.applyBounds()
+    })
   }
 
   /** 导航策略按 manifest 限定；Electron 权限挂在 App Session 上（默认全拒） */
@@ -207,6 +245,8 @@ export class WebService {
       title: manifest.name,
       webPreferences: {
         session: this.sessionService.getSession(parentContext.appId),
+        // 受管弹窗与父容器同一套能力集（同 App 能力一致）
+        ...internalPreload(manifest),
         ...SECURE_WEB_PREFERENCES,
       },
     })
@@ -244,4 +284,11 @@ function parseWindowFeatures(features?: string): { width: number, height: number
       result.height = value
   }
   return result
+}
+
+/** internal App 注入平台 preload（无业务通道的最小桥）；第三方 App 保持无桥最小面 */
+function internalPreload(manifest: DesktopAppManifest): { preload?: string } {
+  return manifest.type === 'internal'
+    ? { preload: join(__dirname, '../preload/index.cjs') }
+    : {}
 }

@@ -158,6 +158,7 @@ export class DesktopRuntime {
     )
     this.overlayService = new OverlayWindowService(
       () => this.windowService.getMainWindow(),
+      this.resolver,
       this.logger.scope('overlay'),
     )
     this.resilienceService = new ResilienceService(this.events, this.logger.scope('resilience'))
@@ -170,6 +171,7 @@ export class DesktopRuntime {
     )
     this.sessionService.onCreated((appId, appSession) => {
       this.downloadService.attach(appId, appSession)
+      this.attachProtocolHandlers(appSession)
     })
 
     // 设备通用层：device:* 通道（读卡器/打印机），Driver 缺省用内置 mock，可经 bootstrap.devices 注入
@@ -257,6 +259,7 @@ export class DesktopRuntime {
       updateService: this.options.updates?.url ? this.updateService : undefined,
       asarService: this.options.updates?.asar ? this.asarUpdateService : undefined,
       overlayService: this.overlayService,
+      events: this.events,
       resolver: this.resolver,
     })
     this.forwardEventsToShell()
@@ -277,13 +280,21 @@ export class DesktopRuntime {
     this.events.on('window:maximizedChanged', (maximized) => {
       this.windowService.getMainWindow()?.webContents.send('window:maximizedChanged', maximized)
     })
-    // 运行时权限请求 → Shell 授权条 UI，用户决策经 permission:respond 回传
+    // 运行时权限请求 → 浮层权限弹窗（原生窗压过 Web 容器），用户决策经 permission:respond 回传
     this.events.on('permission:request', (request) => {
-      this.windowService.getMainWindow()?.webContents.send('permission:request', request)
+      this.overlayService.pushDialog(request)
     })
-    // 下载任务状态 → Shell 底部横幅
+    // 请求已结束（用户决策 / 30s 超时 / App 关闭作废）→ 弹窗卡片同步移除
+    this.events.on('permission:decided', ({ requestId }) => {
+      this.overlayService.resolveDialog(requestId)
+    })
+    // 平台通知 → 浮层窗右下角 toast（应用内可定制 UI，不进 OS 通知中心）
+    this.events.on('notification:received', (notification) => {
+      this.overlayService.pushToast(notification)
+    })
+    // 下载任务状态 → 浮层窗右下角下载面板
     this.events.on('download:updated', (tasks) => {
-      this.windowService.getMainWindow()?.webContents.send('download:updated', tasks)
+      this.overlayService.setDownloads(tasks)
     })
     // 更新流程状态 → Shell 底部横幅
     this.events.on('update:state', (state) => {
@@ -304,5 +315,15 @@ export class DesktopRuntime {
     this.deviceService?.dispose()
     this.events.clear()
     this.logger?.info('desktop application disposed')
+  }
+
+  /** bootstrap 注入的自定义协议处理器 → App Session（分区懒创建，幂等注册） */
+  private readonly protocolHandled = new WeakSet<Electron.Session>()
+  private attachProtocolHandlers(appSession: Electron.Session): void {
+    if (this.protocolHandled.has(appSession))
+      return
+    this.protocolHandled.add(appSession)
+    for (const [scheme, handler] of Object.entries(this.options.protocols ?? {}))
+      appSession.protocol.handle(scheme, handler)
   }
 }

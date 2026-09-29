@@ -16,6 +16,7 @@ export interface PermissionStoreSchema {
 }
 
 interface RuntimeRequest {
+  requestId: string
   appId: string
   permission: Permission
   resolve: (granted: boolean) => void
@@ -96,6 +97,7 @@ export class PermissionService {
         resolve(false)
       }, RUNTIME_REQUEST_TIMEOUT_MS)
       this.pendingRuntime.set(requestId, {
+        requestId,
         appId: context.appId,
         permission,
         resolve,
@@ -137,6 +139,23 @@ export class PermissionService {
     this.finishRuntimeRequest(pending, granted)
   }
 
+  /** 撤销 App 的全部运行时授权决策（应用中心「重置授权」）：清内存与持久化，下次请求重新询问 */
+  resetRuntime(appId: string): void {
+    const prefix = `${appId}:`
+    for (const key of [...this.runtimeDecisions.keys()]) {
+      if (key.startsWith(prefix))
+        this.runtimeDecisions.delete(key)
+    }
+    if (!this.store)
+      return
+    const decisions = { ...this.store.get('decisions') }
+    for (const key of Object.keys(decisions)) {
+      if (key.startsWith(prefix))
+        delete decisions[key]
+    }
+    this.store.set('decisions', decisions)
+  }
+
   /** App 退出（Tab 关闭）时取消其全部挂起请求：页面已不存在，按拒绝处理并清缓存 */
   cancelForApp(appId: string): void {
     for (const pending of [...this.pendingRuntime.values()]) {
@@ -157,6 +176,7 @@ export class PermissionService {
     clearTimeout(pending.timer)
     pending.resolve(granted)
     this.events.emit('permission:decided', {
+      requestId: pending.requestId,
       appId: pending.appId,
       permission: pending.permission,
       granted,

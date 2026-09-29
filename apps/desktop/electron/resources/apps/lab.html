@@ -52,6 +52,12 @@
   button.op.warn:hover { background: #fffbeb; border-color: #d97706; }
   a.link { color: #0f766e; font-size: 13px; }
 
+  .media-box { display: none; align-items: flex-start; gap: 16px; margin-top: 12px; }
+  .media-box video { width: 220px; border-radius: 8px; background: #111827; }
+  .media-side { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; }
+  .meter { width: 200px; height: 10px; border-radius: 5px; background: #e5e7eb; overflow: hidden; }
+  .meter div { height: 100%; width: 0; background: linear-gradient(90deg, #14b8a6, #0f766e); transition: width .08s linear; }
+
   .fields { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
   .field { display: flex; gap: 10px; align-items: baseline; }
   .field .k { color: #6b7280; flex: none; width: 130px; }
@@ -90,7 +96,7 @@
     </div>
 
     <div class="card">
-      <h2>存储 <span class="tip">web 容器无平台 preload —— 业务数据走网页 localStorage / cookie，按 App 持久隔离；重启应用后数值保留即验证通过</span></h2>
+      <h2>存储 <span class="tip">业务数据走网页 localStorage / sessionStorage（按 App 持久隔离，重启保留）；cookie 对 app:// 源不可用——Chromium 仅对 http(s) 开放 cookie，属平台限制</span></h2>
       <div class="grid">
         <button class="op" data-op="storage-add">localStorage +1</button>
         <button class="op" data-op="storage-reset">localStorage 清零</button>
@@ -106,27 +112,36 @@
     </div>
 
     <div class="card">
-      <h2>权限 · 已声明直接放行 <span class="tip">lab 声明了剪贴板 / 通知 —— 点击直接执行，不弹授权条</span></h2>
+      <h2>权限 · 已声明直接放行 <span class="tip">lab 声明了剪贴板 / 通知 —— 点击直接执行，不弹授权条；平台通知经 Shell 应用内 toast 呈现，系统通知走 OS 通知中心</span></h2>
       <div class="grid">
         <button class="op" data-op="clip-write">写剪贴板</button>
         <button class="op" data-op="clip-read">读剪贴板</button>
-        <button class="op" data-op="notify">发送系统通知</button>
+        <button class="op" data-op="notify">平台通知（Shell toast）</button>
+        <button class="op" data-op="sys-notify">系统通知（OS toast）</button>
         <button class="op" data-op="perm-query">permissions 全量自检</button>
       </div>
       <div class="fields" style="margin-top:10px">
         <div class="field"><span class="k">剪贴板最近读写</span><span class="v" id="v-clip">-</span></div>
-        <div class="field"><span class="k">通知</span><span class="v" id="v-notify">-</span></div>
+        <div class="field"><span class="k">最近一次通知</span><span class="v" id="v-notify">-</span></div>
       </div>
     </div>
 
     <div class="card">
       <h2>权限 · 运行时授权 <span class="tip">媒体 / 位置 / 全屏 / 鼠标锁定 / 屏幕捕获 未在 manifest 声明 —— 首次点击应弹出顶部授权条，允许后执行成功，拒绝或 30 秒超时则失败；决策持久化，重启后不再询问</span></h2>
       <div class="grid">
-        <button class="op" data-op="media">摄像头 + 麦克风</button>
+        <button class="op" data-op="media">摄像头 + 麦克风（实时预览）</button>
+        <button class="op" data-op="media-stop">停止预览</button>
         <button class="op" data-op="geolocation">获取地理位置</button>
         <button class="op" data-op="fullscreen">请求全屏（1.5s 后自动退出）</button>
         <button class="op" data-op="pointer-lock">锁定鼠标（1.5s 后自动退出）</button>
         <button class="op" data-op="display-capture">屏幕捕获 getDisplayMedia</button>
+      </div>
+      <div class="media-box" id="media-preview">
+        <video id="v-video" autoplay muted playsinline></video>
+        <div class="media-side">
+          <span class="k">麦克风实时电平（对麦克风说话）</span>
+          <div class="meter"><div id="v-mic"></div></div>
+        </div>
       </div>
       <div class="fields" style="margin-top:10px">
         <div class="field"><span class="k">媒体流</span><span class="v" id="v-media">-</span></div>
@@ -160,6 +175,40 @@
         <button class="op" data-op="dialog-alert">alert</button>
         <button class="op" data-op="dialog-confirm">confirm</button>
         <button class="op" data-op="dialog-prompt">prompt</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>平台 API <span class="tip">App 侧能力全览：应用清单 / Tab 会话 / 窗口状态 / 设备 / 更新——全部由 Main 按 event.sender 反查身份执行；Tab 列表推送实时显示在下方</span></h2>
+      <div class="grid">
+        <button class="op" data-op="app-list">app.list 应用清单</button>
+        <button class="op" data-op="app-current">app.getCurrent 当前身份</button>
+        <button class="op" data-op="app-manifest">app.getManifest('lab')</button>
+        <button class="op" data-op="tabs-list">tabs.list 会话列表</button>
+        <button class="op" data-op="tabs-open">tabs.open 打开 OA</button>
+        <button class="op" data-op="tabs-activate">tabs.activate 激活自己</button>
+        <button class="op" data-op="tabs-reload">tabs.reload 重载自己</button>
+        <button class="op" data-op="window-max">window.isMaximized</button>
+        <button class="op" data-op="device-idcard">device.readIdCard 读卡</button>
+        <button class="op" data-op="device-print">device.print 打印</button>
+        <button class="op" data-op="update-check">update.check 检查更新</button>
+      </div>
+      <div class="fields" style="margin-top:10px">
+        <div class="field"><span class="k">tabs:updated 推送</span><span class="v" id="v-tabs">-</span></div>
+        <div class="field"><span class="k">自己的 tabId</span><span class="v" id="v-tab">-</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>安全边界 <span class="tip">App 无权执行的平台动作应全部被拒（橙色=预期拦截）——任何一条「意外成功」都是越权漏洞</span></h2>
+      <div class="grid">
+        <button class="op warn" data-op="deny-overlay-menu">overlay.showMenu（Shell 专属）</button>
+        <button class="op warn" data-op="deny-overlay-action">overlay.action 伪造动作</button>
+        <button class="op warn" data-op="deny-cache">cache.clear 清缓存（Shell 专属）</button>
+        <button class="op warn" data-op="deny-cache-site">cache.clearSite 清站点数据</button>
+        <button class="op warn" data-op="deny-perm-reset">permission.reset 撤销授权</button>
+        <button class="op warn" data-op="deny-respond">permission.respond 伪造决策</button>
+        <button class="op warn" data-op="deny-invoke">$invoke 未暴露通道</button>
       </div>
     </div>
   </div>
@@ -200,7 +249,12 @@
   addEventListener('online', renderOnline)
   addEventListener('offline', renderOnline)
   log('页面加载完成。绿色=符合预期，红色=不符合预期，橙色=预期被拦截', 'info')
-  log('提示：运行时授权类操作首次点击会弹出顶部授权条，请到 Shell 顶栏决策', 'info')
+  log('提示：运行时授权类操作首次点击会弹出居中授权弹窗（原生浮层），决策持久化后不再询问，可在应用中心「重置授权」后重新触发', 'info')
+
+  // Tab 会话推送：Main 全量推送（增删激活都推），页面直接渲染
+  window.desktop.events.on('tabs:updated', (list) => {
+    document.getElementById('v-tabs').textContent = `${list.length} 个：${list.map(t => t.appId).join('、')}`
+  })
 
   // ---------- 存储 ----------
   const LS = 'lab-count'
@@ -218,7 +272,43 @@
 
   // ---------- 权限 ----------
   let mediaStream = null
+  let audioCtx = null
+  // 媒体代际：授权等待期间重复点击 / 手动停止后旧请求作废，拿到的新流立即释放（防摄像头占用泄漏）
+  let mediaToken = 0
 
+  /** 麦克风实时电平：AudioContext 分析器驱动电平条 */
+  function startMicMeter(stream) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+    const analyser = audioCtx.createAnalyser()
+    analyser.fftSize = 512
+    audioCtx.createMediaStreamSource(stream).connect(analyser)
+    const data = new Uint8Array(analyser.frequencyBinCount)
+    const bar = document.getElementById('v-mic')
+    const tick = () => {
+      if (!audioCtx) return
+      analyser.getByteTimeDomainData(data)
+      let peak = 0
+      for (const v of data) peak = Math.max(peak, Math.abs(v - 128))
+      bar.style.width = `${Math.min(100, (peak / 128) * 100 * 1.5)}%`
+      requestAnimationFrame(tick)
+    }
+    tick()
+  }
+
+  function stopMedia() {
+    mediaToken++
+    mediaStream?.getTracks().forEach(t => t.stop())
+    mediaStream = null
+    if (audioCtx) { audioCtx.close(); audioCtx = null }
+    document.getElementById('media-preview').style.display = 'none'
+    document.getElementById('v-video').srcObject = null
+    document.getElementById('v-mic').style.width = '0%'
+  }
+  // 页面卸载兜底：确保摄像头/麦克风硬件立即释放
+  addEventListener('pagehide', stopMedia)
+
+  // 自己的 tabId（tabs.activate / tabs.reload 用，由 app.getCurrent / tabs.list 取得）
+  let myTabId = null
   const ops = {
     // ---- 存储 ----
     'storage-add': () => {
@@ -236,9 +326,13 @@
       document.cookie = `lab=${Date.now()}; max-age=31536000; path=/`
       renderCookie()
       const saved = document.cookie.split('; ').find(c => c.startsWith('lab='))
-      log(saved ? 'cookie 写入成功（持久化一年，重启保留）' : '当前源下浏览器限制 cookie 写入（http/https 源才可用）', saved ? 'ok' : 'info')
+      // Chromium 仅对 http(s) scheme 开放 cookie（EXCLUDE_NONCOOKIEABLE_SCHEME），
+      // app:// 源的写入被静默丢弃——平台限制而非协议注册问题
+      log(saved
+        ? 'cookie 写入成功（持久化一年，重启保留）'
+        : 'cookie 被浏览器拒绝：app:// 非 http(s) scheme，Chromium 不为其存储 cookie（平台限制）——内部页状态用 localStorage，FSY 等 https App 不受影响', saved ? 'ok' : 'info')
     },
-    'cookie-read': () => { renderCookie(); log(`cookie 读取：${document.getElementById('v-cookie').textContent}`, 'ok') },
+    'cookie-read': () => { renderCookie(); log(`cookie 读取：${document.getElementById('v-cookie').textContent}`, 'info') },
 
     // ---- 权限：已声明 ----
     'clip-write': async () => {
@@ -252,11 +346,19 @@
     },
     'notify': async () => {
       try {
+        await window.desktop.notification.show({ title: '平台功能实验室', body: `平台通知测试 ${now()}（已声明 notification → 放行）` })
+        document.getElementById('v-notify').textContent = '已发送（Shell toast）'
+        log('平台通知已发送：由 Shell 以应用内 toast 呈现（右下角，5 秒自动消失，不进 OS 通知中心）', 'ok')
+      }
+      catch (err) { document.getElementById('v-notify').textContent = `失败: ${err.message || err.name}`; log(`平台通知被拒: ${err.message || err.name}（manifest 未声明 notification 时平台直接拒绝）`, 'fail') }
+    },
+    'sys-notify': async () => {
+      try {
         const p = await Notification.requestPermission()
         document.getElementById('v-notify').textContent = p
         if (p === 'granted') {
           new Notification('平台功能实验室', { body: `系统通知测试 ${now()}（已声明 → 放行）` })
-          log('系统通知已发出，权限 granted', 'ok')
+          log('系统通知已发出（OS toast，不受平台管控），权限 granted', 'ok')
         } else { log(`通知权限结果: ${p}`, 'fail') }
       }
       catch (err) { document.getElementById('v-notify').textContent = `失败: ${err.name}`; log(`通知请求失败: ${err.name}`, 'fail') }
@@ -273,16 +375,27 @@
 
     // ---- 权限：运行时授权（未声明 → 授权条） ----
     'media': async () => {
+      stopMedia()
+      const token = mediaToken
       try {
-        if (mediaStream) mediaStream.getTracks().forEach(t => t.stop())
-        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        // 等待授权期间被停止或重新发起：本次流立即释放，否则摄像头指示灯常亮
+        if (token !== mediaToken) {
+          stream.getTracks().forEach(t => t.stop())
+          return
+        }
+        mediaStream = stream
+        document.getElementById('v-video').srcObject = mediaStream
+        document.getElementById('media-preview').style.display = 'flex'
+        startMicMeter(mediaStream)
         document.getElementById('v-media').textContent = `${mediaStream.getVideoTracks().length} 视频 + ${mediaStream.getAudioTracks().length} 音频轨`
-        log('摄像头 + 麦克风获取成功（授权条允许 → 放行）', 'ok')
+        log('摄像头 + 麦克风获取成功 → 下方实时画面，对麦克风说话看电平条（授权条允许 → 放行）', 'ok')
       } catch (err) {
         document.getElementById('v-media').textContent = `失败: ${err.name}`
         log(`媒体获取失败: ${err.name}（授权拒绝 / 超时 / 无设备）`, 'fail')
       }
     },
+    'media-stop': () => { stopMedia(); log('媒体预览已停止', 'info') },
     'geolocation': () => {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -367,6 +480,113 @@
     'dialog-alert': () => { alert(`alert 对话框 ${now()}`); log('alert 已弹出并关闭', 'ok') },
     'dialog-confirm': () => { const ok = confirm('confirm 对话框：确定吗？'); log(`confirm 返回 ${ok}`, 'ok') },
     'dialog-prompt': () => { const v = prompt('prompt 对话框：随便输入点什么', 'hello'); log(`prompt 返回 ${JSON.stringify(v)}`, 'ok') },
+
+    // ---- 平台 API ----
+    'app-list': async () => {
+      const apps = await window.desktop.app.list()
+      log(`app.list: ${apps.map(a => `${a.manifest.id}(${a.source})`).join('、')}`, 'ok')
+    },
+    'app-current': async () => {
+      const ctx = await window.desktop.app.getCurrent()
+      log(`getCurrent: appId=${ctx.appId} · manifest=${ctx.manifest.name} · 权限 ${ctx.permissions.length} 项（tabId 属 Tab 会话域，用 tabs.list 查）`, 'ok')
+    },
+    'app-manifest': async () => {
+      const m = await window.desktop.app.getManifest('lab')
+      log(m ? `getManifest('lab'): ${m.name} v${m.version} · ${m.type} · 声明权限 ${m.permissions?.length ?? 0} 项` : 'getManifest: 未找到', m ? 'ok' : 'fail')
+    },
+    'tabs-list': async () => {
+      const tabs = await window.desktop.tabs.list()
+      const self = tabs.find(t => t.appId === 'lab')
+      if (self) { myTabId = self.id; document.getElementById('v-tab').textContent = `#${self.id.slice(0, 8)}…` }
+      log(`tabs.list: ${tabs.length} 个 → ${tabs.map(t => t.appId).join('、') || '（无）'}`, 'ok')
+    },
+    'tabs-open': async () => {
+      const tab = await window.desktop.tabs.open({ appId: 'oa' })
+      log(`tabs.open(oa): 已创建并激活 #${tab.id.slice(0, 8)}…（点本测试卡回到 lab 可用 tabs.activate）`, 'ok')
+    },
+    'tabs-activate': async () => {
+      if (!myTabId) { log('尚未取得自己的 tabId：先点「app.getCurrent」或「tabs.list」', 'fail'); return }
+      await window.desktop.tabs.activate(myTabId)
+      log('tabs.activate: 已切回 lab ✓', 'ok')
+    },
+    'tabs-reload': async () => {
+      if (!myTabId) { log('尚未取得自己的 tabId：先点「app.getCurrent」或「tabs.list」', 'fail'); return }
+      await window.desktop.tabs.reload(myTabId)
+      log('tabs.reload: 本页重载已触发（日志清空属正常）', 'ok')
+    },
+    'window-max': async () => {
+      const max = await window.desktop.window.isMaximized()
+      log(`window.isMaximized: ${max ? '已最大化' : '非最大化'}`, 'ok')
+    },
+    'device-idcard': async () => {
+      const card = await window.desktop.device.readIdCard()
+      log(card ? `readIdCard: ${card.name} · ${card.idNumber.replace(/^(.{4}).*(.{3})$/, '$1****$2')} · ${card.gender}` : 'readIdCard: null（无卡 / 未接读卡器，平台内置 mock 兜底）', 'ok')
+    },
+    'device-print': async () => {
+      await window.desktop.device.print({ title: 'lab 打印测试', lines: [`平台功能实验室 · ${now()}`, '份数与行数超限会被平台钳制'], copies: 1 })
+      log('print: 打印任务已提交（内置 mock，真实 Driver 经 bootstrap.devices 注入）', 'ok')
+    },
+    'update-check': async () => {
+      try {
+        await window.desktop.update.check()
+        log('update.check: 已触发（配置了 updates.url 时生效，dev 缺省跳过）', 'ok')
+      }
+      catch (err) {
+        // 未配置更新源时平台不注册该通道（契约保留，能力按配置启用）
+        log(`update.check: 通道未启用 ✓（未配置 updates.url，属预期）${err.message.includes('No handler') ? '' : ` — ${err.message}`}`, 'block')
+      }
+    },
+
+    // ---- 安全边界（App 无权动作，应全部被拒） ----
+    'deny-overlay-menu': async () => {
+      try {
+        await window.desktop.overlay.showMenu({ x: 10, y: 10, theme: 'light', items: [{ id: 'x', label: '越权菜单' }] })
+        log('overlay.showMenu 意外成功——越权漏洞！', 'fail')
+      }
+      catch (err) { log(`overlay.showMenu 被拒 ✓（${err.message}）`, 'block') }
+    },
+    'deny-overlay-action': async () => {
+      try {
+        await window.desktop.overlay.action('reload')
+        log('overlay.action 未报错但被静默忽略 ✓（非浮层窗无权回传动作，Shell 不会收到）', 'block')
+      }
+      catch (err) { log(`overlay.action 被拒 ✓（${err.message}）`, 'block') }
+    },
+    'deny-cache': async () => {
+      try {
+        await window.desktop.cache.clear('oa')
+        log('cache.clear 意外成功——越权漏洞！', 'fail')
+      }
+      catch (err) { log(`cache.clear 被拒 ✓（${err.message}）`, 'block') }
+    },
+    'deny-cache-site': async () => {
+      try {
+        await window.desktop.cache.clearSite('oa')
+        log('cache.clearSite 意外成功——越权漏洞！', 'fail')
+      }
+      catch (err) { log(`cache.clearSite 被拒 ✓（${err.message}）`, 'block') }
+    },
+    'deny-perm-reset': async () => {
+      try {
+        await window.desktop.permission.reset('fsy')
+        log('permission.reset 意外成功——越权漏洞！', 'fail')
+      }
+      catch (err) { log(`permission.reset 被拒 ✓（${err.message}）`, 'block') }
+    },
+    'deny-respond': async () => {
+      try {
+        await window.desktop.permission.respond('00000000-0000-4000-8000-000000000000', true)
+        log('permission.respond 伪造决策意外成功——越权漏洞！', 'fail')
+      }
+      catch (err) { log(`permission.respond 被拒 ✓（${err.message}）`, 'block') }
+    },
+    'deny-invoke': () => {
+      try {
+        window.desktop.$invoke('no:such:channel')
+        log('$invoke 未知通道意外成功——白名单失效！', 'fail')
+      }
+      catch (err) { log(`$invoke 未暴露通道被拒 ✓（${err.message}）`, 'block') }
+    },
   }
 
   document.querySelectorAll('button.op').forEach((btn) => {

@@ -1,6 +1,6 @@
 import type { Permission } from '@desktop/shared'
 import type { BrowserWindow } from 'electron'
-import { shell } from 'electron'
+import { desktopCapturer, shell } from 'electron'
 
 /**
  * 平台权限 → Chromium session 权限名的映射：manifest.permissions 里
@@ -99,6 +99,15 @@ export function applyWebAppGuards(
 }
 
 /**
+ * 运行时授权类 session 权限：同步 check 先放行，异步 request 才真正把关。
+ * Chromium 对这类能力（媒体 / 定位 / 全屏 / 鼠标锁定 / 屏幕捕获）在发起请求前
+ * 先做同步 permission check——check 不过连 request 都不触发，运行时授权弹窗
+ * 链路会整体失效；而通知 / 剪贴板读取只走同步 check、没有 request 环节，
+ * 必须保持声明制，不可放进这里。
+ */
+const RUNTIME_CHECK_THROUGH = new Set(['media', 'geolocation', 'fullscreen', 'pointerLock', 'display-capture'])
+
+/**
  * Session 级权限白名单：基础项（复制粘贴）+ 声明（'all' 或数组），其余一律拒绝。
  * 声明之外但提供 requestApproval 的（Web App 容器），转运行时授权请用户决策；
  * callback 支持异步调用，决策回来前页面请求挂起。
@@ -109,12 +118,11 @@ export function applySessionPermissionGuards(
   allowedPermissions: 'all' | string[] = [],
   requestApproval?: (wc: Electron.WebContents, permission: string) => Promise<boolean>,
 ): void {
-  const isAllowed = (permission: string) =>
-    permission === 'clipboard-sanitized-write'
-    || allowedPermissions === 'all'
+  const isDeclared = (permission: string) =>
+    allowedPermissions === 'all'
     || (Array.isArray(allowedPermissions) && allowedPermissions.includes(permission))
   session.setPermissionRequestHandler((wc, permission, callback) => {
-    if (isAllowed(permission))
+    if (permission === 'clipboard-sanitized-write' || isDeclared(permission))
       return callback(true)
     if (requestApproval) {
       void requestApproval(wc, permission).then(granted => callback(granted))
@@ -123,7 +131,17 @@ export function applySessionPermissionGuards(
     console.warn(`[security] denied permission request: ${permission}`)
     callback(false)
   })
-  session.setPermissionCheckHandler((_wc, permission) => isAllowed(permission))
+  // 同步 check：基础写 + 已声明 + 运行时授权类（后者的真正关卡在 request handler）
+  session.setPermissionCheckHandler(
+    (_wc, permission) =>
+      permission === 'clipboard-sanitized-write' || isDeclared(permission) || RUNTIME_CHECK_THROUGH.has(permission),
+  )
+  // 屏幕捕获源提供：display-capture 权限请求放行后才会走到这里，取主屏；拒绝时 Chromium 在更早环节已拦
+  session.setDisplayMediaRequestHandler((_request, callback) => {
+    void desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
+      callback(sources.length ? { video: sources[0] } : {})
+    })
+  })
 }
 
 /**

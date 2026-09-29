@@ -1,10 +1,11 @@
 import type { AppContext } from './context'
 import type { DeviceIdCard, DevicePrintTicket } from './device'
 import type { DesktopIpc } from './ipc'
-import type { OverlayMenuConfig } from './ipc/overlay'
+import type { OverlayMenuConfig, OverlaySyncState } from './ipc/overlay'
 import type { DesktopAppManifest, RegisteredApp } from './manifest'
 import type { AppPermissionState, Permission } from './permission'
 import type { DesktopTab, OpenTabOptions, WorkAreaRect } from './tab'
+
 /**
  * Renderer 可监听的平台推送事件：从契约中数组形态的 channel 自动推导，
  * 与 Main 侧 emit 保持单一来源。
@@ -46,6 +47,8 @@ export interface DesktopApi {
     respond: (requestId: string, granted: boolean) => Promise<void>
     /** App 权限状态列表（声明 + 运行时决策合成视图） */
     list: (appId: string) => Promise<AppPermissionState[]>
+    /** 撤销 App 的全部运行时授权决策，下次请求重新询问 */
+    reset: (appId: string) => Promise<void>
   }
   storage: {
     get: <T>(key: string) => Promise<T | undefined>
@@ -91,6 +94,17 @@ export interface DesktopApi {
     hideMenu: () => Promise<void>
     /** 仅供 OverlayWindow 页面回传用户动作（Main 校验来源，Shell 调用无效） */
     action: (itemId: string) => Promise<void>
+    /** 仅供 OverlayWindow 页面量高回报（Main 据此调整浮层窗尺寸） */
+    resize: (height: number) => Promise<void>
+    /** 仅供 OverlayWindow 页面 mounted 后拉取当前状态（菜单 / toast / 下载 / 挂起授权请求） */
+    sync: () => Promise<OverlaySyncState>
+  }
+  /**
+   * 平台通知：App 发起后由平台以浮层 toast 呈现（右下角，全局统一可定制 UI，
+   * 不进系统通知中心）。需在 manifest 声明 notification 权限。
+   */
+  notification: {
+    show: (notification: { title: string, body?: string }) => Promise<void>
   }
   /**
    * App 业务通道统一入口：调用 bootstrap 时经 preload 白名单声明的业务通道

@@ -23,6 +23,13 @@ export interface WindowOverrides {
    */
   permissions?: 'all' | string[]
   /**
+   * 自定义协议处理器（scheme → handler）：注册到每个 App 的 persist 分区 Session 上。
+   * Electron 顶层 protocol API 只作用于 defaultSession，分区 Session 必须逐个挂；
+   * core 在 Session 创建的咽喉位置统一注册（幂等）。
+   * 典型用途：内部静态页走 app:// 标准源加载（standard+secure 使 cookie/origin 语义等同 https）。
+   */
+  protocols?: Record<string, (request: Request) => Promise<Response>>
+  /**
    * 硬件驱动注入（设备通用层 device:*）：缺省用平台内置 mock。
    * 对接真实设备 SDK 时在此注入对应 Driver 实现，契约与业务页不动。
    */

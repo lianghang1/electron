@@ -34,25 +34,29 @@ export type { DesktopInvoke, DesktopIpc } from './types/ipc'
 
 /* ---------------- 浮层（OverlayWindow 独立原生窗） ---------------- */
 
-export type { OverlayMenuConfig, OverlayMenuItem } from './types/ipc/overlay'
+export type { OverlayMenuConfig, OverlayMenuItem, OverlaySyncState } from './types/ipc/overlay'
 
-/* ---------------- 更新（整包 + asar 热更） ---------------- */
+/* ---------------- App 清单与来源（多 App 注册） ---------------- */
 
 export type { AppSource, DesktopAppManifest, RegisteredApp } from './types/manifest'
+
+/* ---------------- 平台通知（Shell 应用内 toast） ---------------- */
+
+export type { PlatformNotification } from './types/notification'
 
 /* ---------------- 运行时权限 ---------------- */
 
 export { PERMISSIONS } from './types/permission'
 export type { AppPermissionState, Permission, PermissionRequest } from './types/permission'
 
-/* ---------------- Tab 会话 ---------------- */
+/* ---------------- 安全策略 ---------------- */
 
 export type { AppSecurityPolicy } from './types/security'
 
-/* ---------------- App 清单与来源（多 App 注册） ---------------- */
+/* ---------------- Tab 会话 ---------------- */
 
 export type { DesktopTab, OpenTabOptions, WorkAreaRect } from './types/tab'
 
-/* ---------------- 安全策略 ---------------- */
+/* ---------------- 更新（整包 + asar 热更） ---------------- */
 
 export type { AsarUpdateState, UpdateManifest, UpdateState } from './types/update'

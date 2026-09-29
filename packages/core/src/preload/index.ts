@@ -21,6 +21,7 @@ const channels = {
   permissionCheck: 'permission:check',
   permissionRespond: 'permission:respond',
   permissionList: 'permission:list',
+  permissionReset: 'permission:reset',
   storageGet: 'storage:get',
   storageSet: 'storage:set',
   storageRemove: 'storage:remove',
@@ -30,10 +31,13 @@ const channels = {
   overlayShowMenu: 'overlay:showMenu',
   overlayHideMenu: 'overlay:hideMenu',
   overlayAction: 'overlay:action',
+  overlayResize: 'overlay:resize',
+  overlaySync: 'overlay:sync',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   deviceIdcardRead: 'device:idcard:read',
   devicePrinterPrint: 'device:printer:print',
+  notificationShow: 'notification:show',
 } as const satisfies Record<string, keyof DesktopIpc>
 
 /** 平台 invoke 通道白名单（$invoke 之外的强类型方法不受此表约束） */
@@ -84,6 +88,7 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
       check: permission => ipcRenderer.invoke(channels.permissionCheck, permission),
       respond: (requestId, granted) => ipcRenderer.invoke(channels.permissionRespond, requestId, granted),
       list: appId => ipcRenderer.invoke(channels.permissionList, appId),
+      reset: appId => ipcRenderer.invoke(channels.permissionReset, appId),
     },
     storage: {
       get: key => ipcRenderer.invoke(channels.storageGet, key),
@@ -99,6 +104,8 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
       showMenu: config => ipcRenderer.invoke(channels.overlayShowMenu, config),
       hideMenu: () => ipcRenderer.invoke(channels.overlayHideMenu),
       action: itemId => ipcRenderer.invoke(channels.overlayAction, itemId),
+      resize: height => ipcRenderer.invoke(channels.overlayResize, height),
+      sync: () => ipcRenderer.invoke(channels.overlaySync),
     },
     update: {
       check: () => ipcRenderer.invoke(channels.updateCheck),
@@ -107,6 +114,9 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
     device: {
       readIdCard: () => ipcRenderer.invoke(channels.deviceIdcardRead),
       print: ticket => ipcRenderer.invoke(channels.devicePrinterPrint, ticket),
+    },
+    notification: {
+      show: notification => ipcRenderer.invoke(channels.notificationShow, notification),
     },
     $invoke: (channel, ...args) => {
       if (!allowedChannels.has(channel))

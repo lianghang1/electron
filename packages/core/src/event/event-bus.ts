@@ -7,6 +7,7 @@ import type {
   DownloadTask,
   Permission,
   PermissionRequest,
+  PlatformNotification,
   UpdateState,
 } from '@desktop/shared'
 
@@ -20,7 +21,9 @@ export interface PlatformEventMap {
   'tab:closed': [DesktopTab]
   'permission:denied': [{ context: CallerContext, permission: Permission }]
   'permission:request': [PermissionRequest]
-  'permission:decided': [{ appId: string, permission: Permission, granted: boolean }]
+  'permission:decided': [{ requestId: string, appId: string, permission: Permission, granted: boolean }]
+  /** 平台通知产生（runtime 监听后经 OverlayWindowService 呈现右下角 toast） */
+  'notification:received': [PlatformNotification]
   'renderer:crashed': [{ appId: string, reason: string }]
   'window:maximizedChanged': [boolean]
   'download:updated': [DownloadTask[]]
