@@ -63,8 +63,9 @@ async function install() {
   align-items: center;
   height: 52px;
   padding: 0 16px;
-  background: #ffffff;
-  border-top: 1px solid #e5e7eb;
+  background: var(--dt-surface);
+  border-top: 1px solid var(--dt-line);
+  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
 }
 .upd-dot {
   width: 8px;
@@ -72,13 +73,13 @@ async function install() {
   border-radius: 50%;
   margin-right: 12px;
   flex: none;
-  background: #3370ff;
+  background: var(--dt-brand);
 }
 .upd-dot--downloaded {
-  background: #16a34a;
+  background: var(--dt-success);
 }
 .upd-dot--error {
-  background: #dc2626;
+  background: var(--dt-danger);
 }
 .upd-info {
   flex: none;
@@ -88,26 +89,26 @@ async function install() {
 .upd-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1f2328;
+  color: var(--dt-text);
   margin-right: 12px;
 }
 .upd-desc {
   font-size: 12px;
-  color: #6b7280;
+  color: var(--dt-text-2);
 }
 .upd-track {
   flex: 1;
   height: 4px;
   margin-left: 16px;
   border-radius: 2px;
-  background: #f1f5f9;
+  background: var(--dt-hover);
   overflow: hidden;
 }
 .upd-bar {
   height: 100%;
   border-radius: 2px;
-  background: #3370ff;
-  transition: width 0.3s ease;
+  background: var(--dt-brand);
+  transition: width 0.3s var(--dt-ease);
 }
 .upd-btn {
   flex: none;
@@ -115,15 +116,17 @@ async function install() {
   padding: 0 16px;
   margin-left: 16px;
   border: none;
-  border-radius: 6px;
-  background: #3370ff;
-  color: #ffffff;
+  border-radius: var(--dt-radius-1);
+  background: var(--dt-brand);
+  color: var(--dt-brand-on);
   font-size: 12px;
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
+  transition: background var(--dt-dur) var(--dt-ease);
 }
 .upd-btn:hover {
-  background: #2860e1;
+  background: var(--dt-brand-hover);
 }
 
 .upd-enter-active,

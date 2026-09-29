@@ -12,8 +12,8 @@ const emit = defineEmits<{ open: [appId: string] }>()
 
 const activeAppId = computed(() => props.tabs.find(tab => tab.active)?.appId)
 
-/** 字母头像柔和色板（按 appId 稳定取色，避免全蓝一片） */
-const AVATAR_COLORS = ['#3370ff', '#0f9d8f', '#7c5cff', '#e0663c', '#c2379e', '#2f8af5']
+/** 字母头像柔和色板（按 appId 稳定取色，避免全青玉一片；识别色与主题主色无关） */
+const AVATAR_COLORS = ['#0f9d8f', '#7c5cff', '#e0663c', '#c2379e', '#2f8af5', '#d9a514']
 function avatarColor(appId: string): string {
   let hash = 0
   for (const ch of appId) hash = (hash * 31 + ch.charCodeAt(0)) | 0
@@ -22,7 +22,7 @@ function avatarColor(appId: string): string {
 </script>
 
 <template>
-  <!-- 飞书式窄导航：图标上 / 文字下的纵排导航项，激活项品牌色高亮 + 左侧指示条 -->
+  <!-- 飞书式窄导航：图标上 / 文字下的纵排导航项，激活项主色高亮 + 左侧指示条 -->
   <aside class="dt-launcher">
     <button
       v-for="app in apps"
@@ -48,10 +48,11 @@ function avatarColor(appId: string): string {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  background: #ffffff;
-  border-right: 1px solid #e7e9ec;
+  background: var(--dt-surface);
+  border-right: 1px solid var(--dt-line);
   padding: 10px 8px;
   overflow-y: auto;
+  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
 }
 .dt-launcher__item {
   position: relative;
@@ -66,13 +67,13 @@ function avatarColor(appId: string): string {
   padding: 8px 0 7px;
   cursor: pointer;
   font-family: inherit;
-  transition: background 0.12s;
+  transition: background var(--dt-dur) var(--dt-ease);
 }
 .dt-launcher__item:hover {
-  background: #f2f3f5;
+  background: var(--dt-hover);
 }
 .dt-launcher__item--active {
-  background: #f2f7ff;
+  background: var(--dt-brand-soft);
 }
 .dt-launcher__item--active::before {
   content: '';
@@ -83,7 +84,7 @@ function avatarColor(appId: string): string {
   width: 3px;
   height: 22px;
   border-radius: 0 3px 3px 0;
-  background: #3370ff;
+  background: var(--dt-brand);
 }
 .dt-launcher__icon {
   width: 32px;
@@ -101,16 +102,16 @@ function avatarColor(appId: string): string {
 }
 .dt-launcher__name {
   font-size: 11px;
-  color: #4b5563;
+  color: var(--dt-text-2);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   padding: 0 4px;
-  transition: color 0.12s;
+  transition: color var(--dt-dur) var(--dt-ease);
 }
 .dt-launcher__item--active .dt-launcher__name {
-  color: #3370ff;
+  color: var(--dt-brand-text);
   font-weight: 600;
 }
 </style>

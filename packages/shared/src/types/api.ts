@@ -1,6 +1,7 @@
 import type { AppContext } from './context'
 import type { DeviceIdCard, DevicePrintTicket } from './device'
 import type { DesktopIpc } from './ipc'
+import type { OverlayMenuConfig } from './ipc/overlay'
 import type { DesktopAppManifest, RegisteredApp } from './manifest'
 import type { AppPermissionState, Permission } from './permission'
 import type { DesktopTab, OpenTabOptions, WorkAreaRect } from './tab'
@@ -78,6 +79,18 @@ export interface DesktopApi {
     readIdCard: () => Promise<DeviceIdCard | null>
     /** 打印票据（份数与行数超限会被平台钳制/拒绝） */
     print: (ticket: DevicePrintTicket) => Promise<void>
+  }
+  /**
+   * 浮层域：全局菜单/弹窗渲染进独立透明原生窗（OverlayWindow），
+   * 原生层级永远盖过 WebContentsView，Shell DOM 不再承载全局浮层。
+   */
+  overlay: {
+    /** Shell 发起：在视口坐标处弹出浮层菜单（Main 换算屏幕坐标并显示） */
+    showMenu: (config: OverlayMenuConfig) => Promise<void>
+    /** 收起浮层菜单 */
+    hideMenu: () => Promise<void>
+    /** 仅供 OverlayWindow 页面回传用户动作（Main 校验来源，Shell 调用无效） */
+    action: (itemId: string) => Promise<void>
   }
   /**
    * App 业务通道统一入口：调用 bootstrap 时经 preload 白名单声明的业务通道

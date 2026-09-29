@@ -32,8 +32,9 @@ const { requests, label, respond } = usePermissionRequests()
 <style scoped>
 .prq-banner {
   flex: none;
-  background: #ffffff;
-  border-top: 1px solid #e5e7eb;
+  background: var(--dt-surface);
+  border-top: 1px solid var(--dt-line);
+  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
 }
 .prq-row {
   display: flex;
@@ -42,13 +43,13 @@ const { requests, label, respond } = usePermissionRequests()
   padding: 0 16px;
 }
 .prq-row + .prq-row {
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--dt-line-soft);
 }
 .prq-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #3370ff;
+  background: var(--dt-brand);
   margin-right: 12px;
   flex: none;
 }
@@ -62,19 +63,19 @@ const { requests, label, respond } = usePermissionRequests()
 .prq-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1f2328;
+  color: var(--dt-text);
   margin-right: 12px;
   flex: none;
 }
 .prq-desc {
   font-size: 13px;
-  color: #6b7280;
+  color: var(--dt-text-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .prq-desc strong {
-  color: #1f2328;
+  color: var(--dt-text);
   font-weight: 600;
 }
 .prq-actions {
@@ -86,26 +87,28 @@ const { requests, label, respond } = usePermissionRequests()
 .prq-btn {
   height: 28px;
   padding: 0 16px;
-  border-radius: 6px;
+  border-radius: var(--dt-radius-1);
   border: 1px solid transparent;
   font-size: 12px;
   font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
+  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
 }
 .prq-btn--primary {
-  background: #3370ff;
-  color: #ffffff;
+  background: var(--dt-brand);
+  color: var(--dt-brand-on);
 }
 .prq-btn--primary:hover {
-  background: #2860e1;
+  background: var(--dt-brand-hover);
 }
 .prq-btn--ghost {
-  background: #ffffff;
-  border-color: #cfd5de;
-  color: #4b5563;
+  background: var(--dt-surface);
+  border-color: var(--dt-line);
+  color: var(--dt-text-2);
 }
 .prq-btn--ghost:hover {
-  background: #f3f4f6;
+  background: var(--dt-hover);
 }
 
 .prq-enter-active,

@@ -3,15 +3,17 @@ import type { WorkAreaRect } from '@desktop/shared'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import AppCenter from './components/AppCenter.vue'
 import AppLauncher from './components/AppLauncher.vue'
-import DownloadsBar from './components/DownloadsBar.vue'
+import DownloadPopup from './components/DownloadPopup.vue'
 import PermissionRequests from './components/PermissionRequests.vue'
 import TopBar from './components/TopBar.vue'
 import UpdateBar from './components/UpdateBar.vue'
 import { useApps } from './composables/use-apps'
 import { useTabs } from './composables/use-tabs'
+import { useTheme } from './composables/use-theme'
 
 const { apps } = useApps()
 const { tabs, open, close, activate, reload } = useTabs()
+const { theme, toggle: toggleTheme } = useTheme()
 
 const maximized = ref(false)
 const viewport = ref<HTMLElement | null>(null)
@@ -33,13 +35,47 @@ async function closeWindow(): Promise<void> {
   await window.desktop.window.close()
 }
 
-// ---- 缓存清理（Tab 右键菜单发起，作用域为该 Tab 对应的容器） ----
+// ---- 缓存清理（浮层菜单发起，作用域为该 Tab 对应的容器） ----
 async function cacheClear(appId: string): Promise<void> {
   await window.desktop.cache.clear(appId)
 }
 
 async function cacheClearSite(appId: string): Promise<void> {
   await window.desktop.cache.clearSite(appId)
+}
+
+// ---- Tab 浮层菜单：渲染进独立透明原生窗（OverlayWindow），
+//      原生层级永远压过 WebContentsView，不再受 Shell DOM 层级限制 ----
+let menuTarget: { tabId: string, appId: string } | null = null
+
+async function openTabMenu(payload: { tabId: string, appId: string, x: number, y: number }): Promise<void> {
+  menuTarget = { tabId: payload.tabId, appId: payload.appId }
+  await window.desktop.overlay.showMenu({
+    x: payload.x,
+    y: payload.y,
+    theme: theme.value,
+    items: [
+      { id: 'reload', label: '刷新页面' },
+      { id: 'cache', label: '清理缓存' },
+      { id: 'site', label: '清除站点数据（退出登录）', danger: true },
+      { id: 'close', label: '关闭标签页', separatorBefore: true },
+    ],
+  })
+}
+
+function onMenuAction(itemId: string): void {
+  const target = menuTarget
+  menuTarget = null
+  if (!target)
+    return
+  if (itemId === 'reload')
+    reload(target.tabId)
+  else if (itemId === 'close')
+    close(target.tabId)
+  else if (itemId === 'cache')
+    void cacheClear(target.appId)
+  else if (itemId === 'site')
+    void cacheClearSite(target.appId)
 }
 
 // ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----
@@ -60,6 +96,7 @@ function syncWorkArea(): void {
 
 let resizeObserver: ResizeObserver | null = null
 let unsubMaximized: (() => void) | null = null
+let unsubMenuAction: (() => void) | null = null
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(syncWorkArea)
@@ -69,6 +106,7 @@ onMounted(() => {
   unsubMaximized = window.desktop.events.on('window:maximizedChanged', (value) => {
     maximized.value = value
   })
+  unsubMenuAction = window.desktop.events.on('overlay:menuAction', onMenuAction)
   void window.desktop.window.isMaximized().then((value) => {
     maximized.value = value
   })
@@ -77,12 +115,13 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   unsubMaximized?.()
+  unsubMenuAction?.()
 })
 </script>
 
 <template>
   <div class="dt-shell">
-    <div class="dt-body">
+    <div class="flex flex-1 min-h-0">
       <AppLauncher :apps="apps" :tabs="tabs" @open="open" />
       <Transition name="ac-slide">
         <AppCenter
@@ -93,22 +132,22 @@ onBeforeUnmount(() => {
           @close="appCenterOpen = false"
         />
       </Transition>
-      <main class="dt-main">
+      <main class="flex-1 flex flex-col min-w-0">
         <TopBar
           :tabs="tabs"
           :maximized="maximized"
           :app-center-open="appCenterOpen"
+          :theme="theme"
           @activate="activate"
           @close="close"
-          @reload="reload"
+          @tab-menu="openTabMenu"
+          @toggle-theme="toggleTheme"
           @toggle-center="appCenterOpen = !appCenterOpen"
           @minimize="minimize"
           @toggle-maximize="toggleMaximize"
           @close-window="closeWindow"
-          @cache-clear="cacheClear"
-          @cache-clear-site="cacheClearSite"
         />
-        <div ref="viewport" class="dt-viewport">
+        <div ref="viewport" class="relative flex-1 bg-dt-bg">
           <div v-if="tabs.length === 0" class="dt-empty">
             <p class="dt-empty__title">
               打开一个应用开始工作
@@ -119,7 +158,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <PermissionRequests />
-        <DownloadsBar />
+        <DownloadPopup />
         <UpdateBar />
       </main>
     </div>
@@ -132,30 +171,15 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: #f6f7f9;
-  color: #1f2328;
+  background: var(--dt-bg);
+  color: var(--dt-text);
   font-family:
     system-ui,
     -apple-system,
     'Segoe UI',
     'PingFang SC',
     sans-serif;
-}
-.dt-body {
-  flex: 1;
-  display: flex;
-  min-height: 0;
-}
-.dt-main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-.dt-viewport {
-  position: relative;
-  flex: 1;
-  background: #f5f6f7;
+  transition: background var(--dt-dur) var(--dt-ease);
 }
 .dt-empty {
   height: 100%;
@@ -167,12 +191,13 @@ onBeforeUnmount(() => {
 .dt-empty__title {
   font-size: 14px;
   font-weight: 500;
-  color: #9ca3af;
+  color: var(--dt-text-3);
   margin: 0 0 6px;
 }
 .dt-empty__desc {
   font-size: 12px;
-  color: #c2c7cf;
+  color: var(--dt-text-3);
+  opacity: 0.7;
   margin: 0;
 }
 

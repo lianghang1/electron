@@ -27,6 +27,9 @@ const channels = {
   storageClear: 'storage:clear',
   cacheClear: 'cache:clear',
   cacheClearSite: 'cache:clearSite',
+  overlayShowMenu: 'overlay:showMenu',
+  overlayHideMenu: 'overlay:hideMenu',
+  overlayAction: 'overlay:action',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   deviceIdcardRead: 'device:idcard:read',
@@ -91,6 +94,11 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
     cache: {
       clear: appId => ipcRenderer.invoke(channels.cacheClear, appId),
       clearSite: appId => ipcRenderer.invoke(channels.cacheClearSite, appId),
+    },
+    overlay: {
+      showMenu: config => ipcRenderer.invoke(channels.overlayShowMenu, config),
+      hideMenu: () => ipcRenderer.invoke(channels.overlayHideMenu),
+      action: itemId => ipcRenderer.invoke(channels.overlayAction, itemId),
     },
     update: {
       check: () => ipcRenderer.invoke(channels.updateCheck),

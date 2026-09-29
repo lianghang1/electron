@@ -12,6 +12,11 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   'upload': '上传文件',
   'filesystem.read': '读取文件',
   'filesystem.write': '写入文件',
+  'media': '摄像头 / 麦克风',
+  'geolocation': '地理位置',
+  'fullscreen': '进入全屏',
+  'pointerLock': '锁定鼠标',
+  'display-capture': '屏幕捕获',
 }
 
 export function permissionLabel(permission: Permission): string {

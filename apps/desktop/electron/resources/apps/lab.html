@@ -21,6 +21,8 @@
     display: flex; flex-direction: column;
     background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px;
     overflow: hidden;
+    position: sticky; top: 24px;
+    height: calc(100vh - 48px);
   }
   header.top { display: flex; align-items: center; gap: 10px; }
   .badge {
@@ -48,10 +50,11 @@
   }
   button.op:hover { background: #f0fdfa; border-color: #0f766e; }
   button.op.warn:hover { background: #fffbeb; border-color: #d97706; }
+  a.link { color: #0f766e; font-size: 13px; }
 
   .fields { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
   .field { display: flex; gap: 10px; align-items: baseline; }
-  .field .k { color: #6b7280; flex: none; width: 120px; }
+  .field .k { color: #6b7280; flex: none; width: 130px; }
   .field .v { font-variant-numeric: tabular-nums; word-break: break-all; }
 
   .loghead { padding: 10px 14px; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; }
@@ -71,30 +74,44 @@
     <header class="top">
       <span class="badge"><span class="dot"></span>APP ID: lab</span>
       <h1>平台功能实验室</h1>
-      <span class="meta">本次加载 <b id="loaded-at">--:--:--</b> · persist:app-lab · <b>全部权限已声明</b>（应用中心可见）</span>
+      <span class="meta">本次加载 <b id="loaded-at">--:--:--</b> · persist:app-lab</span>
     </header>
 
     <div class="card">
-      <h2>存储 <span class="tip">web 容器无平台 preload —— 业务数据走网页 localStorage / cookie，同样按 App 持久隔离；重启应用后数值保留即验证通过</span></h2>
+      <h2>运行环境 <span class="tip">容器基础信息自检</span></h2>
+      <div class="fields">
+        <div class="field"><span class="k">URL</span><span class="v" id="v-href">-</span></div>
+        <div class="field"><span class="k">UA</span><span class="v" id="v-ua">-</span></div>
+        <div class="field"><span class="k">语言 / 时区</span><span class="v" id="v-locale">-</span></div>
+        <div class="field"><span class="k">屏幕 / DPR</span><span class="v" id="v-screen">-</span></div>
+        <div class="field"><span class="k">视口</span><span class="v" id="v-viewport">-</span></div>
+        <div class="field"><span class="k">网络状态</span><span class="v" id="v-online">-</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>存储 <span class="tip">web 容器无平台 preload —— 业务数据走网页 localStorage / cookie，按 App 持久隔离；重启应用后数值保留即验证通过</span></h2>
       <div class="grid">
         <button class="op" data-op="storage-add">localStorage +1</button>
         <button class="op" data-op="storage-reset">localStorage 清零</button>
+        <button class="op" data-op="session-add">sessionStorage +1</button>
         <button class="op" data-op="cookie-add">cookie 写入</button>
         <button class="op" data-op="cookie-read">cookie 读取</button>
       </div>
       <div class="fields" style="margin-top:10px">
         <div class="field"><span class="k">localStorage 计数</span><span class="v" id="v-ls">-</span></div>
+        <div class="field"><span class="k">sessionStorage 计数</span><span class="v" id="v-ss">-</span></div>
         <div class="field"><span class="k">cookie</span><span class="v" id="v-cookie">-</span></div>
       </div>
     </div>
 
     <div class="card">
-      <h2>权限能力 <span class="tip">lab 已声明 clipboard / notification —— 点击应直接放行（应用中心显示「已声明」）；FSY 未声明，同操作会弹出授权条</span></h2>
+      <h2>权限 · 已声明直接放行 <span class="tip">lab 声明了剪贴板 / 通知 —— 点击直接执行，不弹授权条</span></h2>
       <div class="grid">
         <button class="op" data-op="clip-write">写剪贴板</button>
         <button class="op" data-op="clip-read">读剪贴板</button>
         <button class="op" data-op="notify">发送系统通知</button>
-        <button class="op" data-op="perm-query">permissions 状态自检</button>
+        <button class="op" data-op="perm-query">permissions 全量自检</button>
       </div>
       <div class="fields" style="margin-top:10px">
         <div class="field"><span class="k">剪贴板最近读写</span><span class="v" id="v-clip">-</span></div>
@@ -103,9 +120,25 @@
     </div>
 
     <div class="card">
-      <h2>下载 <span class="tip">lab 声明 download → will-download 放行，任务进入平台下载条（DownloadsBar）；OA 未声明 → 同操作直接拒绝</span></h2>
+      <h2>权限 · 运行时授权 <span class="tip">媒体 / 位置 / 全屏 / 鼠标锁定 / 屏幕捕获 未在 manifest 声明 —— 首次点击应弹出顶部授权条，允许后执行成功，拒绝或 30 秒超时则失败；决策持久化，重启后不再询问</span></h2>
       <div class="grid">
-        <button class="op" data-op="download">发起下载（应放行）</button>
+        <button class="op" data-op="media">摄像头 + 麦克风</button>
+        <button class="op" data-op="geolocation">获取地理位置</button>
+        <button class="op" data-op="fullscreen">请求全屏（1.5s 后自动退出）</button>
+        <button class="op" data-op="pointer-lock">锁定鼠标（1.5s 后自动退出）</button>
+        <button class="op" data-op="display-capture">屏幕捕获 getDisplayMedia</button>
+      </div>
+      <div class="fields" style="margin-top:10px">
+        <div class="field"><span class="k">媒体流</span><span class="v" id="v-media">-</span></div>
+        <div class="field"><span class="k">位置</span><span class="v" id="v-geo">-</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>下载 <span class="tip">lab 声明 download → will-download 放行，任务进入右下角下载浮窗，保存到系统下载目录；OA 未声明 → 同操作直接取消</span></h2>
+      <div class="grid">
+        <button class="op" data-op="download-blob">小文件下载（blob，瞬时完成）</button>
+        <button class="op" data-op="download-remote">远程文件下载（约 3MB，看进度）</button>
       </div>
     </div>
 
@@ -118,20 +151,15 @@
     </div>
 
     <div class="card">
-      <h2>导航与弹窗拦截 <span class="tip">外部导航 → 拦截并转交系统浏览器（本页面不跳走）；origin 内弹窗 → 平台受管弹窗；外部弹窗 → 拒绝</span></h2>
+      <h2>弹窗与导航 <span class="tip">外部导航 → 拦截转系统浏览器；origin 内弹窗 → 平台受管弹窗（同 Session 登录态）；外部弹窗 → 拒绝；原生对话框由 Chromium 渲染</span></h2>
       <div class="grid">
-        <button class="op warn" data-op="nav-external">导航到外部网站（应被拦截）</button>
         <button class="op" data-op="popup-internal">window.open 本站弹窗（应受管创建）</button>
         <button class="op warn" data-op="popup-external">window.open 外部弹窗（应拒绝）</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>运行环境</h2>
-      <div class="fields">
-        <div class="field"><span class="k">URL</span><span class="v" id="v-href">-</span></div>
-        <div class="field"><span class="k">UA</span><span class="v" id="v-ua">-</span></div>
-        <div class="field"><span class="k">console 输出</span><span class="v">网页 console 已不进平台日志（平台只记崩溃/异常）——DevTools 里看</span></div>
+        <button class="op warn" data-op="nav-external">导航到外部网站（应被拦截）</button>
+        <a class="link" href="https://example.com" target="_blank">target=_blank 外链（应转系统浏览器）</a>
+        <button class="op" data-op="dialog-alert">alert</button>
+        <button class="op" data-op="dialog-confirm">confirm</button>
+        <button class="op" data-op="dialog-prompt">prompt</button>
       </div>
     </div>
   </div>
@@ -148,8 +176,6 @@
     return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
   }
   document.getElementById('loaded-at').textContent = now()
-  document.getElementById('v-href').textContent = location.href
-  document.getElementById('v-ua').textContent = navigator.userAgent.slice(0, 60) + '…'
 
   const logEl = document.getElementById('log')
   function log(msg, type = 'info') {
@@ -158,62 +184,86 @@
     line.innerHTML = `<span class="t">${now()}</span>${msg}`
     logEl.appendChild(line)
     logEl.scrollTop = logEl.scrollHeight
-    while (logEl.children.length > 80) logEl.removeChild(logEl.firstChild)
+    while (logEl.children.length > 200) logEl.removeChild(logEl.firstChild)
   }
   document.getElementById('log-clear').onclick = () => { logEl.innerHTML = '' }
+
+  // ---------- 运行环境 ----------
+  document.getElementById('v-href').textContent = location.href
+  document.getElementById('v-ua').textContent = navigator.userAgent
+  document.getElementById('v-locale').textContent = `${navigator.language} · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`
+  document.getElementById('v-screen').textContent = `${screen.width}×${screen.height} · DPR ${devicePixelRatio}`
+  const renderViewport = () => { document.getElementById('v-viewport').textContent = `${innerWidth}×${innerHeight}` }
+  const renderOnline = () => { document.getElementById('v-online').textContent = navigator.onLine ? '在线' : '离线' }
+  renderViewport(); renderOnline()
+  addEventListener('resize', renderViewport)
+  addEventListener('online', renderOnline)
+  addEventListener('offline', renderOnline)
   log('页面加载完成。绿色=符合预期，红色=不符合预期，橙色=预期被拦截', 'info')
+  log('提示：运行时授权类操作首次点击会弹出顶部授权条，请到 Shell 顶栏决策', 'info')
 
   // ---------- 存储 ----------
   const LS = 'lab-count'
+  const SS = 'lab-session'
   function renderLs() {
     document.getElementById('v-ls').textContent = `${localStorage.getItem(LS) ?? 0} 次`
+  }
+  function renderSs() {
+    document.getElementById('v-ss').textContent = `${sessionStorage.getItem(SS) ?? 0} 次`
   }
   function renderCookie() {
     document.getElementById('v-cookie').textContent = document.cookie.split('; ').find(c => c.startsWith('lab=')) ?? '(无)'
   }
-  renderLs(); renderCookie()
+  renderLs(); renderSs(); renderCookie()
 
   // ---------- 权限 ----------
-  function clipEl() { return document.getElementById('v-clip') }
-  function notifyEl() { return document.getElementById('v-notify') }
+  let mediaStream = null
 
   const ops = {
+    // ---- 存储 ----
     'storage-add': () => {
       const n = Number(localStorage.getItem(LS) ?? '0') + 1
       localStorage.setItem(LS, String(n)); renderLs()
       log(`localStorage 写入成功，当前 ${n} 次（重启应用后应保留）`, 'ok')
     },
     'storage-reset': () => { localStorage.setItem(LS, '0'); renderLs(); log('localStorage 已清零', 'ok') },
+    'session-add': () => {
+      const n = Number(sessionStorage.getItem(SS) ?? '0') + 1
+      sessionStorage.setItem(SS, String(n)); renderSs()
+      log(`sessionStorage 写入 ${n} 次（Tab 关闭后清空，重启保留）`, 'ok')
+    },
     'cookie-add': () => {
       document.cookie = `lab=${Date.now()}; max-age=31536000; path=/`
       renderCookie()
       const saved = document.cookie.split('; ').find(c => c.startsWith('lab='))
-      log(saved ? 'cookie 写入成功（持久化一年，重启保留）' : 'file:// 源下浏览器限制 cookie 写入（正常现象，http/https 源才可用）', saved ? 'ok' : 'info')
+      log(saved ? 'cookie 写入成功（持久化一年，重启保留）' : '当前源下浏览器限制 cookie 写入（http/https 源才可用）', saved ? 'ok' : 'info')
     },
     'cookie-read': () => { renderCookie(); log(`cookie 读取：${document.getElementById('v-cookie').textContent}`, 'ok') },
 
+    // ---- 权限：已声明 ----
     'clip-write': async () => {
       const text = `lab-${Date.now()}`
-      try { await navigator.clipboard.writeText(text); clipEl().textContent = text; log(`剪贴板写入成功: ${text}（已声明 → 直接放行）`, 'ok') }
-      catch (err) { clipEl().textContent = `失败: ${err.name}`; log(`剪贴板写入被拒: ${err.name}`, 'fail') }
+      try { await navigator.clipboard.writeText(text); document.getElementById('v-clip').textContent = text; log(`剪贴板写入成功: ${text}（已声明 → 直接放行）`, 'ok') }
+      catch (err) { document.getElementById('v-clip').textContent = `失败: ${err.name}`; log(`剪贴板写入被拒: ${err.name}`, 'fail') }
     },
     'clip-read': async () => {
-      try { const text = await navigator.clipboard.readText(); clipEl().textContent = text || '(剪贴板为空)'; log(`剪贴板读取成功: ${(text || '(空)').slice(0, 30)}（已声明 → 直接放行）`, 'ok') }
-      catch (err) { clipEl().textContent = `失败: ${err.name}`; log(`剪贴板读取被拒: ${err.name}`, 'fail') }
+      try { const text = await navigator.clipboard.readText(); document.getElementById('v-clip').textContent = text || '(剪贴板为空)'; log(`剪贴板读取成功: ${(text || '(空)').slice(0, 30)}（已声明 → 直接放行）`, 'ok') }
+      catch (err) { document.getElementById('v-clip').textContent = `失败: ${err.name}`; log(`剪贴板读取被拒: ${err.name}`, 'fail') }
     },
     'notify': async () => {
       try {
         const p = await Notification.requestPermission()
-        notifyEl().textContent = p
+        document.getElementById('v-notify').textContent = p
         if (p === 'granted') {
           new Notification('平台功能实验室', { body: `系统通知测试 ${now()}（已声明 → 放行）` })
           log('系统通知已发出，权限 granted', 'ok')
         } else { log(`通知权限结果: ${p}`, 'fail') }
       }
-      catch (err) { notifyEl().textContent = `失败: ${err.name}`; log(`通知请求失败: ${err.name}`, 'fail') }
+      catch (err) { document.getElementById('v-notify').textContent = `失败: ${err.name}`; log(`通知请求失败: ${err.name}`, 'fail') }
     },
     'perm-query': async () => {
-      for (const name of ['clipboard-read', 'clipboard-write', 'notifications']) {
+      const names = ['clipboard-read', 'clipboard-write', 'notifications', 'media', 'geolocation', 'fullscreen', 'pointerLock', 'display-capture']
+      for (const name of names) {
         try {
           const st = await navigator.permissions.query({ name })
           log(`permissions.${name}: ${st.state}`, 'info')
@@ -221,15 +271,70 @@
       }
     },
 
-    'download': () => {
+    // ---- 权限：运行时授权（未声明 → 授权条） ----
+    'media': async () => {
+      try {
+        if (mediaStream) mediaStream.getTracks().forEach(t => t.stop())
+        mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+        document.getElementById('v-media').textContent = `${mediaStream.getVideoTracks().length} 视频 + ${mediaStream.getAudioTracks().length} 音频轨`
+        log('摄像头 + 麦克风获取成功（授权条允许 → 放行）', 'ok')
+      } catch (err) {
+        document.getElementById('v-media').textContent = `失败: ${err.name}`
+        log(`媒体获取失败: ${err.name}（授权拒绝 / 超时 / 无设备）`, 'fail')
+      }
+    },
+    'geolocation': () => {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          document.getElementById('v-geo').textContent = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`
+          log(`地理位置获取成功（±${Math.round(pos.coords.accuracy)}m）`, 'ok')
+        },
+        (err) => {
+          document.getElementById('v-geo').textContent = `失败: ${err.code}`
+          log(`地理位置失败: ${err.message}（授权拒绝 / 超时）`, 'fail')
+        },
+        { timeout: 15000 },
+      )
+    },
+    'fullscreen': async () => {
+      try {
+        await document.documentElement.requestFullscreen()
+        log('已进入全屏（授权条允许 → 放行）', 'ok')
+        setTimeout(() => { document.exitFullscreen(); log('已自动退出全屏', 'info') }, 1500)
+      } catch (err) { log(`全屏失败: ${err.name}（授权拒绝 / 超时）`, 'fail') }
+    },
+    'pointer-lock': async () => {
+      try {
+        await document.body.requestPointerLock()
+        log('鼠标已锁定（授权条允许 → 放行）', 'ok')
+        setTimeout(() => { document.exitPointerLock(); log('已自动退出鼠标锁定', 'info') }, 1500)
+      } catch (err) { log(`鼠标锁定失败: ${err.name}（授权拒绝 / 超时）`, 'fail') }
+    },
+    'display-capture': async () => {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+        stream.getTracks().forEach(t => t.stop())
+        log('屏幕捕获授权并取得媒体流（授权条允许 → 放行）', 'ok')
+      } catch (err) { log(`屏幕捕获失败: ${err.name}（授权拒绝 / 超时）`, 'fail') }
+    },
+
+    // ---- 下载 ----
+    'download-blob': () => {
       const blob = new Blob([`lab download test ${new Date().toISOString()}\n`.repeat(200)], { type: 'text/plain' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url; a.download = `lab-test-${Date.now()}.txt`; a.click()
       URL.revokeObjectURL(url)
-      log('下载已发起 → 应出现在底部下载条（download 已声明 → 放行）', 'ok')
+      log('下载已发起 → 应出现在右下角下载浮窗（download 已声明 → 放行）', 'ok')
+    },
+    'download-remote': () => {
+      const a = document.createElement('a')
+      a.href = 'https://httpbin.org/bytes/3000000'
+      a.download = 'lab-remote-3mb.bin'; a.click()
+      log('远程下载已发起 → 浮窗应出现进度条并走完 0→100%', 'ok')
     },
 
+    // ---- 网络 ----
     'fetch-ok': async () => {
       log('fetch https://httpbin.org/get …', 'info')
       try {
@@ -245,6 +350,7 @@
       } catch (err) { log(`fetch 被拦截: ${err.name}（浏览器同源策略，符合预期）`, 'block') }
     },
 
+    // ---- 弹窗与导航 ----
     'nav-external': () => {
       location.href = 'https://example.com'
       log('已发起外部导航 → 平台应拦截并转系统浏览器，本页不应跳走', 'block')
@@ -258,6 +364,9 @@
       const win = window.open('https://example.com', '_blank', 'width=520,height=420')
       log(win ? '外部弹窗意外创建（应拒绝！）' : '外部弹窗已拒绝（转系统浏览器），符合预期', win ? 'fail' : 'block')
     },
+    'dialog-alert': () => { alert(`alert 对话框 ${now()}`); log('alert 已弹出并关闭', 'ok') },
+    'dialog-confirm': () => { const ok = confirm('confirm 对话框：确定吗？'); log(`confirm 返回 ${ok}`, 'ok') },
+    'dialog-prompt': () => { const v = prompt('prompt 对话框：随便输入点什么', 'hello'); log(`prompt 返回 ${JSON.stringify(v)}`, 'ok') },
   }
 
   document.querySelectorAll('button.op').forEach((btn) => {

@@ -4,5 +4,5 @@
     "composite": true,
     "types": ["electron-vite/node"]
   },
-  "include": ["contracts.d.ts", "electron.vite.config.*", "electron/**/*"]
+  "include": ["contracts.d.ts", "electron.vite.config.*", "uno.config.ts", "electron/**/*"]
 }

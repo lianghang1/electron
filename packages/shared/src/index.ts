@@ -32,6 +32,10 @@ export type { DownloadTask, DownloadTaskStatus } from './types/download'
 
 export type { DesktopInvoke, DesktopIpc } from './types/ipc'
 
+/* ---------------- 浮层（OverlayWindow 独立原生窗） ---------------- */
+
+export type { OverlayMenuConfig, OverlayMenuItem } from './types/ipc/overlay'
+
 /* ---------------- 更新（整包 + asar 热更） ---------------- */
 
 export type { AppSource, DesktopAppManifest, RegisteredApp } from './types/manifest'

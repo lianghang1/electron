@@ -19,7 +19,8 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "@electron-toolkit/utils": "catalog:"
+    "@electron-toolkit/utils": "catalog:",
+    "reka-ui": "^2.10.5"
   },
   "devDependencies": {
     "@desktop/config": "workspace:*",
@@ -32,6 +33,7 @@
     "electron-builder": "catalog:",
     "electron-vite": "catalog:",
     "typescript": "catalog:",
+    "unocss": "^66.10.5",
     "vite": "catalog:",
     "vue": "catalog:",
     "vue-tsc": "catalog:"

@@ -15,6 +15,11 @@ export const PERMISSIONS = [
   'upload',
   'filesystem.read',
   'filesystem.write',
+  'media',
+  'geolocation',
+  'fullscreen',
+  'pointerLock',
+  'display-capture',
 ] as const
 
 export type Permission = (typeof PERMISSIONS)[number]

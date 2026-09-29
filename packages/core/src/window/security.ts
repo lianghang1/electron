@@ -11,6 +11,11 @@ const PLATFORM_TO_SESSION: Partial<Record<Permission, string>> = {
   'clipboard.read': 'clipboard-read',
   'clipboard.write': 'clipboard-sanitized-write',
   'notification': 'notifications',
+  'media': 'media',
+  'geolocation': 'geolocation',
+  'fullscreen': 'fullscreen',
+  'pointerLock': 'pointerLock',
+  'display-capture': 'display-capture',
 }
 
 /** manifest.permissions 中可落地的 session 权限（Shell 逃生口不受此限，直接传 Chromium 名） */

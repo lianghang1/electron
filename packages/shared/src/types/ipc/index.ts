@@ -2,6 +2,7 @@ import type { AppIpc } from './app'
 import type { CacheIpc } from './cache'
 import type { DeviceIpc } from './device'
 import type { DownloadIpc } from './download'
+import type { OverlayIpc } from './overlay'
 import type { PermissionIpc } from './permission'
 import type { StorageIpc } from './storage'
 import type { TabsIpc } from './tabs'
@@ -30,6 +31,7 @@ export type DesktopIpc
     & DeviceIpc
     & DownloadIpc
     & CacheIpc
+    & OverlayIpc
 
 /** 契约中 invoke 形态的 channel 子集：Main 侧 handle 包装 / Preload invoke 只看这里 */
 export type DesktopInvoke = {

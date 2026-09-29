@@ -26,6 +26,7 @@ import { TabService } from '../tab/tab-service'
 import { AsarUpdateService } from '../updater/asar-update-service'
 import { UpdateService } from '../updater/update-service'
 import { WebService } from '../web/web-service'
+import { OverlayWindowService } from '../window/overlay-window'
 import { WindowService } from '../window/window-service'
 
 /**
@@ -53,6 +54,8 @@ export class DesktopRuntime {
   private webService?: WebService
   private tabService?: TabService
   private windowService!: WindowService
+  /** 全局浮层独立原生窗：右键菜单/确认弹窗渲染处（原生层级压过 WebContentsView） */
+  private overlayService!: OverlayWindowService
 
   constructor(private readonly options: BootstrapOptions) {}
 
@@ -153,6 +156,10 @@ export class DesktopRuntime {
       this.resolver,
       this.logger.scope('window'),
     )
+    this.overlayService = new OverlayWindowService(
+      () => this.windowService.getMainWindow(),
+      this.logger.scope('overlay'),
+    )
     this.resilienceService = new ResilienceService(this.events, this.logger.scope('resilience'))
     // 下载管理：App 首次取得 Session 时挂 will-download guard（按 manifest.download 权限放行）
     this.downloadService = new DownloadService(
@@ -249,6 +256,7 @@ export class DesktopRuntime {
       permissionService: this.permissionService,
       updateService: this.options.updates?.url ? this.updateService : undefined,
       asarService: this.options.updates?.asar ? this.asarUpdateService : undefined,
+      overlayService: this.overlayService,
       resolver: this.resolver,
     })
     this.forwardEventsToShell()

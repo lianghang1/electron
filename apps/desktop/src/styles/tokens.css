@@ -1,0 +1,77 @@
+/**
+ * 青玉 Studio 设计令牌（方向 C 双主题）· 全部视觉值的单一数据源。
+ * 浅色为默认；深色挂在 :root[data-theme='dark']，组件零改动换肤。
+ * 组件与 OverlayWindow 浮层页一律只引用 var(--dt-*)，禁止散落硬编码色值。
+ */
+:root {
+  /* 画布与面板 */
+  --dt-bg: #f5f6f8;
+  --dt-surface: #ffffff;
+  --dt-surface-2: #f9fafb;
+  --dt-hover: #f2f3f5;
+  --dt-line: #e7e9ec;
+  --dt-line-soft: #f3f4f6;
+
+  /* 文字 */
+  --dt-text: #1f2328;
+  --dt-text-2: #6b7280;
+  --dt-text-3: #9ca3af;
+
+  /* 青玉主色阶（500 为浅色主色） */
+  --dt-brand: #0f9d8f;
+  --dt-brand-hover: #0d8a7e;
+  --dt-brand-soft: #e6f5f3;
+  --dt-brand-text: #0b6b61;
+  --dt-brand-on: #ffffff;
+
+  /* 语义色 */
+  --dt-success: #0d9f6e;
+  --dt-warning: #efaa17;
+  --dt-danger: #d92d20;
+  --dt-danger-soft: #fef3f2;
+  --dt-danger-text: #d92d20;
+
+  /* 缎面微光（暗色面板顶部 1px 内高光，替代毛玻璃） */
+  --dt-glow: none;
+
+  /* 形状 / 动效 / 阴影 */
+  --dt-radius-1: 6px;
+  --dt-radius-2: 10px;
+  --dt-radius-3: 12px;
+  --dt-dur: 120ms;
+  --dt-ease: cubic-bezier(0.2, 0, 0, 1);
+  --dt-shadow-menu: 0 8px 24px rgba(2, 8, 20, 16%);
+  --dt-shadow-bar: 0 4px 12px rgba(2, 8, 20, 8%);
+}
+
+:root[data-theme='dark'] {
+  /* 深墨蓝画布 + 缎面面板 */
+  --dt-bg: #0b1220;
+  --dt-surface: #101a2b;
+  --dt-surface-2: #0e1828;
+  --dt-hover: #1a2740;
+  --dt-line: #223049;
+  --dt-line-soft: #1a2740;
+
+  --dt-text: #e6eaf2;
+  --dt-text-2: #8a94a8;
+  --dt-text-3: #5a6478;
+
+  /* 暗色下主色提亮保证对比度 */
+  --dt-brand: #2dd4bf;
+  --dt-brand-hover: #5cdfce;
+  --dt-brand-soft: #123b36;
+  --dt-brand-text: #7be8d8;
+  --dt-brand-on: #06231f;
+
+  --dt-success: #34d399;
+  --dt-warning: #fbbf24;
+  --dt-danger: #f97066;
+  --dt-danger-soft: #2a1215;
+  --dt-danger-text: #f97066;
+
+  --dt-glow: inset 0 1px 0 rgba(255, 255, 255, 5%);
+
+  --dt-shadow-menu: 0 8px 24px rgba(0, 0, 0, 50%);
+  --dt-shadow-bar: none;
+}

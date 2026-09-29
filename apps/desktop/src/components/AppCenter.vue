@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { AppPermissionState, DesktopTab, RegisteredApp } from '@desktop/shared'
-import { ref } from 'vue'
+import { AccordionContent, AccordionHeader, AccordionItem, AccordionRoot, AccordionTrigger } from 'reka-ui'
+import { ref, watch } from 'vue'
 import { permissionLabel } from '../composables/use-permission-labels'
 
 const props = defineProps<{
@@ -18,10 +19,24 @@ const SOURCE_LABELS: Record<RegisteredApp['source'], string> = {
   'remote': '远程',
 }
 
-/** 当前展开权限详情的 App（同时只展开一个，切换即重新拉取以反映最新决策） */
-const expandedId = ref<string | null>(null)
+/** 展开的权限详情（reka-ui Accordion 单开模式）：切换即重新拉取以反映最新决策 */
+const expandedId = ref<string>('')
 const permissionStates = ref<AppPermissionState[]>([])
 const permissionLoading = ref(false)
+
+watch(expandedId, async (appId) => {
+  if (!appId) {
+    permissionStates.value = []
+    return
+  }
+  permissionLoading.value = true
+  try {
+    permissionStates.value = await window.desktop.permission.list(appId)
+  }
+  finally {
+    permissionLoading.value = false
+  }
+})
 
 /** 清除站点数据需二次点击确认（等于该容器登出），3s 不点则复原 */
 const pendingKey = ref<string | null>(null)
@@ -49,21 +64,6 @@ async function clearApp(appId: string, kind: 'cache' | 'site'): Promise<void> {
     if (doneKey.value === key)
       doneKey.value = null
   }, 2000)
-}
-
-async function toggleExpand(appId: string): Promise<void> {
-  if (expandedId.value === appId) {
-    expandedId.value = null
-    return
-  }
-  expandedId.value = appId
-  permissionLoading.value = true
-  try {
-    permissionStates.value = await window.desktop.permission.list(appId)
-  }
-  finally {
-    permissionLoading.value = false
-  }
 }
 
 /** 权限状态文案：声明 = 平台直接放行；未声明看运行时用户决策 */
@@ -99,13 +99,24 @@ function isRunning(appId: string): boolean {
       </button>
     </header>
 
-    <div class="ac-list">
+    <!-- reka-ui Accordion（单开）：只接管展开态与无障碍交互，外观完全自绘 -->
+    <AccordionRoot
+      v-model="expandedId"
+      type="single"
+      collapsible
+      class="ac-list"
+    >
       <p v-if="apps.length === 0" class="ac-empty">
         暂无已注册应用
       </p>
 
-      <div v-for="app in apps" :key="app.manifest.id" class="ac-card">
-        <div class="ac-card__row">
+      <AccordionItem
+        v-for="app in apps"
+        :key="app.manifest.id"
+        :value="app.manifest.id"
+        class="ac-card"
+      >
+        <AccordionHeader class="ac-card__row">
           <button
             class="ac-card__main"
             :title="`打开 ${app.manifest.name}`"
@@ -128,54 +139,51 @@ function isRunning(appId: string): boolean {
               </span>
             </span>
           </button>
-          <button
-            class="ac-card__toggle"
-            :class="{ 'ac-card__toggle--open': expandedId === app.manifest.id }"
-            title="权限详情"
-            @click.stop="toggleExpand(app.manifest.id)"
-          >
+          <AccordionTrigger class="ac-card__toggle" title="权限详情">
             ›
-          </button>
-        </div>
+          </AccordionTrigger>
+        </AccordionHeader>
 
-        <div v-if="expandedId === app.manifest.id" class="ac-card__detail">
-          <p v-if="permissionLoading" class="ac-hint">
-            加载中…
-          </p>
-          <p v-else-if="permissionStates.length === 0" class="ac-hint">
-            无权限记录
-          </p>
-          <template v-else>
-            <div
-              v-for="state in permissionStates"
-              :key="state.permission"
-              class="ac-perm"
-            >
-              <span class="ac-perm__name">{{ permissionLabel(state.permission) }}</span>
-              <span class="ac-perm__state" :class="stateClass(state)">{{ stateText(state) }}</span>
+        <AccordionContent class="ac-card__content">
+          <div class="ac-card__detail">
+            <p v-if="permissionLoading" class="ac-hint">
+              加载中…
+            </p>
+            <p v-else-if="permissionStates.length === 0" class="ac-hint">
+              无权限记录
+            </p>
+            <template v-else>
+              <div
+                v-for="state in permissionStates"
+                :key="state.permission"
+                class="ac-perm"
+              >
+                <span class="ac-perm__name">{{ permissionLabel(state.permission) }}</span>
+                <span class="ac-perm__state" :class="stateClass(state)">{{ stateText(state) }}</span>
+              </div>
+            </template>
+
+            <div class="ac-clear">
+              <button
+                class="ac-clear__btn"
+                :class="{ 'ac-clear__btn--done': doneKey === clearKey(app.manifest.id, 'cache') }"
+                @click.stop="clearApp(app.manifest.id, 'cache')"
+              >
+                {{ doneKey === clearKey(app.manifest.id, 'cache') ? '已清理' : '清理缓存' }}
+              </button>
+              <button
+                class="ac-clear__btn ac-clear__btn--danger"
+                @click.stop="clearApp(app.manifest.id, 'site')"
+              >
+                {{ pendingKey === clearKey(app.manifest.id, 'site')
+                  ? '将退出登录，再点一次确认'
+                  : doneKey === clearKey(app.manifest.id, 'site') ? '已清理' : '清除站点数据' }}
+              </button>
             </div>
-          </template>
-
-          <div class="ac-clear">
-            <button
-              class="ac-clear__btn"
-              :class="{ 'ac-clear__btn--done': doneKey === clearKey(app.manifest.id, 'cache') }"
-              @click.stop="clearApp(app.manifest.id, 'cache')"
-            >
-              {{ doneKey === clearKey(app.manifest.id, 'cache') ? '已清理' : '清理缓存' }}
-            </button>
-            <button
-              class="ac-clear__btn ac-clear__btn--danger"
-              @click.stop="clearApp(app.manifest.id, 'site')"
-            >
-              {{ pendingKey === clearKey(app.manifest.id, 'site')
-                ? '将退出登录，再点一次确认'
-                : doneKey === clearKey(app.manifest.id, 'site') ? '已清理' : '清除站点数据' }}
-            </button>
           </div>
-        </div>
-      </div>
-    </div>
+        </AccordionContent>
+      </AccordionItem>
+    </AccordionRoot>
   </aside>
 </template>
 
@@ -185,9 +193,10 @@ function isRunning(appId: string): boolean {
   flex: none;
   display: flex;
   flex-direction: column;
-  background: #ffffff;
-  border-right: 1px solid #e5e7eb;
+  background: var(--dt-surface);
+  border-right: 1px solid var(--dt-line);
   min-height: 0;
+  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
 }
 .ac-header {
   height: 44px;
@@ -196,25 +205,25 @@ function isRunning(appId: string): boolean {
   align-items: center;
   justify-content: space-between;
   padding: 0 8px 0 16px;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--dt-line-soft);
 }
 .ac-title {
   font-size: 13px;
   font-weight: 600;
-  color: #1f2328;
+  color: var(--dt-text);
 }
 .ac-close {
   width: 28px;
   height: 28px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--dt-radius-1);
   font-size: 12px;
-  color: #4b5563;
+  color: var(--dt-text-2);
   cursor: pointer;
 }
 .ac-close:hover {
-  background: #f3f4f6;
+  background: var(--dt-hover);
 }
 .ac-list {
   flex: 1;
@@ -224,7 +233,7 @@ function isRunning(appId: string): boolean {
 .ac-empty,
 .ac-hint {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--dt-text-3);
   padding: 8px;
   margin: 0;
 }
@@ -250,9 +259,10 @@ function isRunning(appId: string): boolean {
   cursor: pointer;
   text-align: left;
   font-family: inherit;
+  transition: background var(--dt-dur) var(--dt-ease);
 }
 .ac-card__main:hover {
-  background: #f3f4f6;
+  background: var(--dt-hover);
 }
 .ac-card__icon {
   width: 32px;
@@ -266,8 +276,8 @@ function isRunning(appId: string): boolean {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #3370ff;
-  color: #ffffff;
+  background: var(--dt-brand);
+  color: var(--dt-brand-on);
   font-size: 14px;
 }
 .ac-card__meta {
@@ -279,7 +289,7 @@ function isRunning(appId: string): boolean {
 .ac-card__name {
   font-size: 13px;
   font-weight: 600;
-  color: #1f2328;
+  color: var(--dt-text);
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -291,12 +301,12 @@ function isRunning(appId: string): boolean {
   height: 7px;
   flex: none;
   border-radius: 50%;
-  background: #0d9f6e;
+  background: var(--dt-success);
   margin-left: 6px;
 }
 .ac-card__info {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--dt-text-3);
   margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -309,24 +319,38 @@ function isRunning(appId: string): boolean {
   margin-left: 4px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--dt-radius-1);
   font-size: 16px;
   line-height: 1;
-  color: #9ca3af;
+  color: var(--dt-text-3);
   cursor: pointer;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s var(--dt-ease), background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
 }
 .ac-card__toggle:hover {
-  background: #f3f4f6;
-  color: #4b5563;
+  background: var(--dt-hover);
+  color: var(--dt-text-2);
 }
-.ac-card__toggle--open {
+.ac-card__toggle[data-state='open'] {
   transform: rotate(90deg);
+}
+.ac-card__content[data-state='open'] {
+  animation: ac-slide-down 0.15s var(--dt-ease);
+}
+@keyframes ac-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 .ac-card__detail {
   margin: 0 8px 8px 50px;
   padding: 8px 10px;
-  background: #f9fafb;
+  background: var(--dt-surface-2);
+  border: 1px solid var(--dt-line-soft);
   border-radius: 8px;
 }
 .ac-perm {
@@ -337,52 +361,54 @@ function isRunning(appId: string): boolean {
   font-size: 12px;
 }
 .ac-perm + .ac-perm {
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--dt-line-soft);
 }
 .ac-perm__name {
-  color: #4b5563;
+  color: var(--dt-text-2);
 }
 .ac-perm__state {
   flex: none;
 }
 .ac-perm__state--ok {
-  color: #0d9f6e;
+  color: var(--dt-success);
 }
 .ac-perm__state--deny {
-  color: #ef4444;
+  color: var(--dt-danger-text);
 }
 .ac-perm__state--pending {
-  color: #9ca3af;
+  color: var(--dt-text-3);
 }
 .ac-clear {
   display: flex;
   gap: 8px;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #f3f4f6;
+  border-top: 1px solid var(--dt-line-soft);
 }
 .ac-clear__btn {
   flex: 1;
   height: 26px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  background: #ffffff;
+  border: 1px solid var(--dt-line);
+  border-radius: var(--dt-radius-1);
+  background: var(--dt-surface);
   font-size: 12px;
-  color: #4b5563;
+  font-family: inherit;
+  color: var(--dt-text-2);
   cursor: pointer;
+  transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
 }
 .ac-clear__btn:hover {
-  background: #f3f4f6;
+  background: var(--dt-hover);
 }
 .ac-clear__btn--danger {
-  color: #ef4444;
-  border-color: #fecaca;
+  color: var(--dt-danger-text);
+  border-color: color-mix(in srgb, var(--dt-danger) 35%, transparent);
 }
 .ac-clear__btn--danger:hover {
-  background: #fef2f2;
+  background: var(--dt-danger-soft);
 }
 .ac-clear__btn--done {
-  color: #0d9f6e;
-  border-color: #a7f3d0;
+  color: var(--dt-success);
+  border-color: color-mix(in srgb, var(--dt-success) 35%, transparent);
 }
 </style>
