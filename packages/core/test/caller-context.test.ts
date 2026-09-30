@@ -37,7 +37,7 @@ describe('callerResolver', () => {
     const resolver = new CallerResolver()
     const wc = fakeWebContents(1)
     resolver.register(wc, appContext)
-    resolver.unregister(wc)
+    resolver.unregister(wc.id)
     expect(() => resolver.resolve(wc)).toThrowError(DesktopError)
   })
 })

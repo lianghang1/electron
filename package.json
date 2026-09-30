@@ -25,7 +25,8 @@
     "@desktop/config": "workspace:*",
     "eslint": "catalog:",
     "tsx": "catalog:",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "ws": "^8.22.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

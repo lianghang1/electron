@@ -65,6 +65,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      ws:
+        specifier: ^8.22.0
+        version: 8.22.0
 
   apps/desktop:
     dependencies:
@@ -126,6 +129,9 @@ importers:
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
+      reka-ui:
+        specifier: ^2.10.5
+        version: 2.10.5(vue@3.5.40(typescript@5.9.3))
     devDependencies:
       '@desktop/config':
         specifier: workspace:*
@@ -3886,6 +3892,18 @@ packages:
 
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+  ws@8.22.0:
+    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
 
   xml-name-validator@5.0.0:
     resolution: {integrity: sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg==}
@@ -7867,6 +7885,8 @@ snapshots:
       strip-ansi: 6.0.1
 
   wrappy@1.0.2: {}
+
+  ws@8.22.0: {}
 
   xml-name-validator@5.0.0: {}
 

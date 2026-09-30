@@ -154,6 +154,7 @@
       <div class="grid">
         <button class="op" data-op="download-blob">小文件下载（blob，瞬时完成）</button>
         <button class="op" data-op="download-remote">远程文件下载（约 3MB，看进度）</button>
+        <button class="op" data-op="download-slow">慢速下载（同源直链，看进度条）</button>
       </div>
     </div>
 
@@ -455,6 +456,13 @@
         URL.revokeObjectURL(url)
         log(`远程文件已取得（${(blob.size / 1024 / 1024).toFixed(1)}MB）→ 进入平台下载流程，右下角浮窗显示进度`, 'ok')
       } catch (err) { log(`远程下载失败: ${err.message}（需外网访问 registry.npmmirror.com）`, 'fail') }
+    },
+    'download-slow': () => {
+      // 同源直链（app://lab/slow-download）+ Content-Disposition → 直接进平台下载域，
+      // Main 侧流式限速（≈10MB/s）让进度条持续数秒，可稳定观察 progressing 态
+      const a = document.createElement('a')
+      a.href = '/slow-download'; a.click()
+      log('慢速下载已发起（约 20MB / ≈10MB/s）→ 右下角浮窗应持续显示进度条', 'ok')
     },
 
     // ---- 网络 ----

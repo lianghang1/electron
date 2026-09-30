@@ -86,7 +86,7 @@ describe('permissionService.requestRuntime', () => {
     expect(onRequest).toHaveBeenCalledOnce()
   })
 
-  it('用户拒绝持久化后，重启级缓存同样返回拒绝', async () => {
+  it('用户拒绝不记忆：下次请求重新询问（拒绝不永久挡住，对齐重置授权语义）', async () => {
     const { service, events } = createService([])
     const onRequest = vi.fn()
     events.on('permission:request', onRequest)
@@ -94,7 +94,13 @@ describe('permissionService.requestRuntime', () => {
     const request = onRequest.mock.calls[0][0]
     service.respond(request.requestId, false)
     await expect(first).resolves.toBe(false)
-    await expect(service.requestRuntime(crm, PERMISSIONS[0])).resolves.toBe(false)
+
+    // 拒绝只影响本次：第二次请求重新推送询问，再次拒绝仍按本次拒绝
+    const second = service.requestRuntime(crm, PERMISSIONS[0])
+    expect(onRequest).toHaveBeenCalledTimes(2)
+    const retry = onRequest.mock.calls[1][0]
+    service.respond(retry.requestId, false)
+    await expect(second).resolves.toBe(false)
   })
 
   it('超时按拒绝处理', async () => {

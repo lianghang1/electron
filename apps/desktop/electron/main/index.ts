@@ -26,9 +26,41 @@ const appFiles: Record<string, string> = {
 
 const appEntryUrl = (id: string): string => `app://${id}/index.html`
 
+/**
+ * app://lab/slow-download：慢速下载测试路由。
+ * 同源直链 + Content-Disposition 走平台下载域，流式限速（20MB @ ≈10MB/s）让
+ * progressing 态持续数秒——blob 下载写盘过快，进度条一闪而过无法稳定观察。
+ */
+function handleSlowDownload(): Response {
+  const chunk = new Uint8Array(1024 * 1024)
+  const totalChunks = 20
+  let sent = 0
+  const stream = new ReadableStream({
+    async pull(controller) {
+      if (sent >= totalChunks) {
+        controller.close()
+        return
+      }
+      sent++
+      controller.enqueue(chunk)
+      await new Promise(resolve => setTimeout(resolve, 100))
+    },
+  })
+  return new Response(stream, {
+    headers: {
+      'content-type': 'application/octet-stream',
+      'content-disposition': 'attachment; filename="lab-slow-download.bin"',
+      // 必须显式声明总长：缺省时 totalBytes=0 为不确定态，平台下载卡不渲染进度条
+      'content-length': String(totalChunks * chunk.byteLength),
+    },
+  })
+}
+
 /** 忽略 pathname：内部页均为单文件应用，任意路径都回落到 entry 文件（杜绝路径穿越） */
 async function handleAppRequest(request: Request): Promise<Response> {
-  const { host } = new URL(request.url)
+  const { host, pathname } = new URL(request.url)
+  if (host === 'lab' && pathname === '/slow-download')
+    return handleSlowDownload()
   const file = appFiles[host]
   if (!file)
     return new Response(`unknown internal app: ${host}`, { status: 404 })
