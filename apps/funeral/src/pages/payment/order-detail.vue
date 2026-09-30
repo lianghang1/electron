@@ -3,6 +3,7 @@ import type { PayBillItem, PayBusiness, PayInvoiceInit, SettlementMethod } from 
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fh } from '../../api/fh'
+import FhInvoiceDialog from '../../components/FhInvoiceDialog.vue'
 import FhModal from '../../components/FhModal.vue'
 import { playSpeech } from '../../composables/use-speech'
 
@@ -21,6 +22,13 @@ const totalAmount = ref(0)
 const discountAmount = ref(0)
 const machineId = ref('')
 const paymentLoading = ref(false)
+const invoiceDialogOpen = ref(false)
+
+/** 弹层确认回写抬头（随结算单提交） */
+function handleInvoiceConfirm(title: string): void {
+  if (settlementInvoice.value)
+    settlementInvoice.value.title = title
+}
 
 const modalVisible = ref(false)
 const modalMessage = ref('')
@@ -241,9 +249,13 @@ onMounted(async () => {
           <span class="fp-order__pay-label">应付金额</span>
           <span class="fp-order__pay-value">¥{{ finalAmount.toFixed(2) }}</span>
         </div>
-        <p class="fp-order__tips">
-          支付完成后可在扫码开票中申请电子发票
-        </p>
+        <button class="fp-order__invoice" @click="invoiceDialogOpen = true">
+          <span class="fp-order__invoice-label">发票抬头</span>
+          <span class="fp-order__invoice-value" :class="{ 'is-default': !settlementInvoice?.title }">
+            {{ settlementInvoice?.title || '个人（默认）' }}
+          </span>
+          <span class="fp-order__invoice-edit">修改</span>
+        </button>
         <button
           class="fh-btn fh-btn--primary fp-order__submit"
           :disabled="paymentLoading || finalAmount <= 0"
@@ -253,6 +265,8 @@ onMounted(async () => {
         </button>
       </footer>
     </div>
+
+    <FhInvoiceDialog v-model:open="invoiceDialogOpen" :init-title="settlementInvoice?.title || ''" @confirm="handleInvoiceConfirm" />
 
     <FhModal v-model:visible="modalVisible" type="warning" :message="modalMessage" />
   </div>
@@ -502,11 +516,53 @@ onMounted(async () => {
   font-variant-numeric: tabular-nums;
 }
 
-.fp-order__tips {
+.fp-order__invoice {
   flex: 1;
-  margin: 0 0 0 24px;
-  font-size: 13px;
+  display: flex;
+  align-items: baseline;
+  margin: 0 24px;
+  padding: 10px 20px;
+  border: 1px solid var(--fh-gold-line);
+  border-radius: var(--fh-radius-sm);
+  background: var(--fh-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.fp-order__invoice:hover {
+  border-color: var(--fh-gold);
+}
+
+.fp-order__invoice-label {
+  flex: none;
+  font-size: 15px;
+  color: var(--fh-text-2);
+}
+
+.fp-order__invoice-value {
+  margin-left: 14px;
+  min-width: 0;
+  font-family: var(--fh-font-serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--fh-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fp-order__invoice-value.is-default {
+  font-family: inherit;
+  font-weight: 400;
   color: var(--fh-text-3);
+}
+
+.fp-order__invoice-edit {
+  flex: none;
+  margin-left: auto;
+  padding-left: 14px;
+  font-size: 14px;
+  color: var(--fh-gold);
 }
 
 .fp-order__submit {

@@ -24,7 +24,8 @@
   },
   "dependencies": {
     "@electron-toolkit/utils": "catalog:",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "reka-ui": "^2.10.5"
   },
   "devDependencies": {
     "@desktop/config": "workspace:*",
