@@ -393,8 +393,12 @@ function dialogBtnClass(primary: boolean): string {
           </p>
           <p class="ov-dl__desc m-0 mt-[2px] text-[11.5px] text-[#57606a]">
             {{ STATUS_TEXT[task.status] }}
-            <template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template>
-            <template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
+            <template v-if="task.status === 'progressing' && task.percent >= 0">
+              · {{ task.percent }}%
+            </template>
+            <template v-if="task.total > 0">
+              · {{ formatBytes(task.total) }}
+            </template>
           </p>
           <div
             v-if="task.status === 'progressing' && task.percent >= 0"

@@ -249,4 +249,3 @@ function onTabsWheel(e: WheelEvent): void {
   color: #ffffff;
 }
 </style>
-

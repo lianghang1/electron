@@ -3,8 +3,8 @@ import type { CacheService } from '../cache/cache-service'
 import type { TabService } from '../tab/tab-service'
 import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
-import { assertShell } from './caller-context'
 import { DesktopError } from '@desktop/shared'
+import { assertShell } from './caller-context'
 import { handle } from './handle'
 
 export interface OverlayIpcDeps {

@@ -50,17 +50,31 @@
 | 12 | 应用中心远程源 | ✅ | apps.remoteUrl 异步拉取 DesktopAppManifest 数组（超时 10s、失败静默跳过不拖垮启动），结构校验与本地源同一标准，代码注册优先；本地服务器联调通过 |
 | 13 | 应用中心 UI | ✅ | Shell 左侧推开式面板（flex 成员让位，Web 容器经 ResizeObserver 自动跟随）：App 卡片（名称/版本/来源 内置·本地·远程/类型）、运行状态点（tabs:updated 联动）、点击打开（防重复）、卡片展开权限详情（permission.list 声明+授权合成视图）；配套 app:list 契约升级为 RegisteredApp（manifest + source），AppRegistry 记录注册来源 |
 | 14 | Shell UI 视觉精修（飞书感） | ✅ | titleBarStyle: hidden 去掉系统标题栏（自绘窗口控制唯一入口，backgroundColor 防闪白）；标题栏与 TabBar 合并 40px 沉浸顶栏（品牌+应用中心入口 / Tab / 窗口控制三段式，整栏 -webkit-app-region: drag 拖拽区、控件 no-drag，顺带修复整窗不可拖动）；左侧栏 168px 文字列表 → 68px 飞书式图标导航（图标上文字下，激活项随 Tab 蓝色高亮）；主色统一飞书蓝 #3370ff（横幅/按钮/进度条/图标方块），hover 灰 #f2f3f5 |
-| 15 | 医院自助终端（apps/hospital） | ✅ 骨架 | Kiosk 形态第二个落地应用（dev:hospital / build:hospital）：业务页（挂号/报告打印/导诊演示级，mock 已标替换位）+ 扫码枪 HID 键盘流监听 + 打印机/读卡器 mock 通道 + userData/config.json 业务配置覆盖；框架侧唯一改动 = core 导出 handle 原语（App 自有业务通道注册），契约 hospital:* 段扩展 preload/renderer 自动获得。方案与进度见 docs/hospital-kiosk-plan.md |
+| 15 | 医院自助终端（apps/hospital） | ✅ 骨架 | Kiosk 形态第二个落地应用（dev:hospital / build:hospital）：业务页（挂号/报告打印/导诊演示级，mock 已标替换位）+ 扫码枪 HID 键盘流监听 + 打印机/读卡器 mock 通道 + userData/config.json 业务配置覆盖；框架侧唯一改动 = core 导出 handle 原语（App 自有业务通道注册），契约 hospital:* 段扩展 preload/renderer 自动获得 |
 | 16 | 殡仪馆自助终端（apps/funeral） | ✅ 骨架 | 真实业务项目（dev:funeral / build:funeral），照 hospital 模式。业务闭环演示级：业务缴费（扫码/读卡/手动输身份证查询业务单 → qrcode 真二维码 → 轮询支付状态 mock 15s 成功 → 打印凭条）、发票服务（待开票/已开票双 tab → 个人/企业抬头表单 → 开票 → 打印）、服务介绍/政策指引静态页；外设通道平台化：hospital 的 printer/idcard 升级为通用 device:* 段（读卡器/打印机跨 Kiosk App 复用），fh:* 业务段独立；触屏数字键盘 NumPad（18 位身份证，X 仅末位校验）；素雅庄重风（暖白 #f7f6f3 + 墨青 #3a4a5a），fk-/fp-/fi- 前缀；真实接入位均标注（业务系统/支付下单/发票平台/中文软键盘） |
 | 17 | 契约分层 + 设备通用层 | ✅ | 平台/业务边界重构：① DesktopIpc 只留平台段 + device:*，业务契约（fh:*/hospital:*）下沉到各自 app（src/types/ + createHandle\<AppIpc\>() 注册 + preload 白名单 appChannels + renderer 经 desktop.$invoke 由 src/api/ 收口类型）；② 硬件通用层上收 core/src/device（DeviceService 统一 handler + payload 校验 + 打印频控，CardReaderDriver/PrinterDriver 接口缝，缺省内置 mock，bootstrap.devices 注入真实 SDK）——App 接硬件 = 最多写一个 Driver 文件，不碰契约；③ preload 由副作用导入改为 exposeDesktop(options) 工厂。funeral/hospital 全量迁移，typecheck/lint/三端 dev 冒烟通过 |
+| 18 | monorepo 工程配置统一重构 | ✅ | 2026-09-27 定稿：@desktop/vite-config 并入 @desktop/config（exports ./vite 预构建 JS 工厂 / ./eslint / ./tsconfig.base.json 包名化 extends），删除 @desktop/electron、@desktop/ui 空占位与 apps/client 旧模板；app 内脚本全量 TS 化（tsx 运行） |
+| 19 | @desktop/utils 工具包 | ✅ | 环境无关工具层：HTTP 封装（双端适配，主进程可复用）+ 加密 / 深度合并 / StorageManager（过期机制）/ nanoid + 验证模块（身份证 15/18 位、手机号） |
+| 20 | 更新体系全 app 推广 + 无人值守闭环 | ✅ | 引导器与 afterPack 提升为 core 共享（launcher 的 package.json 按 app 参数化生成），4 app 全部 oneClick + perMachine:false 零 UAC；新增 resilience.scheduledRestart 凌晨定时重启（择优：asar 热更 > 整包 quitAndInstall > 纯重启）；kiosk 热更 e2e 三阶段实机通过（pending → apply 指针切换 → 60s 判活稳定不回滚） |
+| 21 | 平台测试基建 | ✅ | core vitest 5 文件 33 用例（被测对象零 electron 运行时依赖，零 mock）；CDP 回归探针收编 scripts/probe/（含权限复位前置，见 #29） |
+| 22 | App 脚手架 + 热更发布工具 | ✅ | pnpm gen:app \<slug\> \<中文名\> 生成 kiosk 骨架三件套；pnpm hotfix 交互/直通双模式（自动打包 + 版本确认 + semver 校验） |
+| 23 | 容器缓存清理域 | ✅ | cache:clear（可再生缓存，保登录态）/ cache:clearSite（站点数据，登出并自动重载该容器全部 Tab）；仅 Shell 可调（assertShell），经 SessionService 物理隔离只影响目标 App |
+| 24 | 平台通知 | ✅ | notification:show / notification:received 契约；Main 权限校验（manifest 声明 notification）+ 内容限制（title 60 / body 200 字符）；Shell 右下角 toast（5s 自动消失、堆叠上限 4、滑入动画），不进 OS 通知中心 |
+| 25 | 浮层三窗原生架构 | ✅ | overlay-window 承载三类透明原生窗根治 WebContentsView 压制 Shell DOM 问题：panel 消息窗（showInactive 不抢焦点 + 按需鼠标穿透）/ dialog 授权弹窗 / menu 右键菜单——浮层打开期间页面内容零扰动，setViewSuppressed 视图抑制链路整体删除；清场先行 + 延迟隐藏防透明窗残留帧；菜单支持 ESC/方向键/Enter，动作由 Main 直接执行 |
+| 26 | 平台实验室（lab 测试页） | ✅ | 平台能力自测入口：media/geolocation/fullscreen/pointerLock/display-capture 权限触发 + 下载/通知/缓存测试按钮，与 scripts/probe/ 探针配套做自动化回归 |
+| 27 | 下载通知 toast 化 | ✅ | 聚合横幅改逐条下载卡片（与平台通知同设计语言）：终态 TTL 自动清理 + download:dismiss 手动关闭；顺带修复窗口销毁后访问 webContents 报错 |
+| 28 | 应用中心权限重置 | ✅ | 2026-09-30 核实已随授权重置落地（AppCenter 权限详情「重置授权」按钮 + reka AlertDialog 确认 + permission.reset），本次无需新开发 |
+| 29 | 回归探针收编 | ✅ | 2026-09-30 落地 scripts/probe/（_lib 共享库 + dialog 8 断言 / download 15 断言 / menu 7 断言 / exit 优雅退出 + reset-perms / activate-window 辅助），统一权限复位前置，全部实测通过；download 确定性进度捕捉依赖 app://lab/slow-download 同源限速路由 |
+| 30 | funeral 中文软键盘 | ✅ | 2026-09-30 落地：精简拼音字库（音节→候选字 + 贪心切分引擎，覆盖姓名 / 单位高频字）+ FhKeyboard 触屏软键盘（QWERTY + 数字行，NumPad 同族风格）+ FhInvoiceDialog 弹层（reka-ui Dialog 原语）；结算页 footer 抬头行卡编辑入口，确认随结算单提交；CDP 端到端 13 断言全过 |
+| 31 | funeral 真实接入（模拟先行） | ✅ | 2026-09-30 按用户决策模拟先行：支付下单 / 发票平台 / 报表 PDF 维持 mock 闭环（支付会话 15s 到账、发票 20s 翻转已开票），business.ts 真实接入位逐通道标注（扫码解码 / 支付中台 / 业务系统 / 商品 / 发票 / 报表 / 班次），接口凭证就绪后仅替换 business.ts，页面与类型零改动 |
 
 ### 打包备注（Windows）
 
 - 前置环境变量：`ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/`（工具链下载）；`ELECTRON_BUILDER_CACHE=<项目内目录>`（本机受控环境写不了 %LOCALAPPDATA% 时重定向）
 - 配置唯一来源：apps/desktop/electron-builder.yml（package.json 的 "build" 字段会覆盖 yml，已删除，勿再加回）
 - asar 热更引导器：afterPack（scripts/after-pack.cjs）先把 electron-builder 产物 app.asar 改名为 app.core.asar，再把 build/launcher 打包为 KB 级 app.asar；launcher 的 package.json name 必须是正式应用名（决定 userData 路径），main 与真实包一致指向 out/main/index.js（过 electron-builder 完整性检查）
-- build/icon.ico 由 scripts/generate-icon.mjs 纯 Node 生成（蓝色圆角方块 + 白色四宫格，多尺寸内嵌 PNG），改图标重跑脚本即可
-- 更新 / 远程源联调开关（环境变量，不设置即生产默认）：`DESKTOP_UPDATE_FEED`（updates.url，asar 清单相对其解析）+ `DESKTOP_APPS_REMOTE`（apps.remoteUrl）；配套 scripts/update-test-server.mjs 本地 feed（asar 清单 + latest.yml 占位 + 远程 registry）
+- build/icon.ico 由 apps/<app>/scripts/generate-icon.ts 纯 Node 生成（蓝色圆角方块 + 白色四宫格，多尺寸内嵌 PNG），改图标重跑脚本即可
+- 更新 / 远程源联调开关（环境变量，不设置即生产默认）：`DESKTOP_UPDATE_FEED`（updates.url，asar 清单相对其解析）+ `DESKTOP_APPS_REMOTE`（apps.remoteUrl）；端到端热更验证用 scripts/e2e-update-server.ts 本地 feed（asar 清单 + latest.yml 占位 + 远程 registry）
 - 产物自包含：electron-vite build 把 workspace 包全部 bundle 进 out/main（无 bare import），无需打包 node_modules 里的 workspace 链接；original-fs（Electron 内置）已在 vite-config main external 显式声明
 
 ## 三、后续方向与裁剪决策（2026-09-25 定位评审）
@@ -71,7 +85,7 @@
 
 - 平台能力扩展（JSSDK 式）：按业务需要逐步向 Web App 暴露平台能力，每项配权限词汇表条目，走现有 IPC 契约模式
 - 应用中心小改：搜索 / 分类 / 直装远程 App（需 App 级分发通道）
-- App 接入文档：manifest 编写 + 权限模型说明（有团队接入时再写）
+- ~~App 接入文档~~ ✅ 已落地 [docs/app-integration.md](./app-integration.md)（2026-09-30）：两类接入路径 / manifest 与权限模型 / 契约三步 / Driver 注入 / 发布流程
 
 **⛔ 明确不做（含决策原因）**
 
@@ -100,6 +114,8 @@
 | .asar 文件的删除 / 写入 / 直读必须用 original-fs | Electron 把 *.asar 后缀路径代理为 asar 虚拟文件系统：fs.rmSync 报 ERR_FS_EISDIR，createWriteStream / createReadStream 报 Invalid package；引导器（删除）与 AsarUpdateService（下载落盘 / sha256 直读 / 清理）全部走 original-fs |
 | 契约分层：平台段进 shared，业务契约放 app 本地 | DesktopIpc 只含平台 + device:*；fh:*/hospital:* 等业务词汇留在各自 app（createHandle\<AppIpc\>() 注册 + preload appChannels 白名单 + $invoke 收口），防业务词汇持续污染平台契约 |
 | 硬件交互走 core 设备通用层（device:*），App 只写 Driver | 读卡器/打印机等通用外设 handler 由 core DeviceService 统一注册（含校验/频控），厂商 SDK 差异收敛到 CardReaderDriver/PrinterDriver 接口，bootstrap.devices 注入；新 Kiosk App 接硬件不碰契约 |
+| 全局浮层（toast/授权弹窗/右键菜单）走独立透明原生窗，不做 Shell DOM 浮层 | WebContentsView 原生合成层永远压过 Shell DOM；DOM 菜单打开期间需抑制视图让位导致页面内容变灰（线上 bug 实锤），原生浮层窗天然压过 view，页面内容零扰动（#25） |
+| 基础 UI 一律 reka-ui 原语，禁止手写基础组件 | 用户拍板（2026-09-30）；自绘仅限 reka-ui 无对应物的领域组件（软键盘键位网格、业务卡片等） |
 
 ## 五、维护约定
 

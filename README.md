@@ -2,6 +2,12 @@
 
 类飞书桌面平台的 Electron monorepo：一个 Shell（窗口框架 + 标签页容器）承载多个 Web App，平台提供统一的安全基线、IPC 契约、会话与存储隔离。
 
+## 文档导航
+
+- [docs/app-integration.md](./docs/app-integration.md) — **App 接入指南**：Web App / Kiosk 接入、权限模型、契约三步、发布流程（新人/接入方从这里开始）
+- [docs/ROADMAP.md](./docs/ROADMAP.md) — 进度唯一事实源 + 关键决策记录（勿回退项）
+- [prd.md](./prd.md) — 需求与架构背景
+
 ## 技术栈
 
 - Electron + electron-vite（ESM main，CJS preload）
@@ -29,13 +35,14 @@ electron/
 │   │   └── src/
 │   │       ├── runtime/      #   DesktopRuntime（组装根）+ bootstrap 入口
 │   │       ├── ipc/          #   IPC 域注册文件（window/app/tabs/...）+ handle 原语
-│   │       ├── app|window|tab|web|device|permission|storage|session|download|updater/
+│   │       ├── app|window|tab|web|device|permission|storage|session|download|cache|overlay|updater|resilience|audit|logger/
 │   │       │                 #   平台能力域（一域一目录，Service 构造器注入）
 │   │       ├── event/        #   EventBus（域间解耦，仅 Main 进程内）
 │   │       └── preload/      #   最小桥 window.desktop + 通道白名单
-│   └── config/               # 工程配置唯一入口：vite 工厂（dist）/ eslint 工厂 / tsconfig.base
+│   ├── config/               # 工程配置唯一入口：vite 工厂（dist）/ eslint 工厂 / tsconfig.base
+│   └── utils/                # 环境无关工具层：HTTP 封装 / 加密 / 深度合并 / StorageManager / 验证（主进程可复用）
 ├── resources/brand/          # 安装器品牌图（NSIS sidebar/header）+ 生成脚本
-├── scripts/                  # gen:app 脚手架 / hotfix 热更打包
+├── scripts/                  # gen:app 脚手架 / hotfix 热更打包 / probe 回归探针
 └── pnpm-workspace.yaml
 ```
 
@@ -79,12 +86,18 @@ Main 侧 `handle()` 按 `DesktopInvoke` 子集约束通道与入参；preload �
 
 Tab 状态变化由事件驱动：`TabService → EventBus → forwardEventsToShell → tabs:updated（全量列表）`，Shell UI 不做 diff，直接重渲染。
 
+### 浮层（overlay）
+
+全局 toast、运行时授权弹窗、Tab 右键菜单由**独立透明原生窗**（`core/src/window/overlay-window.ts`）承载，分 panel / dialog / menu 三类：WebContentsView 原生层永远压过 Shell DOM，DOM 浮层会被 Web 内容遮住，原生浮层窗则天然压过 Web 内容且完全不扰动页面布局。
+
 ## 快速开始
 
 ```bash
 pnpm install        # 安装依赖
 pnpm dev            # 启动桌面应用（dev 模式，HMR）
 pnpm dev:kiosk      # 启动自助机应用（全屏 kiosk 形态）
+pnpm dev:hospital   # 医院自助终端
+pnpm dev:funeral    # 殡仪馆自助终端
 pnpm build          # 生产构建（main + preload + renderer）
 pnpm test           # 平台单测（packages/core，vitest）
 pnpm typecheck      # 全 workspace 类型检查
