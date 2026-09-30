@@ -18,6 +18,8 @@ const SCREEN_MARGIN = 8
 const TOPBAR_HEIGHT = 40
 /** 通知 toast 自动消失时长（ms）：太短用户容易错过 */
 const TOAST_TTL_MS = 8000
+/** 弹窗清场到隐藏的间隔（ms）：等浮层页绘制完透明空帧再 hide，2-3 帧足够，留余量 */
+const DIALOG_CLEAR_DELAY_MS = 100
 
 /**
  * 浮层窗口服务：独立透明无边框 BrowserWindow 承载全局浮层。
@@ -43,6 +45,8 @@ export class OverlayWindowService {
   private downloads: DownloadTask[] = []
   /** 挂起中的运行时授权请求（dialog 窗数据源） */
   private dialogs: PermissionRequest[] = []
+  /** 清场隐藏延迟器：空帧绘制落地后再 hide；期间来了新请求则取消（窗口保持可见） */
+  private dialogHideTimer: NodeJS.Timeout | null = null
 
   constructor(
     private readonly getParent: () => BrowserWindow | undefined,
@@ -80,6 +84,11 @@ export class OverlayWindowService {
     if (this.dialogs.some(item => item.requestId === request.requestId))
       return
     this.dialogs.push(request)
+    // 清场隐藏还没落地就有新请求：取消延迟隐藏，窗口保持可见，卡片原地换新（key 变化重播入场动画）
+    if (this.dialogHideTimer) {
+      clearTimeout(this.dialogHideTimer)
+      this.dialogHideTimer = null
+    }
     const win = this.ensureDialog()
     this.applyDialogBounds()
     // 数据先行：页面在窗口隐藏状态下渲染就绪，show 瞬间即有内容——
@@ -102,12 +111,20 @@ export class OverlayWindowService {
     if (!this.dialogs.some(item => item.requestId === requestId))
       return
     this.dialogs = this.dialogs.filter(item => item.requestId !== requestId)
-    if (!this.dialogs.length) {
-      this.dialogWin?.hide()
-      return
-    }
     if (!this.dialogWin)
       return
+    if (!this.dialogs.length) {
+      // 清场先行：先推空列表让浮层页在可见状态下移除卡片并绘制一帧透明画面，再隐藏窗口。
+      // 直接 hide 的话窗口缓冲区最后一帧是旧卡片（隐藏文档不再渲染，清卡片的绘制不会发生），
+      // 下次 show 瞬间会先合成残留帧——卡片「瞬间出现」后又闪回复播入场动画，
+      // 即「第一次正常、之后只是显示隐藏」的观感。与 refreshPanel 隐藏前清空页面状态同一策略。
+      this.dialogWin.webContents.send('permission:pending', [])
+      this.dialogHideTimer = setTimeout(() => {
+        this.dialogHideTimer = null
+        this.dialogWin?.hide()
+      }, DIALOG_CLEAR_DELAY_MS)
+      return
+    }
     this.applyDialogBounds()
     this.dialogWin.webContents.send('permission:pending', this.dialogs)
   }
@@ -271,15 +288,19 @@ export class OverlayWindowService {
       },
     })
     win.setMenu(null)
+    // closed 时窗口已销毁，届时访问 win.webContents 会抛 Object has been destroyed——
+    // 存活期先取好 webContents 与 id
+    const wc = win.webContents
+    const wcId = wc.id
     win.on('closed', () => {
       if (this.panelWin === win)
         this.panelWin = null
       if (this.dialogWin === win)
         this.dialogWin = null
-      this.resolver.unregister(win.webContents)
+      this.resolver.unregister(wcId)
     })
     // 浮层页以 Shell 身份登记：permission:respond 等决策回传通道经 assertShell 放行
-    this.resolver.register(win.webContents, { appId: SHELL_APP_ID, instanceId: `overlay-${win.id}` })
+    this.resolver.register(wc, { appId: SHELL_APP_ID, instanceId: `overlay-${win.id}` })
 
     const devUrl = process.env.ELECTRON_RENDERER_URL
     const load

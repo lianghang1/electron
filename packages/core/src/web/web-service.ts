@@ -132,7 +132,7 @@ export class WebService {
     const runtime = this.runtimes.get(runtimeId)
     if (!runtime)
       return
-    this.resolver.unregister(runtime.view.webContents)
+    this.resolver.unregister(runtime.view.webContents.id)
     this.windowService.getMainWindow()?.contentView.removeChildView(runtime.view)
     runtime.view.webContents.close()
     this.runtimes.delete(runtimeId)
@@ -273,12 +273,14 @@ export class WebService {
     applyWebAppGuards(popup.webContents, allowedOrigins, (childUrl, childFeatures) =>
       this.createPopupWindow(popup.webContents, manifest, childUrl, childFeatures))
 
+    // closed 时弹窗已销毁：webContents 须存活期捕获 id，销毁后访问会抛 Object has been destroyed
+    const popupWcId = popup.webContents.id
     this.resolver.register(popup.webContents, {
       appId: parentContext.appId,
       instanceId: parentContext.instanceId,
     })
     popup.on('closed', () => {
-      this.resolver.unregister(popup.webContents)
+      this.resolver.unregister(popupWcId)
       this.logger.debug('popup closed', { appId: parentContext.appId, url })
     })
 

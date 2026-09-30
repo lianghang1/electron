@@ -15,8 +15,9 @@ export class CallerResolver {
     this.contexts.set(wc.id, context)
   }
 
-  unregister(wc: WebContents): void {
-    this.contexts.delete(wc.id)
+  /** 按 id 注销：closed 回调触发时窗口已销毁，不可再访问 webContents，须存活期捕获 id 传入 */
+  unregister(id: number): void {
+    this.contexts.delete(id)
   }
 
   resolve(sender: WebContents): CallerContext {
