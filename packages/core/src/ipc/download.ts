@@ -1,10 +1,12 @@
 import type { DownloadService } from '../download/download-service'
+import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
 import { assertShell } from './caller-context'
 import { handle } from './handle'
 
 export interface DownloadIpcDeps {
   downloadService: DownloadService
+  overlayService: OverlayWindowService
   resolver: CallerResolver
 }
 
@@ -26,5 +28,10 @@ export function registerDownloadIpc(deps: DownloadIpcDeps): void {
   handle('download:reveal', (e, taskId) => {
     shellOnly(e.sender)
     return deps.downloadService.revealFile(taskId)
+  })
+
+  handle('download:dismiss', (e, taskId) => {
+    shellOnly(e.sender)
+    deps.overlayService.dismissDownload(taskId)
   })
 }

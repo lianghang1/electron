@@ -22,7 +22,7 @@ import { permissionLabel } from '../composables/use-permission-labels'
  * 原生层级压过 WebContentsView。仅承载必须盖住 Web 容器区域的浮层——
  * Tab 右键菜单等 Shell 域内浮层在 Shell DOM 渲染（reka-ui + 视图抑制），不经过本页。
  * 同一份页面服务两类浮层窗（每窗同时只收一种消息，互斥渲染）：
- * - 消息窗：download:updated 下载面板 + notification:received 通知 toast（右上角）
+ * - 消息窗：download:updated 下载通知卡 + notification:received 通知 toast（右上角）
  * - 弹窗窗：permission:pending 运行时授权决策卡（全屏遮罩模态，居中）
  *
  * 交互语义交给 reka-ui 原语（Toast 滑动关闭/悬停暂停/无障碍、Dialog 焦点圈养/ESC），
@@ -124,6 +124,11 @@ function dismissToast(toastId: string): void {
   void window.desktop.notification.dismiss(toastId)
 }
 
+/** 关闭单条下载卡片：回传 Main 隐藏（列表更新由 Main 推送） */
+function dismissDownload(taskId: string): void {
+  void window.desktop.download.dismiss(taskId)
+}
+
 /** reka Toast 的关闭事件统一走 Main（控制态由 Main 数据推导，页面不私存） */
 function onToastOpenChange(toastId: string, value: boolean): void {
   if (!value)
@@ -202,7 +207,8 @@ watch([toasts, downloads], () => {
   })
 }, { deep: true })
 
-const DL_DOT_STATUS: Record<DownloadTask['status'], string> = {
+/** 下载卡片图标底色（按状态）：进行中青玉 / 完成绿 / 失败红 */
+const DL_ICON_BG: Record<DownloadTask['status'], string> = {
   progressing: 'bg-[#0f766e]',
   completed: 'bg-[#16a34a]',
   cancelled: 'bg-[#dc2626]',
@@ -264,45 +270,53 @@ function dialogBtnClass(primary: boolean): string {
       </DialogContent>
     </DialogRoot>
 
-    <!-- 右上角消息区：下载面板 + 通知 toast（reka Toast：悬停暂停 / 滑动关闭 / 单条 ×）。
+    <!-- 右上角消息区：下载通知卡 + 通知 toast（reka Toast：悬停暂停 / 滑动关闭 / 单条 ×）。
          容器穿透（pointer-events-none），命中卡片才接管；超高内部滚动不超出软件区域 -->
     <div
       v-if="hasPanelContent"
       ref="panelRef"
       class="ov-panel relative m-[12px] flex max-h-[calc(100vh-24px)] w-[320px] flex-col overflow-y-auto pointer-events-none"
     >
+      <!-- 下载通知卡：与通知 toast 同款外观，逐条独立（不聚合）；终态 8s 自动消失，× 手动关闭 -->
       <div
-        v-if="downloads.length"
-        class="ov-panel__block pointer-events-auto flex-none overflow-hidden rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
+        v-for="task in downloads"
+        :key="task.id"
+        class="ov-dl ov-anim-slide pointer-events-auto relative mb-[8px] flex rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white px-[12px] pb-[10px] pt-[9px] shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
+        :title="task.path"
       >
-        <p class="ov-panel__head m-0 px-[12px] pb-[6px] pt-[8px] text-[12px] font-600 text-[#57606a]">
-          下载
-        </p>
-        <div v-for="task in downloads" :key="task.id" class="ov-dl pointer-events-auto flex flex-wrap items-center px-[12px] py-[8px]" :title="task.path">
-          <span class="ov-dl__dot mr-[10px] h-[8px] w-[8px] flex-none rounded-full" :class="DL_DOT_STATUS[task.status]" />
-          <div class="ov-dl__info flex w-[210px] flex-none flex-col overflow-hidden">
-            <span class="ov-dl__name truncate text-[12.5px] font-500 text-[#1f2328]">{{ task.filename }}</span>
-            <span class="ov-dl__desc text-[11.5px] text-[#57606a]">
-              {{ STATUS_TEXT[task.status] }}
-              <template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template>
-              <template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
-            </span>
-          </div>
+        <span class="ov-dl__icon mr-[8px] mt-[2px] flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] text-white" :class="DL_ICON_BG[task.status]">
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+        </span>
+        <div class="ov-dl__main min-w-0 flex-1">
+          <p class="ov-dl__name m-0 truncate text-[12.5px] font-600 text-[#1f2328]">
+            {{ task.filename }}
+          </p>
+          <p class="ov-dl__desc m-0 mt-[2px] text-[11.5px] text-[#57606a]">
+            {{ STATUS_TEXT[task.status] }}
+            <template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template>
+            <template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
+          </p>
           <div
             v-if="task.status === 'progressing' && task.percent >= 0"
-            class="ov-dl__track ml-[12px] h-[4px] flex-1 overflow-hidden rounded-[2px] bg-[#e8ecf1]"
+            class="ov-dl__track mt-[6px] h-[4px] w-full overflow-hidden rounded-[2px] bg-[#e8ecf1]"
           >
             <div class="ov-dl__bar h-full rounded-[2px] bg-[#0f766e] transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
           </div>
-          <div v-if="task.status === 'completed'" class="ov-dl__ops mt-[5px] flex w-full justify-end">
-            <button class="ov-dl__op cursor-pointer rounded-[6px] border border-[#d5dae1] bg-white px-[10px] py-[3px] text-[11px] text-[#1f2328] transition-colors duration-[120ms] hover:border-[#0f766e] hover:text-[#0f766e]" @click="openTask(task.id)">
+          <div v-if="task.status === 'completed'" class="ov-dl__ops mt-[6px] flex justify-end">
+            <button class="ov-dl__op flex-none cursor-pointer rounded-[6px] border border-[#d5dae1] bg-white px-[10px] py-[3px] text-[11px] text-[#1f2328] transition-colors duration-[120ms] hover:border-[#0f766e] hover:text-[#0f766e]" @click="openTask(task.id)">
               打开
             </button>
-            <button class="ov-dl__op cursor-pointer rounded-[6px] border border-[#d5dae1] bg-white px-[10px] py-[3px] text-[11px] text-[#1f2328] transition-colors duration-[120ms] hover:border-[#0f766e] hover:text-[#0f766e]" @click="revealTask(task.id)">
+            <button class="ov-dl__op flex-none cursor-pointer rounded-[6px] border border-[#d5dae1] bg-white px-[10px] py-[3px] text-[11px] text-[#1f2328] transition-colors duration-[120ms] hover:border-[#0f766e] hover:text-[#0f766e]" @click="revealTask(task.id)">
               文件夹
             </button>
           </div>
         </div>
+        <button
+          class="ov-dl__close absolute right-[6px] top-[6px] h-[18px] w-[18px] cursor-pointer border-none bg-transparent p-0 text-[12px] leading-[18px] text-[#8a919c] transition-colors duration-[120ms] hover:text-[#1f2328]"
+          @click="dismissDownload(task.id)"
+        >
+          ×
+        </button>
       </div>
       <ToastViewport
         class="ov-panel__toasts m-0 flex-none list-none p-0 [&>*+*]:mt-2"

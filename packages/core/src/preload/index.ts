@@ -34,6 +34,7 @@ const channels = {
   overlayIgnoreMouse: 'overlay:ignoreMouse',
   downloadOpen: 'download:open',
   downloadReveal: 'download:reveal',
+  downloadDismiss: 'download:dismiss',
   updateCheck: 'update:check',
   updateInstall: 'update:install',
   deviceIdcardRead: 'device:idcard:read',
@@ -111,6 +112,7 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
     download: {
       open: taskId => ipcRenderer.invoke(channels.downloadOpen, taskId),
       reveal: taskId => ipcRenderer.invoke(channels.downloadReveal, taskId),
+      dismiss: taskId => ipcRenderer.invoke(channels.downloadDismiss, taskId),
     },
     update: {
       check: () => ipcRenderer.invoke(channels.updateCheck),

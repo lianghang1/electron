@@ -11,4 +11,6 @@ export type DownloadIpc = {
   'download:open': (taskId: string) => void
   /** 在资源管理器中定位已完成的下载文件 */
   'download:reveal': (taskId: string) => void
+  /** 关闭某条下载任务的通知卡片（仅隐藏展示，不影响任务本身） */
+  'download:dismiss': (taskId: string) => void
 }

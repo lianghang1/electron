@@ -1,6 +1,9 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import OverlayApp from './overlay/OverlayApp.vue'
+
+import './styles/css/reset.css'
+import './styles/css/transition.css'
 import './styles/tokens.css'
 import 'virtual:uno.css'
 

@@ -70,7 +70,7 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
     overlayService: deps.overlayService,
     resolver: deps.resolver,
   })
-  registerDownloadIpc({ downloadService: deps.downloadService, resolver: deps.resolver })
+  registerDownloadIpc({ downloadService: deps.downloadService, overlayService: deps.overlayService, resolver: deps.resolver })
   registerNotificationIpc({
     registry: deps.registry,
     permissionService: deps.permissionService,

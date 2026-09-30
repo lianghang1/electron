@@ -18,6 +18,8 @@ const SCREEN_MARGIN = 8
 const TOPBAR_HEIGHT = 40
 /** 通知 toast 自动消失时长（ms）：太短用户容易错过 */
 const TOAST_TTL_MS = 8000
+/** 下载卡片终态自动消失时长：与通知 toast 同款体验（进行中的任务常驻展示进度） */
+const DOWNLOAD_TTL_MS = TOAST_TTL_MS
 /** 弹窗清场到隐藏的间隔（ms）：等浮层页绘制完透明空帧再 hide，2-3 帧足够，留余量 */
 const DIALOG_CLEAR_DELAY_MS = 100
 
@@ -43,6 +45,10 @@ export class OverlayWindowService {
   private toasts: PlatformNotification[] = []
   private readonly toastTimers = new Map<string, NodeJS.Timeout>()
   private downloads: DownloadTask[] = []
+  /** 已被用户手动关闭的下载卡片 id：任务仍在服务列表中（保留 30s），按 id 隐藏不再展示 */
+  private readonly dismissedDownloads = new Set<string>()
+  /** 下载终态卡片的自动消失计时器：与通知 toast 同款 8s 自动消失 */
+  private readonly downloadTtlTimers = new Map<string, NodeJS.Timeout>()
   /** 挂起中的运行时授权请求（dialog 窗数据源） */
   private dialogs: PermissionRequest[] = []
   /** 清场隐藏延迟器：空帧绘制落地后再 hide；期间来了新请求则取消（窗口保持可见） */
@@ -74,6 +80,37 @@ export class OverlayWindowService {
   /** 下载任务状态更新：无任务时窗口隐藏 */
   setDownloads(tasks: DownloadTask[]): void {
     this.downloads = tasks
+    // 终态任务起 TTL 计时器：与通知 toast 一致的自动消失
+    for (const task of tasks) {
+      if (task.status !== 'progressing' && !this.dismissedDownloads.has(task.id) && !this.downloadTtlTimers.has(task.id)) {
+        this.downloadTtlTimers.set(
+          task.id,
+          setTimeout(() => {
+            this.downloadTtlTimers.delete(task.id)
+            this.dismissedDownloads.add(task.id)
+            this.refreshPanel()
+          }, DOWNLOAD_TTL_MS),
+        )
+      }
+    }
+    // 已从服务列表消失的任务（服务保留期结束清理）：同步收计时器与隐藏记录，防集合无限增长
+    const liveIds = new Set(tasks.map(task => task.id))
+    for (const [id, timer] of this.downloadTtlTimers) {
+      if (!liveIds.has(id)) {
+        clearTimeout(timer)
+        this.downloadTtlTimers.delete(id)
+      }
+    }
+    for (const id of this.dismissedDownloads) {
+      if (!liveIds.has(id))
+        this.dismissedDownloads.delete(id)
+    }
+    this.refreshPanel()
+  }
+
+  /** 用户手动关闭单条下载卡片：仅隐藏展示，不影响任务本身 */
+  dismissDownload(taskId: string): void {
+    this.dismissedDownloads.add(taskId)
     this.refreshPanel()
   }
 
@@ -205,7 +242,9 @@ export class OverlayWindowService {
   }
 
   private refreshPanel(): void {
-    if (!this.toasts.length && !this.downloads.length) {
+    // 展示过滤：手动关闭 / 已过 TTL 的下载卡片不再推送（任务本身仍在服务列表中）
+    const visibleDownloads = this.downloads.filter(task => !this.dismissedDownloads.has(task.id))
+    if (!this.toasts.length && !visibleDownloads.length) {
       // 隐藏前同步清空页面状态（面板关闭/任务清空的推送在此收口）
       this.panelWin?.webContents.send('notification:received', [])
       this.panelWin?.webContents.send('download:updated', [])
@@ -219,7 +258,7 @@ export class OverlayWindowService {
     win.setBounds(this.anchorPanel(parent, win.getBounds().height))
     // 数据先行（与 pushDialog 同策略）：页面在隐藏状态渲染就绪后再显窗，避免首显空白帧
     win.webContents.send('notification:received', this.toasts)
-    win.webContents.send('download:updated', this.downloads)
+    win.webContents.send('download:updated', visibleDownloads)
     if (!win.isVisible()) {
       // 默认整窗穿透，页面按命中元素切换（避免透明区遮挡下层页面点击）
       win.setIgnoreMouseEvents(true, { forward: true })
