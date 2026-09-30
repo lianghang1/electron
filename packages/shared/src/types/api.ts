@@ -94,8 +94,6 @@ export interface DesktopApi {
     resize: (height: number) => Promise<void>
     /** 仅供浮层窗页面 mounted 后拉取当前状态（toast / 下载 / 挂起授权请求） */
     sync: () => Promise<OverlaySyncState>
-    /** 仅供消息窗页面回传：用户主动关闭面板（清空通知与下载面板，新事件到达时重新弹出） */
-    dismiss: () => Promise<void>
     /** 仅供消息窗页面回传：按命中元素切换窗口鼠标穿透（透明区不遮挡下层页面点击） */
     ignoreMouse: (ignore: boolean) => Promise<void>
   }

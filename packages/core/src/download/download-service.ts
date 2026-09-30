@@ -41,72 +41,85 @@ export class DownloadService {
     this.attached.add(appSession)
 
     appSession.on('will-download', (_event, item, webContents) => {
-      // 权限把关：manifest 声明 → 直接放行；未声明 → 运行时授权
-      // （已持久化允许的 App 免询问直接下载；否则弹授权卡，允许后重发下载，拒绝/超时取消本次）
-      if (!this.permissionService.getPermissions(appId).includes('download')
-        && !this.permissionService.hasRuntimeDecision(appId, 'download')) {
-        item.cancel()
+      // 权限把关：manifest 声明 / 已持久化允许 → 直接放行；
+      // 未声明 → item.pause() 挂起下载走运行时授权：允许后 resume 继续原下载，
+      // 拒绝/超时 cancel。不采用「取消后重发 downloadURL」——blob: URL 重发不可靠，
+      // pause/resume 保持原下载会话，任意 URL 形态（blob:/data:/http）都天然可用
+      const declared = this.permissionService.getPermissions(appId).includes('download')
+        || this.permissionService.hasRuntimeDecision(appId, 'download')
+      if (!declared) {
         const url = item.getURL()
         const context = this.resolver.resolve(webContents)
-        this.logger.info('download not declared, requesting runtime permission', { appId, url })
+        this.logger.info('download not declared, pausing for runtime permission', { appId, url })
+        item.pause()
         void this.permissionService.requestRuntime(context, 'download').then((allowed) => {
-          if (!allowed) {
-            this.logger.info('download denied', { appId, url })
-            return
+          // 决策返回时 item 可能已随 Tab 关闭销毁（DownloadItem 无 isDestroyed，操作会抛）
+          try {
+            if (!allowed) {
+              this.logger.info('download denied', { appId, url })
+              item.cancel()
+              return
+            }
+            this.beginTask(appId, item)
+            item.resume()
           }
-          // 允许已持久化记忆：从原页面 webContents 重新发起下载——
-          // blob: URL 只在创建它的页面会话内可解析，session.downloadURL 对它不可靠
-          if (!webContents.isDestroyed())
-            webContents.downloadURL(url)
+          catch (error) {
+            this.logger.warn('download item gone before permission applied', { appId, error: String(error) })
+          }
         })
         return
       }
 
-      const id = `dl-${Date.now()}-${++this.seq}`
-      const filename = item.getFilename() || 'download'
-      // 保存位置：saveAs 配置弹系统另存对话框选目录；默认静默保存到系统下载目录（Kiosk 友好）
-      const defaultPath = join(app.getPath('downloads'), filename)
-      if (this.config.download?.saveAs)
-        item.setSaveDialogOptions({ title: '保存下载', defaultPath })
-      else
-        item.setSavePath(defaultPath)
-      const task: DownloadTask = {
-        id,
-        appId,
-        filename,
-        path: item.getSavePath(),
-        received: 0,
-        total: item.getTotalBytes(),
-        percent: 0,
-        status: 'progressing',
-        startedAt: Date.now(),
-      }
-      this.tasks.set(id, task)
-      this.push()
-
-      item.on('updated', (_e, state) => {
-        task.received = item.getReceivedBytes()
-        task.total = item.getTotalBytes()
-        task.percent = task.total > 0 ? Math.floor((task.received / task.total) * 100) : -1
-        task.status = state === 'interrupted' ? 'interrupted' : 'progressing'
-        this.throttlePush(id)
-      })
-      item.once('done', (_e, state) => {
-        this.clearThrottle(id)
-        task.status = state === 'completed' ? 'completed' : state
-        task.received = item.getReceivedBytes()
-        // saveAs 模式下路径由用户选择决定，完成时回填
-        task.path = item.getSavePath()
-        this.logger.info(`download ${task.status}`, { appId, filename })
-        this.push()
-        // 结束的任务保留一段时间供横幅展示，随后清理
-        setTimeout(() => {
-          this.tasks.delete(id)
-          this.push()
-        }, FINISHED_RETAIN_MS).unref?.()
-      })
+      this.beginTask(appId, item)
     })
     this.logger.debug('download guard attached', { appId })
+  }
+
+  /** 从已放行的 DownloadItem 开始任务：落盘路径 + 进度/完成事件接线（直接下载与授权后恢复共用） */
+  private beginTask(appId: string, item: Electron.DownloadItem): void {
+    const id = `dl-${Date.now()}-${++this.seq}`
+    const filename = item.getFilename() || 'download'
+    // 保存位置：saveAs 配置弹系统另存对话框选目录；默认静默保存到系统下载目录（Kiosk 友好）
+    const defaultPath = join(app.getPath('downloads'), filename)
+    if (this.config.download?.saveAs)
+      item.setSaveDialogOptions({ title: '保存下载', defaultPath })
+    else
+      item.setSavePath(defaultPath)
+    const task: DownloadTask = {
+      id,
+      appId,
+      filename,
+      path: item.getSavePath(),
+      received: 0,
+      total: item.getTotalBytes(),
+      percent: 0,
+      status: 'progressing',
+      startedAt: Date.now(),
+    }
+    this.tasks.set(id, task)
+    this.push()
+
+    item.on('updated', (_e, state) => {
+      task.received = item.getReceivedBytes()
+      task.total = item.getTotalBytes()
+      task.percent = task.total > 0 ? Math.floor((task.received / task.total) * 100) : -1
+      task.status = state === 'interrupted' ? 'interrupted' : 'progressing'
+      this.throttlePush(id)
+    })
+    item.once('done', (_e, state) => {
+      this.clearThrottle(id)
+      task.status = state === 'completed' ? 'completed' : state
+      task.received = item.getReceivedBytes()
+      // saveAs 模式下路径由用户选择决定，完成时回填
+      task.path = item.getSavePath()
+      this.logger.info(`download ${task.status}`, { appId, filename })
+      this.push()
+      // 结束的任务保留一段时间供横幅展示，随后清理
+      setTimeout(() => {
+        this.tasks.delete(id)
+        this.push()
+      }, FINISHED_RETAIN_MS).unref?.()
+    })
   }
 
   /** App 关闭时取消其进行中的下载（Tab 关闭联动，防孤儿下载） */
@@ -115,15 +128,6 @@ export class DownloadService {
       if (task.appId === appId && task.status === 'progressing')
         task.status = 'cancelled'
     }
-  }
-
-  /** 用户关闭面板时清空任务展示：进行中的下载继续、文件照常落盘，只是不再显示进度 */
-  clearUI(): void {
-    for (const timer of this.throttles.values())
-      clearTimeout(timer)
-    this.throttles.clear()
-    this.tasks.clear()
-    this.push()
   }
 
   /** 用系统默认程序打开已完成的下载文件（taskId 寻址，路径不可伪造） */

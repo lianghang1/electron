@@ -31,7 +31,6 @@ const channels = {
   cacheClearSite: 'cache:clearSite',
   overlayResize: 'overlay:resize',
   overlaySync: 'overlay:sync',
-  overlayDismiss: 'overlay:dismiss',
   overlayIgnoreMouse: 'overlay:ignoreMouse',
   downloadOpen: 'download:open',
   downloadReveal: 'download:reveal',
@@ -107,7 +106,6 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
     overlay: {
       resize: height => ipcRenderer.invoke(channels.overlayResize, height),
       sync: () => ipcRenderer.invoke(channels.overlaySync),
-      dismiss: () => ipcRenderer.invoke(channels.overlayDismiss),
       ignoreMouse: ignore => ipcRenderer.invoke(channels.overlayIgnoreMouse, ignore),
     },
     download: {

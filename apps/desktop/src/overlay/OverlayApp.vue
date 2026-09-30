@@ -77,8 +77,10 @@ function syncCountdowns(): void {
 watch(dialogs, syncCountdowns, { deep: true })
 
 /**
- * 遮罩动画只在窗口可见后播放：窗口隐藏期间页面已把内容渲染就绪（Main 数据先行），
- * show 瞬间直接呈现——若动画在隐藏期就播完/播了一半，显窗时内容会「跳帧闪一下」。
+ * 弹窗渲染门控：窗口隐藏期间不插入卡片 DOM——CSS 动画在元素插入时立即开始计时，
+ * 隐藏期插入的话动画在 show 前已播完，用户看到的是静态呈现（「第二次只是显示隐藏」）。
+ * visibilitychange 触发后才渲染：show 后首次插入，动画必然在可见状态下播完整一次，
+ * 每次弹卡都是完整入场动画（与第一次一致）；动画类常挂，插入即播，无事后补类的重播问题。
  */
 const dialogLive = ref(false)
 function syncDialogLive(): void {
@@ -102,11 +104,6 @@ function onMouseMove(e: MouseEvent): void {
     return
   lastIgnore = transparent
   void window.desktop.overlay.ignoreMouse(transparent)
-}
-
-async function dismissPanel(): Promise<void> {
-  // 清空与刷新由 Main 统一推送（通知清空 + 下载展示清空）
-  await window.desktop.overlay.dismiss()
 }
 
 async function openTask(taskId: string): Promise<void> {
@@ -227,8 +224,8 @@ function dialogBtnClass(primary: boolean): string {
          逐条决策（只渲染队首），ESC = 本次拒绝，遮罩点击不关闭 -->
     <DialogRoot :open="currentRequest !== null">
       <DialogOverlay
-        class="ov-dialog fixed inset-0 z-[10] bg-[rgba(15,23,42,0.28)]"
-        :class="dialogLive ? 'ov-anim-fade' : ''"
+        v-if="dialogLive"
+        class="ov-dialog ov-anim-fade fixed inset-0 z-[10] bg-[rgba(15,23,42,0.28)]"
       />
       <DialogContent
         class="fixed inset-0 z-[20] flex flex-col items-center justify-center"
@@ -237,9 +234,9 @@ function dialogBtnClass(primary: boolean): string {
         @interact-outside="keepDialogOpen"
       >
         <div
-          v-if="currentRequest"
-          class="ov-dialog__card box-border w-[400px] rounded-[12px] border-x border-b border-x-[rgba(2,8,20,0.1)] border-b-[rgba(2,8,20,0.1)] bg-white px-[18px] pb-[14px] pt-[16px] shadow-[0_8px_24px_rgba(2,8,20,0.16)]"
-          :class="dialogLive ? 'ov-anim-pop' : ''"
+          v-if="currentRequest && dialogLive"
+          :key="currentRequest.requestId"
+          class="ov-dialog__card ov-anim-pop box-border w-[400px] rounded-[12px] border-x border-b border-x-[rgba(2,8,20,0.1)] border-b-[rgba(2,8,20,0.1)] bg-white px-[18px] pb-[14px] pt-[16px] shadow-[0_8px_24px_rgba(2,8,20,0.16)]"
         >
           <div class="ov-dialog__head mb-[10px] flex items-center">
             <span class="ov-dialog__icon mr-[8px] flex h-[28px] w-[28px] flex-none items-center justify-center rounded-[8px] bg-[#0f766e] text-white">
@@ -274,16 +271,9 @@ function dialogBtnClass(primary: boolean): string {
       ref="panelRef"
       class="ov-panel relative m-[12px] flex max-h-[calc(100vh-24px)] w-[320px] flex-col overflow-y-auto pointer-events-none"
     >
-      <button
-        class="ov-panel__close pointer-events-auto absolute right-0 top-0 z-[1] h-[26px] w-[26px] cursor-pointer border-none bg-transparent p-0 text-[15px] leading-[26px] text-[#8a919c] transition-colors duration-[120ms] hover:text-[#1f2328]"
-        title="关闭"
-        @click="dismissPanel"
-      >
-        ×
-      </button>
       <div
         v-if="downloads.length"
-        class="ov-panel__block pointer-events-auto overflow-hidden rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
+        class="ov-panel__block pointer-events-auto flex-none overflow-hidden rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
       >
         <p class="ov-panel__head m-0 px-[12px] pb-[6px] pt-[8px] text-[12px] font-600 text-[#57606a]">
           下载
@@ -315,27 +305,32 @@ function dialogBtnClass(primary: boolean): string {
         </div>
       </div>
       <ToastViewport
-        class="ov-panel__toasts m-0 list-none p-0 [&>*+*]:mt-2"
+        class="ov-panel__toasts m-0 flex-none list-none p-0 [&>*+*]:mt-2"
       >
         <ToastRoot
           v-for="toast in toasts"
           :key="toast.id"
           :open="true"
           :duration="8000"
-          class="ov-toast ov-anim-slide pointer-events-auto relative rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white px-[12px] pb-[10px] pt-[9px] shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
+          class="ov-toast ov-anim-slide pointer-events-auto relative flex rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white px-[12px] pb-[10px] pt-[9px] shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
           @update:open="value => onToastOpenChange(toast.id, value)"
         >
-          <p class="ov-toast__app m-0 text-[11px] text-[#8a919c]">
-            {{ toast.appName }}
-          </p>
-          <ToastTitle class="ov-toast__title m-0 mt-[2px] text-[12.5px] font-600 text-[#1f2328]">
-            {{ toast.title }}
-          </ToastTitle>
-          <ToastDescription v-if="toast.body" class="ov-toast__body m-0 mt-[2px] text-[11.5px] leading-[1.5] text-[#57606a]">
-            {{ toast.body }}
-          </ToastDescription>
+          <span class="ov-toast__icon mr-[8px] mt-[2px] flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] bg-[#0f766e] text-white">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+          </span>
+          <div class="ov-toast__main min-w-0 flex-1">
+            <p class="ov-toast__app m-0 text-[11px] text-[#8a919c]">
+              {{ toast.appName }}
+            </p>
+            <ToastTitle class="ov-toast__title m-0 mt-[2px] text-[12.5px] font-600 text-[#1f2328]">
+              {{ toast.title }}
+            </ToastTitle>
+            <ToastDescription v-if="toast.body" class="ov-toast__body m-0 mt-[2px] text-[11.5px] leading-[1.5] text-[#57606a]">
+              {{ toast.body }}
+            </ToastDescription>
+          </div>
           <ToastClose
-            class="absolute right-[6px] top-[6px] h-[18px] w-[18px] cursor-pointer border-none bg-transparent p-0 text-[12px] leading-[18px] text-[#8a919c] transition-colors duration-[120ms] hover:text-[#1f2328]"
+            class="ov-toast__close absolute right-[6px] top-[6px] h-[18px] w-[18px] cursor-pointer border-none bg-transparent p-0 text-[12px] leading-[18px] text-[#8a919c] transition-colors duration-[120ms] hover:text-[#1f2328]"
           >
             ×
           </ToastClose>
@@ -355,7 +350,16 @@ body {
   overflow: hidden;
 }
 
-/* ---- 动画（Uno 工具类不便表达的 keyframes，类名由模板按窗口可见性/挂载时机挂载） ---- */
+/* 面板超高内部滚动：隐藏滚动条（窗口高度贴合内容，只有极端堆积才滚动，滚动条无视觉意义） */
+.ov-panel {
+  scrollbar-width: none;
+}
+.ov-panel::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* ---- 动画（Uno 工具类不便表达的 keyframes，类名常挂，元素插入时播一次） ---- */
 @keyframes ov-fade {
   from { opacity: 0; }
 }

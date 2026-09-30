@@ -109,7 +109,7 @@ onBeforeUnmount(() => {
               清理缓存
             </ContextMenuItem>
             <ContextMenuItem class="dt-ctxmenu__item dt-ctxmenu__item--danger" @select="$emit('clearSite', tab.appId)">
-              清除站点数据（退出登录）
+              清除站点数据
             </ContextMenuItem>
             <ContextMenuSeparator class="dt-ctxmenu__sep" />
             <ContextMenuItem class="dt-ctxmenu__item" @select="$emit('close', tab.id)">
@@ -298,9 +298,16 @@ onBeforeUnmount(() => {
   background: #e81123;
   color: #ffffff;
 }
+</style>
 
-/* Tab 右键菜单：reka ContextMenu 承担定位 / 键盘导航 / 无障碍，外观跟随 dt-* 主题令牌。
-   打开期间激活 Web 视图归零让位（见 onMenuOpen），Portal 到 body 的内容不被遮挡 */
+<!--
+  Tab 右键菜单：reka ContextMenu 承担定位 / 键盘导航 / 无障碍，外观跟随 dt-* 主题令牌；
+  打开期间激活 Web 视图归零让位（见 onMenuOpen），Portal 到 body 的内容不被遮挡。
+  本块必须是非 scoped 样式——ContextMenuContent 经 Portal 渲染，Vue 的 scopeId 不会
+  fallthrough 到其根元素，scoped 规则全部不命中（背景/边框/阴影整体丢失）；
+  dt- 前缀类名防全局冲突。
+-->
+<style>
 .dt-ctxmenu {
   z-index: 60;
   min-width: 184px;
@@ -308,7 +315,8 @@ onBeforeUnmount(() => {
   border: 1px solid var(--dt-line);
   border-radius: var(--dt-radius-3);
   background: var(--dt-surface);
-  box-shadow: var(--dt-shadow-menu);
+  /* 浮层菜单压在任意页面上：一级投影，10% 级弱阴影在浅色画布上不可感知 */
+  box-shadow: 0 10px 28px rgba(2, 8, 20, 0.18), 0 2px 8px rgba(2, 8, 20, 0.1);
   animation: dt-menu-in 0.14s var(--dt-ease);
 }
 .dt-ctxmenu__item {

@@ -14,6 +14,8 @@ const PANEL_WIDTH = 320
 const SHADOW = 12
 /** 浮层窗到屏幕工作区边缘的最小间距 */
 const SCREEN_MARGIN = 8
+/** Shell 顶栏高度（TopBar 40px）：消息窗从顶栏之下开始，不遮挡顶部导航 */
+const TOPBAR_HEIGHT = 40
 /** 通知 toast 自动消失时长（ms）：太短用户容易错过 */
 const TOAST_TTL_MS = 8000
 
@@ -133,18 +135,6 @@ export class OverlayWindowService {
       this.panelWin.setBounds(this.anchorPanel(parent, height))
   }
 
-  /** 用户主动关闭消息面板：清空通知（取消计时）并隐藏；下载展示由 downloadService.clearUI 清，新事件到达时重新弹出 */
-  dismissPanel(sender: WebContents): void {
-    if (this.panelWin?.webContents !== sender)
-      return
-    for (const timer of this.toastTimers.values())
-      clearTimeout(timer)
-    this.toastTimers.clear()
-    this.toasts = []
-    this.panelWin.webContents.send('notification:received', [])
-    this.panelWin.hide()
-  }
-
   /** 透明窗鼠标穿透开关（仅消息窗生效）：Windows 透明窗整个 bounds 都命中鼠标 */
   setPanelMouseIgnore(sender: WebContents, ignore: boolean): void {
     if (this.panelWin?.webContents !== sender)
@@ -223,15 +213,15 @@ export class OverlayWindowService {
   }
 
   /**
-   * 消息窗右上角锚定：对齐主窗口内容区右上角，高度钳制在内容区内
-   * （浮层是主窗口的子窗，只允许出现在软件窗口范围内——超出内容区会盖到别的应用上）。
+   * 消息窗右上角锚定：对齐主窗口内容区右上角，顶部让出 Shell 顶栏（40px），
+   * 高度钳制在顶栏之下到内容区底边之间（浮层是主窗口的子窗，只允许出现在软件窗口范围内）。
    */
   private anchorPanel(parent: BrowserWindow, height: number): Electron.Rectangle {
     const content = parent.getContentBounds()
     const width = PANEL_WIDTH + SHADOW * 2
     const x = content.x + content.width - width - SCREEN_MARGIN
-    const y = content.y + SCREEN_MARGIN
-    const clampedHeight = Math.min(height, content.height - SCREEN_MARGIN * 2)
+    const y = content.y + TOPBAR_HEIGHT + SCREEN_MARGIN
+    const clampedHeight = Math.min(height, content.height - TOPBAR_HEIGHT - SCREEN_MARGIN * 2)
     return { x: Math.round(x), y: Math.round(y), width, height: Math.round(clampedHeight) }
   }
 

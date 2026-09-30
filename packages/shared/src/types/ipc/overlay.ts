@@ -25,8 +25,6 @@ export type OverlayIpc = {
   'overlay:resize': (height: number) => void
   /** 仅供浮层窗页面 mounted 后拉取当前状态（toast / 下载 / 挂起授权请求） */
   'overlay:sync': () => OverlaySyncState
-  /** 仅供消息窗页面回传：用户主动关闭面板（清空通知与面板显示，新事件到达时重新弹出） */
-  'overlay:dismiss': () => void
   /**
    * 仅供消息窗页面回传：透明窗口鼠标穿透开关（true = 整窗穿透）。
    * Windows 透明窗整个 bounds 都命中鼠标，面板视觉只占右上角一小块——

@@ -1,4 +1,3 @@
-import type { DownloadService } from '../download/download-service'
 import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
 import { DesktopError } from '@desktop/shared'
@@ -6,8 +5,6 @@ import { handle } from './handle'
 
 export interface OverlayIpcDeps {
   overlayService: OverlayWindowService
-  /** 下载管理：面板关闭时同步清空任务展示 */
-  downloadService: DownloadService
   resolver: CallerResolver
 }
 
@@ -26,13 +23,6 @@ export function registerOverlayIpc(deps: OverlayIpcDeps): void {
       throw new DesktopError('PERMISSION_DENIED', 'This channel is overlay-only')
     }
     return deps.overlayService.syncFor(e.sender)
-  })
-  // 消息窗用户主动关闭面板：清空通知与面板显示；下载任务展示同步清空（进行中的下载继续）
-  handle('overlay:dismiss', (e) => {
-    if (!deps.overlayService.isOverlay(e.sender))
-      return
-    deps.overlayService.dismissPanel(e.sender)
-    deps.downloadService.clearUI()
   })
   // 消息窗鼠标穿透切换（按窗口身份生效，弹窗窗不参与）
   handle('overlay:ignoreMouse', (e, ignore) => {
