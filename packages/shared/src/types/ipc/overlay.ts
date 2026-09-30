@@ -1,13 +1,25 @@
 /**
- * 浮层域契约：消息窗（通知 toast / 下载面板）与授权弹窗渲染进独立透明原生窗
- * （OverlayWindow），原生层级永远盖过 WebContentsView——这两类浮层必须覆盖
- * Web 容器区域，只能走原生窗。Tab 右键菜单等 Shell 域内浮层回归 Shell DOM
- * （reka-ui + 视图抑制），不再经过浮层窗。
+ * 浮层域契约：消息窗（通知 toast / 下载通知卡）、授权弹窗、Tab 右键菜单渲染进
+ * 独立透明原生窗（OverlayWindow），原生层级永远盖过 WebContentsView——这三类浮层
+ * 必须覆盖 Web 容器区域，只能走原生窗（菜单窗让页面内容保持可见，无需抑制视图）。
  * 文件与 core/src/ipc/overlay.ts（注册实现）一一对应。
  */
 import type { DownloadTask } from '../download'
 import type { PlatformNotification } from '../notification'
 import type { PermissionRequest } from '../permission'
+
+/** 菜单项动作：菜单窗回传后由 Main 直接执行对应 service（Shell 无需中转） */
+export type TabMenuAction = 'reload' | 'clearCache' | 'clearSite' | 'close'
+
+/** Tab 右键菜单：Shell 发起，浮层窗在 (x, y)（主窗内容区坐标）附近渲染菜单卡 */
+export interface TabContextMenu {
+  /** 菜单实例 id：防止重复打开 / 页面 key 对账 */
+  id: string
+  tabId: string
+  appId: string
+  x: number
+  y: number
+}
 
 /** 浮层页同步状态：页面 mounted 后主动拉取（杜绝 Main 推送早于页面订阅的竞态） */
 export interface OverlaySyncState {
@@ -15,6 +27,8 @@ export interface OverlaySyncState {
   downloads: DownloadTask[]
   /** 挂起中的运行时授权请求（弹窗窗数据源） */
   dialogs: PermissionRequest[]
+  /** 挂起中的 Tab 右键菜单（菜单窗数据源） */
+  menu: TabContextMenu | null
 }
 
 export type OverlayIpc = {
@@ -23,7 +37,7 @@ export type OverlayIpc = {
    * 页面渲染后量高回报，Main 据此调整窗口尺寸与位置。
    */
   'overlay:resize': (height: number) => void
-  /** 仅供浮层窗页面 mounted 后拉取当前状态（toast / 下载 / 挂起授权请求） */
+  /** 仅供浮层窗页面 mounted 后拉取当前状态（toast / 下载 / 挂起授权请求 / 右键菜单） */
   'overlay:sync': () => OverlaySyncState
   /**
    * 仅供消息窗页面回传：透明窗口鼠标穿透开关（true = 整窗穿透）。
@@ -31,4 +45,12 @@ export type OverlayIpc = {
    * 页面按命中元素切换穿透，避免透明区遮挡下层页面点击。
    */
   'overlay:ignoreMouse': (ignore: boolean) => void
+  /** Tab 右键菜单变化推送（菜单窗数据源，null = 已关闭） */
+  'menu:pending': [TabContextMenu | null]
+  /** 仅 Shell 发起：打开 Tab 右键菜单浮层窗 */
+  'overlay:menu': (menu: { tabId: string, appId: string, x: number, y: number }) => void
+  /** 仅供菜单窗页面回传：选中菜单项（Main 执行动作后自动关菜单） */
+  'overlay:menuSelect': (action: TabMenuAction) => void
+  /** 仅供菜单窗页面回传：关闭菜单（ESC / 点击菜单外） */
+  'overlay:menuDismiss': () => void
 }

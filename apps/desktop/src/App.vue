@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { WorkAreaRect } from '@desktop/shared'
+import type { DesktopTab, WorkAreaRect } from '@desktop/shared'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import AppCenter from './components/AppCenter.vue'
 import AppLauncher from './components/AppLauncher.vue'
@@ -10,7 +10,7 @@ import { useTabs } from './composables/use-tabs'
 import { useTheme } from './composables/use-theme'
 
 const { apps } = useApps()
-const { tabs, open, close, activate, reload } = useTabs()
+const { tabs, open, close, activate } = useTabs()
 const { theme, toggle: toggleTheme } = useTheme()
 
 const maximized = ref(false)
@@ -33,13 +33,9 @@ async function closeWindow(): Promise<void> {
   await window.desktop.window.close()
 }
 
-// ---- 缓存清理（Tab 右键菜单发起，作用域为该 Tab 对应的容器） ----
-async function cacheClear(appId: string): Promise<void> {
-  await window.desktop.cache.clear(appId)
-}
-
-async function cacheClearSite(appId: string): Promise<void> {
-  await window.desktop.cache.clearSite(appId)
+// ---- Tab 右键菜单：交由原生浮层窗渲染（页面内容保持可见），坐标为内容区 DIP ----
+function openTabContextMenu(tab: DesktopTab, x: number, y: number): void {
+  void window.desktop.overlay.menu({ tabId: tab.id, appId: tab.appId, x, y })
 }
 
 // ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----
@@ -100,9 +96,7 @@ onBeforeUnmount(() => {
           :theme="theme"
           @activate="activate"
           @close="close"
-          @reload="reload"
-          @clear-cache="cacheClear"
-          @clear-site="cacheClearSite"
+          @context-menu="openTabContextMenu"
           @toggle-theme="toggleTheme"
           @toggle-center="appCenterOpen = !appCenterOpen"
           @minimize="minimize"

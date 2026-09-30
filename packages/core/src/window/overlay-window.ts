@@ -1,4 +1,4 @@
-import type { DownloadTask, OverlaySyncState, PermissionRequest, PlatformNotification } from '@desktop/shared'
+import type { DownloadTask, OverlaySyncState, PermissionRequest, PlatformNotification, TabContextMenu } from '@desktop/shared'
 import type { WebContents } from 'electron'
 import type { CallerResolver } from '../ipc/caller-context'
 import type { Logger } from '../logger/logger'
@@ -21,25 +21,28 @@ const TOAST_TTL_MS = 8000
 /** 下载卡片终态自动消失时长：与通知 toast 同款体验（进行中的任务常驻展示进度） */
 const DOWNLOAD_TTL_MS = TOAST_TTL_MS
 /** 弹窗清场到隐藏的间隔（ms）：等浮层页绘制完透明空帧再 hide，2-3 帧足够，留余量 */
-const DIALOG_CLEAR_DELAY_MS = 100
+const OVERLAY_CLEAR_DELAY_MS = 100
 
 /**
  * 浮层窗口服务：独立透明无边框 BrowserWindow 承载全局浮层。
  * WebContentsView 是原生合成层，永远盖在 Shell DOM 之上——必须盖住 Web 容器区域的
- * 浮层（消息区、授权弹窗）只能走原生窗口才能压过它；Shell 域内浮层（Tab 右键菜单）
- * 在 Shell DOM 渲染（reka-ui）并配合视图抑制，不经过浮层窗。
+ * 浮层（消息区、授权弹窗、Tab 右键菜单）只能走原生窗口；原生窗承载菜单的同时
+ * 让页面内容保持可见（无需视图抑制）。Shell 域内浮层不再有别的入口。
  *
- * 两类浮层窗（均懒创建、复用，hide 不销毁，挂 parent 常驻主窗口之上）：
- * - panel  右下角消息区（下载浮窗 + 通知 toast）：showInactive 不抢焦点，无内容自动隐藏
+ * 三类浮层窗（均懒创建、复用，hide 不销毁，挂 parent 常驻主窗口之上）：
+ * - panel  右下角消息区（下载通知卡 + 通知 toast）：showInactive 不抢焦点，无内容自动隐藏
  * - dialog 权限弹窗：全屏遮罩模态（窗口铺满主窗内容区，遮罩 + 居中卡片由页面绘制），
  *   用户决策 / 超时 / App 关闭后同步移除
+ * - menu   Tab 右键菜单：全屏透明模态（透明层拦截点击 + 锚点处菜单卡由页面绘制），
+ *   选中 / ESC / 点击菜单外关闭，页面内容全程可见
  *
  * panel 内容高度动态：页面渲染后经 overlay:resize 量高回报，Main 据此调整窗口；
- * dialog 尺寸由 Main 直接确定，无需回报。
+ * dialog / menu 尺寸由 Main 直接确定（全屏铺开），无需回报。
  */
 export class OverlayWindowService {
   private panelWin: BrowserWindow | null = null
   private dialogWin: BrowserWindow | null = null
+  private menuWin: BrowserWindow | null = null
 
   /** 右下角消息区数据源（Main 持有，窗口复用时全量重推） */
   private toasts: PlatformNotification[] = []
@@ -51,8 +54,14 @@ export class OverlayWindowService {
   private readonly downloadTtlTimers = new Map<string, NodeJS.Timeout>()
   /** 挂起中的运行时授权请求（dialog 窗数据源） */
   private dialogs: PermissionRequest[] = []
+  /** 挂起中的 Tab 右键菜单（menu 窗数据源） */
+  private menu: TabContextMenu | null = null
   /** 清场隐藏延迟器：空帧绘制落地后再 hide；期间来了新请求则取消（窗口保持可见） */
   private dialogHideTimer: NodeJS.Timeout | null = null
+  /** 菜单窗清场隐藏延迟器（与 dialogHideTimer 同策略，窗口独立互不影响） */
+  private menuHideTimer: NodeJS.Timeout | null = null
+  /** 菜单实例序号：生成菜单 id */
+  private menuSeq = 0
 
   constructor(
     private readonly getParent: () => BrowserWindow | undefined,
@@ -159,7 +168,7 @@ export class OverlayWindowService {
       this.dialogHideTimer = setTimeout(() => {
         this.dialogHideTimer = null
         this.dialogWin?.hide()
-      }, DIALOG_CLEAR_DELAY_MS)
+      }, OVERLAY_CLEAR_DELAY_MS)
       return
     }
     this.applyDialogBounds()
@@ -168,12 +177,55 @@ export class OverlayWindowService {
 
   /** 弹窗窗全屏遮罩：窗口铺满主窗口内容区，遮罩与居中卡片由页面绘制（模态语义，遮罩区拦截点击） */
   private applyDialogBounds(): void {
+    this.applyFullscreenBounds(this.dialogWin)
+  }
+
+  /** 全屏铺开通用：浮层窗铺满主窗口内容区（dialog 遮罩 / menu 拦截层共用） */
+  private applyFullscreenBounds(win: BrowserWindow | null): void {
     const parent = this.getParent()
-    const win = this.dialogWin
     if (!parent || !win)
       return
     const content = parent.getContentBounds()
     win.setBounds({ x: content.x, y: content.y, width: content.width, height: content.height })
+  }
+
+  // ---- Tab 右键菜单 ----
+
+  /** Shell 发起：打开 Tab 右键菜单（原生浮层窗承载，页面内容保持可见） */
+  pushMenu(input: { tabId: string, appId: string, x: number, y: number }): void {
+    // 清场隐藏还没落地就有新菜单：取消延迟隐藏，窗口保持可见，卡片原地换新
+    if (this.menuHideTimer) {
+      clearTimeout(this.menuHideTimer)
+      this.menuHideTimer = null
+    }
+    this.menu = { id: `ctx-${++this.menuSeq}`, ...input }
+    const win = this.ensureMenu()
+    this.applyFullscreenBounds(win)
+    // 数据先行：页面在窗口隐藏状态下渲染就绪，show 瞬间即有菜单（与 pushDialog 同策略）
+    win.webContents.send('menu:pending', this.menu)
+    if (!win.isVisible())
+      win.show()
+    win.focus()
+  }
+
+  /** 关闭菜单（选中动作由 IPC 层执行后调用；ESC / 点击菜单外也走这里） */
+  dismissMenu(): void {
+    if (!this.menu)
+      return
+    this.menu = null
+    if (!this.menuWin)
+      return
+    // 清场先行：推空让页面在可见状态下移除菜单卡并绘制透明帧，再隐藏（防残留帧，同 resolveDialog）
+    this.menuWin.webContents.send('menu:pending', null)
+    this.menuHideTimer = setTimeout(() => {
+      this.menuHideTimer = null
+      this.menuWin?.hide()
+    }, OVERLAY_CLEAR_DELAY_MS)
+  }
+
+  /** 当前挂起菜单（IPC 层执行选中动作时取 tabId / appId） */
+  getMenu(): TabContextMenu | null {
+    return this.menu
   }
 
   // ---- 浮层页回调 ----
@@ -204,10 +256,12 @@ export class OverlayWindowService {
    */
   syncFor(sender: WebContents): OverlaySyncState {
     if (this.panelWin?.webContents === sender)
-      return { toasts: this.toasts, downloads: this.downloads, dialogs: [] }
+      return { toasts: this.toasts, downloads: this.downloads, dialogs: [], menu: null }
     if (this.dialogWin?.webContents === sender)
-      return { toasts: [], downloads: [], dialogs: this.dialogs }
-    return { toasts: [], downloads: [], dialogs: [] }
+      return { toasts: [], downloads: [], dialogs: this.dialogs, menu: null }
+    if (this.menuWin?.webContents === sender)
+      return { toasts: [], downloads: [], dialogs: [], menu: this.menu }
+    return { toasts: [], downloads: [], dialogs: [], menu: null }
   }
 
   /**
@@ -221,6 +275,7 @@ export class OverlayWindowService {
     try {
       this.ensurePanel(parent)
       this.ensureDialog()
+      this.ensureMenu()
     }
     catch (error) {
       this.logger.warn('overlay prewarm failed', { error: String(error) })
@@ -231,6 +286,7 @@ export class OverlayWindowService {
   isOverlay(sender: WebContents): boolean {
     return this.panelWin?.webContents === sender
       || this.dialogWin?.webContents === sender
+      || this.menuWin?.webContents === sender
   }
 
   // ---- 内部：消息区 ----
@@ -304,6 +360,18 @@ export class OverlayWindowService {
     return win
   }
 
+  private ensureMenu(): BrowserWindow {
+    if (this.menuWin)
+      return this.menuWin
+    const parent = this.getParent()
+    if (!parent)
+      throw new Error('[overlay] main window is not ready')
+    const win = this.createOverlayWindow(parent)
+    // 菜单不因失焦消失（全屏透明模态）：挂起菜单由 Main 统一管理（选中 / ESC / 点击菜单外）
+    this.menuWin = win
+    return win
+  }
+
   /** 浮层窗公共底座：透明无边框、不进任务栏；注册 Shell 身份供决策回传通道校验 */
   private createOverlayWindow(parent: BrowserWindow): BrowserWindow {
     const win = new BrowserWindow({
@@ -336,6 +404,8 @@ export class OverlayWindowService {
         this.panelWin = null
       if (this.dialogWin === win)
         this.dialogWin = null
+      if (this.menuWin === win)
+        this.menuWin = null
       this.resolver.unregister(wcId)
     })
     // 浮层页以 Shell 身份登记：permission:respond 等决策回传通道经 assertShell 放行

@@ -1,7 +1,7 @@
 import type { AppContext } from './context'
 import type { DeviceIdCard, DevicePrintTicket } from './device'
 import type { DesktopIpc } from './ipc'
-import type { OverlaySyncState } from './ipc/overlay'
+import type { OverlaySyncState, TabMenuAction } from './ipc/overlay'
 import type { DesktopAppManifest, RegisteredApp } from './manifest'
 import type { AppPermissionState, Permission } from './permission'
 import type { DesktopTab, OpenTabOptions, WorkAreaRect } from './tab'
@@ -40,8 +40,6 @@ export interface DesktopApi {
     activate: (tabId: string) => Promise<void>
     reload: (tabId: string) => Promise<void>
     setWorkArea: (rect: WorkAreaRect) => Promise<void>
-    /** Shell DOM 浮层（Tab 右键菜单）打开期间抑制激活视图显示，关闭后恢复 */
-    setViewSuppressed: (suppressed: boolean) => Promise<void>
   }
   permission: {
     check: (permission: Permission) => Promise<boolean>
@@ -92,10 +90,16 @@ export interface DesktopApi {
   overlay: {
     /** 仅供消息窗页面量高回报（Main 据此调整浮层窗尺寸） */
     resize: (height: number) => Promise<void>
-    /** 仅供浮层窗页面 mounted 后拉取当前状态（toast / 下载 / 挂起授权请求） */
+    /** 仅供浮层窗页面 mounted 后拉取当前状态（toast / 下载 / 挂起授权请求 / 右键菜单） */
     sync: () => Promise<OverlaySyncState>
     /** 仅供消息窗页面回传：按命中元素切换窗口鼠标穿透（透明区不遮挡下层页面点击） */
     ignoreMouse: (ignore: boolean) => Promise<void>
+    /** 仅 Shell 发起：打开 Tab 右键菜单浮层窗（原生窗承载，页面内容保持可见） */
+    menu: (menu: { tabId: string, appId: string, x: number, y: number }) => Promise<void>
+    /** 仅供菜单窗页面回传：选中菜单项（Main 执行动作后自动关菜单） */
+    menuSelect: (action: TabMenuAction) => Promise<void>
+    /** 仅供菜单窗页面回传：关闭菜单（ESC / 点击菜单外） */
+    menuDismiss: () => Promise<void>
   }
   /**
    * 下载：任务进度经浮层面板展示，完成后可打开文件 / 所在文件夹（浏览器级体验）。

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DownloadTask, PermissionRequest, PlatformNotification } from '@desktop/shared'
+import type { DownloadTask, PermissionRequest, PlatformNotification, TabContextMenu, TabMenuAction } from '@desktop/shared'
 import {
   DialogContent,
   DialogDescription,
@@ -19,11 +19,11 @@ import { permissionLabel } from '../composables/use-permission-labels'
 
 /**
  * 浮层页（OverlayWindow 的 renderer，经 #/overlay 路由挂载）：
- * 原生层级压过 WebContentsView。仅承载必须盖住 Web 容器区域的浮层——
- * Tab 右键菜单等 Shell 域内浮层在 Shell DOM 渲染（reka-ui + 视图抑制），不经过本页。
- * 同一份页面服务两类浮层窗（每窗同时只收一种消息，互斥渲染）：
+ * 原生层级压过 WebContentsView。承载必须盖住 Web 容器区域的浮层。
+ * 同一份页面服务三类浮层窗（每窗同时只收一种消息，互斥渲染）：
  * - 消息窗：download:updated 下载通知卡 + notification:received 通知 toast（右上角）
  * - 弹窗窗：permission:pending 运行时授权决策卡（全屏遮罩模态，居中）
+ * - 菜单窗：menu:pending Tab 右键菜单（全屏透明模态，锚点定位——页面内容保持可见）
  *
  * 交互语义交给 reka-ui 原语（Toast 滑动关闭/悬停暂停/无障碍、Dialog 焦点圈养/ESC），
  * 外观用 UnoCSS 工具类自绘；卡片样式固定高对比配色（不随 Shell 主题），保证任意背景下清晰可读。
@@ -31,6 +31,7 @@ import { permissionLabel } from '../composables/use-permission-labels'
 const toasts = ref<PlatformNotification[]>([])
 const downloads = ref<DownloadTask[]>([])
 const dialogs = ref<PermissionRequest[]>([])
+const menu = ref<TabContextMenu | null>(null)
 
 const STATUS_TEXT: Record<DownloadTask['status'], string> = {
   progressing: '下载中',
@@ -77,18 +78,19 @@ function syncCountdowns(): void {
 watch(dialogs, syncCountdowns, { deep: true })
 
 /**
- * 弹窗渲染门控：窗口隐藏期间不插入卡片 DOM——CSS 动画在元素插入时立即开始计时，
+ * 浮层渲染门控：窗口隐藏期间不插入卡片 DOM——CSS 动画在元素插入时立即开始计时，
  * 隐藏期插入的话动画在 show 前已播完，用户看到的是静态呈现（「第二次只是显示隐藏」）。
  * visibilitychange 触发后才渲染：show 后首次插入，动画必然在可见状态下播完整一次，
  * 每次弹卡都是完整入场动画（与第一次一致）；动画类常挂，插入即播，无事后补类的重播问题。
+ * 弹窗窗与菜单窗共用本门控（各自 document 的可见性互不影响）。
  */
-const dialogLive = ref(false)
-function syncDialogLive(): void {
-  dialogLive.value = document.visibilityState === 'visible'
+const overlayVisible = ref(false)
+function syncOverlayVisible(): void {
+  overlayVisible.value = document.visibilityState === 'visible'
 }
 
 watch(dialogs, () => {
-  void nextTick(syncDialogLive)
+  void nextTick(syncOverlayVisible)
 }, { deep: true })
 
 /**
@@ -128,6 +130,67 @@ function dismissToast(toastId: string): void {
 function dismissDownload(taskId: string): void {
   void window.desktop.download.dismiss(taskId)
 }
+
+// ---- Tab 右键菜单（菜单窗） ----
+
+/** 菜单项固定文案与顺序（与旧版 Shell DOM 菜单一致）；动作由 Main 直接执行 */
+const MENU_ITEMS: Array<{ action: TabMenuAction, label: string, danger?: boolean }> = [
+  { action: 'reload', label: '刷新页面' },
+  { action: 'clearCache', label: '清理缓存' },
+  { action: 'clearSite', label: '清除站点数据', danger: true },
+  { action: 'close', label: '关闭标签页' },
+]
+
+/** 键盘导航高亮项（上下键移动 / Enter 选中） */
+const highlightIndex = ref(0)
+watch(menu, () => {
+  highlightIndex.value = 0
+})
+
+/** 选中：本地立即清卡（清场先行），Main 执行动作后推 menu:pending null 对账 */
+function selectMenu(action: TabMenuAction): void {
+  menu.value = null
+  void window.desktop.overlay.menuSelect(action)
+}
+
+/** ESC / 点击菜单外：回传 Main 关窗，本地立即清卡 */
+function dismissMenu(): void {
+  menu.value = null
+  void window.desktop.overlay.menuDismiss()
+}
+
+/** 菜单窗键盘：ESC 关闭 / 上下移动高亮 / Enter 选中（菜单窗 show 时持有焦点） */
+function onMenuKeydown(e: KeyboardEvent): void {
+  if (!menu.value)
+    return
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    dismissMenu()
+  }
+  else if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    highlightIndex.value = (highlightIndex.value + 1) % MENU_ITEMS.length
+  }
+  else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    highlightIndex.value = (highlightIndex.value - 1 + MENU_ITEMS.length) % MENU_ITEMS.length
+  }
+  else if (e.key === 'Enter') {
+    e.preventDefault()
+    selectMenu(MENU_ITEMS[highlightIndex.value].action)
+  }
+}
+
+/** 菜单卡锚点定位：Shell 转发的右键坐标（内容区 DIP = 菜单窗内坐标），贴边时向内收 */
+const MENU_CARD_W = 190
+const MENU_CARD_H = 140
+const menuPos = computed(() => {
+  if (!menu.value)
+    return { left: '0px', top: '0px' }
+  const left = Math.max(4, Math.min(menu.value.x, window.innerWidth - MENU_CARD_W - 8))
+  const top = Math.max(4, Math.min(menu.value.y, window.innerHeight - MENU_CARD_H - 8))
+  return { left: `${Math.round(left)}px`, top: `${Math.round(top)}px` }
+})
 
 /** reka Toast 的关闭事件统一走 Main（控制态由 Main 数据推导，页面不私存） */
 function onToastOpenChange(toastId: string, value: boolean): void {
@@ -181,20 +244,26 @@ onMounted(async () => {
     window.desktop.events.on('permission:pending', (list) => {
       dialogs.value = list
     }),
+    window.desktop.events.on('menu:pending', (m) => {
+      menu.value = m
+    }),
   )
   window.addEventListener('mousemove', onMouseMove)
-  document.addEventListener('visibilitychange', syncDialogLive)
+  window.addEventListener('keydown', onMenuKeydown)
+  document.addEventListener('visibilitychange', syncOverlayVisible)
   // 主动拉取当前状态：Main 推送可能早于本页事件订阅（did-finish-load ≠ Vue mounted）
   const state = await window.desktop.overlay.sync()
   toasts.value = state.toasts
   downloads.value = state.downloads
   dialogs.value = state.dialogs
+  menu.value = state.menu
 })
 
 onBeforeUnmount(() => {
   for (const off of unsubs) off()
   window.removeEventListener('mousemove', onMouseMove)
-  document.removeEventListener('visibilitychange', syncDialogLive)
+  window.removeEventListener('keydown', onMenuKeydown)
+  document.removeEventListener('visibilitychange', syncOverlayVisible)
   if (countdownTimer)
     clearInterval(countdownTimer)
 })
@@ -230,7 +299,7 @@ function dialogBtnClass(primary: boolean): string {
          逐条决策（只渲染队首），ESC = 本次拒绝，遮罩点击不关闭 -->
     <DialogRoot :open="currentRequest !== null">
       <DialogOverlay
-        v-if="dialogLive"
+        v-if="overlayVisible"
         class="ov-dialog ov-anim-fade fixed inset-0 z-[10] bg-[rgba(15,23,42,0.28)]"
       />
       <DialogContent
@@ -240,7 +309,7 @@ function dialogBtnClass(primary: boolean): string {
         @interact-outside="keepDialogOpen"
       >
         <div
-          v-if="currentRequest && dialogLive"
+          v-if="currentRequest && overlayVisible"
           :key="currentRequest.requestId"
           class="ov-dialog__card ov-anim-pop box-border w-[400px] rounded-[12px] border-x border-b border-x-[rgba(2,8,20,0.1)] border-b-[rgba(2,8,20,0.1)] bg-white px-[18px] pb-[14px] pt-[16px] shadow-[0_8px_24px_rgba(2,8,20,0.16)]"
         >
@@ -269,6 +338,37 @@ function dialogBtnClass(primary: boolean): string {
         </div>
       </DialogContent>
     </DialogRoot>
+
+    <!-- Tab 右键菜单：原生浮层窗承载（页面内容保持可见，无需视图抑制）。
+         全屏透明层拦截点击（点菜单外 = 关闭），菜单卡锚定 Shell 转发的右键坐标，
+         固定浅色配色（不随 Shell 主题，浮层页统一策略） -->
+    <div
+      v-if="menu && overlayVisible"
+      :key="menu.id"
+      class="ov-menu ov-anim-fade fixed inset-0 z-[10]"
+      @contextmenu.prevent
+      @pointerdown.self="dismissMenu"
+    >
+      <div
+        class="ov-menu__card ov-anim-pop fixed min-w-[184px] rounded-[10px] border border-[rgba(2,8,20,0.1)] bg-white p-[4px] shadow-[0_10px_28px_rgba(2,8,20,0.18),0_2px_8px_rgba(2,8,20,0.1)]"
+        :style="menuPos"
+      >
+        <template v-for="(item, i) in MENU_ITEMS" :key="item.action">
+          <div v-if="i === MENU_ITEMS.length - 1" class="ov-menu__sep mx-[6px] my-[4px] h-px bg-[#e8ecf1]" />
+          <button
+            class="ov-menu__item flex h-[28px] w-full cursor-pointer items-center rounded-[6px] border-none bg-transparent px-[10px] text-left text-[12.5px] font-[inherit] transition-colors duration-[120ms]"
+            :class="[
+              item.danger ? 'text-[#dc2626]' : 'text-[#1f2328]',
+              i === highlightIndex ? (item.danger ? 'bg-[#fee2e2]' : 'bg-[#f3f6f9]') : '',
+            ]"
+            @pointermove="highlightIndex = i"
+            @click="selectMenu(item.action)"
+          >
+            {{ item.label }}
+          </button>
+        </template>
+      </div>
+    </div>
 
     <!-- 右上角消息区：下载通知卡 + 通知 toast（reka Toast：悬停暂停 / 滑动关闭 / 单条 ×）。
          容器穿透（pointer-events-none），命中卡片才接管；超高内部滚动不超出软件区域 -->
@@ -401,5 +501,10 @@ body {
 /* 相邻操作按钮间距（保留 margin 方案，不使用 gap） */
 .ov-dl__op + .ov-dl__op {
   margin-left: 6px;
+}
+
+/* 菜单项 hover/键盘高亮外的降级：pointermove 已切高亮，无系统 :hover 依赖 */
+.ov-menu__item:focus {
+  outline: none;
 }
 </style>

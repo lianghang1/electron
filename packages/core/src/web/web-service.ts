@@ -43,8 +43,6 @@ export class WebService {
   private focusedId: string | null = null
   /** 激活视图处于 HTML5 全屏（view 铺满整窗，忽略容器区域） */
   private htmlFullscreen = false
-  /** Shell DOM 浮层（Tab 右键菜单等）打开期间抑制激活视图显示 */
-  private suppressed = false
   /** 已挂权限 guard 的 Session，避免同一 App Session 重复挂 */
   private readonly guardedSessions = new WeakSet<Electron.Session>()
 
@@ -117,17 +115,6 @@ export class WebService {
     this.applyBounds()
   }
 
-  /**
-   * Shell DOM 浮层（Tab 右键菜单等）需要盖住容器区域时调用：
-   * true = 激活视图归零让位（Shell DOM 压不过 WebContentsView 原生层），false = 恢复。
-   */
-  setSuppressed(value: boolean): void {
-    if (this.suppressed === value)
-      return
-    this.suppressed = value
-    this.applyBounds()
-  }
-
   destroy(runtimeId: string): void {
     const runtime = this.runtimes.get(runtimeId)
     if (!runtime)
@@ -158,12 +145,12 @@ export class WebService {
     if (!win)
       return
     for (const [id, runtime] of this.runtimes) {
-      if (id === this.focusedId && !this.suppressed && this.htmlFullscreen) {
+      if (id === this.focusedId && this.htmlFullscreen) {
         const content = win.getContentBounds()
         runtime.view.setBounds({ x: 0, y: 0, width: content.width, height: content.height })
         continue
       }
-      const area = id === this.focusedId && !this.suppressed ? this.workArea : null
+      const area = id === this.focusedId ? this.workArea : null
       runtime.view.setBounds(
         area
           ? {

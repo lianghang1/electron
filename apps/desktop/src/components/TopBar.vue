@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { DesktopTab } from '@desktop/shared'
 import type { ShellTheme } from '../composables/use-theme'
-import { ContextMenuContent, ContextMenuItem, ContextMenuPortal, ContextMenuRoot, ContextMenuSeparator, ContextMenuTrigger } from 'reka-ui'
-import { onBeforeUnmount, ref } from 'vue'
+import { ref } from 'vue'
 
 defineProps<{
   tabs: DesktopTab[]
@@ -17,10 +16,8 @@ defineProps<{
 defineEmits<{
   activate: [tabId: string]
   close: [tabId: string]
-  /** Tab 右键菜单动作（reka ContextMenu 页内渲染） */
-  reload: [tabId: string]
-  clearCache: [appId: string]
-  clearSite: [appId: string]
+  /** Tab 右键：转发锚点坐标（内容区 DIP），菜单经原生浮层窗渲染（页面内容保持可见） */
+  contextMenu: [tab: DesktopTab, x: number, y: number]
   toggleCenter: []
   toggleTheme: []
   minimize: []
@@ -34,31 +31,6 @@ const tabsEl = ref<HTMLElement | null>(null)
 function onTabsWheel(e: WheelEvent): void {
   tabsEl.value?.scrollBy({ left: e.deltaY })
 }
-
-// ---- Shell DOM 右键菜单与 Web 视图的层级协同 ----
-// 菜单渲染在 Shell DOM（Portal 到 body），而激活的 WebContentsView 是原生合成层、
-// 永远盖住 Shell DOM：菜单打开期间经 tabs.setViewSuppressed 让激活视图归零让位，
-// 关闭后恢复。多个 Tab 菜单的开/关用集合归并，只在 0↔1 边界通知 Main，避免重复 IPC。
-const openMenus = new Set<string>()
-let suppressed = false
-
-function onMenuOpen(tabId: string, value: boolean): void {
-  if (value)
-    openMenus.add(tabId)
-  else openMenus.delete(tabId)
-  const next = openMenus.size > 0
-  if (next === suppressed)
-    return
-  suppressed = next
-  void window.desktop.tabs.setViewSuppressed(next)
-}
-
-onBeforeUnmount(() => {
-  if (!suppressed)
-    return
-  suppressed = false
-  void window.desktop.tabs.setViewSuppressed(false)
-})
 </script>
 
 <template>
@@ -78,46 +50,24 @@ onBeforeUnmount(() => {
     </button>
 
     <div ref="tabsEl" class="dt-topbar__tabs" @wheel="onTabsWheel">
-      <ContextMenuRoot
+      <button
         v-for="tab in tabs"
         :key="tab.id"
-        @update:open="value => onMenuOpen(tab.id, value)"
+        class="dt-tab"
+        :class="{ 'dt-tab--active': tab.active }"
+        :title="tab.title"
+        @click="$emit('activate', tab.id)"
+        @contextmenu.prevent="$emit('contextMenu', tab, $event.clientX, $event.clientY)"
       >
-        <ContextMenuTrigger as-child>
-          <button
-            class="dt-tab"
-            :class="{ 'dt-tab--active': tab.active }"
-            :title="tab.title"
-            @click="$emit('activate', tab.id)"
-          >
-            <span class="dt-tab__title">{{ tab.title }}</span>
-            <span
-              class="dt-tab__close"
-              title="关闭"
-              @click.stop="$emit('close', tab.id)"
-            >
-              <svg viewBox="0 0 10 10" width="8" height="8"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>
-            </span>
-          </button>
-        </ContextMenuTrigger>
-        <ContextMenuPortal>
-          <ContextMenuContent class="dt-ctxmenu">
-            <ContextMenuItem class="dt-ctxmenu__item" @select="$emit('reload', tab.id)">
-              刷新页面
-            </ContextMenuItem>
-            <ContextMenuItem class="dt-ctxmenu__item" @select="$emit('clearCache', tab.appId)">
-              清理缓存
-            </ContextMenuItem>
-            <ContextMenuItem class="dt-ctxmenu__item dt-ctxmenu__item--danger" @select="$emit('clearSite', tab.appId)">
-              清除站点数据
-            </ContextMenuItem>
-            <ContextMenuSeparator class="dt-ctxmenu__sep" />
-            <ContextMenuItem class="dt-ctxmenu__item" @select="$emit('close', tab.id)">
-              关闭标签页
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenuPortal>
-      </ContextMenuRoot>
+        <span class="dt-tab__title">{{ tab.title }}</span>
+        <span
+          class="dt-tab__close"
+          title="关闭"
+          @click.stop="$emit('close', tab.id)"
+        >
+          <svg viewBox="0 0 10 10" width="8" height="8"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" /></svg>
+        </span>
+      </button>
     </div>
 
     <div class="dt-topbar__spacer" />
@@ -300,57 +250,3 @@ onBeforeUnmount(() => {
 }
 </style>
 
-<!--
-  Tab 右键菜单：reka ContextMenu 承担定位 / 键盘导航 / 无障碍，外观跟随 dt-* 主题令牌；
-  打开期间激活 Web 视图归零让位（见 onMenuOpen），Portal 到 body 的内容不被遮挡。
-  本块必须是非 scoped 样式——ContextMenuContent 经 Portal 渲染，Vue 的 scopeId 不会
-  fallthrough 到其根元素，scoped 规则全部不命中（背景/边框/阴影整体丢失）；
-  dt- 前缀类名防全局冲突。
--->
-<style>
-.dt-ctxmenu {
-  z-index: 60;
-  min-width: 184px;
-  padding: 4px;
-  border: 1px solid var(--dt-line);
-  border-radius: var(--dt-radius-3);
-  background: var(--dt-surface);
-  /* 浮层菜单压在任意页面上：一级投影，10% 级弱阴影在浅色画布上不可感知 */
-  box-shadow: 0 10px 28px rgba(2, 8, 20, 0.18), 0 2px 8px rgba(2, 8, 20, 0.1);
-  animation: dt-menu-in 0.14s var(--dt-ease);
-}
-.dt-ctxmenu__item {
-  display: flex;
-  align-items: center;
-  height: 28px;
-  padding: 0 10px;
-  border-radius: var(--dt-radius-1);
-  font-size: 12.5px;
-  color: var(--dt-text);
-  cursor: pointer;
-  user-select: none;
-  transition: background 0.12s ease;
-}
-.dt-ctxmenu__item[data-highlighted] {
-  background: var(--dt-hover);
-  outline: none;
-}
-.dt-ctxmenu__item--danger {
-  color: var(--dt-danger-text);
-}
-.dt-ctxmenu__item--danger[data-highlighted] {
-  background: var(--dt-danger-soft);
-}
-.dt-ctxmenu__sep {
-  height: 1px;
-  margin: 4px 6px;
-  border: none;
-  background: var(--dt-line-soft);
-}
-@keyframes dt-menu-in {
-  from {
-    opacity: 0;
-    transform: translateY(-4px) scale(0.98);
-  }
-}
-</style>

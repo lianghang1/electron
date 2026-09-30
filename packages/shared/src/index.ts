@@ -34,7 +34,7 @@ export type { DesktopInvoke, DesktopIpc } from './types/ipc'
 
 /* ---------------- 浮层（OverlayWindow 独立原生窗） ---------------- */
 
-export type { OverlaySyncState } from './types/ipc/overlay'
+export type { OverlaySyncState, TabContextMenu, TabMenuAction } from './types/ipc/overlay'
 
 /* ---------------- App 清单与来源（多 App 注册） ---------------- */
 
