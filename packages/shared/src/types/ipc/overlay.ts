@@ -1,12 +1,7 @@
-/**
- * 浮层域契约：消息窗（通知 toast / 下载通知卡）、授权弹窗、Tab 右键菜单渲染进
- * 独立透明原生窗（OverlayWindow），原生层级永远盖过 WebContentsView——这三类浮层
- * 必须覆盖 Web 容器区域，只能走原生窗（菜单窗让页面内容保持可见，无需抑制视图）。
- * 文件与 core/src/ipc/overlay.ts（注册实现）一一对应。
- */
 import type { DownloadTask } from '../download'
 import type { PlatformNotification } from '../notification'
 import type { PermissionRequest } from '../permission'
+import { defineDomain, invoke, push } from '../../domain'
 
 /** 菜单项动作：菜单窗回传后由 Main 直接执行对应 service（Shell 无需中转） */
 export type TabMenuAction = 'reload' | 'clearCache' | 'clearSite' | 'close'
@@ -31,26 +26,34 @@ export interface OverlaySyncState {
   menu: TabContextMenu | null
 }
 
-export type OverlayIpc = {
+/**
+ * 浮层域契约：消息窗（通知 toast / 下载通知卡）、授权弹窗、Tab 右键菜单渲染进
+ * 独立透明原生窗（OverlayWindow），原生层级永远盖过 WebContentsView——这三类浮层
+ * 必须覆盖 Web 容器区域，只能走原生窗（菜单窗让页面内容保持可见，无需抑制视图）。
+ * 文件与 core/src/ipc/overlay.ts（注册实现）一一对应。
+ */
+export const overlayDomain = defineDomain('overlay', {
   /**
    * 仅供消息窗页面回报内容高度：消息面板内容动态，
    * 页面渲染后量高回报，Main 据此调整窗口尺寸与位置。
    */
-  'overlay:resize': (height: number) => void
+  resize: invoke<(height: number) => void>(),
   /** 仅供浮层窗页面 mounted 后拉取当前状态（toast / 下载 / 挂起授权请求 / 右键菜单） */
-  'overlay:sync': () => OverlaySyncState
+  sync: invoke<() => OverlaySyncState>(),
   /**
    * 仅供消息窗页面回传：透明窗口鼠标穿透开关（true = 整窗穿透）。
    * Windows 透明窗整个 bounds 都命中鼠标，面板视觉只占右上角一小块——
    * 页面按命中元素切换穿透，避免透明区遮挡下层页面点击。
    */
-  'overlay:ignoreMouse': (ignore: boolean) => void
-  /** Tab 右键菜单变化推送（菜单窗数据源，null = 已关闭） */
-  'menu:pending': [TabContextMenu | null]
+  ignoreMouse: invoke<(ignore: boolean) => void>(),
   /** 仅 Shell 发起：打开 Tab 右键菜单浮层窗 */
-  'overlay:menu': (menu: { tabId: string, appId: string, x: number, y: number }) => void
+  menu: invoke<(menu: { tabId: string, appId: string, x: number, y: number }) => void>(),
   /** 仅供菜单窗页面回传：选中菜单项（Main 执行动作后自动关菜单） */
-  'overlay:menuSelect': (action: TabMenuAction) => void
+  menuSelect: invoke<(action: TabMenuAction) => void>(),
   /** 仅供菜单窗页面回传：关闭菜单（ESC / 点击菜单外） */
-  'overlay:menuDismiss': () => void
-}
+  menuDismiss: invoke<() => void>(),
+
+  // ---- Main → Renderer 推送 ----
+  /** Tab 右键菜单变化推送（菜单窗数据源，null = 已关闭） */
+  menuPending: push<[TabContextMenu | null]>(),
+})

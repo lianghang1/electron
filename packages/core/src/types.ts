@@ -1,4 +1,4 @@
-import type { DesktopConfig } from '@desktop/shared'
+import type { DesktopConfig, RawPrinterConfig } from '@desktop/shared'
 import type { BrowserWindowConstructorOptions, WebPreferences } from 'electron'
 
 /**
@@ -28,14 +28,24 @@ export interface WindowOverrides {
    * 典型用途：内部静态页走 app:// 标准源加载（standard+secure 使 cookie/origin 语义等同 https）。
    */
   protocols?: Record<string, (request: Request) => Promise<Response>>
-  // /**
-  //  * 硬件驱动注入（设备通用层 device:*）：缺省用平台内置 mock。
-  //  * 对接真实设备 SDK 时在此注入对应 Driver 实现，契约与业务页不动。
-  //  */
-  // devices?: {
-  //   cardReader?: CardReaderDriver
-  //   printer?: PrinterDriver
-  // }
+  /**
+   * 硬件设备（设备通用层 device:*）：SDK 资源根（厂商 DLL 基准目录，如 devices/huashi/）。
+   * 缺省 userData/devices——未放置 DLL 时由内置 stub mock 兜底（读卡返回模拟数据）。
+   */
+  devices?: {
+    resourcesRoot?: string
+    /** 强制注册内置 mock 读卡器；缺省仅 dev 环境注册（真实硬件优先） */
+    mock?: boolean
+    /** 摄像采集（capture 域） */
+    capture?: { saveDir?: string }
+    /** 打印（print 域） */
+    print?: {
+      /** 静态打印机清单（RawPrinterConfig），dev 缺省注册一台 mock 打印机 */
+      printers?: RawPrinterConfig[]
+      /** SumatraPDF 可执行文件路径（PDF 打印后端） */
+      sumatraPath?: string
+    }
+  }
 }
 
 /**

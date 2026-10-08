@@ -1,0 +1,116 @@
+import { Buffer } from 'node:buffer'
+import { BrowserWindow } from 'electron'
+import { printError } from './errors'
+
+type HiddenTarget = 'utility' | 'pdf'
+
+/**
+ * 隐藏窗口池：所有"渲染后打印"都发生在不可见窗口里。
+ * - utility：加载 HTML 模板 → webContents.print / printToPDF / getPrintersAsync
+ * - pdfViewer：plugins:true 加载 PDF 文件（无 SumatraPDF 时的兜底打印路径）
+ *
+ * 每个窗口同一时刻只能执行一个"渲染+打印"任务（runExclusive 串行化），
+ * 否则并发 submit 的第二次 loadURL 会打断第一次的渲染。
+ */
+export class HiddenWindowPool {
+  private utility: BrowserWindow | null = null
+  private pdfViewer: BrowserWindow | null = null
+  private queues: Map<HiddenTarget, Promise<unknown>> = new Map()
+
+  /** 串行执行占用目标窗口的完整任务（渲染→打印必须在同一个锁内完成） */
+  async runExclusive<T>(target: HiddenTarget, fn: (win: BrowserWindow) => Promise<T>): Promise<T> {
+    const prev = this.queues.get(target) ?? Promise.resolve()
+    let release!: () => void
+    const gate = new Promise<void>(resolve => (release = resolve))
+    // 前一任务无论成败都不阻塞后续任务
+    this.queues.set(target, prev.then(() => gate, () => gate))
+    await prev
+    try {
+      const win = target === 'utility' ? await this.getUtility() : await this.getPdfViewer()
+      return await fn(win)
+    }
+    finally {
+      release()
+    }
+  }
+
+  private async getUtility(): Promise<BrowserWindow> {
+    if (this.utility && !this.utility.isDestroyed())
+      return this.utility
+    this.utility = new BrowserWindow({
+      show: false,
+      skipTaskbar: true,
+      webPreferences: {
+        sandbox: true,
+        nodeIntegration: false,
+        contextIsolation: true,
+        backgroundThrottling: false,
+      },
+    })
+    this.utility.on('closed', () => {
+      this.utility = null
+    })
+    return this.utility
+  }
+
+  private async getPdfViewer(): Promise<BrowserWindow> {
+    if (this.pdfViewer && !this.pdfViewer.isDestroyed())
+      return this.pdfViewer
+    this.pdfViewer = new BrowserWindow({
+      show: false,
+      skipTaskbar: true,
+      webPreferences: {
+        sandbox: true,
+        nodeIntegration: false,
+        contextIsolation: true,
+        plugins: true, // Chromium 内置 PDF 查看器，兜底打印 PDF 用
+      },
+    })
+    this.pdfViewer.on('closed', () => {
+      this.pdfViewer = null
+    })
+    return this.pdfViewer
+  }
+
+  /** 只借用 utility 窗口执行窗口级 API（如 getPrintersAsync），与渲染/打印任务互斥 */
+  withUtility<T>(fn: (win: BrowserWindow) => Promise<T>): Promise<T> {
+    return this.runExclusive('utility', fn)
+  }
+
+  /** 便捷入口：加载 HTML 并等待渲染与字体就绪（仅渲染场景；通道内部请用 runExclusive 包住渲染+打印全程） */
+  async loadHtml(html: string): Promise<BrowserWindow> {
+    return this.runExclusive('utility', win => loadHtmlInto(win, html))
+  }
+
+  destroyAll(): void {
+    for (const win of [this.utility, this.pdfViewer]) {
+      if (win && !win.isDestroyed())
+        win.destroy()
+    }
+    this.utility = null
+    this.pdfViewer = null
+  }
+}
+
+/** 在指定窗口加载 HTML 并等待渲染与字体就绪（打印前必须等到，否则截到半渲染页面） */
+export async function loadHtmlInto(win: BrowserWindow, html: string): Promise<BrowserWindow> {
+  const dataUrl = `data:text/html;charset=utf-8;base64,${Buffer.from(html, 'utf8').toString('base64')}`
+  await win.loadURL(dataUrl)
+  await win.webContents.executeJavaScript(
+    'new Promise(r => { const f = document.fonts ? document.fonts.ready : Promise.resolve(); f.then(() => requestAnimationFrame(() => setTimeout(r, 30))) })',
+  )
+  return win
+}
+
+/** webContents.print 的 Promise 化；失败原因映射为统一错误码 */
+export function webContentsPrint(wc: Electron.WebContents, options: Electron.WebContentsPrintOptions): Promise<void> {
+  return new Promise((resolve, reject) => {
+    wc.print(options, (success, failureReason) => {
+      if (success)
+        resolve()
+      else if (failureReason === 'Print job canceled')
+        reject(printError('JOB_CANCELED', failureReason))
+      else reject(printError('JOB_FAILED', failureReason || '打印任务失败'))
+    })
+  })
+}

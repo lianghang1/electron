@@ -1,7 +1,8 @@
 import type { Logger } from '../../logger/logger'
-import type { IdCardAdapter, IdReaderDevice, ReadResult } from './types'
+import type { IdCardAdapter, IdReaderDevice, IdReaderResult } from './types'
 
 import { DllIdAdapter } from './adapters/dll-adapter'
+import { StubIdAdapter } from './adapters/stub-adapter'
 import { toIdCardError } from './errors'
 
 /**
@@ -14,10 +15,14 @@ export class IdCardService {
   /** 同一读卡器同一时刻只能执行一次读卡（硬件限制），按设备串行化 */
   private locks = new Map<string, Promise<unknown>>()
 
-  constructor(resourcesRoot: string, private readonly logger: Logger) {
+  constructor(resourcesRoot: string, private readonly logger: Logger, mock = false) {
     this.adapters = new Map<string, IdCardAdapter>([
       ['dll', new DllIdAdapter(resourcesRoot)],
     ])
+    // mock 读卡器追加在真实适配器之后：自动选设备时真实硬件优先，无硬件时 stub 兜底
+    if (mock) {
+      this.adapters.set('stub', new StubIdAdapter())
+    }
   }
 
   async listReaders(): Promise<IdReaderDevice[]> {
@@ -25,7 +30,7 @@ export class IdCardService {
     return groups.flat()
   }
 
-  async read(req: { deviceId: string }): Promise<ReadResult> {
+  async read(req: { deviceId: string }): Promise<IdReaderResult> {
     try {
       if (!req?.deviceId) {
         return { ok: false, error: { code: 'VALIDATION_FAILED', message: '缺少 deviceId' } }

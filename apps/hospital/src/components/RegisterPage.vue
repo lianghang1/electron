@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { DevicePrintTicket } from '@desktop/shared'
 import { ref } from 'vue'
 
 const emit = defineEmits<{ back: [] }>()
@@ -25,30 +24,12 @@ const DEPARTMENTS: Department[] = [
 const step = ref<'select' | 'done'>('select')
 const selected = ref<Department | null>(null)
 const ticketNo = ref('')
-const printState = ref<'idle' | 'printing' | 'done'>('idle')
 
 function register(dept: Department): void {
   selected.value = dept
   // mock：真实部署替换为 HIS 挂号接口
   ticketNo.value = `A${String(Math.floor(Math.random() * 60) + 20).padStart(3, '0')}`
   step.value = 'done'
-}
-
-async function printTicket(): Promise<void> {
-  if (!selected.value || printState.value !== 'idle')
-    return
-  printState.value = 'printing'
-  const ticket: DevicePrintTicket = {
-    title: '挂号凭条',
-    lines: [
-      `科室 ${selected.value.name}`,
-      `就诊序号 ${ticketNo.value}`,
-      `位置 ${selected.value.location}`,
-      new Date().toLocaleString('zh-CN', { hour12: false }),
-    ],
-  }
-  await window.desktop.device.print(ticket)
-  printState.value = 'done'
 }
 </script>
 
@@ -91,13 +72,6 @@ async function printTicket(): Promise<void> {
           请按叫号顺序前往相应科室候诊
         </div>
         <div class="hr-done__actions">
-          <button
-            class="hs-btn-primary"
-            :disabled="printState !== 'idle'"
-            @click="printTicket"
-          >
-            {{ printState === 'idle' ? '打印凭条' : printState === 'printing' ? '打印中…' : '已打印' }}
-          </button>
           <button class="hs-btn-ghost" @click="emit('back')">
             返回首页
           </button>

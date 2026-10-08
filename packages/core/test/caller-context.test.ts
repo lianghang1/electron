@@ -9,8 +9,8 @@ function fakeWebContents(id: number): WebContents {
   return { id } as WebContents
 }
 
-const shellContext = { appId: SHELL_APP_ID }
-const appContext = { appId: 'crm' }
+const shellContext = { appId: SHELL_APP_ID, instanceId: 'shell' }
+const appContext = { appId: 'crm', instanceId: 'crm-1' }
 
 describe('callerResolver', () => {
   it('登记后按 webContents.id 反查身份', () => {

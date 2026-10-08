@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Microsoft YaHei', 'Noto Sans CJK SC', 'SimSun', serif;
+    font-size: 12pt;
+    line-height: 1.8;
+    color: #000;
+    background: #fff;
+  }
+  h1 { font-size: 18pt; text-align: center; margin-bottom: 6mm; letter-spacing: 2px; }
+  .doc-no { text-align: right; font-size: 10pt; color: #444; margin-bottom: 4mm; }
+  p { text-indent: 2em; margin-bottom: 2mm; }
+  table.info { width: 100%; border-collapse: collapse; margin: 4mm 0; font-size: 11pt; }
+  table.info th, table.info td { border: 1px solid #000; padding: 2mm 3mm; text-align: left; }
+  table.info th { width: 28%; background: #f5f5f5; font-weight: normal; }
+  .sign { display: flex; justify-content: space-between; margin-top: 14mm; }
+  .sign div { width: 40%; }
+  .sign .line { border-bottom: 1px solid #000; height: 10mm; margin-bottom: 2mm; }
+</style>
+</head>
+<body>
+  <h1>{{title}}</h1>
+  <div class="doc-no">编号：{{docNo}}</div>
+  {{#each paragraphs}}
+  <p>{{text}}</p>
+  {{/each}}
+  <table class="info">
+    <tr><th>甲方</th><td>{{partyA}}</td></tr>
+    <tr><th>乙方</th><td>{{partyB}}</td></tr>
+    <tr><th>签署日期</th><td>{{signDate}}</td></tr>
+  </table>
+  <div class="sign">
+    <div><div class="line"></div><div>甲方（签章）</div></div>
+    <div><div class="line"></div><div>乙方（签章）</div></div>
+  </div>
+</body>
+</html>

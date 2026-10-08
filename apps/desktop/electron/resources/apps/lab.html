@@ -190,7 +190,6 @@
         <button class="op" data-op="tabs-reload">tabs.reload 重载自己</button>
         <button class="op" data-op="window-max">window.isMaximized</button>
         <button class="op" data-op="device-idcard">device.readIdCard 读卡</button>
-        <button class="op" data-op="device-print">device.print 打印</button>
         <button class="op" data-op="update-check">update.check 检查更新</button>
       </div>
       <div class="fields" style="margin-top:10px">
@@ -536,12 +535,10 @@
       log(`window.isMaximized: ${max ? '已最大化' : '非最大化'}`, 'ok')
     },
     'device-idcard': async () => {
-      const card = await window.desktop.device.readIdCard()
-      log(card ? `readIdCard: ${card.name} · ${card.idNumber.replace(/^(.{4}).*(.{3})$/, '$1****$2')} · ${card.gender}` : 'readIdCard: null（无卡 / 未接读卡器，平台内置 mock 兜底）', 'ok')
-    },
-    'device-print': async () => {
-      await window.desktop.device.print({ title: 'lab 打印测试', lines: [`平台功能实验室 · ${now()}`, '份数与行数超限会被平台钳制'], copies: 1 })
-      log('print: 打印任务已提交（内置 mock，真实 Driver 经 bootstrap.devices 注入）', 'ok')
+      const result = await window.desktop.device.readIdCard()
+      log(result.ok && result.data
+        ? `readIdCard: ${result.data.name} · ${result.data.idNumber.replace(/^(.{4}).*(.{3})$/, '$1****$2')} · ${result.data.gender}`
+        : `readIdCard: ${result.error ? `${result.error.code} ${result.error.message}` : '无数据'}（dev 内置 stub mock 兜底）`, result.ok ? 'ok' : 'fail')
     },
     'update-check': async () => {
       try {

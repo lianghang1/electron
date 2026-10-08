@@ -2,6 +2,10 @@ import type { DesktopConfig } from '@desktop/shared'
 import type { AppRegistry } from '../app/app-registry'
 import type { AppService } from '../app/app-service'
 import type { CacheService } from '../cache/cache-service'
+import type { CaptureSystem } from '../devices/capture'
+import type { IdCardSystem } from '../devices/idcard'
+import type { PrintSystem } from '../devices/print'
+import type { ScannerSystem } from '../devices/scanner'
 import type { DownloadService } from '../download/download-service'
 import type { EventBus } from '../event/event-bus'
 import type { PermissionService } from '../permission/permission-service'
@@ -14,10 +18,14 @@ import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
 import { registerAppIpc } from './app'
 import { registerCacheIpc } from './cache'
+import { registerCaptureIpc } from './capture'
+import { registerDeviceIpc } from './device'
 import { registerDownloadIpc } from './download'
 import { registerNotificationIpc } from './notification'
 import { registerOverlayIpc } from './overlay'
 import { registerPermissionIpc } from './permission'
+import { registerPrintIpc } from './print'
+import { registerScannerIpc } from './scanner'
 import { registerStorageIpc } from './storage'
 import { registerTabsIpc } from './tabs'
 import { registerUpdateIpc } from './update'
@@ -41,6 +49,14 @@ export interface PlatformIpcDeps {
   overlayService: OverlayWindowService
   /** 下载管理：任务面板操作（打开文件 / 定位文件夹）与面板关闭联动 */
   downloadService: DownloadService
+  /** 设备系统（读卡器等外设硬件）：bootstrap 装配，未配置时设备通道返回不可用结果 */
+  idCard?: IdCardSystem
+  /** 扫码枪系统（bootstrap 装配，恒创建） */
+  scanner: ScannerSystem
+  /** 图像采集系统（bootstrap 装配，恒创建） */
+  capture: CaptureSystem
+  /** 统一打印系统（bootstrap 装配，恒创建） */
+  print: PrintSystem
   /** 平台事件总线：通知等域经它把 Main 侧事件转推 Shell */
   events: EventBus
   resolver: CallerResolver
@@ -73,6 +89,10 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
     resolver: deps.resolver,
   })
   registerDownloadIpc({ downloadService: deps.downloadService, overlayService: deps.overlayService, resolver: deps.resolver })
+  registerDeviceIpc({ idCard: deps.idCard })
+  registerScannerIpc({ scanner: deps.scanner })
+  registerCaptureIpc({ capture: deps.capture })
+  registerPrintIpc({ print: deps.print })
   registerNotificationIpc({
     registry: deps.registry,
     permissionService: deps.permissionService,

@@ -202,7 +202,7 @@ export class OverlayWindowService {
     const win = this.ensureMenu()
     this.applyFullscreenBounds(win)
     // 数据先行：页面在窗口隐藏状态下渲染就绪，show 瞬间即有菜单（与 pushDialog 同策略）
-    win.webContents.send('menu:pending', this.menu)
+    win.webContents.send('overlay:menuPending', this.menu)
     if (!win.isVisible())
       win.show()
     win.focus()
@@ -216,7 +216,7 @@ export class OverlayWindowService {
     if (!this.menuWin)
       return
     // 清场先行：推空让页面在可见状态下移除菜单卡并绘制透明帧，再隐藏（防残留帧，同 resolveDialog）
-    this.menuWin.webContents.send('menu:pending', null)
+    this.menuWin.webContents.send('overlay:menuPending', null)
     this.menuHideTimer = setTimeout(() => {
       this.menuHideTimer = null
       this.menuWin?.hide()

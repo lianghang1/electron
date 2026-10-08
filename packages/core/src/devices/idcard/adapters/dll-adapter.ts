@@ -1,4 +1,4 @@
-import type { BrandDriver, IdCardAdapter, IdCardData, IdReaderDevice, ReadResult } from '../types'
+import type { BrandDriver, IdCardAdapter, IdCardData, IdReaderDevice, IdReaderResult } from '../types'
 import { createRequire } from 'node:module'
 import { HuashiDriver } from '../drivers/huashi-driver'
 import { toIdCardError } from '../errors'
@@ -64,7 +64,7 @@ export class DllIdAdapter implements IdCardAdapter {
     })
   }
 
-  async read(device: IdReaderDevice): Promise<ReadResult> {
+  async read(device: IdReaderDevice): Promise<IdReaderResult> {
     try {
       // 设备 ID 约定（全系统同构）：<transport>:<名字>
       const driverName = device.id.slice(this.transport.length + 1)

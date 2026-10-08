@@ -11,22 +11,80 @@
 
 /* ---------------- 错误基类（唯一运行时值） ---------------- */
 
-export { DesktopError } from './errors'
-export type { DesktopErrorCode } from './errors'
+export { defineDomain, invoke, push } from './domain'
+export type {
+  DomainApi,
+  DomainContract,
+  DomainDefs,
+  DomainIpc,
+  DomainValue,
+  InvokeSig,
+  PushSig,
+  SigOf,
+} from './domain'
 
 /* ---------------- 对外 API 契约（invoke 通道形状 / 事件表） ---------------- */
 
+export { DesktopError } from './errors'
+export type { DesktopErrorCode } from './errors'
+
+/* ---------------- 域契约定义原语（defineDomain：契约定义即映射） ---------------- */
+
 export type { DesktopApi, DesktopEvents } from './types/api'
 export type { DesktopConfig } from './types/config'
+export type { AppContext, AppInstance, AppLifecycleState, CallerContext } from './types/context'
 
 /* ---------------- 配置与调用方上下文 ---------------- */
 
-export type { AppContext, AppInstance, AppLifecycleState, CallerContext } from './types/context'
-export type { DeviceIdCard, DevicePrintTicket } from './types/device'
+export type {
+  CaptureAdapter,
+  CaptureCaps,
+  CaptureDevice,
+  CaptureDeviceProfile,
+  CaptureError,
+  CaptureErrorCode,
+  CaptureLogFn,
+  CaptureRequest,
+  CaptureResult,
+  CaptureTransport,
+} from './types/devices/capture'
+
+/* ---------------- 设备类型（scanner / capture / print） ---------------- */
+
+export type { IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderResult, IdReaderTransport } from './types/devices/idcard'
+export type {
+  ChannelId,
+  ChannelPreference,
+  FilePayload,
+  HardwareControls,
+  HtmlPayload,
+  JobStatus,
+  Overlay,
+  PaperInput,
+  PaperProfile,
+  PaperSpec,
+  PrinterCaps,
+  PrintError,
+  PrintErrorCode,
+  PrintKind,
+  PrintLogFn,
+  PrintOptions,
+  PrintPayload,
+  PrintPreset,
+  PrintRequest,
+  PrintResult,
+  RawPayload,
+  RawPrinterConfig,
+  TemplatePayload,
+  UnifiedPrinter,
+} from './types/devices/print'
+export type { ScanErrorCode, ScannerConfig, ScannerLogFn, ScanOptions, ScanResult } from './types/devices/scanner'
 
 /* ---------------- 设备通道（device:*，读卡器 / 打印机） ---------------- */
 
 export type { DownloadTask, DownloadTaskStatus } from './types/download'
+
+export { captureDomain, deviceDomain, platformDomains, printDomain, scannerDomain } from './types/ipc'
 
 /* ---------------- 下载任务 ---------------- */
 

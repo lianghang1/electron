@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DeviceIdCard, DevicePrintTicket } from '@desktop/shared'
+import type { IdCardData } from '@desktop/shared'
 import { computed, ref } from 'vue'
 import { useScanner } from '../composables/use-scanner'
 
@@ -13,20 +13,18 @@ interface Report {
 }
 
 const state = ref<'identify' | 'list'>('identify')
-const patient = ref<DeviceIdCard | null>(null)
+const patient = ref<IdCardData | null>(null)
 const reports = ref<Report[]>([])
-const printingId = ref('')
-const printedIds = ref<string[]>([])
 
 // 扫码枪：USB HID 键盘流，扫报告条码直接进入报告列表
 useScanner({ onScan: () => identify() })
 
 async function readCard(): Promise<void> {
-  const card = await window.desktop.device.readIdCard()
-  identify(card ?? undefined)
+  const result = await window.desktop.device.readIdCard()
+  identify(result.ok && result.data ? result.data : undefined)
 }
 
-function identify(card?: DeviceIdCard): void {
+function identify(card?: IdCardData): void {
   if (state.value === 'list')
     return
   patient.value = card ?? null
@@ -40,24 +38,6 @@ function identify(card?: DeviceIdCard): void {
 
 const maskedId = computed(() =>
   patient.value ? patient.value.idNumber.replace(/^(.{3}).+(.{3})$/, '$1***********$2') : '')
-
-async function printReport(report: Report): Promise<void> {
-  if (printingId.value)
-    return
-  printingId.value = report.id
-  const ticket: DevicePrintTicket = {
-    title: '检验检查报告',
-    lines: [
-      `${report.type} ${report.name}`,
-      `报告编号 ${report.id}`,
-      `患者 ${patient.value?.name ?? '自助打印'}`,
-      `报告日期 ${report.date}`,
-    ],
-  }
-  await window.desktop.device.print(ticket)
-  printingId.value = ''
-  printedIds.value = [...printedIds.value, report.id]
-}
 </script>
 
 <template>
@@ -84,7 +64,7 @@ async function printReport(report: Report): Promise<void> {
     <template v-else>
       <div class="hp-head">
         <h2 class="hp-title">
-          可打印报告
+          报告查询
           <span v-if="patient" class="hp-patient">{{ patient.name }}（{{ maskedId }}）</span>
         </h2>
         <button class="hs-btn-back" @click="emit('back')">
@@ -97,13 +77,6 @@ async function printReport(report: Report): Promise<void> {
             <span class="hp-row__name">{{ report.name }}</span>
             <span class="hp-row__meta">{{ report.type }} · {{ report.date }} · {{ report.id }}</span>
           </div>
-          <button
-            class="hs-btn-primary hp-row__print"
-            :disabled="printingId === report.id"
-            @click="printReport(report)"
-          >
-            {{ printedIds.includes(report.id) ? '已打印' : printingId === report.id ? '打印中…' : '打印报告' }}
-          </button>
         </div>
       </div>
     </template>
@@ -191,16 +164,6 @@ async function printReport(report: Report): Promise<void> {
   font-size: 15px;
   color: #8fa6bf;
   margin-top: 6px;
-}
-.hp-row__print {
-  height: 48px;
-  padding: 0 32px;
-  font-size: 18px;
-  border-radius: 10px;
-}
-.hp-row__print:disabled {
-  background: #7ba7d9;
-  cursor: default;
 }
 
 .hs-btn-back,

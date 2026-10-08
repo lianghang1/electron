@@ -1,7 +1,12 @@
-import type { AppSource, DesktopAppManifest } from '@desktop/shared'
+import type { AppSource, CaptureDeviceProfile, DesktopAppManifest, PrintPreset, RawPrinterConfig, ScannerConfig } from '@desktop/shared'
+import type { CaptureSystem } from '../devices/capture'
+import type { IdCardSystem } from '../devices/idcard'
+import type { PrintSystem } from '../devices/print'
+import type { ScannerSystem } from '../devices/scanner'
 import type { Logger } from '../logger/logger'
 import type { PermissionStoreSchema } from '../permission/permission-service'
 import type { BootstrapOptions } from '../types'
+import { join } from 'node:path'
 import process from 'node:process'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow } from 'electron'
@@ -11,6 +16,10 @@ import { AppService } from '../app/app-service'
 import { loadLocalAppManifests, loadRemoteAppManifests } from '../app/app-source'
 import { AuditService } from '../audit/audit-service'
 import { CacheService } from '../cache/cache-service'
+import { createCaptureSystem } from '../devices/capture'
+import { createIdCardSystem } from '../devices/idcard'
+import { createPrintSystem } from '../devices/print'
+import { createScannerSystem, SCANNER_DEFAULTS } from '../devices/scanner'
 import { DownloadService } from '../download/download-service'
 import { EventBus } from '../event/event-bus'
 import { registerPlatformIpc } from '../ipc'
@@ -27,6 +36,17 @@ import { UpdateService } from '../updater/update-service'
 import { WebService } from '../web/web-service'
 import { OverlayWindowService } from '../window/overlay-window'
 import { WindowService } from '../window/window-service'
+
+/** dev 缺省网络打印机（mock 模式：指令落盘 out/mock-print，无真机即可联调打印链路） */
+const DEV_MOCK_PRINTER: RawPrinterConfig = {
+  id: 'raw:127.0.0.1:9100',
+  displayName: '网络打印机（模拟模式）',
+  protocol: 'escpos',
+  transport: { type: 'tcp', host: '127.0.0.1', port: 9100 },
+  mock: true,
+  mockOutputDir: 'out/mock-print',
+  capabilities: { maxWidthMm: 80 },
+}
 
 /**
  * 平台组装根：初始化全部 Service → 注册 IPC → 建主窗口；
@@ -54,6 +74,14 @@ export class DesktopRuntime {
   private windowService!: WindowService
   /** 全局浮层独立原生窗：右键菜单/确认弹窗渲染处（原生层级压过 WebContentsView） */
   private overlayService!: OverlayWindowService
+  /** 设备系统：证卡读取（dll 真实驱动，dev 加 stub mock 兜底） */
+  private idCardSystem?: IdCardSystem
+  /** 设备系统：扫码枪（键盘仿真观察，恒创建） */
+  private scannerSystem!: ScannerSystem
+  /** 设备系统：图像采集（UVC/DLL 双路线，恒创建） */
+  private captureSystem!: CaptureSystem
+  /** 设备系统：统一打印（系统队列 + 网络直连，恒创建） */
+  private printSystem!: PrintSystem
 
   constructor(private readonly options: BootstrapOptions) {}
 
@@ -173,6 +201,53 @@ export class DesktopRuntime {
       this.downloadService.attach(appId, appSession)
       this.attachProtocolHandlers(appSession)
     })
+
+    this.setupDevices()
+  }
+
+  /**
+   * 设备系统装配：资源根由宿主配置（缺省 userData/devices），dev 环境 stub mock 兜底。
+   * scanner/capture/print 的运行时编辑持久化由 core 经 electron-store 托管（userData），
+   * capture/print 的存储缺键时回落出厂档案/出厂预设（不设 defaults，避免空值覆盖）。
+   */
+  private setupDevices(): void {
+    const resourcesRoot = this.options.devices?.resourcesRoot ?? join(app.getPath('userData'), 'devices')
+
+    this.idCardSystem = createIdCardSystem({
+      resourcesRoot,
+      logger: this.logger.scope('device:idcard'),
+      mock: this.options.devices?.mock ?? is.dev,
+    })
+
+    // 扫码枪：配置持久化 + 键盘观察接入所有窗口（before-input-event，全局生效）
+    const scannerStore = new Store<ScannerConfig>({ name: 'device-scanner', defaults: SCANNER_DEFAULTS })
+    this.scannerSystem = createScannerSystem({
+      initialConfig: scannerStore.store,
+      persist: config => scannerStore.set(config),
+      logger: this.logger.scope('device:scanner'),
+    })
+    app.on('browser-window-created', (_, win) => this.scannerSystem?.attachWindow(win))
+
+    // 图像采集：设备档案持久化，图片默认落 userData/capture
+    const captureStore = new Store<{ devices?: CaptureDeviceProfile[] }>({ name: 'device-capture-profiles' })
+    this.captureSystem = createCaptureSystem({
+      resourcesRoot,
+      initialProfiles: captureStore.get('devices'),
+      persist: devices => captureStore.set('devices', devices),
+      defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(app.getPath('userData'), 'capture'),
+      logger: this.logger.scope('device:capture'),
+    })
+
+    // 打印：预设持久化，网络打印机档案由宿主注入（dev 缺省 mock 打印机）
+    const presetStore = new Store<{ presets?: PrintPreset[] }>({ name: 'device-print-presets' })
+    this.printSystem = createPrintSystem({
+      stateDir: app.getPath('userData'),
+      printers: this.options.devices?.print?.printers ?? (is.dev ? [DEV_MOCK_PRINTER] : []),
+      sumatraPath: this.options.devices?.print?.sumatraPath,
+      customPresets: presetStore.get('presets'),
+      persistPresets: presets => presetStore.set('presets', presets),
+      logger: this.logger.scope('device:print'),
+    })
   }
 
   /** Tab 体系按形态装配：Kiosk 等单应用形态关掉后不初始化 Tab/App/Web 服务 */
@@ -256,6 +331,10 @@ export class DesktopRuntime {
       asarService: this.options.updates?.asar ? this.asarUpdateService : undefined,
       overlayService: this.overlayService,
       downloadService: this.downloadService,
+      idCard: this.idCardSystem,
+      scanner: this.scannerSystem,
+      capture: this.captureSystem,
+      print: this.printSystem,
       events: this.events,
       resolver: this.resolver,
     })
@@ -307,6 +386,10 @@ export class DesktopRuntime {
   private dispose(): void {
     this.webService?.dispose()
     this.storageService?.dispose()
+    this.idCardSystem?.destroy()
+    this.scannerSystem?.destroy()
+    this.captureSystem?.destroy()
+    this.printSystem?.destroy()
     this.resilienceService?.dispose()
     this.auditService?.dispose()
     this.events.clear()

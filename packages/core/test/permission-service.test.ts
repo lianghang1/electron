@@ -1,4 +1,4 @@
-import type { CallerContext } from '@desktop/shared'
+import type { CallerContext, Permission } from '@desktop/shared'
 import type { Logger } from '../src/logger/logger'
 import { PERMISSIONS } from '@desktop/shared'
 import { describe, expect, it, vi } from 'vitest'
@@ -7,13 +7,13 @@ import { SHELL_APP_ID } from '../src/constants'
 import { EventBus } from '../src/event/event-bus'
 import { PermissionService } from '../src/permission/permission-service'
 
-const shell: CallerContext = { appId: SHELL_APP_ID }
-const crm: CallerContext = { appId: 'crm' }
+const shell: CallerContext = { appId: SHELL_APP_ID, instanceId: 'shell' }
+const crm: CallerContext = { appId: 'crm', instanceId: 'crm-1' }
 
 /** 单测环境无 electron-store：决策仅内存（PermissionService 预留的测试形态） */
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as Logger
 
-function createService(permissions?: string[]): { service: PermissionService, events: EventBus } {
+function createService(permissions?: Permission[]): { service: PermissionService, events: EventBus } {
   const events = new EventBus()
   const registry = new AppRegistry()
   registry.register({
@@ -41,7 +41,7 @@ describe('permissionService.check / assert', () => {
 
   it('未注册 App 一律拒绝', () => {
     const { service } = createService([PERMISSIONS[0]])
-    expect(service.check({ appId: 'ghost' }, PERMISSIONS[0])).toBe(false)
+    expect(service.check({ appId: 'ghost', instanceId: 'ghost' }, PERMISSIONS[0])).toBe(false)
   })
 
   it('assert 拒绝时抛 PERMISSION_DENIED 并广播 permission:denied', () => {

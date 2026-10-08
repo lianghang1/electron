@@ -7,7 +7,7 @@ import NumPad from './NumPad.vue'
 
 /**
  * 运维设置面板：馆名连点 3 次进入。
- * 授权门（NumPad 密码，30s 无操作自动关）→ 设备信息（编辑保存）/ 外设测试（读卡器/打印机/语音）→ 退出应用（确认后 app.quit）。
+ * 授权门（NumPad 密码，30s 无操作自动关）→ 设备信息（编辑保存）/ 外设测试（读卡器/语音）→ 退出应用（确认后 app.quit）。
  * 文字输入（馆名/柜台名）依赖 USB 键盘，与发票抬头输入同一限制。
  */
 const props = defineProps<{ visible: boolean }>()
@@ -98,7 +98,7 @@ async function handleSave(): Promise<void> {
 }
 
 // ---- 外设测试 ----
-type TestKey = 'idcard' | 'printer' | 'speech'
+type TestKey = 'idcard' | 'speech'
 const testRunning = ref<Set<TestKey>>(new Set())
 const testResults = ref<Partial<Record<TestKey, { ok: boolean, text: string }>>>({})
 
@@ -108,20 +108,14 @@ async function runTest(key: TestKey): Promise<void> {
   testRunning.value = new Set([...testRunning.value, key])
   try {
     if (key === 'idcard') {
-      const card = await window.desktop.device.readIdCard()
+      const result = await window.desktop.device.readIdCard()
+      const card = result.ok && result.data ? result.data : null
       testResults.value = {
         ...testResults.value,
         idcard: card
           ? { ok: true, text: `读卡正常：${card.name} ${card.idNumber}` }
-          : { ok: false, text: '未读到卡片，请将身份证放置读卡区后重试' },
+          : { ok: false, text: result.error?.message ?? '未读到卡片，请将身份证放置读卡区后重试' },
       }
-    }
-    else if (key === 'printer') {
-      await window.desktop.device.print({
-        title: '外设测试页',
-        lines: ['== 外设测试页 ==', '打印机自检', new Date().toLocaleString('zh-CN')],
-      })
-      testResults.value = { ...testResults.value, printer: { ok: true, text: '打印任务已发送，请检查出票' } }
     }
     else {
       playSpeech('语音播报测试正常')
@@ -284,7 +278,6 @@ onBeforeUnmount(stopCountdown)
             <div
               v-for="item in ([
                 { key: 'idcard', title: '身份证读卡器', desc: '放置身份证后点击测试' },
-                { key: 'printer', title: '凭条打印机', desc: '发送一张测试页' },
                 { key: 'speech', title: '语音播报', desc: '播放一段测试语音' },
               ] as const)" :key="item.key" class="fs-test"
             >

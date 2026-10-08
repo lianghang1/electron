@@ -23,7 +23,7 @@ import { permissionLabel } from '../composables/use-permission-labels'
  * 同一份页面服务三类浮层窗（每窗同时只收一种消息，互斥渲染）：
  * - 消息窗：download:updated 下载通知卡 + notification:received 通知 toast（右上角）
  * - 弹窗窗：permission:pending 运行时授权决策卡（全屏遮罩模态，居中）
- * - 菜单窗：menu:pending Tab 右键菜单（全屏透明模态，锚点定位——页面内容保持可见）
+ * - 菜单窗：overlay:menuPending Tab 右键菜单（全屏透明模态，锚点定位——页面内容保持可见）
  *
  * 交互语义交给 reka-ui 原语（Toast 滑动关闭/悬停暂停/无障碍、Dialog 焦点圈养/ESC），
  * 外观用 UnoCSS 工具类自绘；卡片样式固定高对比配色（不随 Shell 主题），保证任意背景下清晰可读。
@@ -147,7 +147,7 @@ watch(menu, () => {
   highlightIndex.value = 0
 })
 
-/** 选中：本地立即清卡（清场先行），Main 执行动作后推 menu:pending null 对账 */
+/** 选中：本地立即清卡（清场先行），Main 执行动作后推 overlay:menuPending null 对账 */
 function selectMenu(action: TabMenuAction): void {
   menu.value = null
   void window.desktop.overlay.menuSelect(action)
@@ -244,7 +244,7 @@ onMounted(async () => {
     window.desktop.events.on('permission:pending', (list) => {
       dialogs.value = list
     }),
-    window.desktop.events.on('menu:pending', (m) => {
+    window.desktop.events.on('overlay:menuPending', (m) => {
       menu.value = m
     }),
   )
