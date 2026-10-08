@@ -11,7 +11,6 @@ import { AppService } from '../app/app-service'
 import { loadLocalAppManifests, loadRemoteAppManifests } from '../app/app-source'
 import { AuditService } from '../audit/audit-service'
 import { CacheService } from '../cache/cache-service'
-import { DeviceService } from '../device/device-service'
 import { DownloadService } from '../download/download-service'
 import { EventBus } from '../event/event-bus'
 import { registerPlatformIpc } from '../ipc'
@@ -48,7 +47,6 @@ export class DesktopRuntime {
   private asarUpdateService!: AsarUpdateService
   private auditService!: AuditService
   private resilienceService!: ResilienceService
-  private deviceService!: DeviceService
   /** features.tabs = false 时为空：单应用形态不装配 Tab 体系 */
   private appService?: AppService
   private webService?: WebService
@@ -177,10 +175,6 @@ export class DesktopRuntime {
       this.downloadService.attach(appId, appSession)
       this.attachProtocolHandlers(appSession)
     })
-
-    // 设备通用层：device:* 通道（读卡器/打印机），Driver 缺省用内置 mock，可经 bootstrap.devices 注入
-    this.deviceService = new DeviceService(this.options.devices ?? {}, this.logger.scope('device'))
-    this.deviceService.register()
   }
 
   /** Tab 体系按形态装配：Kiosk 等单应用形态关掉后不初始化 Tab/App/Web 服务 */
@@ -317,7 +311,6 @@ export class DesktopRuntime {
     this.storageService?.dispose()
     this.resilienceService?.dispose()
     this.auditService?.dispose()
-    this.deviceService?.dispose()
     this.events.clear()
     this.logger?.info('desktop application disposed')
   }

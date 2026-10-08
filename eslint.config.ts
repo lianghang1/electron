@@ -3,7 +3,7 @@ import { createEslintConfig } from '@desktop/config/eslint'
 export default createEslintConfig(
   {
     // 设计文档与 README 里的 TS 代码块只是示意，不参与 lint
-    ignores: ['prd.md', 'README.md', 'docs/**'],
+    ignores: ['prd.md', 'README.md', 'docs/**', '.trae/**'],
   },
   {
     // IPC 契约必须保持 type alias：Main 侧 handle 包装用 keyof/Parameters 提取，
