@@ -12,12 +12,21 @@ catalogs:
     '@electron-toolkit/utils':
       specifier: ^4.0.0
       version: 4.0.0
+    '@fun-design/http-alova-axios':
+      specifier: ^0.0.5
+      version: 0.0.5
+    '@fun-design/utils':
+      specifier: ^2.0.0
+      version: 2.0.0
     '@types/node':
       specifier: ^22.19.1
       version: 22.20.1
     '@vitejs/plugin-vue':
       specifier: ^6.0.2
       version: 6.0.8
+    '@vueuse/core':
+      specifier: ^15.0.0
+      version: 15.0.0
     electron:
       specifier: ^39.2.6
       version: 39.8.10
@@ -172,6 +181,58 @@ importers:
       vue-router:
         specifier: ^4.5.0
         version: 4.6.4(vue@3.5.40(typescript@5.9.3))
+      vue-tsc:
+        specifier: 'catalog:'
+        version: 3.3.8(typescript@5.9.3)
+
+  apps/funeral-kiosk:
+    dependencies:
+      '@electron-toolkit/utils':
+        specifier: 'catalog:'
+        version: 4.0.0(electron@39.8.10)
+      '@fun-design/http-alova-axios':
+        specifier: 'catalog:'
+        version: 0.0.5(vue@3.5.40(typescript@5.9.3))
+      '@fun-design/utils':
+        specifier: 'catalog:'
+        version: 2.0.0
+      '@vueuse/core':
+        specifier: 'catalog:'
+        version: 15.0.0(vue@3.5.40(typescript@5.9.3))
+    devDependencies:
+      '@desktop/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@desktop/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@desktop/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.1
+      '@vitejs/plugin-vue':
+        specifier: 'catalog:'
+        version: 6.0.8(vite@7.3.6(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))(vue@3.5.40(typescript@5.9.3))
+      electron:
+        specifier: 'catalog:'
+        version: 39.8.10
+      electron-builder:
+        specifier: 'catalog:'
+        version: 26.15.3(electron-builder-squirrel-windows@26.15.3)
+      electron-vite:
+        specifier: 'catalog:'
+        version: 5.0.0(vite@7.3.6(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: 'catalog:'
+        version: 7.3.6(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.40(typescript@5.9.3)
       vue-tsc:
         specifier: 'catalog:'
         version: 3.3.8(typescript@5.9.3)
@@ -343,6 +404,15 @@ importers:
         version: 5.9.3
 
 packages:
+
+  '@alova/adapter-axios@2.0.20':
+    resolution: {integrity: sha512-qHzzOWjdHj1LgRVNpvp1qqgeljA5zReTiIicdpzT9OcBJ6DAuk1WgMW/oKXZEZVNsSqI+hPS9tFjb0OW/cariA==}
+    peerDependencies:
+      alova: ^3.0.20
+      axios: '>=0.4.0'
+
+  '@alova/shared@1.3.4':
+    resolution: {integrity: sha512-kdYHUqO35AEdnQHnzevyf+VhhfD0jc+EBbZv/aYkA4rwjVjf+vB6D/ZkTwiYFH1yQjwiGwF1ZbJv5a7rKGyNiw==}
 
   '@antfu/eslint-config@5.4.1':
     resolution: {integrity: sha512-x7BiNkxJRlXXs8tIvg0CgMuNo5IZVWkGLMJotCtCtzWUHW78Pmm8PvtXhvLBbTc8683GGBK616MMztWLh4RNjA==}
@@ -938,6 +1008,17 @@ packages:
 
   '@floating-ui/vue@1.1.11':
     resolution: {integrity: sha512-HzHKCNVxnGS35r9fCHBc3+uCnjw9IWIlCPL683cGgM9Kgj2BiAl8x1mS7vtvP6F9S/e/q4O6MApwSHj8hNLGfw==}
+
+  '@fun-design/http-alova-axios@0.0.5':
+    resolution: {integrity: sha512-m47EpqJRaf3361nmK1N6FbsjJBoOXqjIq1Xdv4lvya3MbiiL0AVwbNViGjCn9QLFX0QmYvZRIBMgP4/3jwd23w==}
+    peerDependencies:
+      vue: ^3.0.0 || ^2.7.0
+
+  '@fun-design/http-alova@0.0.7':
+    resolution: {integrity: sha512-inde1C9Rl/CDBzzBlqE9uYIQGoMc28l6EnP92W3ru5uRALwhcFlIPNHlpS4tlDQ4cmYDDWzvJOrUctY5Uxw7iA==}
+    peerDependencies:
+      alova: ^3.5.5
+      vue: ^3.0.0 || ^2.7.0
 
   '@fun-design/utils@2.0.0':
     resolution: {integrity: sha512-X8FoFQiHQcl96wHFPdaAfPM8PlxbvpkyH56mUOAYv40ecnC0u/CDUdrCnrLEpMIYB4CrPUVZ7LlxYIewut/R9A==}
@@ -1617,11 +1698,27 @@ packages:
     peerDependencies:
       vue: ^3.5.0
 
+  '@vueuse/core@15.0.0':
+    resolution: {integrity: sha512-Zv67h5mrk7YHDJsRObx+DXaCBz6RKBUpxqLesJ+3xZNPG6yuQs7ja7kg3veFrrouYLWAqydQ7CwGEbLVxB43Ng==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      vue: ^3.5.0
+
   '@vueuse/metadata@14.4.0':
     resolution: {integrity: sha512-swx/255R6JyHZFJhx845iz5CRWDZdCfvkZOpACWc5+c5WHcG24mv8gUT1WIdFQaHt6dq79rvILd9QnCWiyVm9g==}
 
+  '@vueuse/metadata@15.0.0':
+    resolution: {integrity: sha512-sfWE5LADAKJ0KnjtGliMdSN8Ij/L7uP6rXIZlgPloAI4zvvefbw6H5Lt7KJA6RqQOYgVqWF5Guj50HHMIzygBg==}
+    engines: {node: '>=22'}
+
   '@vueuse/shared@14.4.0':
     resolution: {integrity: sha512-JRgY90Sz8DDtPMsaDflvPMp9xYk69JZAmbuDvAquUVXKr2gEjqtzGNTTthLfckH0BzBqvnu31gb4a8TGLRe79g==}
+    peerDependencies:
+      vue: ^3.5.0
+
+  '@vueuse/shared@15.0.0':
+    resolution: {integrity: sha512-vbNXhGrbV53xPOMSyOzMHQRvhMgZf7oNDw2RChUetVxwTIEkInQ1joZ9JbT0G3z2n2AJNjvmCWeM9ySYrnvogA==}
+    engines: {node: '>=22'}
     peerDependencies:
       vue: ^3.5.0
 
@@ -1643,6 +1740,10 @@ packages:
     engines: {node: '>=0.4.0'}
     hasBin: true
 
+  agent-base@6.0.2:
+    resolution: {integrity: sha512-RZNwNclF7+MS/8bDg70amg32dyeZGZxiDuQmZxKLAlQjr3jGyLx+4Kkk58UO7D2QdgFIQCovuSuZESne6RG6XQ==}
+    engines: {node: '>= 6.0.0'}
+
   agent-base@7.1.4:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
@@ -1663,6 +1764,10 @@ packages:
 
   alien-signals@3.2.1:
     resolution: {integrity: sha512-I8FjmltrfnDFoZedi5CG8DghVYNhzb/Ijluz7tCSJH0xpd0484Kowhbb1XDYOxfJpU1p5wnM2X54dA+IfGyD1g==}
+
+  alova@3.5.5:
+    resolution: {integrity: sha512-V/w9xLNBpmBxx7Zeb+OAJapt9yD1L/hBoqi86xlRtug94F2xUkA1GFsJMeDeV/oL/iQCvW8fQyplGOiLXDkACg==}
+    engines: {node: '>= 18.0.0'}
 
   ansi-regex@5.0.1:
     resolution: {integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==}
@@ -1721,6 +1826,9 @@ packages:
 
   aws4@1.13.2:
     resolution: {integrity: sha512-lHe62zvbTB5eEABUVi/AwVh0ZKY9rMMDhmm+eeyuuUQbQ3+J+fONVQOZyj+DdrvD4BY33uYniyRJ4UJIaSKAfw==}
+
+  axios@1.20.0:
+    resolution: {integrity: sha512-r8aOh8j9cGKpgQAqpzrUHnSIc6a59Y3Xf/cv8sy1DrHCkZHzQGEuoq1tARk6qSyDdtQGSDgpb9kFlruzPvrgwg==}
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
@@ -2483,6 +2591,15 @@ packages:
   flatted@3.4.4:
     resolution: {integrity: sha512-5+ybhBZANEJxaH3X5evAFatUxLfEHSr7n6kYJ+1Qd0mUqr4eu9gIf6GDbWHf8RJijHrjjO8G+la14SlL2SeS1Q==}
 
+  follow-redirects@1.16.1:
+    resolution: {integrity: sha512-FNvFGzoMLWmE6Yj9spb/zjd7yiNCHiAW9/Tg9CXrQ8wuu32HtlJOwWO11OJafl5FfY3DxTdQ0vj42zU1kvv5jg==}
+    engines: {node: '>=4.0'}
+    peerDependencies:
+      debug: '*'
+    peerDependenciesMeta:
+      debug:
+        optional: true
+
   form-data@4.0.6:
     resolution: {integrity: sha512-vKatAh4SlVfgbv+YtmhiRjhEMJsYpsG1Y2rMQtR+SVSbytsSD1YGzDIcrAJmdFec88u/+VoGmxnl+80gL1tRCQ==}
     engines: {node: '>= 6'}
@@ -2647,6 +2764,10 @@ packages:
   http2-wrapper@1.0.3:
     resolution: {integrity: sha512-V+23sDMr12Wnz7iTcDeJr3O6AIxlnvT/bmaAAAP/Xda35C90p9599p0F1eHR/N1KILWSoWVAiOMFjBBXaXSMxg==}
     engines: {node: '>=10.19.0'}
+
+  https-proxy-agent@5.0.1:
+    resolution: {integrity: sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==}
+    engines: {node: '>= 6'}
 
   https-proxy-agent@7.0.6:
     resolution: {integrity: sha512-vK9P5/iUfdl95AI+JVyUuIcVtd4ofvtrOr3HNtM2yxC9bnMbEdp3x01OhQNnjb8IJYi38VlTE3mBXwcfvywuSw==}
@@ -3295,6 +3416,10 @@ packages:
   proper-lockfile@4.1.2:
     resolution: {integrity: sha512-TjNPblN4BwAWMXU8s9AEz4JmQxnD1NNL7bNOY/AKUzyamc379FWASUhc/K1pL2noVb+XmZKLL68cjzLsiOAMaA==}
 
+  proxy-from-env@2.1.0:
+    resolution: {integrity: sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==}
+    engines: {node: '>=10'}
+
   pump@3.0.4:
     resolution: {integrity: sha512-VS7sjc6KR7e1ukRFhQSY5LM2uBWAUPiOPa/A3mkKmiMwSmRFUITt0xuj+/lesgnCv+dPIEYlkzrcyXgquIHMcA==}
 
@@ -3323,6 +3448,9 @@ packages:
   quick-lru@5.1.1:
     resolution: {integrity: sha512-WuyALRjWPDGtt/wzJiadO5AXY+8hZ80hVpe6MyivgraREW751X3SbhRvG3eLKOYN+8VEvqLcf3wdnt44Z4S4SA==}
     engines: {node: '>=10'}
+
+  rate-limiter-flexible@5.0.5:
+    resolution: {integrity: sha512-+/dSQfo+3FYwYygUs/V2BBdwGa9nFtakDwKt4l0bnvNB53TNT++QSFewwHX9qXrZJuMe9j+TUaU21lm5ARgqdQ==}
 
   read-binary-file-arch@1.0.6:
     resolution: {integrity: sha512-BNg9EN3DD3GsDXX7Aa8O4p92sryjkmzYYgmgTAc6CA4uGLEDzFfxOxugu21akOxpcXHiEgsYkC6nPsQvLLLmEg==}
@@ -3971,6 +4099,14 @@ packages:
 
 snapshots:
 
+  '@alova/adapter-axios@2.0.20(alova@3.5.5)(axios@1.20.0)':
+    dependencies:
+      '@alova/shared': 1.3.4
+      alova: 3.5.5
+      axios: 1.20.0
+
+  '@alova/shared@1.3.4': {}
+
   '@antfu/eslint-config@5.4.1(@typescript-eslint/typescript-estree@8.65.0(typescript@5.9.3))(@typescript-eslint/utils@8.65.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(@vue/compiler-sfc@3.5.40)(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)(vitest@3.2.7(@types/debug@4.1.13)(@types/node@22.20.1)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))':
     dependencies:
       '@antfu/install-pkg': 1.1.0
@@ -4525,6 +4661,23 @@ snapshots:
     transitivePeerDependencies:
       - '@vue/composition-api'
       - vue
+
+  '@fun-design/http-alova-axios@0.0.5(vue@3.5.40(typescript@5.9.3))':
+    dependencies:
+      '@alova/adapter-axios': 2.0.20(alova@3.5.5)(axios@1.20.0)
+      '@alova/shared': 1.3.4
+      '@fun-design/http-alova': 0.0.7(alova@3.5.5)(vue@3.5.40(typescript@5.9.3))
+      alova: 3.5.5
+      axios: 1.20.0
+      vue: 3.5.40(typescript@5.9.3)
+    transitivePeerDependencies:
+      - debug
+      - supports-color
+
+  '@fun-design/http-alova@0.0.7(alova@3.5.5)(vue@3.5.40(typescript@5.9.3))':
+    dependencies:
+      alova: 3.5.5
+      vue: 3.5.40(typescript@5.9.3)
 
   '@fun-design/utils@2.0.0':
     dependencies:
@@ -5248,9 +5401,22 @@ snapshots:
       '@vueuse/shared': 14.4.0(vue@3.5.40(typescript@5.9.3))
       vue: 3.5.40(typescript@5.9.3)
 
+  '@vueuse/core@15.0.0(vue@3.5.40(typescript@5.9.3))':
+    dependencies:
+      '@types/web-bluetooth': 0.0.21
+      '@vueuse/metadata': 15.0.0
+      '@vueuse/shared': 15.0.0(vue@3.5.40(typescript@5.9.3))
+      vue: 3.5.40(typescript@5.9.3)
+
   '@vueuse/metadata@14.4.0': {}
 
+  '@vueuse/metadata@15.0.0': {}
+
   '@vueuse/shared@14.4.0(vue@3.5.40(typescript@5.9.3))':
+    dependencies:
+      vue: 3.5.40(typescript@5.9.3)
+
+  '@vueuse/shared@15.0.0(vue@3.5.40(typescript@5.9.3))':
     dependencies:
       vue: 3.5.40(typescript@5.9.3)
 
@@ -5263,6 +5429,12 @@ snapshots:
       acorn: 8.18.0
 
   acorn@8.18.0: {}
+
+  agent-base@6.0.2:
+    dependencies:
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
 
   agent-base@7.1.4: {}
 
@@ -5285,6 +5457,11 @@ snapshots:
       require-from-string: 2.0.2
 
   alien-signals@3.2.1: {}
+
+  alova@3.5.5:
+    dependencies:
+      '@alova/shared': 1.3.4
+      rate-limiter-flexible: 5.0.5
 
   ansi-regex@5.0.1: {}
 
@@ -5372,6 +5549,16 @@ snapshots:
       when-exit: 2.1.5
 
   aws4@1.13.2: {}
+
+  axios@1.20.0:
+    dependencies:
+      follow-redirects: 1.16.1
+      form-data: 4.0.6
+      https-proxy-agent: 5.0.1
+      proxy-from-env: 2.1.0
+    transitivePeerDependencies:
+      - debug
+      - supports-color
 
   balanced-match@1.0.2: {}
 
@@ -6275,6 +6462,8 @@ snapshots:
 
   flatted@3.4.4: {}
 
+  follow-redirects@1.16.1: {}
+
   form-data@4.0.6:
     dependencies:
       asynckit: 0.4.0
@@ -6465,6 +6654,13 @@ snapshots:
     dependencies:
       quick-lru: 5.1.1
       resolve-alpn: 1.2.1
+
+  https-proxy-agent@5.0.1:
+    dependencies:
+      agent-base: 6.0.2
+      debug: 4.4.3
+    transitivePeerDependencies:
+      - supports-color
 
   https-proxy-agent@7.0.6:
     dependencies:
@@ -7262,6 +7458,8 @@ snapshots:
       retry: 0.12.0
       signal-exit: 3.0.7
 
+  proxy-from-env@2.1.0: {}
+
   pump@3.0.4:
     dependencies:
       end-of-stream: 1.4.5
@@ -7286,6 +7484,8 @@ snapshots:
   quansync@1.0.0: {}
 
   quick-lru@5.1.1: {}
+
+  rate-limiter-flexible@5.0.5: {}
 
   read-binary-file-arch@1.0.6:
     dependencies:

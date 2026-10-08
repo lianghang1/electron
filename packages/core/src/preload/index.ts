@@ -9,6 +9,7 @@ const channels = {
   restore: 'window:restore',
   isMaximized: 'window:isMaximized',
   close: 'window:close',
+  quit: 'window:quit',
   appList: 'app:list',
   appGetManifest: 'app:getManifest',
   appGetCurrent: 'app:getCurrent',
@@ -74,6 +75,7 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
       maximize: () => ipcRenderer.invoke(channels.maximize),
       restore: () => ipcRenderer.invoke(channels.restore),
       close: () => ipcRenderer.invoke(channels.close),
+      quit: () => ipcRenderer.invoke(channels.quit),
       isMaximized: () => ipcRenderer.invoke(channels.isMaximized),
     },
     app: {

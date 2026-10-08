@@ -26,6 +26,7 @@ export interface DesktopApi {
     maximize: () => Promise<void>
     restore: () => Promise<void>
     close: () => Promise<void>
+    quit: () => Promise<void>
     isMaximized: () => Promise<boolean>
   }
   app: {

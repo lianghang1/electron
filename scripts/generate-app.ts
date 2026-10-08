@@ -63,6 +63,9 @@ const files: Array<[string, string]> = [
     },
     dependencies: {
       '@electron-toolkit/utils': 'catalog:',
+      '@fun-design/http-alova-axios': 'catalog:',
+      '@fun-design/utils': 'catalog:',
+      '@vueuse/core': 'catalog:',
     },
     devDependencies: {
       '@desktop/config': 'workspace:*',

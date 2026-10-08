@@ -1,5 +1,5 @@
 import type { IpcMainInvokeEvent } from 'electron'
-import { BrowserWindow } from 'electron'
+import { app, BrowserWindow } from 'electron'
 import { handle } from './handle'
 
 const winFrom = (event: IpcMainInvokeEvent) => BrowserWindow.fromWebContents(event.sender)
@@ -14,4 +14,6 @@ export function registerWindowIpc(): void {
   handle('window:restore', e => winFrom(e)?.unmaximize())
   handle('window:isMaximized', e => winFrom(e)?.isMaximized() ?? false)
   handle('window:close', e => winFrom(e)?.close())
+  // 走 app.quit()（before-quit → quitting 标记），exitGuard 只拦窗口 close，不会拦退出流程
+  handle('window:quit', () => app.quit())
 }
