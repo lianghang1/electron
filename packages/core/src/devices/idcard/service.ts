@@ -2,7 +2,6 @@ import type { Logger } from '../../logger/logger'
 import type { IdCardAdapter, IdReaderDevice, ReadResult } from './types'
 
 import { DllIdAdapter } from './adapters/dll-adapter'
-// import { StubIdAdapter } from './adapters/stub-adapter'
 import { toIdCardError } from './errors'
 
 /**
@@ -17,7 +16,6 @@ export class IdCardService {
 
   constructor(resourcesRoot: string, private readonly logger: Logger) {
     this.adapters = new Map<string, IdCardAdapter>([
-      // ['stub', new StubIdAdapter()],
       ['dll', new DllIdAdapter(resourcesRoot)],
     ])
   }

@@ -64,8 +64,7 @@ export class DesktopRuntime {
 
       electronApp.setAppUserModelId(this.options.app.id)
 
-      // Default open or close DevTools by F12 in development
-      // and ignore CommandOrControl + R in production.
+      // 快捷键收敛：dev 下 F12 开关 DevTools；生产屏蔽 CommandOrControl+R 刷新（防误触重载页面）
       app.on('browser-window-created', (_, window) => {
         optimizer.watchWindowShortcuts(window)
       })
@@ -90,14 +89,13 @@ export class DesktopRuntime {
       )
 
       app.on('activate', () => {
-        // On macOS re-create a window when the dock icon is clicked
-        // and there are no other windows open.
+        // macOS：点 Dock 图标时若无存活窗口则重建（其他平台窗口常驻，不触发）
         if (BrowserWindow.getAllWindows().length === 0)
           this.windowService.createMainWindow(this.options)
       })
     })
 
-    // Quit when all windows are closed, except on macOS.
+    // 全部窗口关闭即退出（macOS 惯例除外：关窗留驻 Dock，走 activate 重建）
     app.on('window-all-closed', () => {
       if (process.platform !== 'darwin')
         app.quit()
