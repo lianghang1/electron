@@ -187,15 +187,15 @@ importers:
 
   apps/funeral-kiosk:
     dependencies:
+      '@desktop/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
       '@electron-toolkit/utils':
         specifier: 'catalog:'
         version: 4.0.0(electron@39.8.10)
       '@fun-design/http-alova-axios':
         specifier: 'catalog:'
         version: 0.0.5(vue@3.5.40(typescript@5.9.3))
-      '@fun-design/utils':
-        specifier: 'catalog:'
-        version: 2.0.0
       '@vueuse/core':
         specifier: 'catalog:'
         version: 15.0.0(vue@3.5.40(typescript@5.9.3))
@@ -384,7 +384,7 @@ importers:
   packages/utils:
     dependencies:
       '@fun-design/utils':
-        specifier: ^2.0.0
+        specifier: 'catalog:'
         version: 2.0.0
       crypto-js:
         specifier: ^4.2.0

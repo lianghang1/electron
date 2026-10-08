@@ -62,9 +62,9 @@ const files: Array<[string, string]> = [
       artifactName: '${productName}-${version}-${arch}.${ext}',
     },
     dependencies: {
+      '@desktop/utils': 'workspace:*',
       '@electron-toolkit/utils': 'catalog:',
       '@fun-design/http-alova-axios': 'catalog:',
-      '@fun-design/utils': 'catalog:',
       '@vueuse/core': 'catalog:',
     },
     devDependencies: {
