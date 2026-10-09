@@ -24,7 +24,7 @@
     "docker.md": "Dockerfile,docker*.md,nginx*,.dockerignore",
     "package.json": "tsconfig.json,pnpm-lock.yaml,pnpm-workspace.yaml,LICENSE,.gitattributes,.gitignore,.gitpod.yml,CNAME,.npmrc,.browserslistrc,.nvmrc,.versionrc,.git-cz.json",
     "eslint.config.*": ".commitlintrc.*,.prettier*,.editorconfig,.commitlint.cjs,.eslint*,commitlint.config.*",
-    "vite.config.ts": "*.env, .env.*"
+    "*.vite.config.ts": "*.env, .env.*"
   },
 
   // Disable the default formatter, use eslint instead

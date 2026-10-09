@@ -1,0 +1,10 @@
+@use './variables.scss' as *;
+
+:root {
+  --v-color-primary: #{$v-color-primary};
+  --v-color-accent: #{$v-color-accent};
+  --v-color-purple: #{$v-color-purple};
+  --v-color-success: #{$v-color-success};
+  --v-color-warning: #{$v-color-warning};
+  --v-color-danger: #{$v-color-danger};
+}

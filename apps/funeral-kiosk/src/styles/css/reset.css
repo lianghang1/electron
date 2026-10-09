@@ -1,0 +1,27 @@
+:root {
+  font-size: 16px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  /* 移除点击高亮，适合触摸屏 */
+  -webkit-tap-highlight-color: transparent;
+  /* 继承根字体大小 */
+  font-size: inherit;
+}
+
+/* 全局滚动条隐藏 - 适合触摸屏设备 */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* Firefox滚动条隐藏 */
+* {
+  scrollbar-width: none;
+}
