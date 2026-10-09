@@ -2,7 +2,7 @@ import type { DomainApi } from '../domain'
 import type { DesktopIpc } from './ipc'
 import type { appDomain } from './ipc/app'
 import type { cacheDomain } from './ipc/cache'
-import type { captureDomain, deviceDomain, printDomain, scannerDomain } from './ipc/devices'
+import type { captureDomain, deviceDomain, printDomain, scannerDomain, signatureDomain } from './ipc/devices'
 import type { downloadDomain } from './ipc/download'
 import type { notificationDomain } from './ipc/notification'
 import type { overlayDomain } from './ipc/overlay'
@@ -36,6 +36,7 @@ export type DesktopApi
     & DomainApi<typeof cacheDomain>
     & DomainApi<typeof updateDomain>
     & DomainApi<typeof deviceDomain>
+    & DomainApi<typeof signatureDomain>
     & DomainApi<typeof scannerDomain>
     & DomainApi<typeof captureDomain>
     & DomainApi<typeof printDomain>

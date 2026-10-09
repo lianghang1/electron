@@ -51,7 +51,8 @@ export type {
 
 /* ---------------- 设备类型（scanner / capture / print） ---------------- */
 
-export type { IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderResult, IdReaderTransport } from './types/devices/idcard'
+export type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IcCardWriteResult, IcReaderResult, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderResult, IdReaderTransport } from './types/devices/idcard'
+export type { SignActionResult, SignDevice, SignDeviceTransport, SignErrorCode, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint } from './types/devices/signature'
 export type {
   ChannelId,
   ChannelPreference,

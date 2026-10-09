@@ -23,4 +23,6 @@ export function registerPrintIpc(deps: PrintIpcDeps): void {
   handle('print:savePreset', (_e, preset) => deps.print.savePreset(preset))
   handle('print:renderPreview', (_e, templateId, data, paper) => deps.print.renderPreview(templateId, data, paper))
   handle('print:reprint', (_e, jobId) => deps.print.reprint(jobId))
+  handle('print:getNetworkPrinters', () => deps.print.getNetworkPrinters())
+  handle('print:upsertNetworkPrinter', (_e, printer) => deps.print.upsertNetworkPrinter(printer))
 }

@@ -2,21 +2,24 @@ import type { CaptureAdapter, CaptureDevice, CaptureDeviceProfile, CaptureReques
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { WebSocket } from 'ws'
+import { captureCamSdkBase64 } from './camsdk-session'
 import { captureError } from '../errors'
 
 /**
- * WebSocket 本地服务适配器（点易拍 BaucheSDK 已验证协议）。
+ * WebSocket 本地服务适配器（多协议：点易拍 BaucheSDK 二进制帧 / 华视 CamSDKServer JSON 帧）。
  *
- * 协议（源自点易拍 SDK Sample/html/js/WsUtil.js）：
- *   服务端：ws://localhost:9002（BaucheSDKsetup.exe 安装后常驻）
+ * 点易拍协议（源自点易拍 SDK Sample/html/js/WsUtil.js，9002 端口）：
  *   帧格式：二进制 = 0xEF + cmd + len + payload；文本 = "GetPicBase64:<base64>" 等回执
  *   开预览：EF 25 05 camId wHi wLo hHi hLo
  *   拍照：  EF 0A 01 00                    → 文本回执 GetPicBase64:<jpg base64>
  *   关预览：EF 08 00
+ * 华视 CamSDKServer 协议（9000 端口）见 camsdk-session.ts，由 profile.ws.protocol = 'camsdk' 分发。
  */
 
 interface WsProfileConfig {
   url: string
+  protocol?: 'dianyipai' | 'camsdk'
   camId?: number
   width?: number
   height?: number
@@ -78,14 +81,23 @@ export class WsAdapter implements CaptureAdapter {
         .map(async (p) => {
           const { host, port } = parseWsUrl(p.ws!.url)
           const alive = await tcpProbe(host, port)
+          // 协议未经验证的档案（verified: false）只探活不采集：声明 ready 会误导上层直接拍照
+          const verified = p.ws!.verified !== false
           return {
             id: `ws:${p.id}`,
             displayName: p.displayName,
             brand: p.brand,
             transport: 'ws' as const,
-            status: alive ? ('ready' as const) : ('offline' as const),
+            status: alive ? (verified ? ('ready' as const) : ('unavailable' as const)) : ('offline' as const),
             capabilities: { crop: true, desewarp: true, ...(p.capabilities ?? {}) },
-            meta: { url: p.ws!.url, note: alive ? '本地服务运行中' : '本地服务未运行（需安装厂商 SDK 服务端）' },
+            meta: {
+              url: p.ws!.url,
+              note: !alive
+                ? '本地服务未运行（需安装厂商 SDK 服务端）'
+                : verified
+                  ? '本地服务运行中'
+                  : '服务在线，但该设备 ws 协议帧待真机实测，暂未适配采集',
+            },
           }
         }),
     )
@@ -96,10 +108,14 @@ export class WsAdapter implements CaptureAdapter {
     if (!profile?.ws) {
       throw captureError('DEVICE_NOT_FOUND', `ws 适配器下不存在设备: ${device.id}`)
     }
+    // 协议未经验证（verified: false）：服务探活在 listDevices 可见，但绝不套用其他厂商协议采集
+    if (profile.ws.verified === false) {
+      throw captureError('ADAPTER_UNAVAILABLE', `${profile.brand}设备 ws 协议帧待真机实测（不套用点易拍协议），暂未适配采集`)
+    }
     const { host, port } = parseWsUrl(profile.ws.url)
     const alive = await tcpProbe(host, port)
     if (!alive) {
-      throw captureError('DEVICE_OFFLINE', `点易拍本地服务未运行（${host}:${port}），请安装厂商 SDK 服务端`, {
+      throw captureError('DEVICE_OFFLINE', `${profile.brand}本地采集服务未运行（${host}:${port}），请确认厂商 SDK 服务端已安装`, {
         url: profile.ws.url,
       })
     }
@@ -108,7 +124,9 @@ export class WsAdapter implements CaptureAdapter {
     await mkdir(dir, { recursive: true })
     const file = path.join(dir, `ws-${profile.id}-${Date.now()}.jpg`)
 
-    const base64 = await this.captureBase64(profile.ws)
+    const base64 = profile.ws.protocol === 'camsdk'
+      ? await captureCamSdkBase64(profile.ws)
+      : await this.captureBase64(profile.ws)
     await writeFile(file, Buffer.from(base64, 'base64'))
     return {
       ok: true,
@@ -121,7 +139,6 @@ export class WsAdapter implements CaptureAdapter {
   /** 单次采集会话：开预览 → 拍照 → 收 GetPicBase64 → 关预览 */
   private captureBase64(wsCfg: WsProfileConfig): Promise<string> {
     return new Promise((resolve, reject) => {
-      const WS = (globalThis as unknown as { WebSocket: new (url: string) => MiniWS }).WebSocket
       const prefix = 'GetPicBase64:'
       const camId = wsCfg.camId ?? 0
       const w = wsCfg.width ?? 1600
@@ -129,7 +146,9 @@ export class WsAdapter implements CaptureAdapter {
 
       let settled = false
       let timer: ReturnType<typeof setTimeout> | undefined
-      const ws = new WS(wsCfg.url)
+      /** 拍照指令延迟发送定时器（预览稳定后拍照），会话结束须清理 */
+      let captureTimer: ReturnType<typeof setTimeout> | undefined
+      const ws = new WebSocket(wsCfg.url) as unknown as MiniWS
       ws.binaryType = 'arraybuffer'
 
       const done = (err: unknown, base64?: string): void => {
@@ -137,6 +156,7 @@ export class WsAdapter implements CaptureAdapter {
           return
         settled = true
         clearTimeout(timer)
+        clearTimeout(captureTimer)
         try {
           ws.close()
         }
@@ -165,7 +185,7 @@ export class WsAdapter implements CaptureAdapter {
       ws.onopen = () => {
         // 开预览（分辨率 1600×1200），预览帧到达后设备才可拍照
         ws.send(frame(0x25, [camId, Math.floor(w / 256), w % 256, Math.floor(h / 256), h % 256]))
-        setTimeout(() => ws.send(frame(0x0A, [0x00])), 700)
+        captureTimer = setTimeout(() => ws.send(frame(0x0A, [0x00])), 700)
       }
       ws.onmessage = (ev) => {
         if (typeof ev.data === 'string' && ev.data.startsWith(prefix)) {

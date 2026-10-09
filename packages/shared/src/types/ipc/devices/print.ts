@@ -1,4 +1,4 @@
-import type { JobStatus, PaperInput, PaperProfile, PrinterCaps, PrintPreset, PrintRequest, PrintResult, UnifiedPrinter } from '../../devices/print'
+import type { JobStatus, PaperInput, PaperProfile, PrinterCaps, PrintPreset, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '../../devices/print'
 import { invoke } from '../../../domain'
 
 /**
@@ -32,4 +32,8 @@ export const printDomainDefs = {
   renderPreview: invoke<(templateId: string, data: Record<string, unknown>, paper: PaperInput) => Promise<string>>(),
   /** 重打：优先用 PDF 存档（版式一致），文件/指令负载任务原样重提交 */
   reprint: invoke<(jobId: string) => Promise<PrintResult>>(),
+  /** 网络直连打印机档案列表（运行时编辑数据源） */
+  getNetworkPrinters: invoke<() => RawPrinterConfig[]>(),
+  /** 运行时编辑网络直连打印机档案（upsert 按 id 覆盖或新增，持久化并即时生效），返回更新后的档案列表 */
+  upsertNetworkPrinter: invoke<(printer: RawPrinterConfig) => RawPrinterConfig[]>(),
 }

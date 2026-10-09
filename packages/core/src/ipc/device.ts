@@ -1,4 +1,4 @@
-import type { IdReaderDevice, IdReaderResult } from '@desktop/shared'
+import type { IcCardReadRequest, IcCardWriteRequest, IcCardWriteResult, IcReaderResult, IdReaderDevice, IdReaderResult } from '@desktop/shared'
 import type { IdCardSystem } from '../devices/idcard'
 import { handle } from './handle'
 
@@ -14,6 +14,8 @@ export interface DeviceIpcDeps {
 export function registerDeviceIpc(deps: DeviceIpcDeps): void {
   handle('device:listReaders', () => listReaders(deps.idCard))
   handle('device:readIdCard', (_e, req) => readIdCard(deps.idCard, req))
+  handle('device:readIcCard', (_e, req) => readIcCard(deps.idCard, req))
+  handle('device:writeIcCard', (_e, req) => writeIcCard(deps.idCard, req))
 }
 
 /** 列出读卡器：系统未装配返回统一错误结果 */
@@ -24,14 +26,41 @@ async function listReaders(system: IdCardSystem | undefined): Promise<{ ok: true
   return { ok: true, readers: await system.listReaders() }
 }
 
-/** 读证卡：deviceId 缺省时自动选用第一个就绪的读卡器；系统未装配返回统一错误结果 */
+/** 读身份证：deviceId 缺省时自动选用第一个支持身份证且就绪的读卡器；系统未装配返回统一错误结果 */
 async function readIdCard(system: IdCardSystem | undefined, req?: { deviceId?: string }): Promise<IdReaderResult> {
   if (!system) {
     return { ok: false, error: { code: 'ADAPTER_UNAVAILABLE', message: '设备系统未装配（bootstrap 未配置 devices）' } }
   }
-  const deviceId = req?.deviceId ?? (await system.listReaders()).find(reader => reader.status === 'ready')?.id
+  const deviceId = req?.deviceId ?? (await system.listReaders()).find(reader => reader.status === 'ready' && reader.capabilities.includes('idcard'))?.id
   if (!deviceId) {
     return { ok: false, error: { code: 'DEVICE_NOT_FOUND', message: '无可用读卡器' } }
   }
   return system.read({ deviceId })
+}
+
+/** 读 IC 卡：deviceId 缺省时自动选用第一个支持 IC 卡且就绪的读卡器；系统未装配返回统一错误结果 */
+async function readIcCard(system: IdCardSystem | undefined, req?: IcCardReadRequest & { deviceId?: string }): Promise<IcReaderResult> {
+  if (!system) {
+    return { ok: false, error: { code: 'ADAPTER_UNAVAILABLE', message: '设备系统未装配（bootstrap 未配置 devices）' } }
+  }
+  const deviceId = req?.deviceId ?? (await system.listReaders()).find(reader => reader.status === 'ready' && reader.capabilities.includes('iccard'))?.id
+  if (!deviceId) {
+    return { ok: false, error: { code: 'DEVICE_NOT_FOUND', message: '无可用 IC 卡读卡器' } }
+  }
+  return system.readIc({ deviceId, key: req?.key, keyType: req?.keyType, sector: req?.sector })
+}
+
+/** 写 IC 卡块：deviceId 缺省时自动选用第一个支持写卡且就绪的读卡器；危险块由驱动强制拒绝 */
+async function writeIcCard(system: IdCardSystem | undefined, req?: IcCardWriteRequest & { deviceId?: string }): Promise<IcCardWriteResult> {
+  if (!system) {
+    return { ok: false, error: { code: 'ADAPTER_UNAVAILABLE', message: '设备系统未装配（bootstrap 未配置 devices）' } }
+  }
+  const deviceId = req?.deviceId ?? (await system.listReaders()).find(reader => reader.status === 'ready' && reader.capabilities.includes('iccard-write'))?.id
+  if (!deviceId) {
+    return { ok: false, error: { code: 'DEVICE_NOT_FOUND', message: '无支持写卡的 IC 卡读卡器' } }
+  }
+  if (!req) {
+    return { ok: false, error: { code: 'VALIDATION_FAILED', message: '缺少写入参数' } }
+  }
+  return system.writeIc({ deviceId, block: req.block, data: req.data, key: req.key, keyType: req.keyType })
 }

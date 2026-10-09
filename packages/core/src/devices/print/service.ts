@@ -1,4 +1,4 @@
-import type { ChannelId, JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintPreset, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
+import type { ChannelId, JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintPreset, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
 import type { PreparedContent, PreparedJob } from './channels/channel-types'
 import type { PrintChannel } from './channels/print-channel'
 import type { HiddenWindowPool } from './hidden-window'
@@ -25,10 +25,13 @@ export class PrintService {
   private readonly jobs: JobStore
   private readonly channels: Map<string, PrintChannel>
   private presets: PrintPreset[]
+  /** 网络直连打印机档案（与 PrinterRegistry 同一数组实例，原地变更即时生效） */
+  private readonly printers: RawPrinterConfig[]
   /** 可选日志注入（PII 域外的打印数据可记录） */
   private readonly logger: PrintLogFn
   private readonly archiveDir: string
   private readonly persistPresets?: (presets: PrintPreset[]) => void
+  private readonly persistPrinters?: (printers: RawPrinterConfig[]) => void
 
   /** 装配注入的依赖与现场数据（文件路径/打印机/预设），设备层不自行寻址 */
   constructor(
@@ -45,6 +48,10 @@ export class PrintService {
       customPresets?: PrintPreset[]
       /** 预设编辑持久化 */
       persistPresets?: (presets: PrintPreset[]) => void
+      /** 网络直连打印机档案（初始档案，与 registry 共享实例） */
+      printers: RawPrinterConfig[]
+      /** 打印机档案运行时编辑持久化 */
+      persistPrinters?: (printers: RawPrinterConfig[]) => void
       logger?: PrintLogFn
     },
   ) {
@@ -53,6 +60,8 @@ export class PrintService {
     this.jobs = new JobStore(deps.jobsFile)
     this.persistPresets = deps.persistPresets
     this.presets = mergePresets(deps.customPresets)
+    this.printers = deps.printers
+    this.persistPrinters = deps.persistPrinters
     this.channels = new Map<string, PrintChannel>([
       ['system', new SystemChannel(windows, deps.archiveDir, deps.sumatraPath)],
       ['raw', new RawChannel()],
@@ -76,6 +85,28 @@ export class PrintService {
     else list.push(preset)
     this.presets = list
     this.persistPresets?.(list)
+  }
+
+  /** 网络直连打印机档案列表（运行时编辑数据源） */
+  getNetworkPrinters(): RawPrinterConfig[] {
+    return this.printers.slice()
+  }
+
+  /**
+   * 运行时编辑网络直连打印机档案：upsert 按 id 覆盖或新增 → 持久化。
+   * 原地变更共享数组（PrinterRegistry 同一实例），listPrinters/submit 无需重建即读到新档案。
+   */
+  upsertNetworkPrinter(printer: RawPrinterConfig): RawPrinterConfig[] {
+    if (!printer?.id || !printer.transport?.host || !printer.transport?.port) {
+      throw printError('VALIDATION_FAILED', '打印机档案缺少 id 或 transport.host/port')
+    }
+    const i = this.printers.findIndex(p => p.id === printer.id)
+    if (i >= 0)
+      this.printers.splice(i, 1, printer)
+    else
+      this.printers.push(printer)
+    this.persistPrinters?.(this.printers.slice())
+    return this.printers.slice()
   }
 
   /** 按预设一键打印：调用方只提供业务数据（永不 reject，与 submit 一致） */

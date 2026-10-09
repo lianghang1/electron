@@ -2,81 +2,113 @@ import type { ElectronViteConfigFnPromise } from 'electron-vite'
 import type { UserConfig } from 'vite'
 import { resolve } from 'node:path'
 import process from 'node:process'
+import { mergeConfig } from 'vite'
 
 /**
- * renderer 回调可用的环境信息：vite ConfigEnv 的结构子集。
- * 用结构类型而非直接引用 ConfigEnv——pnpm 下本包与 electron-vite 可能解析到不同 vite 实例，
+ * 配置回调可用的环境信息：vite ConfigEnv 的结构子集。
+ * 用结构类型而非直接引用 vite ConfigEnv——pnpm 下本包与 electron-vite 可能解析到不同 vite 实例，
  * 直接引用会因类型不同一导致 defineConfig 函数重载全部失配。
  */
-export interface RendererConfigEnv {
+export interface CreateConfigEnv {
   /** 构建命令：serve = dev，build = 打包 */
   command: 'build' | 'serve'
   /** 当前 mode（development / production / 自定义 --mode） */
   mode: string
 }
 
+/** 进程段配置输入：对象，或按环境求值的回调（可读取 mode / command，配合 loadEnv 按环境定制） */
+export type ConfigInput = UserConfig | ((env: CreateConfigEnv) => UserConfig | Promise<UserConfig>)
+
 export interface CreateElectronViteConfigOptions {
-  /**
-   * renderer 额外配置（插件、alias 等），与默认配置浅合并。
-   * 支持函数形态：可读取 mode / command，配合 loadEnv 按环境定制（如 dev 专属插件）。
-   */
-  renderer?: UserConfig | ((env: RendererConfigEnv) => UserConfig | Promise<UserConfig>)
+  /** main 进程额外配置，与默认配置深合并（vite mergeConfig：对象深合并、数组拼接） */
+  main?: ConfigInput
+  /** preload 额外配置，与默认配置深合并 */
+  preload?: ConfigInput
+  /** renderer 额外配置，与默认配置深合并 */
+  renderer?: ConfigInput
   /** main 进程入口，相对 app 目录 */
   mainEntry?: string
   /** preload 入口，相对 app 目录 */
   preloadEntry?: string
 }
 
+/** 求值配置输入：回调形态传入环境求值，对象形态原样返回 */
+async function evalConfigInput(input: ConfigInput | undefined, env: CreateConfigEnv): Promise<UserConfig | undefined> {
+  if (!input) {
+    return undefined
+  }
+  return typeof input === 'function' ? input(env) : input
+}
+
+/** 额外配置与默认配置合并；无额外配置时直接复用默认对象 */
+function mergeExtra(defaults: UserConfig, extra: UserConfig | undefined): UserConfig {
+  return extra ? mergeConfig(defaults, extra) : defaults
+}
+
 /**
  * 创建 electron-vite 配置。
  * electron-vite 从 app 目录运行，路径统一基于 process.cwd() 解析。
- * 返回 async 函数形态配置（electron.vite.config.ts 可直接 default export），env 由 electron-vite 注入，
- * 函数与对象形态的 renderer 均按环境求值。
+ * main / preload / renderer 三段均支持对象或函数形态的额外配置，与内置默认深合并。
+ *
+ * 直接返回显式标注类型的 async 函数——不经过 defineConfig 包裹：
+ * pnpm 双 vite 实例下 ConfigEnv 类型不同一，defineConfig 的函数重载会全部失配。
  */
 export function createElectronViteConfig(options: CreateElectronViteConfigOptions = {}): ElectronViteConfigFnPromise {
   const {
+    main,
+    preload,
     renderer,
     mainEntry = 'electron/main/index.ts',
     preloadEntry = 'electron/preload/index.ts',
   } = options
   const cwd = process.cwd()
 
+  const mainDefaults: UserConfig = {
+    build: {
+      rollupOptions: {
+        input: { index: resolve(cwd, mainEntry) },
+        // Electron 内置模块不在 electron-vite 默认 external 列表里，显式声明
+        // （运行时由 Electron 提供，删真实 .asar 文件必须用它绕过 asar fs 补丁）
+        external: ['original-fs'],
+      },
+    },
+  }
+
+  const preloadDefaults: UserConfig = {
+    build: {
+      rollupOptions: {
+        input: { index: resolve(cwd, preloadEntry) },
+        // 强制 CJS：ESM preload 要求 sandbox: false，这里保持 sandbox: true 的安全默认。
+        // 文件名显式固定，不受 app package.json type 影响
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].cjs',
+          chunkFileNames: '[name]-[hash].cjs',
+        },
+      },
+    },
+  }
+
+  const rendererDefaults: UserConfig = {
+    root: '.',
+    build: {
+      rollupOptions: {
+        input: { index: resolve(cwd, 'index.html') },
+      },
+    },
+  }
+
   return async (env) => {
-    const extra = typeof renderer === 'function' ? await renderer(env) : renderer
+    const [mainExtra, preloadExtra, rendererExtra] = await Promise.all([
+      evalConfigInput(main, env),
+      evalConfigInput(preload, env),
+      evalConfigInput(renderer, env),
+    ])
+
     return {
-      main: {
-        build: {
-          rollupOptions: {
-            input: { index: resolve(cwd, mainEntry) },
-            // Electron 内置模块不在 electron-vite 默认 external 列表里，显式声明
-            // （运行时由 Electron 提供，删真实 .asar 文件必须用它绕过 asar fs 补丁）
-            external: ['original-fs'],
-          },
-        },
-      },
-      preload: {
-        build: {
-          rollupOptions: {
-            input: { index: resolve(cwd, preloadEntry) },
-            // 强制 CJS：ESM preload 要求 sandbox: false，这里保持 sandbox: true 的安全默认。
-            // 文件名显式固定，不受 app package.json type 影响
-            output: {
-              format: 'cjs',
-              entryFileNames: '[name].cjs',
-              chunkFileNames: '[name]-[hash].cjs',
-            },
-          },
-        },
-      },
-      renderer: {
-        root: '.',
-        build: {
-          rollupOptions: {
-            input: { index: resolve(cwd, 'index.html') },
-          },
-        },
-        ...extra,
-      },
+      main: mergeExtra(mainDefaults, mainExtra),
+      preload: mergeExtra(preloadDefaults, preloadExtra),
+      renderer: mergeExtra(rendererDefaults, rendererExtra),
     }
   }
 }

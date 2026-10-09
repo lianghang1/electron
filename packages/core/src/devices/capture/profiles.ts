@@ -43,4 +43,15 @@ export const BUILT_IN_CAPTURE_PROFILES: CaptureDeviceProfile[] = [
     },
     capabilities: { ocr: true },
   },
+  {
+    id: 'huashi-camsdk-9000',
+    brand: '华视',
+    displayName: '华视高拍仪（本地服务 9000）',
+    transport: 'ws',
+    // 华视 CamSDKServer（高拍仪 SDK 常驻服务）JSON 协议：
+    // GetCameraInfo / OpenCamera / GetCameraVideoBuff / CameraCapture(base64) / CloseCamera
+    // camId = devNum：0 为高拍仪主摄像头（Document Scanner），服务端另有副摄与内置摄像头
+    ws: { url: 'ws://127.0.0.1:9000', protocol: 'camsdk', camId: 0 },
+    capabilities: { crop: true, desewarp: true, maxDpi: 300 },
+  },
 ]

@@ -163,3 +163,55 @@ $('#btn-cap-print').addEventListener('click', async () => {
 
 registerRefresher(refreshCaptureDevices)
 void refreshCaptureDevices()
+
+// ── 设备档案配置：ws 档案的服务地址（IP/端口）与摄像头编号运行时编辑，保存即热重建适配器 ──
+
+let capProfiles = []
+
+async function refreshCapProfiles() {
+  try {
+    capProfiles = await window.desktop.capture.getProfiles()
+  }
+  catch { capProfiles = [] }
+  const sel = $('#cap-profile')
+  const prev = sel.value
+  const wsProfiles = capProfiles.filter(p => p.ws)
+  sel.innerHTML = wsProfiles.length
+    ? wsProfiles.map(p => `<option value="${esc(p.id)}">${esc(p.displayName)}</option>`).join('')
+    : '<option value="">无 ws 档案</option>'
+  sel.value = prev && wsProfiles.some(p => p.id === prev) ? prev : sel.options[0]?.value ?? ''
+  syncCapProfileForm()
+}
+
+function syncCapProfileForm() {
+  const p = capProfiles.find(x => x.id === $('#cap-profile').value)
+  $('#cap-url').value = p?.ws?.url ?? ''
+  $('#cap-camid').value = p?.ws?.camId ?? 0
+  const proto = p?.ws?.protocol ?? (p?.ws ? 'dianyipai' : '')
+  $('#cap-profile-note').textContent = p ? `协议：${proto}` : ''
+}
+
+$('#cap-profile').addEventListener('change', syncCapProfileForm)
+
+$('#btn-cap-save').addEventListener('click', async () => {
+  const p = capProfiles.find(x => x.id === $('#cap-profile').value)
+  if (!p?.ws) {
+    toast('请先选择一个 ws 档案', false)
+    return
+  }
+  const url = $('#cap-url').value.trim()
+  if (!/^wss?:\/\/.+:/.test(url)) {
+    toast('服务地址格式应为 ws://IP:端口', false)
+    return
+  }
+  try {
+    await window.desktop.capture.upsertProfile({ ...p, ws: { ...p.ws, url, camId: Math.max(0, Number($('#cap-camid').value) || 0) } })
+    toast('档案已保存，适配器已热重建')
+    await refreshCapProfiles()
+    await refreshCaptureDevices()
+  }
+  catch (e) { toast(e.message, false) }
+})
+
+registerRefresher(refreshCapProfiles)
+void refreshCapProfiles()

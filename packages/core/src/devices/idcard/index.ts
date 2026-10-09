@@ -1,5 +1,5 @@
 import type { Logger } from '../../logger/logger'
-import type { IdReaderDevice, IdReaderResult } from './types'
+import type { IcCardReadRequest, IcCardWriteRequest, IcCardWriteResult, IcReaderResult, IdReaderDevice, IdReaderResult } from './types'
 import { IdCardService } from './service'
 
 export interface IdCardSystemOptions {
@@ -12,7 +12,12 @@ export interface IdCardSystemOptions {
 
 export interface IdCardSystem {
   listReaders: () => Promise<IdReaderDevice[]>
+  /** 读身份证（寻卡认证读取全程锁定，同设备与 readIc 串行化） */
   read: (req: { deviceId: string }) => Promise<IdReaderResult>
+  /** 读 M1 IC 卡（密钥认证读块，与 read 同设备串行化） */
+  readIc: (req: IcCardReadRequest & { deviceId: string }) => Promise<IcReaderResult>
+  /** 写 M1 IC 卡单块（覆盖写，驱动强制拒绝密钥控制块/厂商块；与读同设备串行化） */
+  writeIc: (req: IcCardWriteRequest & { deviceId: string }) => Promise<IcCardWriteResult>
   destroy: () => void
 }
 
@@ -22,6 +27,8 @@ export function createIdCardSystem(options: IdCardSystemOptions): IdCardSystem {
   return {
     listReaders: () => service.listReaders(),
     read: req => service.read(req),
+    readIc: req => service.readIc(req),
+    writeIc: req => service.writeIc(req),
     destroy: () => service.destroy(),
   }
 }

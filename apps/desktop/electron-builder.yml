@@ -11,9 +11,9 @@ files:
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json,contracts.d.ts}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-asarUnpack:
-  - resources/**
-# 设备域 asar 外资源（SumatraPDF / 厂商 DLL，需 spawn/LoadLibrary 真实文件）：
+  # 根 resources 走 extraResources（asar 外真实文件），不进 asar；icon 已由 ?asset 构建进 out/
+  - '!resources/**'
+# 运行时资源（SumatraPDF / 厂商 DLL / 内置应用页面，需真实文件路径）：
 # dev 取 <应用根>/resources，打包注入 <resourcesPath>/resources，路径解析统一走 core resolveResourcePath
 extraResources:
   - from: resources

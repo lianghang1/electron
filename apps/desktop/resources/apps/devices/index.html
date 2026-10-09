@@ -115,7 +115,7 @@
     flex: 1; min-height: 320px; border: 1px solid var(--border); border-radius: 10px; background: #10141c;
     position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;
   }
-  .cap-stage video, .cap-stage img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .cap-stage video, .cap-stage img, .cap-stage canvas { max-width: 100%; max-height: 100%; object-fit: contain; background: #fff; }
   .cap-stage .placeholder { color: #6b7688; font-size: 12px; }
   .cap-aside { width: 150px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; }
   .cap-aside img { width: 100%; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
@@ -137,12 +137,13 @@
 <div class="topbar">
   <div class="brand">
     <h1>设备测试</h1>
-    <p>外设通道验证：打印 · 证卡 · 采集 · 扫码</p>
+    <p>外设通道验证：打印 · 证卡 · 采集 · 扫码 · 签名</p>
   </div>
   <button class="nav-tab active" data-page="print">打印</button>
   <button class="nav-tab" data-page="idcard">证卡</button>
   <button class="nav-tab" data-page="capture">采集</button>
   <button class="nav-tab" data-page="scanner">扫码</button>
+  <button class="nav-tab" data-page="signature">签名</button>
   <span style="flex:1"></span>
   <span class="hint" id="updated-at"></span>
   <button class="btn ghost" id="btn-refresh" style="margin: 0 0;">刷新设备</button>
@@ -287,6 +288,33 @@
     <div class="panel" id="printer-list"><div class="empty">检测中…</div></div>
 
     <div class="toolbar">
+      <span class="section-label">网络直连打印机</span>
+      <span class="hint">小票机/标签机 TCP 直连（指令直写），mock 档案指令落盘不联网；保存即时生效并持久化</span>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="btn-netp-add">添加</button>
+    </div>
+    <div class="panel" id="netp-list"><div class="empty">加载中…</div></div>
+    <div class="panel padded" id="netp-form" hidden style="margin-top: 12px;">
+      <div class="form-grid" style="align-items: flex-end;">
+        <label class="field"><span>名称</span><input class="input" id="netp-name" placeholder="前台小票机" style="width: 130px;"></label>
+        <label class="field"><span>主机地址</span><input class="input mono" id="netp-host" placeholder="192.168.1.100" style="width: 140px;" spellcheck="false"></label>
+        <label class="field"><span>端口</span><input class="input" id="netp-port" type="number" min="1" max="65535" value="9100" style="width: 84px;"></label>
+        <label class="field"><span>协议</span>
+          <select class="input" id="netp-protocol">
+            <option value="escpos">ESC/POS</option>
+            <option value="star">Star</option>
+            <option value="zpl">ZPL（斑马标签）</option>
+          </select>
+        </label>
+        <label class="check" style="padding-bottom: 7px;"><input type="checkbox" id="netp-mock"> 落盘模拟（不联网）</label>
+        <label class="check" style="padding-bottom: 7px;"><input type="checkbox" id="netp-default"> 设为默认</label>
+        <button class="btn" id="btn-netp-save">保存</button>
+        <button class="btn ghost" id="btn-netp-cancel">取消</button>
+      </div>
+      <div class="hint" id="netp-form-note" style="margin-top: 8px;"></div>
+    </div>
+
+    <div class="toolbar">
       <span class="section-label">打印任务（最近 100 条）</span>
       <span class="spacer"></span>
       <button class="btn danger-ghost" id="btn-clear-jobs">清空记录</button>
@@ -312,6 +340,62 @@
       <div class="id-body">
         <img id="id-photo" class="id-photo" alt="证件照片">
         <div class="id-fields" id="id-fields"></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <span class="section-label">IC 卡读取（Mifare）</span>
+      <span class="hint">与身份证共用读卡器，同一时刻串行；出厂白键卡片无需输入密钥</span>
+    </div>
+    <div class="panel padded">
+      <div class="form-grid" style="align-items: center;">
+        <label class="field"><span>扇区（0-15）</span>
+          <input class="input" id="ic-sector" type="number" min="0" max="15" value="1" style="width: 70px;">
+        </label>
+        <label class="field"><span>密钥（12 位 hex，留空 = 出厂白键）</span>
+          <input class="input mono" id="ic-key" placeholder="FFFFFFFFFFFF" style="width: 150px;" spellcheck="false" maxlength="12">
+        </label>
+        <label class="field"><span>密钥类型</span>
+          <select class="input" id="ic-keytype" style="width: 80px;">
+            <option value="A">A 键</option>
+            <option value="B">B 键</option>
+          </select>
+        </label>
+        <button class="btn" id="btn-ic-read" style="align-self: flex-end; margin-bottom: 1px;">读取 IC 卡</button>
+        <span class="hint" id="ic-status">选择读卡器后点击读取</span>
+      </div>
+    </div>
+    <div class="panel" id="ic-result" style="margin-top: 12px;" hidden>
+      <div class="row"><span class="hint" style="width: 80px; flex-shrink: 0;">UID</span><span class="name mono selectable" id="ic-uid"></span></div>
+      <div class="row"><span class="hint" style="width: 80px; flex-shrink: 0;">卡类型</span><span class="name mono" id="ic-type"></span></div>
+      <div class="row" style="display: block;">
+        <span class="hint">数据块（每块 16 字节 hex；密钥控制块不回读）</span>
+        <div id="ic-blocks" class="mono selectable" style="margin-top: 6px; line-height: 1.9;"></div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <span class="section-label">IC 卡写入（单块）</span>
+      <span class="hint">覆盖写入 16 字节、不可恢复；驱动强制拒绝密钥控制块（每扇区末块）与厂商块（块 0）</span>
+    </div>
+    <div class="panel padded">
+      <div class="form-grid" style="align-items: center;">
+        <label class="field"><span>块地址（0-63）</span>
+          <input class="input" id="ic-wblock" type="number" min="0" max="63" value="4" style="width: 70px;">
+        </label>
+        <label class="field"><span>数据（32 位 hex = 16 字节）</span>
+          <input class="input mono" id="ic-wdata" placeholder="000102030405060708090A0B0C0D0E0F" style="width: 250px;" spellcheck="false" maxlength="32">
+        </label>
+        <label class="field"><span>扇区密钥（留空 = 白键）</span>
+          <input class="input mono" id="ic-wkey" placeholder="FFFFFFFFFFFF" style="width: 130px;" spellcheck="false" maxlength="12">
+        </label>
+        <label class="field"><span>密钥类型</span>
+          <select class="input" id="ic-wkeytype" style="width: 80px;">
+            <option value="A">A 键</option>
+            <option value="B">B 键</option>
+          </select>
+        </label>
+        <button class="btn danger-ghost" id="btn-ic-write" style="align-self: flex-end; margin-bottom: 1px;">写入块</button>
       </div>
     </div>
   </section>
@@ -340,6 +424,26 @@
       <span class="spacer"></span>
       <button class="btn ghost" id="btn-cap-print" disabled>打印此图</button>
     </div>
+
+    <div class="toolbar">
+      <span class="section-label">设备档案配置</span>
+      <span class="hint">本地服务地址（IP/端口）与摄像头编号可运行时编辑，保存即热重建适配器</span>
+    </div>
+    <div class="panel padded">
+      <div class="form-grid" style="align-items: center;">
+        <label class="field"><span>档案</span>
+          <select class="input" id="cap-profile" style="min-width: 220px;"><option value="">加载中…</option></select>
+        </label>
+        <label class="field"><span>服务地址</span>
+          <input class="input mono" id="cap-url" placeholder="ws://127.0.0.1:9000" style="width: 190px;" spellcheck="false">
+        </label>
+        <label class="field"><span>摄像头编号</span>
+          <input class="input" id="cap-camid" type="number" min="0" value="0" style="width: 70px;">
+        </label>
+        <button class="btn" id="btn-cap-save" style="align-self: flex-end; margin-bottom: 1px;">保存配置</button>
+        <span class="hint" id="cap-profile-note"></span>
+      </div>
+    </div>
   </section>
 
   <!-- ══════════ 扫码 ══════════ -->
@@ -350,18 +454,25 @@
     </div>
     <div class="panel padded">
       <div class="form-grid">
-        <label class="check" style="align-self: flex-end; padding-bottom: 6px;">
-          <input type="checkbox" id="scan-enabled"> 启用扫码枪
-        </label>
-        <label class="field"><span>结束超时 (ms)</span><input class="input" id="scan-timeout" type="number" min="10" step="10" style="width: 90px;"></label>
-        <label class="field"><span>最小码长</span><input class="input" id="scan-minlen" type="number" min="1" style="width: 70px;"></label>
+        <div class="field">
+          <label class="check"><input type="checkbox" id="scan-enabled"> 启用扫码枪</label>
+          <span class="hint">总开关：关闭后按键不再进入条码缓冲，扫码枪退化为普通键盘</span>
+        </div>
+        <label class="field"><span>结束超时 (ms)</span><input class="input" id="scan-timeout" type="number" min="10" step="10" style="width: 90px;"><span class="hint">两次按键间隔超过该时长即判定一条码结束</span></label>
+        <label class="field"><span>最小码长</span><input class="input" id="scan-minlen" type="number" min="1" style="width: 70px;"><span class="hint">短于该长度的连击输入按误触过滤</span></label>
         <label class="field"><span>结束键</span>
           <select class="input" id="scan-endkey">
             <option value="Enter">Enter</option>
             <option value="NumpadEnter">小键盘 Enter</option>
             <option value="Tab">Tab</option>
           </select>
+          <span class="hint">扫码枪出码时追加的结束按键，需与枪机设置一致</span>
         </label>
+        <label class="field"><span>前缀（逗号分隔）</span><input class="input mono" id="scan-prefixes" placeholder="PB:, SO-" style="width: 150px;" spellcheck="false"><span class="hint">区分单据类型的条码头，命中后结果带前缀标记</span></label>
+        <div class="field">
+          <label class="check"><input type="checkbox" id="scan-require-prefix"> 强制要求前缀</label>
+          <span class="hint">开启后未命中任何前缀的输入不作为有效扫码</span>
+        </div>
         <button class="btn" id="btn-scan-save">保存配置</button>
       </div>
     </div>
@@ -384,6 +495,32 @@
     </div>
     <div class="panel" id="scan-list"><div class="empty">用扫码枪扫一下，或先模拟一条</div></div>
   </section>
+
+  <!-- ══════════ 签名 ══════════ -->
+  <section class="page" id="page-signature">
+    <div class="toolbar">
+      <span class="section-label">签名设备</span>
+      <select class="input" id="sign-device" style="min-width: 260px;"><option value="">检测签名设备中…</option></select>
+      <span class="spacer"></span>
+      <span class="hint" id="sign-status">开始会话后笔迹点实时推送，本页 canvas 自绘（汉王回调协议待实测，见设备备注）</span>
+    </div>
+    <div class="cap-wrap">
+      <div class="cap-stage" id="sign-stage">
+        <canvas id="sign-canvas" hidden></canvas>
+        <span class="placeholder" id="sign-placeholder">开始会话后在签名板书写，笔迹实时显示于此</span>
+      </div>
+      <div class="cap-aside" style="justify-content: flex-end;">
+        <span class="hint" id="sign-count">笔画 0</span>
+      </div>
+    </div>
+    <div class="cap-ops">
+      <button class="btn" id="btn-sign-start">开始会话</button>
+      <button class="btn ghost" id="btn-sign-stop" disabled>完成并回收</button>
+      <button class="btn ghost" id="btn-sign-clear" disabled>清板</button>
+      <span class="sep"></span>
+      <button class="btn danger-ghost" id="btn-sign-cancel" disabled>取消会话</button>
+    </div>
+  </section>
 </main>
 
 <div id="toast"></div>
@@ -393,5 +530,6 @@
 <script src="js/idcard.js"></script>
 <script src="js/capture.js"></script>
 <script src="js/scanner.js"></script>
+<script src="js/signature.js"></script>
 </body>
 </html>

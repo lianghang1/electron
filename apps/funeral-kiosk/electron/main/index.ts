@@ -1,7 +1,7 @@
 import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import { is } from '@electron-toolkit/utils'
-import icon from '../resources/icon.png?asset'
+import icon from '../../resources/icon.png?asset'
 import { registerKioskBusiness } from './business'
 
 /**

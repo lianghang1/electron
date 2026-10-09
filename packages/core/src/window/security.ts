@@ -105,7 +105,7 @@ export function applyWebAppGuards(
  * 链路会整体失效；而通知 / 剪贴板读取只走同步 check、没有 request 环节，
  * 必须保持声明制，不可放进这里。
  *
- * fullscreen 故意不在其中：实测 Electron 39 对全屏权限的异步拒绝（用户拒绝 /
+ * fullscreen 故意不在其中：Electron 39 对全屏权限的异步拒绝（用户拒绝 /
  * 超时）会让该 Session 后续的 requestFullscreen 永不再派发且 Promise 永挂
  * （页面卡死，刷新也无法恢复），异步授权路径不可用。全屏在浏览器本就不询问
  * 用户，因此按声明制处理——声明了才启用（request 同步放行），未声明

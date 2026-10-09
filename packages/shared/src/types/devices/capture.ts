@@ -75,8 +75,12 @@ export interface CaptureDeviceProfile {
   transport: CaptureTransport
   /** dll 路线：DLL 路径（asar 外）+ koffi 函数签名（拿到厂商 .h 后填写） */
   dll?: { file: string, functions?: Record<string, string> }
-  /** ws 路线：厂商本地 WebSocket 服务（点易拍 9002 等） */
-  ws?: { url: string, camId?: number, width?: number, height?: number }
+  /**
+   * ws 路线：厂商本地 WebSocket 服务。
+   * protocol：'dianyipai'（点易拍 BaucheSDK 二进制帧，缺省）| 'camsdk'（华视 CamSDKServer JSON 帧）。
+   * camId：点易拍为摄像头编号，camsdk 下为 devNum。verified = 协议帧已验证（缺省视为已验证）。
+   */
+  ws?: { url: string, protocol?: 'dianyipai' | 'camsdk', camId?: number, width?: number, height?: number, verified?: boolean }
   /** service 路线：厂商本地 HTTP 服务模板 */
   service?: {
     baseUrl: string

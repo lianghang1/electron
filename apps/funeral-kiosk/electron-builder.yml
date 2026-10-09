@@ -11,6 +11,12 @@ files:
   - '!electron.vite.config.{js,ts,mjs,cjs}'
   - '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+  # 资源源文件不进 asar：icon 经 ?asset 构建进 out/；路径读取的资源（设备 SDK DLL/
+  # 授权文件等）经 extraResources 随包发布到 resourcesPath/resources
+  - '!resources/**'
+extraResources:
+  - from: resources
+    to: resources
 win:
   target:
     - target: nsis

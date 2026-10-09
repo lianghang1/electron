@@ -6,6 +6,7 @@ import type { CaptureSystem } from '../devices/capture'
 import type { IdCardSystem } from '../devices/idcard'
 import type { PrintSystem } from '../devices/print'
 import type { ScannerSystem } from '../devices/scanner'
+import type { SignatureSystem } from '../devices/signature'
 import type { DownloadService } from '../download/download-service'
 import type { EventBus } from '../event/event-bus'
 import type { PermissionService } from '../permission/permission-service'
@@ -26,6 +27,7 @@ import { registerOverlayIpc } from './overlay'
 import { registerPermissionIpc } from './permission'
 import { registerPrintIpc } from './print'
 import { registerScannerIpc } from './scanner'
+import { registerSignatureIpc } from './signature'
 import { registerStorageIpc } from './storage'
 import { registerTabsIpc } from './tabs'
 import { registerUpdateIpc } from './update'
@@ -51,6 +53,8 @@ export interface PlatformIpcDeps {
   downloadService: DownloadService
   /** 设备系统（读卡器等外设硬件）：bootstrap 装配，未配置时设备通道返回不可用结果 */
   idCard?: IdCardSystem
+  /** 手写签名系统（bootstrap 装配）：未配置时签名通道返回不可用结果 */
+  signature?: SignatureSystem
   /** 扫码枪系统（bootstrap 装配，恒创建） */
   scanner: ScannerSystem
   /** 图像采集系统（bootstrap 装配，恒创建） */
@@ -90,6 +94,7 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   })
   registerDownloadIpc({ downloadService: deps.downloadService, overlayService: deps.overlayService, resolver: deps.resolver })
   registerDeviceIpc({ idCard: deps.idCard })
+  registerSignatureIpc({ signature: deps.signature })
   registerScannerIpc({ scanner: deps.scanner })
   registerCaptureIpc({ capture: deps.capture })
   registerPrintIpc({ print: deps.print })

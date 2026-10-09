@@ -2,9 +2,9 @@ import type { DesktopAppManifest } from '@desktop/shared'
 import { readFile } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
-import { bootstrap } from '@desktop/core'
+import { bootstrap, resolveResourcePath } from '@desktop/core'
 import { protocol } from 'electron'
-import icon from '../resources/icon.png?asset'
+import icon from '../../resources/icon.png?asset'
 
 // 内部 App 页面协议：app://<appId>/index.html。
 // standard + secure 使其成为标准安全源——cookie / origin 语义等同 https（file:// 源禁止写 cookie），
@@ -16,13 +16,13 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 /**
- * 内部 App 的磁盘根：electron/resources/apps。
- * import.meta.dirname 为 out/main——dev 与生产（app.core.asar 保持 out/ 布局，热更包同构）下
- * ../../electron/resources/apps 均成立；electron fs 对 asar 内路径透明，readFile 直接可读。
+ * 内部 App 的磁盘根：resources/apps（根 resources 统一约定）。
+ * resolveResourcePath 双路径：dev 解析 <appRoot>/resources/apps，打包解析
+ * <resourcesPath>/resources/apps（electron-builder extraResources 落点，asar 外真实目录）。
  * 刻意不走 ?asset：?asset 只发射锚点文件本身到 out/main/chunks，兄弟 assets 不跟随，
  * 目录模式必须按真实目录解析。
  */
-const internalAppsRoot = resolve(import.meta.dirname, '../../electron/resources/apps')
+const internalAppsRoot = resolveResourcePath('resources/apps')
 
 /** appId → 内部页磁盘目录，目录模式按 pathname 提供文件 */
 const appDirs: Record<string, string> = {
@@ -179,6 +179,8 @@ bootstrap({
   browserWindowOptions: { titleBarStyle: 'hidden', backgroundColor: '#f6f7f9' },
   // 内部页标准源协议：处理器挂到每个 App 的 persist 分区 Session 上（core 统一注册）
   protocols: { app: handleAppRequest },
+  // 设备模拟联调开关：DESKTOP_DEVICES_MOCK=1 注册 stub 读卡器/采集/签名（无硬件验证链路；正式环境不设置即零模拟）
+  devices: { mock: process.env.DESKTOP_DEVICES_MOCK === '1' },
   apps: {
     allowThirdParty: false,
     manifests: builtinApps,

@@ -2,9 +2,9 @@
 /* eslint-disable node/prefer-global/process */
 import type { BrandDriver, IdCardData } from '../types'
 import { existsSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import path from 'node:path'
 import { idCardError } from '../errors'
+import { requireKoffi, type KoffiFn, type KoffiLib } from './koffi'
 
 /**
  * 华视电子身份证阅读器驱动（深圳华视 SDK V7.1.8，函数以《身份证阅读器SDK使用手册.doc》为准）。
@@ -43,14 +43,6 @@ import { idCardError } from '../errors'
  * PII 红线：读出的证件号/姓名/地址/照片不得写日志、不得持久化（照片全程内存直读，不落盘）。
  */
 
-type KoffiFn = (...args: unknown[]) => number
-interface KoffiLib {
-  func: (signature: string) => KoffiFn
-}
-
-const nodeRequire = createRequire(__filename)
-
-/** 华视 9 个 U 版字段接口（姓名/性别/民族/出生/证号/住址/签发机关/有效期起/有效期止） */
 const FIELD_FNS: Array<[keyof IdCardData, string]> = [
   ['name', 'GetPeopleNameU'],
   ['gender', 'GetPeopleSexU'],
@@ -77,22 +69,29 @@ function normalizeDate(raw: string): string {
  * 新增厂商 = drivers/ 加一个同类驱动 + dll-adapter 注册表加一行。
  */
 export class HuashiDriver implements BrandDriver {
-  readonly brand = '华视'
-  readonly displayName = '华视 CVR-100 证卡读卡器（USB）'
+  // 显式 string 标注（放宽字面量收窄）：CVR 兼容贴牌驱动（科密等）子类覆写品牌/位置
+  readonly brand: string = '华视'
+  readonly displayName: string = '华视 CVR-100 证卡读卡器（USB）'
   /** DLL 相对宿主资源根的出厂位置 */
-  readonly dllFile = 'devices/huashi/Termb.dll'
+  readonly dllFile: string = 'devices/huashi/Termb.dll'
   /** 1001-1016 = USB；1-16 = 串口 */
   readonly port = 1001
+  /** 进程级全局资源互斥：华视系 SDK 靠 chdir 找相邻资源，dll:huashi 与 dll:kemi 不得并发 open（科密子类继承同组） */
+  readonly lockGroup = 'huashi'
 
-  private readonly dllPath: string
+  private readonly resourcesRoot: string
   private lib: KoffiLib | null = null
   private fns: Record<string, KoffiFn> = {}
   /** 读卡会话前的进程 cwd 暂存（open 时切到 DLL 目录，close 时恢复） */
   private prevCwd: string | null = null
 
-  /** 宿主注入资源根，DLL 绝对路径在此拼定 */
+  /** 宿主注入资源根；DLL 绝对路径走 getter（运行时求值 this.dllFile，CVR 兼容贴牌驱动子类覆写 dllFile 即复用全部流程） */
   constructor(resourcesRoot: string) {
-    this.dllPath = path.join(resourcesRoot, this.dllFile)
+    this.resourcesRoot = resourcesRoot
+  }
+
+  private get dllPath(): string {
+    return path.join(this.resourcesRoot, this.dllFile)
   }
 
   dllPresent(): boolean {
@@ -106,15 +105,8 @@ export class HuashiDriver implements BrandDriver {
     if (!existsSync(this.dllPath)) {
       throw idCardError('DEVICE_OFFLINE', `华视 DLL 未就位: ${this.dllPath}`, { dllPath: this.dllPath })
     }
-    let koffi: { load: (p: string) => KoffiLib }
-    try {
-      // 运行时解析，避免构建期依赖 koffi（真机联调时 npm i koffi）
-      koffi = nodeRequire('koffi')
-    }
-    catch {
-      throw idCardError('ADAPTER_UNAVAILABLE', '未安装 koffi 依赖（npm i koffi）', { dllPath: this.dllPath })
-    }
-    this.lib = koffi.load(this.dllPath)
+    // 运行时解析，避免构建期依赖 koffi（真机联调时 npm i koffi）
+    this.lib = requireKoffi({ dllPath: this.dllPath }).load(this.dllPath)
     const f = this.lib.func.bind(this.lib)
     this.fns = {
       CVR_InitComm: f('int CVR_InitComm(int)'),
@@ -130,13 +122,19 @@ export class HuashiDriver implements BrandDriver {
   /**
    * 打开连接（USB 端口 1001）。SDK 按 cwd 相对路径解析 license.dat 与 WltRS.dll，
    * Electron 的 cwd 不可控（真机实验：cwd 偏差 → 照片解码静默失败返回空载荷），
-   * 故会话期间 chdir 到 DLL 目录；读卡经 service 锁串行化，chdir 窗口无并发。
+   * 故会话期间 chdir 到 DLL 目录；华视系（含科密）经 service 锁按 lockGroup 串行化，chdir 窗口无并发。
    */
   open(): void {
     this.ensureLoaded()
     this.prevCwd = process.cwd()
-    process.chdir(path.dirname(this.dllPath))
     try {
+      const dllDir = path.dirname(this.dllPath)
+      try {
+        process.chdir(dllDir)
+      }
+      catch {
+        throw idCardError('DEVICE_OFFLINE', '切换工作目录到 DLL 目录失败', { dllDir })
+      }
       const r = this.fns.CVR_InitComm(this.port)
       if (r !== 1) {
         throw idCardError('DEVICE_OFFLINE', `打开华视读卡器失败（端口 ${this.port}，返回码 ${r}）`, { port: this.port, ret: r })

@@ -369,3 +369,96 @@ void (async () => {
   switchKind('receipt80')
   await refreshJobs()
 })()
+
+// ── 网络直连打印机档案：运行时添加/编辑（upsert 持久化 + 即时生效）；新档案 id 按 raw:host:port 统一约定 ──
+
+const NETP_PROTOCOL_LABEL = { escpos: 'ESC/POS', star: 'Star', zpl: 'ZPL' }
+
+let netPrinters = []
+let editingNetPrinter = null
+
+function renderNetPrinters() {
+  const box = $('#netp-list')
+  if (!netPrinters.length) {
+    box.innerHTML = '<div class="empty">暂无网络直连打印机档案，点右上「添加」创建</div>'
+    return
+  }
+  box.innerHTML = netPrinters.map((p) => {
+    const addr = p.mock ? '落盘模拟' : `${p.transport.host}:${p.transport.port}`
+    return `<div class="row">
+      <div class="grow">
+        <div class="name">${esc(p.displayName || p.id)}${p.isDefault ? ' <span class="chip brand">默认</span>' : ''}</div>
+        <div class="sub">${esc(NETP_PROTOCOL_LABEL[p.protocol] ?? p.protocol)} · ${esc(addr)} · ${esc(p.id)}</div>
+      </div>
+      ${p.mock ? '<span class="chip">模拟</span>' : ''}
+      <button class="btn ghost" data-netp-edit="${esc(p.id)}">编辑</button>
+    </div>`
+  }).join('')
+}
+
+async function refreshNetPrinters() {
+  try {
+    netPrinters = await window.desktop.print.getNetworkPrinters()
+  }
+  catch (e) {
+    toast(`读取打印机档案失败：${e.message}`, false)
+    netPrinters = []
+  }
+  renderNetPrinters()
+}
+
+function openNetPrinterForm(p) {
+  editingNetPrinter = p ?? null
+  $('#netp-name').value = p?.displayName ?? ''
+  $('#netp-host').value = p?.transport?.host ?? ''
+  $('#netp-port').value = p?.transport?.port ?? 9100
+  $('#netp-protocol').value = p?.protocol ?? 'escpos'
+  $('#netp-mock').checked = !!p?.mock
+  $('#netp-default').checked = !!p?.isDefault
+  $('#netp-form-note').textContent = p ? `正在编辑「${p.displayName || p.id}」，id 保持不变` : '新档案，id 按地址生成'
+  $('#netp-form').hidden = false
+}
+
+function closeNetPrinterForm() {
+  editingNetPrinter = null
+  $('#netp-form').hidden = true
+}
+
+$('#btn-netp-add').addEventListener('click', () => openNetPrinterForm(null))
+$('#btn-netp-cancel').addEventListener('click', closeNetPrinterForm)
+
+$('#netp-list').addEventListener('click', (e) => {
+  const id = e.target.dataset?.netpEdit
+  if (!id) return
+  const p = netPrinters.find(x => x.id === id)
+  if (p) openNetPrinterForm(p)
+})
+
+$('#btn-netp-save').addEventListener('click', async () => {
+  const name = $('#netp-name').value.trim()
+  const host = $('#netp-host').value.trim()
+  const port = Number($('#netp-port').value)
+  if (!name) { toast('请填写打印机名称', false); return }
+  if (!host) { toast('请填写主机地址', false); return }
+  if (!Number.isInteger(port) || port < 1 || port > 65535) { toast('端口应为 1-65535 的整数', false); return }
+  const printer = {
+    ...(editingNetPrinter ?? {}),
+    id: editingNetPrinter?.id ?? `raw:${host}:${port}`,
+    displayName: name,
+    protocol: $('#netp-protocol').value,
+    transport: { type: 'tcp', host, port },
+    mock: $('#netp-mock').checked,
+    isDefault: $('#netp-default').checked || undefined,
+  }
+  try {
+    netPrinters = await window.desktop.print.upsertNetworkPrinter(printer)
+    renderNetPrinters()
+    closeNetPrinterForm()
+    toast('打印机档案已保存')
+    await refreshPrinters()
+  }
+  catch (e) { toast(e.message, false) }
+})
+
+registerRefresher(refreshNetPrinters)
+void refreshNetPrinters()
