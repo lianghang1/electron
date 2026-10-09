@@ -5,9 +5,7 @@
   "description": "",
   "scripts": {
     "dev": "pnpm --filter @app/desktop dev",
-    "dev:kiosk": "pnpm --filter @app/kiosk dev",
     "build": "pnpm --filter @app/desktop build",
-    "build:kiosk": "pnpm --filter @app/kiosk build",
     "build:win": "pnpm --filter @app/desktop build:win",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

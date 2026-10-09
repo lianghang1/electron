@@ -1,11 +1,9 @@
 import type { DesktopAppManifest } from '@desktop/shared'
 import { readFile } from 'node:fs/promises'
+import { extname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import { protocol } from 'electron'
-import crmUrl from '../resources/apps/crm.html?asset'
-import labUrl from '../resources/apps/lab.html?asset'
-import oaUrl from '../resources/apps/oa.html?asset'
 import icon from '../resources/icon.png?asset'
 
 // 内部 App 页面协议：app://<appId>/index.html。
@@ -17,11 +15,38 @@ protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ])
 
-/** appId → 内部页磁盘文件（?asset 产出的磁盘绝对路径），协议处理器按 host 取文件 */
-const appFiles: Record<string, string> = {
-  crm: crmUrl,
-  oa: oaUrl,
-  lab: labUrl,
+/**
+ * 内部 App 的磁盘根：electron/resources/apps。
+ * import.meta.dirname 为 out/main——dev 与生产（app.core.asar 保持 out/ 布局，热更包同构）下
+ * ../../electron/resources/apps 均成立；electron fs 对 asar 内路径透明，readFile 直接可读。
+ * 刻意不走 ?asset：?asset 只发射锚点文件本身到 out/main/chunks，兄弟 assets 不跟随，
+ * 目录模式必须按真实目录解析。
+ */
+const internalAppsRoot = resolve(import.meta.dirname, '../../electron/resources/apps')
+
+/** appId → 内部页磁盘目录，目录模式按 pathname 提供文件 */
+const appDirs: Record<string, string> = {
+  devices: join(internalAppsRoot, 'devices'),
+  lab: join(internalAppsRoot, 'lab'),
+}
+
+/** 目录模式支持的静态资源类型：未知扩展名一律 404，不给任意文件读取留口子 */
+const assetMimeTypes: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json',
+  '.map': 'application/json',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
 }
 
 const appEntryUrl = (id: string): string => `app://${id}/index.html`
@@ -56,50 +81,47 @@ function handleSlowDownload(): Response {
   })
 }
 
-/** 忽略 pathname：内部页均为单文件应用，任意路径都回落到 entry 文件（杜绝路径穿越） */
+/**
+ * 目录模式：appId → 目录，pathname → 文件。
+ * '/' 回落 index.html；解码 URL 转义；resolve 后必须落在目录内（杜绝路径穿越）；
+ * 扩展名必须在 MIME 表内（未知类型拒绝），每次请求实时读盘（改完刷新即生效）。
+ */
+async function handleDirAppRequest(host: string, pathname: string): Promise<Response> {
+  const dir = appDirs[host]
+  const relative = decodeURIComponent(pathname).replace(/^\/+/, '') || 'index.html'
+  const file = resolve(dir, relative)
+  if (!file.startsWith(dir + sep))
+    return new Response(`forbidden path: ${host}/${relative}`, { status: 403 })
+  const mime = assetMimeTypes[extname(file).toLowerCase()]
+  if (!mime)
+    return new Response(`unsupported asset: ${host}/${relative}`, { status: 404 })
+  try {
+    const data = await readFile(file)
+    return new Response(data, { headers: { 'content-type': mime } })
+  }
+  catch {
+    return new Response(`asset not found: ${host}/${relative}`, { status: 404 })
+  }
+}
+
+/** 内部页请求路由：纯目录模式，源码即产物，实时读盘改完刷新即生效（lab 的 slow-download 特殊路由除外） */
 async function handleAppRequest(request: Request): Promise<Response> {
   const { host, pathname } = new URL(request.url)
-  if (host === 'lab' && pathname === '/slow-download')
+  if (host === 'lab' && pathname === '/slow-download') {
     return handleSlowDownload()
-  const file = appFiles[host]
-  if (!file)
-    return new Response(`unknown internal app: ${host}`, { status: 404 })
-  try {
-    // ?asset 产出的就是磁盘绝对路径（join(import.meta.dirname, ...)），直接读
-    const html = await readFile(file)
-    return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } })
   }
-  catch (error) {
-    // 读文件失败时把错误带回页面（status 500），避免只看到无信息的空白错误页
-    return new Response(`internal app load failed: ${host}\n${String(error)}`, {
-      status: 500,
-      headers: { 'content-type': 'text/plain; charset=utf-8' },
-    })
+  if (host in appDirs) {
+    return handleDirAppRequest(host, pathname)
   }
+  return new Response(`unknown internal app: ${host}`, { status: 404 })
 }
 
 /**
  * 第一阶段代码注册的测试 App（PRD #38）。
- * 页面为本地静态测试页（各自独立配色 / 加载时间戳 / localStorage 计数），
- * 用于验证 AppRegistry / AppInstance / Tab / WebContents / Session / Permission / 导航策略。
+ * lab / devices 为本地静态测试页，用于验证 AppRegistry / AppInstance / Tab /
+ * WebContents / Session / Permission / 导航策略与平台设备域通道；fsy 为第三方远程源对照。
  */
 const builtinApps: DesktopAppManifest[] = [
-  {
-    id: 'crm',
-    name: 'CRM',
-    version: '1.0.0',
-    type: 'internal',
-    entry: { type: 'web', url: appEntryUrl('crm') },
-    permissions: ['storage', 'clipboard.read', 'download'],
-  },
-  {
-    id: 'oa',
-    name: 'OA',
-    version: '1.0.0',
-    type: 'internal',
-    entry: { type: 'web', url: appEntryUrl('oa') },
-    permissions: ['storage'],
-  },
   {
     id: 'fsy',
     name: 'FSY',
@@ -129,6 +151,15 @@ const builtinApps: DesktopAppManifest[] = [
       'window',
       'fullscreen',
     ],
+  },
+  {
+    // 设备测试：外设通道测试页（打印 / 采集 / 扫码），自包含静态页逐项验证平台设备域通道
+    id: 'devices',
+    name: '设备测试',
+    version: '1.0.0',
+    type: 'internal',
+    entry: { type: 'web', url: appEntryUrl('devices') },
+    permissions: ['storage', 'filesystem.write', 'media'],
   },
 ]
 

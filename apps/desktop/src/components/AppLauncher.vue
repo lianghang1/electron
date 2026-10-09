@@ -52,11 +52,13 @@ function avatarColor(appId: string): string {
   border-right: 1px solid var(--dt-line);
   padding: 10px 8px;
   overflow-y: auto;
+  overflow-x: hidden;
   transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
 }
 .dt-launcher__item {
   position: relative;
-  width: 56px;
+  width: 100%;
+  max-width: 56px;
   flex: none;
   display: flex;
   flex-direction: column;

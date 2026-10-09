@@ -1,6 +1,7 @@
 import type { ScannerConfig, ScannerLogFn, ScanResult } from '@desktop/shared'
+import type { BrowserWindow } from 'electron'
 import { scannerDomain } from '@desktop/shared'
-import { BrowserWindow } from 'electron'
+import { webContents } from 'electron'
 import { KeyboardScanner } from './keyboard-scanner'
 
 /** 扫码枪出厂默认（单一数据源；运行时修改经 persist 写 userData） */
@@ -62,9 +63,11 @@ export class ScanService {
   private broadcast(result: ScanResult): void {
     this.lastScan = result
     this.logger('info', `扫码 ${result.code}`, { prefix: result.prefix })
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed())
-        win.webContents.send(scannerDomain.channels.onScan, result)
+    // 全量 webContents（BrowserWindow + shell Tab 的 WebContentsView 都在内），
+    // 只遍历 BrowserWindow 会漏掉 Tab 装载的页面
+    for (const wc of webContents.getAllWebContents()) {
+      if (!wc.isDestroyed())
+        wc.send(scannerDomain.channels.onScan, result)
     }
   }
 
