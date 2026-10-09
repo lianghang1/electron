@@ -168,10 +168,12 @@ export class SystemChannel implements PrintChannel {
       return { archivedPdfPath: pdfPath, detail: { via: 'chromium-pdf-plugin' } }
     }
 
-    // macOS / Linux（含国产化 OS）：CUPS lp
+    // macOS / Linux（含国产化 OS）：CUPS lp（纸盒 InputSlot 为 CUPS 通用约定，具体名依驱动）
     const args = ['-d', printer.id, '-n', String(copies), '-t', sanitizeJobName(job.jobName), pdfPath]
     if (job.options.pages)
       args.unshift('-P', job.options.pages)
+    if (job.options.subset)
+      args.unshift('-o', `page-set=${job.options.subset}`)
     if (job.options.grayscale)
       args.unshift('-o', 'ColorModel=Gray')
     if (job.options.landscape)
@@ -179,6 +181,10 @@ export class SystemChannel implements PrintChannel {
     const sides = lpSides(job.options.duplex)
     if (sides)
       args.unshift('-o', `sides=${sides}`)
+    if (job.options.bin)
+      args.unshift('-o', `InputSlot=${job.options.bin}`)
+    if (job.options.scale === 'fit')
+      args.unshift('-o', 'fit-to-page')
     for (const [k, v] of lpMarginOptions(job.options.margin)) args.unshift('-o', `${k}=${v}`)
     await withTimeout(runProcess('lp', args), 90000, 'SPOOL_FAILED', 'lp 送打超时（90s）')
     return { archivedPdfPath: pdfPath, detail: { via: 'cups-lp' } }
