@@ -11,6 +11,7 @@ node_modules
 .DS_Store
 dist
 out
+*.tsbuildinfo
 *.local
 unpackage/release
 packages/*/lib/
