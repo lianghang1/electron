@@ -91,6 +91,7 @@ export default createElectronViteConfig({
       resolve: {
         alias: {
           '@': path.join(process.cwd(), './src'),
+          '@shared': path.join(process.cwd(), './shared'),
         },
       },
     }

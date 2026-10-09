@@ -2,6 +2,7 @@ import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import { is } from '@electron-toolkit/utils'
 import icon from '../resources/icon.png?asset'
+import { registerKioskBusiness } from './business'
 
 /**
  * 殡仪服务自助机：单应用全屏形态（Kiosk 同构骨架）。
@@ -51,3 +52,5 @@ bootstrap({
   },
   permissions: 'all',
 })
+
+registerKioskBusiness()

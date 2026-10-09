@@ -87,3 +87,35 @@ export type DomainApi<V extends DomainValue<string, DomainDefs>> = {
     [K in keyof V['defs'] & string as V['defs'][K] extends PushSig<readonly unknown[]> ? never : K]: ApiMethod<SigOf<V['defs'][K]>>
   }
 }
+
+/** window.desktop 桥的最小运行时面（renderer 环境） */
+interface DesktopBridge {
+  $invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
+}
+
+/** 惰性取桥：经 globalThis 避免 node lib 无 DOM；缺失即显式报错而非 undefined 崩溃 */
+function getBridge(): DesktopBridge {
+  const bridge = (globalThis as { desktop?: DesktopBridge }).desktop
+  if (!bridge) {
+    throw new Error('desktop bridge not found: 请确认 preload 已调用 exposeDesktop()')
+  }
+  return bridge
+}
+
+/**
+ * 由域定义值生成 Renderer 类型化 API 分组（invoke 通道 → Promise 方法）。
+ * 运行时经 window.desktop.$invoke 转发，通道须在 preload appChannels 白名单内；
+ * push 通道不进分组，仍经 window.desktop.events.on 订阅。
+ * App 自有域进不了平台 DesktopApi 并集（平台包不含业务词汇），渲染层用本工厂
+ * 一行收口替代手写 invoke 包装：通道 / 入参 / 返回值类型全部由域契约推导。
+ */
+export function createDomainApi<D extends DomainValue<string, DomainDefs>>(domain: D): DomainApi<D>[D['domain']] {
+  const group: Record<string, unknown> = {}
+  for (const [method, channel] of Object.entries(domain.channels)) {
+    if (domain.eventChannels.has(channel)) {
+      continue
+    }
+    group[method] = (...args: unknown[]) => getBridge().$invoke(channel, ...args)
+  }
+  return group as DomainApi<D>[D['domain']]
+}

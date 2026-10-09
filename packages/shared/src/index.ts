@@ -11,7 +11,7 @@
 
 /* ---------------- 错误基类（唯一运行时值） ---------------- */
 
-export { defineDomain, invoke, push } from './domain'
+export { createDomainApi, defineDomain, invoke, push } from './domain'
 export type {
   DomainApi,
   DomainContract,

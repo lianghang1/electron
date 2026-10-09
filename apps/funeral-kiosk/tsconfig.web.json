@@ -7,6 +7,10 @@
       "DOM",
       "DOM.Iterable"
     ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@shared/*": ["./shared/*"]
+    },
     "types": [
       "vite/client",
       "vue"
@@ -16,6 +20,7 @@
     "src/**/*.ts",
     "src/**/*.d.ts",
     "src/**/*.tsx",
-    "src/**/*.vue"
+    "src/**/*.vue",
+    "shared/**/*.ts"
   ]
 }
