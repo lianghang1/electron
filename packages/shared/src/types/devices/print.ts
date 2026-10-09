@@ -68,6 +68,12 @@ export interface PrintOptions {
   grayscale?: boolean
   /** 页码范围，如 "1-3,5"（PDF 直通与系统队列 HTML 路径支持；macOS 仅支持单段范围） */
   pages?: string
+  /** 奇偶页打印（先打单面再翻面续打的场景）；仅 PDF 文件直通（SumatraPDF）支持，其余通道忽略 */
+  subset?: 'odd' | 'even'
+  /** 缩放策略（缺省 fit）；仅 PDF 文件直通（SumatraPDF）支持，其余通道忽略 */
+  scale?: 'noscale' | 'shrink' | 'fit'
+  /** 纸盒/送纸器（驱动纸盒名或序号）；仅 PDF 文件直通（SumatraPDF）支持，其余通道忽略 */
+  bin?: string
   /** 双面打印 */
   duplex?: 'simplex' | 'duplex' | 'duplexshort' | 'duplexlong'
   /** 横向打印（默认纵向） */

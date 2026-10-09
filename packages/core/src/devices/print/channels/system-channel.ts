@@ -122,12 +122,14 @@ export class SystemChannel implements PrintChannel {
     if (process.platform === 'win32') {
       const sumatra = this.resolveSumatraPath()
       if (sumatra) {
-        // SumatraPDF -print-settings：份数、页码范围、黑白、双面、纸张、缩放
+        // SumatraPDF -print-settings：份数、页码范围、奇偶页、黑白、双面、纸张、纸盒、缩放
         const settings: string[] = []
         if (copies > 1)
           settings.push(`${copies}x`)
         if (job.options.pages)
           settings.push(job.options.pages)
+        if (job.options.subset)
+          settings.push(job.options.subset)
         if (job.options.grayscale)
           settings.push('monochrome')
         if (job.options.duplex && job.options.duplex !== 'simplex')
@@ -137,7 +139,9 @@ export class SystemChannel implements PrintChannel {
         const paperName = sumatraPaperName(job.paper)
         if (paperName)
           settings.push(`paper=${paperName}`)
-        settings.push('fit')
+        if (job.options.bin)
+          settings.push(`bin=${job.options.bin}`)
+        settings.push(job.options.scale ?? 'fit')
         const args = ['-print-to', printer.id, '-silent', '-print-settings', settings.join(','), pdfPath]
         await withTimeout(runProcess(sumatra, args), 90000, 'SPOOL_FAILED', `SumatraPDF 送打超时（90s）`)
         return { archivedPdfPath: pdfPath, detail: { via: 'SumatraPDF', settings: settings.join(',') } }

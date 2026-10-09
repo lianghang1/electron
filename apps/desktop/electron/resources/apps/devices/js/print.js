@@ -52,6 +52,7 @@ function switchKind(k) {
   $('#data-html').hidden = kind.payload !== 'html'
   $('#data-file').hidden = kind.payload !== 'file'
   $('#layout-grid').hidden = !kind.docLike
+  $('#pdf-extra-grid').hidden = currentKind !== 'pdf'
   $('#hardware-grid').hidden = !kind.receipt
   $('#btn-preview').hidden = !kind.templateId
   if (kind.paper && papers.some(p => p.id === kind.paper)) $('#opt-paper').value = kind.paper
@@ -115,6 +116,12 @@ function buildOptions() {
     options.landscape = $('#opt-landscape').value === '1'
     options.duplex = $('#opt-duplex').value || undefined
     options.pages = $('#opt-pages').value.trim() || undefined
+  }
+  // PDF 文件直通专有（SumatraPDF -print-settings），其余类型不发送
+  if (currentKind === 'pdf') {
+    options.subset = $('#opt-subset').value || undefined
+    options.scale = $('#opt-scale').value || undefined
+    options.bin = $('#opt-bin').value.trim() || undefined
   }
   if (kind.receipt) {
     const cut = $('#hw-cut').value
