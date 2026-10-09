@@ -13,6 +13,11 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
 asarUnpack:
   - resources/**
+# 设备域 asar 外资源（SumatraPDF / 厂商 DLL，需 spawn/LoadLibrary 真实文件）：
+# dev 取 <应用根>/resources，打包注入 <resourcesPath>/resources，路径解析统一走 core resolveResourcePath
+extraResources:
+  - from: resources
+    to: resources
 win:
   target: nsis
 nsis:

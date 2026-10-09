@@ -279,12 +279,14 @@
   <section class="page" id="page-idcard">
     <div class="toolbar">
       <span class="section-label">证卡读取</span>
-      <span class="hint">device.readIdCard：打开 → 认证 → 读取 → 关闭全程锁定；dev 为 stub 模拟数据，PII 用完即弃不入日志</span>
+      <select class="input" id="id-reader" style="min-width: 260px;"><option value="">检测读卡器中…</option></select>
+      <span class="spacer"></span>
+      <span class="hint">打开 → 认证 → 读取 → 关闭全程锁定；dev 无硬件时为 stub 模拟数据，PII 用完即弃不入日志</span>
     </div>
     <div class="panel padded">
       <div class="form-grid" style="align-items: center;">
         <button class="btn" id="btn-id-read">读取证卡</button>
-        <span class="hint" id="id-status">点击读取（deviceId 缺省自动选第一个就绪读卡器）</span>
+        <span class="hint" id="id-status">选择读卡器后点击读取</span>
       </div>
     </div>
     <div class="panel" id="id-result" style="margin-top: 12px;" hidden>

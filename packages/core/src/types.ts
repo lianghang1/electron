@@ -29,20 +29,25 @@ export interface WindowOverrides {
    */
   protocols?: Record<string, (request: Request) => Promise<Response>>
   /**
-   * 硬件设备（设备通用层 device:*）：SDK 资源根（厂商 DLL 基准目录，如 devices/huashi/）。
-   * 缺省 userData/devices——未放置 DLL 时由内置 stub mock 兜底（读卡返回模拟数据）。
+   * 硬件设备（设备通用层 device:*）。资源根统一经 resolveResourcePath 解析，
+   * DLL / 外置 exe 均相对 resourcesRoot 寻址；模拟设备零隐式注册（仅显式开关驱动）。
    */
   devices?: {
+    /**
+     * SDK 资源根（厂商 DLL 与外置 exe 的共同基准目录）：缺省 resources/ ——
+     * dev 为 <应用根>/resources，打包为 <resourcesPath>/resources。
+     * DLL 位置如 devices/huashi/Termb.dll，外置 exe 如 sumatra/SumatraPDF.exe。
+     */
     resourcesRoot?: string
-    /** 强制注册内置 mock 读卡器；缺省仅 dev 环境注册（真实硬件优先） */
+    /** 注册内置 stub 模拟设备（读卡器 + 采集，无硬件联调/演示用）；缺省不注册，正式环境零模拟 */
     mock?: boolean
     /** 摄像采集（capture 域） */
     capture?: { saveDir?: string }
     /** 打印（print 域） */
     print?: {
-      /** 静态打印机清单（RawPrinterConfig），dev 缺省注册一台 mock 打印机 */
+      /** 静态打印机档案清单；mock: true 档案为指令落盘模拟（无真机联调用），按需显式声明 */
       printers?: RawPrinterConfig[]
-      /** SumatraPDF 可执行文件路径（PDF 打印后端） */
+      /** SumatraPDF 可执行文件位置（PDF 打印后端）：相对 resourcesRoot（缺省 sumatra/SumatraPDF.exe）或绝对路径 */
       sumatraPath?: string
     }
   }

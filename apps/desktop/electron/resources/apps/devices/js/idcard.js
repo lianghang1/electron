@@ -1,5 +1,5 @@
 'use strict'
-/* 证卡读取域：device.readIdCard（打开 → 认证 → 读取 → 关闭全程锁定，PII 用完即弃不入日志） */
+/* 证卡读取域：device.listReaders 设备枚举 + device.readIdCard（打开 → 认证 → 读取 → 关闭全程锁定，PII 用完即弃不入日志） */
 
 const ID_FIELDS = [
   ['name', '姓名'],
@@ -10,6 +10,30 @@ const ID_FIELDS = [
   ['address', '住址'],
   ['issuer', '签发机关'],
 ]
+
+const ID_TRANSPORT_LABEL = { dll: 'SDK 直连', stub: '模拟' }
+
+async function refreshReaders() {
+  const sel = $('#id-reader')
+  try {
+    const r = await window.desktop.device.listReaders()
+    if (!r.ok) {
+      sel.innerHTML = `<option value="">读卡器不可用（${esc(r.error.message)}）</option>`
+      return
+    }
+    if (!r.readers.length) {
+      sel.innerHTML = '<option value="">未检测到读卡器</option>'
+      return
+    }
+    const prev = sel.value
+    sel.innerHTML = r.readers.map(d =>
+      `<option value="${esc(d.id)}">${esc(d.displayName)}（${esc(ID_TRANSPORT_LABEL[d.transport] ?? d.transport)}${d.status === 'ready' ? '' : ` · ${d.status === 'offline' ? '离线' : '不可用'}`}）</option>`).join('')
+    sel.value = prev && r.readers.some(d => d.id === prev) ? prev : sel.options[0].value
+  }
+  catch (e) {
+    sel.innerHTML = `<option value="">检测失败（${esc(e.message)}）</option>`
+  }
+}
 
 function renderIdCard(data) {
   const photo = $('#id-photo')
@@ -37,10 +61,15 @@ function renderIdCard(data) {
 async function readIdCard() {
   const btn = $('#btn-id-read')
   const status = $('#id-status')
+  const deviceId = $('#id-reader').value
+  if (!deviceId) {
+    toast('未检测到可用读卡器', false)
+    return
+  }
   btn.disabled = true
   status.textContent = '读取中…'
   try {
-    const r = await window.desktop.device.readIdCard()
+    const r = await window.desktop.device.readIdCard({ deviceId })
     if (r.ok && r.data) {
       renderIdCard(r.data)
       status.textContent = '读取成功'
@@ -61,3 +90,6 @@ async function readIdCard() {
 }
 
 $('#btn-id-read').addEventListener('click', () => void readIdCard())
+
+registerRefresher(refreshReaders)
+void refreshReaders()

@@ -352,11 +352,13 @@ export class PrintService {
     if (!req || typeof req !== 'object') {
       throw printError('VALIDATION_FAILED', '无效的打印请求')
     }
-    if (!req.options?.paper) {
-      throw printError('VALIDATION_FAILED', '缺少 options.paper（纸张规格）')
-    }
     if (!req.payload?.kind) {
       throw printError('VALIDATION_FAILED', '缺少 payload（打印内容）')
+    }
+    // PDF 文件直通按 PDF 自身页面尺寸打印，不依赖纸张规格；其余内容必须显式指定
+    const isPdfPassthrough = req.businessType === 'pdf' && req.payload.kind === 'file'
+    if (!isPdfPassthrough && !req.options?.paper) {
+      throw printError('VALIDATION_FAILED', '缺少 options.paper（纸张规格）')
     }
   }
 }

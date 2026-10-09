@@ -1,4 +1,4 @@
-import type { AppSource, CaptureDeviceProfile, DesktopAppManifest, PrintPreset, RawPrinterConfig, ScannerConfig } from '@desktop/shared'
+import type { AppSource, CaptureDeviceProfile, DesktopAppManifest, PrintPreset, ScannerConfig } from '@desktop/shared'
 import type { CaptureSystem } from '../devices/capture'
 import type { IdCardSystem } from '../devices/idcard'
 import type { PrintSystem } from '../devices/print'
@@ -6,7 +6,7 @@ import type { ScannerSystem } from '../devices/scanner'
 import type { Logger } from '../logger/logger'
 import type { PermissionStoreSchema } from '../permission/permission-service'
 import type { BootstrapOptions } from '../types'
-import { join } from 'node:path'
+import { isAbsolute, join } from 'node:path'
 import process from 'node:process'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow } from 'electron'
@@ -36,17 +36,7 @@ import { UpdateService } from '../updater/update-service'
 import { WebService } from '../web/web-service'
 import { OverlayWindowService } from '../window/overlay-window'
 import { WindowService } from '../window/window-service'
-
-/** dev 缺省网络打印机（mock 模式：指令落盘 out/mock-print，无真机即可联调打印链路） */
-const DEV_MOCK_PRINTER: RawPrinterConfig = {
-  id: 'raw:127.0.0.1:9100',
-  displayName: '网络打印机（模拟模式）',
-  protocol: 'escpos',
-  transport: { type: 'tcp', host: '127.0.0.1', port: 9100 },
-  mock: true,
-  mockOutputDir: 'out/mock-print',
-  capabilities: { maxWidthMm: 80 },
-}
+import { resolveResourcePath } from './paths'
 
 /**
  * 平台组装根：初始化全部 Service → 注册 IPC → 建主窗口；
@@ -74,7 +64,7 @@ export class DesktopRuntime {
   private windowService!: WindowService
   /** 全局浮层独立原生窗：右键菜单/确认弹窗渲染处（原生层级压过 WebContentsView） */
   private overlayService!: OverlayWindowService
-  /** 设备系统：证卡读取（dll 真实驱动，dev 加 stub mock 兜底） */
+  /** 设备系统：证卡读取（dll 真实驱动 + devices.mock 显式开启的 stub 模拟器） */
   private idCardSystem?: IdCardSystem
   /** 设备系统：扫码枪（键盘仿真观察，恒创建） */
   private scannerSystem!: ScannerSystem
@@ -206,17 +196,23 @@ export class DesktopRuntime {
   }
 
   /**
-   * 设备系统装配：资源根由宿主配置（缺省 userData/devices），dev 环境 stub mock 兜底。
-   * scanner/capture/print 的运行时编辑持久化由 core 经 electron-store 托管（userData），
-   * capture/print 的存储缺键时回落出厂档案/出厂预设（不设 defaults，避免空值覆盖）。
+   * 设备系统装配：资源根统一经 resolveResourcePath 解析（缺省 resources/ —— dev 为
+   * <应用根>/resources，打包为 <resourcesPath>/resources），DLL 与外置 exe 均相对它寻址
+   * （idcard/capture 的 devices/<brand>/、print 的 sumatra/）。
+   * 模拟设备零隐式注册：devices.mock 显式开启才注册 stub 读卡器/采集设备；mock 打印机
+   * 由宿主在 printers 档案里显式声明（mock: true）。运行时编辑持久化由 electron-store 托管
+   * （userData），capture/print 的存储缺键时回落出厂档案/出厂预设（不设 defaults，避免空值覆盖）。
    */
   private setupDevices(): void {
-    const resourcesRoot = this.options.devices?.resourcesRoot ?? join(app.getPath('userData'), 'devices')
+    const resourcesRoot = this.options.devices?.resourcesRoot
+      ? resolveResourcePath(this.options.devices.resourcesRoot)
+      : resolveResourcePath('resources')
+    const mock = this.options.devices?.mock ?? false
 
     this.idCardSystem = createIdCardSystem({
       resourcesRoot,
       logger: this.logger.scope('device:idcard'),
-      mock: this.options.devices?.mock ?? is.dev,
+      mock,
     })
 
     // 扫码枪：配置持久化 + 键盘观察接入所有窗口（before-input-event，全局生效）
@@ -232,18 +228,21 @@ export class DesktopRuntime {
     const captureStore = new Store<{ devices?: CaptureDeviceProfile[] }>({ name: 'device-capture-profiles' })
     this.captureSystem = createCaptureSystem({
       resourcesRoot,
+      mock,
       initialProfiles: captureStore.get('devices'),
       persist: devices => captureStore.set('devices', devices),
       defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(app.getPath('userData'), 'capture'),
       logger: this.logger.scope('device:capture'),
     })
 
-    // 打印：预设持久化，网络打印机档案由宿主注入（dev 缺省 mock 打印机）
+    // 打印：预设持久化，打印机档案由宿主注入（mock: true 档案为指令落盘模拟）；
+    // SumatraPDF 相对资源根解析（缺省 sumatra/SumatraPDF.exe），绝对路径原样
     const presetStore = new Store<{ presets?: PrintPreset[] }>({ name: 'device-print-presets' })
+    const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'sumatra/SumatraPDF.exe'
     this.printSystem = createPrintSystem({
       stateDir: app.getPath('userData'),
-      printers: this.options.devices?.print?.printers ?? (is.dev ? [DEV_MOCK_PRINTER] : []),
-      sumatraPath: this.options.devices?.print?.sumatraPath,
+      printers: this.options.devices?.print?.printers ?? [],
+      sumatraPath: isAbsolute(sumatraRel) ? sumatraRel : join(resourcesRoot, sumatraRel),
       customPresets: presetStore.get('presets'),
       persistPresets: presets => presetStore.set('presets', presets),
       logger: this.logger.scope('device:print'),

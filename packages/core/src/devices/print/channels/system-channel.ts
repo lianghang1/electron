@@ -256,8 +256,8 @@ function parsePageRanges(pages: string | undefined): Array<{ from: number, to: n
 }
 
 /** 统一纸张 → SumatraPDF paper= 标准名（仅 Chromium/SumatraPDF 认识的标准系列；自定义尺寸交给 fit 缩放） */
-function sumatraPaperName(paper: PaperSpec): string | null {
-  switch (paper.preset) {
+function sumatraPaperName(paper?: PaperSpec): string | null {
+  switch (paper?.preset) {
     case 'a4':
       return 'A4'
     case 'a5':

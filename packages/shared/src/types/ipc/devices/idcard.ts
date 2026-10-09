@@ -1,4 +1,4 @@
-import type { IdReaderResult } from '../../devices/idcard'
+import type { IdReaderDevice, IdReaderResult } from '../../devices/idcard'
 import { invoke } from '../../../domain'
 
 /**
@@ -8,6 +8,8 @@ import { invoke } from '../../../domain'
  * 合规约束不同（PII 禁日志、即用即弃、脱敏）。
  */
 export const idCardDomainDefs = {
+  /** 列出全部读卡器（真实硬件优先，mock 兜底；失败经 error 字段回传，永不 reject） */
+  listReaders: invoke<() => Promise<{ ok: true, readers: IdReaderDevice[] } | { ok: false, error: { code: string, message: string } }>>(),
   /**
    * 读一张证卡（打开 → 认证 → 读取 → 关闭全程锁定）。
    * deviceId 缺省时平台自动选用第一个就绪的读卡器；
