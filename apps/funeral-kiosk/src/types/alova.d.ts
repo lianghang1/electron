@@ -1,4 +1,4 @@
-import type { AlovaMeta } from '@fun-design/http-alova-uniapp'
+import type { AlovaMeta } from '@fun-design/http-alova-axios'
 
 import 'alova'
 

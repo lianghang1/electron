@@ -24,14 +24,17 @@ const http = createAlovaAxios({
       if (method.meta?.$skipAuth !== true) {
         httpContext.clearToken()
       }
-      throw new Error('token expired')
+      if (method.meta?.$refreshToken) {
+        throw new Error('token expired')
+      }
+      await httpContext.refreshToken()
     },
   },
   extractData: (response, method) => {
     if (method.meta?.$raw) {
       return response.data
     }
-    return response.data?.response
+    return response.data?.data
   },
 })
 

@@ -1,16 +1,9 @@
-import type { LoginResponse, LoginSmsRequest } from './api'
 import type { AuthState, TenantInfo } from './types'
-import { defineStore } from 'pinia'
-import { httpContext } from '@/http'
-import { getRedirectLoginPath } from '@/models/app/constants'
-import { getCurrentPageStack } from '@/utils'
-import { useAppStore } from '../app'
-import { login } from './api'
 
-/**
- * 全局跳转登录页标志
- */
-let GLOBAL_REDIRECT_LOGIN = false
+import { defineStore } from 'pinia'
+import { getUserInfo } from '@/api/auth'
+import { kioskApi } from '@/api/kiosk'
+import { httpContext } from '@/http'
 
 export const useAuthStore = defineStore('auth-store', () => {
   // state
@@ -20,8 +13,6 @@ export const useAuthStore = defineStore('auth-store', () => {
     authReady: null,
     tenantId: null,
   })
-
-  const appStore = useAppStore()
 
   // getters
   const accessToken = computed(() => state.accessInfo?.token)
@@ -39,29 +30,10 @@ export const useAuthStore = defineStore('auth-store', () => {
     return tokenType ? `${tokenType} ${tokenValue}` : tokenValue
   })
 
-  async function setLoginData(data: LoginResponse) {
-    state.accessInfo = {
-      token: data.access_token,
-      tokenType: data.token_type,
-    }
-    await loadUserInfo()
-  }
-
-  async function loginSms(params: { mobile: string, code: string, iv: string }) {
-    const request: LoginSmsRequest = {
-      grant_type: 'password_api_mobile',
-      mobile: params.mobile,
-      mobileCode: params.code,
-      iv: params.iv,
-      tenantId: safeTenantId.value,
-      deviceId: appStore.deviceId,
-    }
-    const data = await login(request, 'YXBwLWNsaWVudC1hcGlNYjphcHAtY2xpZW50')
-    await setLoginData(data)
-  }
-
   async function loadUserInfo() {
-    const data = await getUserInfo()
+    const data = await getUserInfo({
+      skipAuth: true,
+    })
     state.userInfo = {
       id: data.id,
       nickname: data.nickName || '',
@@ -83,50 +55,27 @@ export const useAuthStore = defineStore('auth-store', () => {
     resetAuth({ redirectLogin: true })
   }
 
-  /**
-   * 跳转登录页
-   * @param fullPath redirect 完整路径
-   * @returns 是否执行跳转
-   */
-  function redirectLogin(fullPath?: string): boolean {
-    if (GLOBAL_REDIRECT_LOGIN) {
-      console.debug(`global redirect login: ${fullPath}`)
-      return false
-    }
-
-    GLOBAL_REDIRECT_LOGIN = true
-
-    const redirectPath = getRedirectLoginPath(fullPath)
-
-    uni.redirectTo({
-      url: redirectPath,
-      complete: () => {
-        setTimeout(() => {
-          GLOBAL_REDIRECT_LOGIN = false
-        }, 750)
-      },
-    })
-    return true
-  }
-
-  function resetAuth(options?: { redirectLogin?: boolean }) {
+  function resetAuth(_options?: { redirectLogin?: boolean }) {
     state.userInfo = null
     state.accessInfo = null
-
-    if (options?.redirectLogin) {
-      const pageStack = getCurrentPageStack()
-      redirectLogin(pageStack?.$page?.fullPath)
-    }
   }
 
-  async function autoLogin() {
-    return null
+  async function refreshToken() {
+    const data = await kioskApi.login()
+
+    state.accessInfo = {
+      token: data.token,
+      tokenType: data.tokenType,
+    }
+
+    await loadUserInfo()
   }
 
   httpContext.set({
     getToken: () => accessTokenWithType.value,
     getTokenValue: () => accessToken.value,
     clearToken: () => resetAuth({ redirectLogin: true }),
+    refreshToken: () => refreshToken(),
   })
 
   return {
@@ -142,16 +91,12 @@ export const useAuthStore = defineStore('auth-store', () => {
     mobile,
 
     // actions
-    setLoginData,
-    loginSms,
-    loadUserInfo,
     logout,
     resetAuth,
-    redirectLogin,
   }
 }, {
   persist: {
-    paths: [
+    pick: [
       'accessInfo',
       'tenantId',
     ],
