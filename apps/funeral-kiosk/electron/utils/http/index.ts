@@ -7,6 +7,12 @@ const http = createAlovaAxios({}, {
     $token: false,
   },
   onRequest: () => {},
+  extractData: (response, method) => {
+    if (method.meta?.$raw) {
+      return response.data
+    }
+    return response.data?.data
+  },
 })
 
 export {

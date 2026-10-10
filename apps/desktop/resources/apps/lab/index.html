@@ -535,10 +535,13 @@
       log(`window.isMaximized: ${max ? '已最大化' : '非最大化'}`, 'ok')
     },
     'device-idcard': async () => {
-      const result = await window.desktop.device.readIdCard()
-      log(result.ok && result.data
-        ? `readIdCard: ${result.data.name} · ${result.data.idNumber.replace(/^(.{4}).*(.{3})$/, '$1****$2')} · ${result.data.gender}`
-        : `readIdCard: ${result.error ? `${result.error.code} ${result.error.message}` : '无数据'}（dev 内置 stub mock 兜底）`, result.ok ? 'ok' : 'fail')
+      try {
+        const data = await window.desktop.device.readIdCard()
+        log(`readIdCard: ${data.name} · ${data.idNumber.replace(/^(.{4}).*(.{3})$/, '$1****$2')} · ${data.gender}（dev 内置 stub mock 兜底）`, 'ok')
+      }
+      catch (err) {
+        log(`readIdCard: ${err.code ?? 'UNKNOWN'} ${err.message}（dev 内置 stub mock 兜底）`, 'fail')
+      }
     },
     'update-check': async () => {
       try {

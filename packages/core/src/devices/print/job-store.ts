@@ -1,4 +1,4 @@
-import type { JobStatus, PrintRequest, PrintResult } from '@desktop/shared'
+import type { JobStatus, PrintError, PrintRequest, PrintResult } from '@desktop/shared'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -10,6 +10,7 @@ interface JobRecord {
   createdAt: string
   finishedAt?: string
   result?: PrintResult
+  error?: PrintError
 }
 
 const MAX_RECORDS = 200
@@ -104,7 +105,18 @@ export class JobStore {
     if (!rec)
       return
     rec.result = result
-    rec.state = result.ok ? 'done' : 'failed'
+    rec.state = 'done'
+    rec.finishedAt = new Date().toISOString()
+    this.scheduleSave()
+  }
+
+  /** 失败落簿：记录统一错误（失败原因查询与任务中心展示用） */
+  fail(jobId: string, error: PrintError): void {
+    const rec = this.jobs.get(jobId)
+    if (!rec)
+      return
+    rec.error = error
+    rec.state = 'failed'
     rec.finishedAt = new Date().toISOString()
     this.scheduleSave()
   }
@@ -178,6 +190,7 @@ export class JobStore {
       createdAt: rec.createdAt,
       finishedAt: rec.finishedAt,
       result: rec.result,
+      error: rec.error,
     }
   }
 }

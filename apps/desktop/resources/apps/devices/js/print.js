@@ -159,15 +159,13 @@ async function submitPrint() {
       payload: buildPayload(),
       options: buildOptions(),
     })
-    $('#print-result').textContent = r.ok
-      ? `已提交：${r.jobId}（通道 ${r.channel ?? '—'}）`
-      : `失败：${r.error?.message ?? '未知错误'}`
-    toast(r.ok ? '已提交打印' : `打印失败：${r.error?.message ?? '未知错误'}`, r.ok)
+    $('#print-result').textContent = `已提交：${r.jobId}（通道 ${r.channel}）`
+    toast('已提交打印')
     void refreshJobs()
   }
   catch (e) {
-    $('#print-result').textContent = ''
-    toast(e.message, false)
+    $('#print-result').textContent = `失败：${e.message ?? '未知错误'}`
+    toast(`打印失败：${e.message ?? '未知错误'}`, false)
   }
 }
 
@@ -258,7 +256,7 @@ function renderJobs() {
   box.innerHTML = jobs.map((j) => {
     const tone = j.state === 'done' ? 'ok' : j.state === 'failed' ? 'err' : ''
     const st = `<span class="badge ${tone}"><span class="dot"></span>${STATE_LABEL[j.state] ?? j.state}</span>`
-    const err = j.state === 'failed' && j.result?.error?.message ? ` · ${esc(j.result.error.message)}` : ''
+    const err = j.state === 'failed' && j.error?.message ? ` · ${esc(j.error.message)}` : ''
     return `<div class="row">
       <div class="grow">
         <div class="name">${esc(j.jobName ?? j.jobId)}</div>
@@ -322,11 +320,11 @@ $('#printer-list').addEventListener('click', async (e) => {
       },
       options: { paper: { preset: 'a4' }, copies: 1, silent: true, printerId: p.id, jobName: `测试页 · ${p.displayName}` },
     })
-    r.ok ? toast(`已提交到 ${p.displayName}`) : toast(`提交失败：${r.error?.message ?? '未知错误'}`, false)
+    toast(`已提交到 ${p.displayName}`)
     void refreshJobs()
   }
   catch (err) {
-    toast(err.message, false)
+    toast(`提交失败：${err.message ?? '未知错误'}`, false)
   }
 })
 
@@ -335,11 +333,11 @@ $('#job-list').addEventListener('click', async (e) => {
   const removeId = e.target.dataset?.remove
   if (reprintId) {
     try {
-      const r = await window.desktop.print.reprint(reprintId)
-      r.ok ? toast('已重新提交打印') : toast(`重试失败：${r.error?.message ?? '未知错误'}`, false)
+      await window.desktop.print.reprint(reprintId)
+      toast('已重新提交打印')
       void refreshJobs()
     }
-    catch (err) { toast(err.message, false) }
+    catch (err) { toast(`重试失败：${err.message ?? '未知错误'}`, false) }
   }
   else if (removeId) {
     if (!window.confirm('删除该任务记录？记录与归档 PDF 将一并删除，不可恢复。')) return

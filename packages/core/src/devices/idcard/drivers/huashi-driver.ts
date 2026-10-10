@@ -1,10 +1,11 @@
 /* eslint-disable node/prefer-global/buffer */
 /* eslint-disable node/prefer-global/process */
 import type { BrandDriver, IdCardData } from '../types'
+import type { KoffiFn, KoffiLib } from './koffi'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { idCardError } from '../errors'
-import { requireKoffi, type KoffiFn, type KoffiLib } from './koffi'
+import { requireKoffi } from './koffi'
 
 /**
  * 华视电子身份证阅读器驱动（深圳华视 SDK V7.1.8，函数以《身份证阅读器SDK使用手册.doc》为准）。

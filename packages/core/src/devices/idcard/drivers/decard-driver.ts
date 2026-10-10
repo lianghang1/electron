@@ -1,9 +1,10 @@
 /* eslint-disable node/prefer-global/buffer */
 import type { BrandDriver, IcCardData, IcCardReadRequest, IcCardWriteRequest } from '../types'
+import type { KoffiFn, KoffiLib } from './koffi'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { idCardError } from '../errors'
-import { requireKoffi, type KoffiFn, type KoffiLib } from './koffi'
+import { requireKoffi } from './koffi'
 
 /**
  * 德卡 IC 卡读卡器驱动（dcrf32.dll，Mifare Classic 全系列通用 API，返回码 0 = 成功）。
@@ -36,7 +37,7 @@ const DATA_BLOCKS = 3
 /** 卡密钥归一化：缺省出厂白键；非法输入在进入原生调用前拒绝 */
 function normalizeKey(raw?: string): Buffer {
   const key = (raw ?? DEFAULT_KEY).trim()
-  if (!/^[0-9a-fA-F]{12}$/.test(key)) {
+  if (!/^[0-9a-f]{12}$/i.test(key)) {
     throw idCardError('VALIDATION_FAILED', 'IC 卡密钥不合法（应为 12 位 hex）')
   }
   return Buffer.from(key, 'hex')
@@ -180,7 +181,7 @@ export class DecardDriver implements BrandDriver {
       throw idCardError('VALIDATION_FAILED', '块 0 是厂商块（UID 区），禁止写入')
     }
     const data = Buffer.from((req?.data ?? '').trim(), 'hex')
-    if (!/^[0-9a-fA-F]{32}$/.test((req?.data ?? '').trim()) || data.length !== 16) {
+    if (!/^[0-9a-f]{32}$/i.test((req?.data ?? '').trim()) || data.length !== 16) {
       throw idCardError('VALIDATION_FAILED', '写入数据不合法（应为 32 位 hex = 16 字节）')
     }
     const sector = Math.floor(block / BLOCKS_PER_SECTOR)

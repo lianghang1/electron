@@ -1,17 +1,17 @@
-import type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IcCardWriteResult, IcReaderResult, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderResult, IdReaderTransport } from '@desktop/shared'
+import type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from '@desktop/shared'
 
-export type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IcCardWriteResult, IcReaderResult, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderResult, IdReaderTransport }
+export type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport }
 
-/** 读卡适配器统一接口 —— 新接入方式 = 实现本接口 */
+/** 读卡适配器统一接口 —— 新接入方式 = 实现本接口。失败抛 IdCardError（code 见 IdReaderErrorCode） */
 export interface IdCardAdapter {
   readonly transport: IdReaderTransport
   listReaders: () => Promise<IdReaderDevice[]>
-  /** 读身份证（驱动未声明该能力时适配器返回 ADAPTER_UNAVAILABLE） */
-  read: (device: IdReaderDevice) => Promise<IdReaderResult>
-  /** 读 M1 IC 卡（驱动未声明该能力时适配器返回 ADAPTER_UNAVAILABLE） */
-  readIc: (device: IdReaderDevice, req: IcCardReadRequest) => Promise<IcReaderResult>
-  /** 写 M1 IC 卡单块（驱动未声明该能力时适配器返回 ADAPTER_UNAVAILABLE） */
-  writeIc: (device: IdReaderDevice, req: IcCardWriteRequest) => Promise<IcCardWriteResult>
+  /** 读身份证（驱动未声明该能力时抛 ADAPTER_UNAVAILABLE） */
+  read: (device: IdReaderDevice) => Promise<IdCardData>
+  /** 读 M1 IC 卡（驱动未声明该能力时抛 ADAPTER_UNAVAILABLE） */
+  readIc: (device: IdReaderDevice, req: IcCardReadRequest) => Promise<IcCardData>
+  /** 写 M1 IC 卡单块（驱动未声明该能力时抛 ADAPTER_UNAVAILABLE） */
+  writeIc: (device: IdReaderDevice, req: IcCardWriteRequest) => Promise<void>
   destroy?: () => void
 }
 

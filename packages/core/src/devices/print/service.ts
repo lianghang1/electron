@@ -1,4 +1,4 @@
-import type { ChannelId, JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintPreset, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
+import type { JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintPreset, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
 import type { PreparedContent, PreparedJob } from './channels/channel-types'
 import type { PrintChannel } from './channels/print-channel'
 import type { HiddenWindowPool } from './hidden-window'
@@ -109,33 +109,14 @@ export class PrintService {
     return this.printers.slice()
   }
 
-  /** 按预设一键打印：调用方只提供业务数据（永不 reject，与 submit 一致） */
+  /** 按预设一键打印：调用方只提供业务数据（失败抛 PrintError，与 submit 一致） */
   async submitByPreset(presetId: string, data: Record<string, unknown>): Promise<PrintResult> {
     const preset = this.presets.find(p => p.id === presetId)
     if (!preset) {
-      return {
-        ok: false,
-        jobId: '',
-        channel: null,
-        printerId: '',
-        error: {
-          code: 'VALIDATION_FAILED',
-          message: `未知打印预设: ${presetId}`,
-          detail: { available: this.presets.map(p => p.id) },
-        },
-      }
+      throw printError('VALIDATION_FAILED', `未知打印预设: ${presetId}`, { available: this.presets.map(p => p.id) })
     }
     if (!preset.templateId) {
-      return {
-        ok: false,
-        jobId: '',
-        channel: null,
-        printerId: '',
-        error: {
-          code: 'VALIDATION_FAILED',
-          message: `预设 ${presetId} 未绑定模板，无法注入数据`,
-        },
-      }
+      throw printError('VALIDATION_FAILED', `预设 ${presetId} 未绑定模板，无法注入数据`)
     }
     const request: PrintRequest = {
       businessType: preset.businessType,
@@ -159,20 +140,16 @@ export class PrintService {
 
   async submit(req: PrintRequest): Promise<PrintResult> {
     const jobId = randomUUID()
-    let printerId = ''
-    let channelId: ChannelId | null = null
     const jobName = req?.options?.jobName?.trim() || `${req?.businessType ?? 'print'}-${Date.now()}`
     // 先登记任务簿：任何阶段失败（含打印机解析/校验）都有任务可查，status 语义一致
     this.jobs.create(req, jobId, jobName)
     try {
       const printer = await this.registry.resolve(req?.options?.printerId)
-      printerId = printer.id
       this.validate(req)
       // paper 支持 PaperSpec 对象或纸型库 ID，这里归一为 PaperSpec
       const paper = resolvePaper(req.options.paper)
       assertPaperSupported(paper, printer.capabilities.maxWidthMm, printer.id)
       const channel = this.pickChannel(req, printer)
-      channelId = channel.id
       this.jobs.markPrinting(jobId)
       const startedAt = Date.now()
       this.log('info', `提交打印任务 ${jobName}`, {
@@ -193,7 +170,6 @@ export class PrintService {
 
       const outcome = await channel.execute(job, printer)
       const result: PrintResult = {
-        ok: true,
         jobId,
         channel: channel.id,
         printerId: printer.id,
@@ -204,23 +180,15 @@ export class PrintService {
       this.jobs.finish(jobId, result)
       this.log('info', `打印任务完成 ${jobName}`, {
         jobId,
-        ok: true,
         durationMs: Date.now() - startedAt,
       })
       return result
     }
     catch (err) {
       const pe = toPrintError(err)
-      const result: PrintResult = {
-        ok: false,
-        jobId,
-        channel: channelId,
-        printerId,
-        error: pe.toJSON(),
-      }
-      this.jobs.finish(jobId, result)
+      this.jobs.fail(jobId, pe.toJSON())
       this.log('warn', `打印任务失败 ${jobName}: ${pe.code} ${pe.message}`, { jobId })
-      return result
+      throw pe
     }
   }
 
@@ -275,13 +243,7 @@ export class PrintService {
   async reprint(jobId: string): Promise<PrintResult> {
     const rec = this.jobs.get(jobId)
     if (!rec) {
-      return {
-        ok: false,
-        jobId,
-        channel: null,
-        printerId: '',
-        error: { code: 'VALIDATION_FAILED', message: `任务不存在: ${jobId}` },
-      }
+      throw printError('VALIDATION_FAILED', `任务不存在: ${jobId}`)
     }
     const p = rec.request.payload
     const archived = rec.result?.archivedPdfPath

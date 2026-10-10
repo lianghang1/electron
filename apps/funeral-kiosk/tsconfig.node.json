@@ -2,6 +2,10 @@
   "extends": "@desktop/config/tsconfig.base.json",
   "compilerOptions": {
     "composite": true,
+    "paths": {
+      "@shared/*": ["./shared/*"],
+      "@electron/*": ["./electron/*"]
+    },
     "types": [
       "electron-vite/node"
     ]
@@ -9,6 +13,7 @@
   "include": [
     "electron.vite.config.*",
     "electron/**/*",
-    "shared/**/*.ts"
+    "shared/**/*.ts",
+    "env.d.ts"
   ]
 }

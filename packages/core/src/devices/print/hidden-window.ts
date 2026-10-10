@@ -1,7 +1,7 @@
-import { BrowserWindow } from 'electron'
 import { rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { BrowserWindow } from 'electron'
 import { printError } from './errors'
 
 type HiddenTarget = 'utility' | 'pdf'

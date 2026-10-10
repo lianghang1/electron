@@ -1,5 +1,6 @@
-import type { IcCardReadRequest, IcCardWriteRequest, IcCardWriteResult, IcReaderResult, IdCardAdapter, IdCardData, IdReaderDevice, IdReaderResult } from '../types'
+import type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IdCardAdapter, IdCardData, IdReaderDevice } from '../types'
 import { Buffer } from 'node:buffer'
+import { idCardError } from '../errors'
 
 /** 占位证件照：生成 80×100 单色调 BMP dataURL（mock 用，避免依赖 capture 模块） */
 function placeholderPhoto(): string {
@@ -48,8 +49,8 @@ export class StubIdAdapter implements IdCardAdapter {
     ]
   }
 
-  async read(_device: IdReaderDevice): Promise<IdReaderResult> {
-    const data: IdCardData = {
+  async read(_device: IdReaderDevice): Promise<IdCardData> {
+    return {
       name: '张三（模拟）',
       idNumber: '110101199001011234',
       gender: '男',
@@ -61,33 +62,30 @@ export class StubIdAdapter implements IdCardAdapter {
       validTo: '2040-01-01',
       photoDataUrl: placeholderPhoto(),
     }
-    return { ok: true, data, meta: { transport: 'stub', simulated: true } }
   }
 
   /** mock IC 卡：UID 固定 + 每字节 = 块地址的规律填充，扇区/块映射一眼可辨 */
-  async readIc(_device: IdReaderDevice, req: IcCardReadRequest): Promise<IcReaderResult> {
+  async readIc(_device: IdReaderDevice, req: IcCardReadRequest): Promise<IcCardData> {
     const sector = req?.sector ?? 1
     const blocks: Record<number, string> = {}
     for (let i = 0; i < 3; i++) {
       const addr = sector * 4 + i
       blocks[addr] = Buffer.alloc(16, addr).toString('hex').toUpperCase()
     }
-    const data = { uid: '04A3B2C1', cardType: '0004', blocks }
-    return { ok: true, data, meta: { transport: 'stub', simulated: true } }
+    return { uid: '04A3B2C1', cardType: '0004', blocks }
   }
 
   /** mock 写卡：危险块校验与真机同规则（控制块/厂商块拒绝），合法块写入后回读可见 */
-  async writeIc(_device: IdReaderDevice, req: IcCardWriteRequest): Promise<IcCardWriteResult> {
+  async writeIc(_device: IdReaderDevice, req: IcCardWriteRequest): Promise<void> {
     const block = req?.block
     if (!Number.isInteger(block) || block < 0 || block > 63) {
-      return { ok: false, error: { code: 'VALIDATION_FAILED', message: '块地址不合法（应为 0-63）' } }
+      throw idCardError('VALIDATION_FAILED', '块地址不合法（应为 0-63）')
     }
     if (block % 4 === 3 || block === 0) {
-      return { ok: false, error: { code: 'VALIDATION_FAILED', message: `块 ${block} 为${block === 0 ? '厂商块' : '密钥控制块'}，禁止写入` } }
+      throw idCardError('VALIDATION_FAILED', `块 ${block} 为${block === 0 ? '厂商块' : '密钥控制块'}，禁止写入`)
     }
-    if (!/^[0-9a-fA-F]{32}$/.test((req?.data ?? '').trim())) {
-      return { ok: false, error: { code: 'VALIDATION_FAILED', message: '写入数据不合法（应为 32 位 hex = 16 字节）' } }
+    if (!/^[0-9a-f]{32}$/i.test((req?.data ?? '').trim())) {
+      throw idCardError('VALIDATION_FAILED', '写入数据不合法（应为 32 位 hex = 16 字节）')
     }
-    return { ok: true, meta: { transport: 'stub', simulated: true, block } }
   }
 }

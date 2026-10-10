@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import process from 'node:process'
 import { idCardError } from '../errors'
 
 /** koffi 声明的原生函数（返回值/入参类型由签名字符串声明，出参经 Buffer 手工解析） */

@@ -150,19 +150,18 @@ export interface PrintError {
   detail?: unknown
 }
 
+/** 打印成功结果（失败以 IpcRemoteError 抛出，code 见 PrintErrorCode；任务簿失败记录见 JobStatus.error） */
 export interface PrintResult {
-  ok: boolean
   /** 统一任务号：重打、查状态、幂等去重都用它 */
   jobId: string
-  /** 实际通道，仅审计/排查用，业务层不得据此分支；未进入通道执行阶段（打印机解析/校验失败）为 null */
-  channel: ChannelId | null
+  /** 实际通道，仅审计/排查用，业务层不得据此分支 */
+  channel: ChannelId
   printerId: string
   meta?: Record<string, string>
   /** HTML/模板路径生成的 PDF 存档（重打依据） */
   archivedPdfPath?: string
   /** 通道私有审计信息（如 mock 落盘路径、送打方式与参数），可读但不得用于业务分支 */
   detail?: unknown
-  error?: PrintError
 }
 
 export interface PrinterCaps {
@@ -196,7 +195,10 @@ export interface JobStatus {
   state: 'accepted' | 'printing' | 'done' | 'failed'
   createdAt: string
   finishedAt?: string
+  /** 成功结果（state = done 时存在） */
   result?: PrintResult
+  /** 失败原因（state = failed 时存在） */
+  error?: PrintError
 }
 
 /** 网络直连打印机档案（宿主注入的现场数据：IP/端口/协议/mock） */

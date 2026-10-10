@@ -1,6 +1,6 @@
 import type { DesktopApi } from '@desktop/shared'
 import type { IpcRendererEvent } from 'electron'
-import { platformDomains } from '@desktop/shared'
+import { decodeIpcError, IpcRemoteError, platformDomains } from '@desktop/shared'
 import { contextBridge, ipcRenderer } from 'electron'
 
 export interface DesktopBridgeOptions {
@@ -32,7 +32,7 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
         continue
       }
       allowedChannels.add(channel)
-      group[method] = (...args: unknown[]) => ipcRenderer.invoke(channel, ...args)
+      group[method] = (...args: unknown[]) => invokeChannel(channel, ...args)
     }
     desktop[domain.domain] = group
   }
@@ -41,7 +41,7 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
     if (!allowedChannels.has(channel)) {
       throw new Error(`ipc channel not exposed: ${channel}`)
     }
-    return ipcRenderer.invoke(channel, ...args)
+    return invokeChannel(channel, ...args)
   }
   desktop.events = {
     on: (channel: string, listener: (...args: unknown[]) => void) => subscribe(channel, listener),
@@ -53,6 +53,18 @@ export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
   catch (error) {
     console.error(error)
   }
+}
+
+/**
+ * invoke 统一出口：主进程 createHandle 抛出的异常已编码进 message，
+ * 在此还原为带 code/details 的 IpcRemoteError（业务按错误码分支）；
+ * 非平台序列化错误（桥自身/网络层）原样透传。
+ */
+function invokeChannel(channel: string, ...args: unknown[]): Promise<unknown> {
+  return ipcRenderer.invoke(channel, ...args).catch((error: unknown) => {
+    const payload = decodeIpcError(error)
+    throw payload ? new IpcRemoteError(payload) : error
+  })
 }
 
 /** 推送订阅包装：剥掉 Electron event 首参只透传契约负载数据，返回取消监听函数 */

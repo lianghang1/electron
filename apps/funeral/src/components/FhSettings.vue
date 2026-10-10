@@ -108,13 +108,10 @@ async function runTest(key: TestKey): Promise<void> {
   testRunning.value = new Set([...testRunning.value, key])
   try {
     if (key === 'idcard') {
-      const result = await window.desktop.device.readIdCard()
-      const card = result.ok && result.data ? result.data : null
+      const card = await window.desktop.device.readIdCard()
       testResults.value = {
         ...testResults.value,
-        idcard: card
-          ? { ok: true, text: `读卡正常：${card.name} ${card.idNumber}` }
-          : { ok: false, text: result.error?.message ?? '未读到卡片，请将身份证放置读卡区后重试' },
+        idcard: { ok: true, text: `读卡正常：${card.name} ${card.idNumber}` },
       }
     }
     else {
@@ -122,8 +119,11 @@ async function runTest(key: TestKey): Promise<void> {
       testResults.value = { ...testResults.value, speech: { ok: true, text: '语音播报已播放' } }
     }
   }
-  catch {
-    testResults.value = { ...testResults.value, [key]: { ok: false, text: '测试失败，请检查设备连接' } }
+  catch (err) {
+    testResults.value = {
+      ...testResults.value,
+      [key]: { ok: false, text: err instanceof Error && err.message ? err.message : '测试失败，请检查设备连接' },
+    }
   }
   finally {
     const next = new Set(testRunning.value)

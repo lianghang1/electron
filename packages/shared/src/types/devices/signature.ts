@@ -40,29 +40,21 @@ export type SignErrorCode
     | 'PROTOCOL_PENDING'
     | 'UNKNOWN'
 
+/** 开始会话结果（失败以 IpcRemoteError 抛出，code 见 SignErrorCode） */
 export interface SignStartResult {
-  ok: boolean
   /** 板面宽（点坐标系上限，renderer 画布等比缩放基准） */
-  width?: number
+  width: number
   /** 板面高 */
-  height?: number
+  height: number
   meta?: Record<string, unknown>
-  error?: { code: SignErrorCode, message: string, detail?: unknown }
 }
 
-/** 结束会话结果：完整笔迹点集，签名图由渲染层 canvas/SVG 自绘（设备侧不产位图） */
+/** 结束会话结果：完整笔迹点集，签名图由渲染层 canvas/SVG 自绘（设备侧不产位图）；失败以 IpcRemoteError 抛出 */
 export interface SignSessionResult {
-  ok: boolean
   /** 笔画数（0 = 未书写） */
-  strokeCount?: number
-  strokes?: SignStroke[]
-  width?: number
-  height?: number
+  strokeCount: number
+  strokes: SignStroke[]
+  width: number
+  height: number
   meta?: Record<string, unknown>
-  error?: { code: SignErrorCode, message: string, detail?: unknown }
-}
-
-export interface SignActionResult {
-  ok: boolean
-  error?: { code: SignErrorCode, message: string, detail?: unknown }
 }

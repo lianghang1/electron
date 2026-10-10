@@ -75,7 +75,6 @@ export class StubAdapter implements CaptureAdapter {
     const file = path.join(dir, `stub-${Date.now()}.bmp`)
     await writeFile(file, bmp)
     return {
-      ok: true,
       imagePath: file,
       thumbDataUrl: `data:image/bmp;base64,${bmp.toString('base64')}`,
       meta: { transport: 'stub', width: w, height: h },

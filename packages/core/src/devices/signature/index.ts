@@ -1,5 +1,5 @@
 import type { Logger } from '../../logger/logger'
-import type { SignActionResult, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
+import type { SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
 import { SignatureService } from './service'
 
 export interface SignatureSystemOptions {
@@ -16,8 +16,8 @@ export interface SignatureSystem {
   start: (req: { deviceId?: string } | undefined, onStroke: (point: SignStrokePoint) => void) => Promise<SignStartResult>
   /** 结束会话并回收完整笔迹点集（签名图由渲染层自绘） */
   stop: () => Promise<SignSessionResult>
-  clear: () => Promise<SignActionResult>
-  cancel: () => Promise<SignActionResult>
+  clear: () => Promise<void>
+  cancel: () => Promise<void>
   destroy: () => void
 }
 

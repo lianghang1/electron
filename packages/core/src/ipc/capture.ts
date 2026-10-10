@@ -9,7 +9,7 @@ export interface CaptureIpcDeps {
 
 /**
  * capture 域通道注册：图像采集（高拍仪/扫描仪/摄像头）。
- * 硬件操作永不 reject，失败以 CaptureResult.error 字段回传（渲染层无需 try/catch）；
+ * 失败统一 reject（CaptureError → IpcRemoteError，code 见 CaptureErrorCode，渲染层 try/catch 分支）；
  * 预览帧只推给发起预览的窗口（webContents 直发，不走全局事件广播）。
  */
 export function registerCaptureIpc(deps: CaptureIpcDeps): void {

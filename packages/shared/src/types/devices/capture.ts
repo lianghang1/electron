@@ -48,12 +48,6 @@ export interface CaptureCameraInfo {
   resolutions: string[]
 }
 
-export interface CaptureError {
-  code: CaptureErrorCode
-  message: string
-  detail?: unknown
-}
-
 export type CaptureLogFn = (
   level: 'info' | 'warn' | 'error',
   message: string,
@@ -69,14 +63,13 @@ export type CaptureErrorCode
     | 'VALIDATION_FAILED'
     | 'UNKNOWN'
 
+/** 采集成功结果（失败以 IpcRemoteError 抛出，code 见 CaptureErrorCode） */
 export interface CaptureResult {
-  ok: boolean
   /** 采集产出的图片文件绝对路径（可直接喂给 print.submit image 负载） */
-  imagePath?: string
+  imagePath: string
   /** 缩略图 dataURL（UI 预览用，免 file:// 权限问题） */
   thumbDataUrl?: string
   meta?: Record<string, unknown>
-  error?: CaptureError
 }
 
 /** 品牌设备档案 —— 出厂值见 core BUILT_IN_CAPTURE_PROFILES，运行时编辑持久化 userData */
@@ -106,7 +99,7 @@ export interface CaptureDeviceProfile {
   capabilities?: CaptureCaps
 }
 
-/** 采集适配器统一接口 —— 新接入方式 = 实现本接口并注册 */
+/** 采集适配器统一接口 —— 新接入方式 = 实现本接口并注册。失败统一抛 CaptureError（code 见 CaptureErrorCode） */
 export interface CaptureAdapter {
   readonly transport: CaptureTransport
   listDevices: () => Promise<CaptureDevice[]>
@@ -116,9 +109,9 @@ export interface CaptureAdapter {
    * 实时预览（可选能力）：开启后预览帧经 onFrame 持续回调（JPEG base64），
    * 会话保持开启供 capture 走会话内拍照；仅支持常驻连接的适配器（ws/camsdk）实现。
    */
-  startPreview?: (deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }) => Promise<CaptureResult>
+  startPreview?: (deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }) => Promise<void>
   /** 关闭实时预览（可选能力） */
-  stopPreview?: (deviceId: string) => Promise<CaptureResult>
+  stopPreview?: (deviceId: string) => Promise<void>
   /** 枚举设备下的摄像头与分辨率（可选能力，ws/camsdk GetCameraInfo） */
   listCameras?: (deviceId: string) => Promise<CaptureCameraInfo[]>
 }

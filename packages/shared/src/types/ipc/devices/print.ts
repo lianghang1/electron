@@ -3,7 +3,8 @@ import { invoke } from '../../../domain'
 
 /**
  * print 域契约 —— 统一打印（系统队列 / 指令直写 / IPP 预留）。
- * submit 永不 reject，失败以 PrintResult.error 字段回传。
+ * submit / submitByPreset / reprint 失败统一 reject（IpcRemoteError，code 见 PrintErrorCode）；
+ * 任务历史（含失败原因）经 status / listJobs 查询。
  */
 export const printDomainDefs = {
   /** 提交打印任务（统一信封：业务类型 + 负载 + 选项） */

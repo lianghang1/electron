@@ -119,7 +119,6 @@ export class WsAdapter implements CaptureAdapter {
     const base64 = live ? await session!.capture() : await this.captureOnce(req, profile, ws)
     const file = await this.saveCaptureBase64(req, profile.id, base64)
     return {
-      ok: true,
       imagePath: file,
       thumbDataUrl: `data:image/jpeg;base64,${base64}`,
       meta: { transport: 'ws', url: ws.url, ...(live ? { via: 'preview' } : {}) },
@@ -150,21 +149,19 @@ export class WsAdapter implements CaptureAdapter {
 
   // ── 实时预览与摄像头枚举（仅华视 CamSDK 路线支持常驻连接） ──
 
-  startPreview(deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }): Promise<CaptureResult> {
+  startPreview(deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }): Promise<void> {
     return this.previewOp(deviceId, async (ws) => {
       // 重复开启先释放旧会话（换摄像头/分辨率重启走同一路径）
       this.previews.get(deviceId)?.close()
       const session = new CamSdkPreviewSession(ws, opts?.resolutionNum ?? 0, onFrame)
       await session.open()
       this.previews.set(deviceId, session)
-      return { ok: true, meta: { transport: 'ws', url: ws.url, preview: true } }
     })
   }
 
-  async stopPreview(deviceId: string): Promise<CaptureResult> {
+  async stopPreview(deviceId: string): Promise<void> {
     this.previews.get(deviceId)?.close()
     this.previews.delete(deviceId)
-    return { ok: true }
   }
 
   async listCameras(deviceId: string): Promise<CaptureCameraInfo[]> {

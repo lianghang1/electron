@@ -27,31 +27,24 @@ function syncIdSections() {
 async function refreshReaders() {
   const sel = $('#id-reader')
   try {
-    const r = await window.desktop.device.listReaders()
-    if (!r.ok) {
-      sel.innerHTML = `<option value="">读卡器不可用（${esc(r.error.message)}）</option>`
-      readers = []
-      syncIdSections()
-      return
-    }
-    if (!r.readers.length) {
-      sel.innerHTML = '<option value="">未检测到读卡器</option>'
-      readers = []
-      syncIdSections()
-      return
-    }
-    readers = r.readers
-    const prev = sel.value
-    sel.innerHTML = r.readers.map(d =>
-      `<option value="${esc(d.id)}">${esc(d.displayName)}（${esc(ID_TRANSPORT_LABEL[d.transport] ?? d.transport)}${d.status === 'ready' ? '' : ` · ${d.status === 'offline' ? '离线' : '不可用'}`}）</option>`).join('')
-    sel.value = prev && r.readers.some(d => d.id === prev) ? prev : sel.options[0].value
-    syncIdSections()
+    readers = await window.desktop.device.listReaders()
   }
   catch (e) {
-    sel.innerHTML = `<option value="">检测失败（${esc(e.message)}）</option>`
+    sel.innerHTML = `<option value="">读卡器不可用（${esc(e.message)}）</option>`
     readers = []
     syncIdSections()
+    return
   }
+  if (!readers.length) {
+    sel.innerHTML = '<option value="">未检测到读卡器</option>'
+    syncIdSections()
+    return
+  }
+  const prev = sel.value
+  sel.innerHTML = readers.map(d =>
+    `<option value="${esc(d.id)}">${esc(d.displayName)}（${esc(ID_TRANSPORT_LABEL[d.transport] ?? d.transport)}${d.status === 'ready' ? '' : ` · ${d.status === 'offline' ? '离线' : '不可用'}`}）</option>`).join('')
+  sel.value = prev && readers.some(d => d.id === prev) ? prev : sel.options[0].value
+  syncIdSections()
 }
 
 function renderIdCard(data) {
@@ -88,20 +81,13 @@ async function readIdCard() {
   btn.disabled = true
   status.textContent = '读取中…'
   try {
-    const r = await window.desktop.device.readIdCard({ deviceId })
-    if (r.ok && r.data) {
-      renderIdCard(r.data)
-      status.textContent = '读取成功'
-      toast('证卡读取成功')
-    }
-    else {
-      status.textContent = `读取失败：${r.error?.code ?? 'UNKNOWN'} · ${r.error?.message ?? '未知错误'}`
-      toast(status.textContent, false)
-    }
+    renderIdCard(await window.desktop.device.readIdCard({ deviceId }))
+    status.textContent = '读取成功'
+    toast('证卡读取成功')
   }
   catch (e) {
-    status.textContent = `调用失败：${e.message}`
-    toast(e.message, false)
+    status.textContent = `读取失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`
+    toast(status.textContent, false)
   }
   finally {
     btn.disabled = false
@@ -131,23 +117,17 @@ async function readIcCard() {
       key: key || undefined,
       keyType: $('#ic-keytype').value,
     })
-    if (r.ok && r.data) {
-      $('#ic-uid').textContent = r.data.uid
-      $('#ic-type').textContent = r.data.cardType ?? '—'
-      $('#ic-blocks').innerHTML = Object.entries(r.data.blocks)
-        .map(([addr, hex]) => `<div>块 ${esc(addr)}：${esc(hex)}</div>`).join('')
-      $('#ic-result').hidden = false
-      status.textContent = '读取成功'
-      toast('IC 卡读取成功')
-    }
-    else {
-      status.textContent = `读取失败：${r.error?.code ?? 'UNKNOWN'} · ${r.error?.message ?? '未知错误'}`
-      toast(status.textContent, false)
-    }
+    $('#ic-uid').textContent = r.uid
+    $('#ic-type').textContent = r.cardType ?? '—'
+    $('#ic-blocks').innerHTML = Object.entries(r.blocks)
+      .map(([addr, hex]) => `<div>块 ${esc(addr)}：${esc(hex)}</div>`).join('')
+    $('#ic-result').hidden = false
+    status.textContent = '读取成功'
+    toast('IC 卡读取成功')
   }
   catch (e) {
-    status.textContent = `调用失败：${e.message}`
-    toast(e.message, false)
+    status.textContent = `读取失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`
+    toast(status.textContent, false)
   }
   finally {
     btn.disabled = false
@@ -191,30 +171,24 @@ async function writeIcBlock() {
   btn.disabled = true
   status.textContent = `写入块 ${block} 中…`
   try {
-    const r = await window.desktop.device.writeIcCard({
+    await window.desktop.device.writeIcCard({
       deviceId,
       block,
       data,
       key: $('#ic-wkey').value.trim() || undefined,
       keyType: $('#ic-wkeytype').value,
     })
-    if (r.ok) {
-      status.textContent = `块 ${block} 写入成功`
-      toast(`块 ${block} 写入成功`)
-      // 写后回读验证（同一扇区密钥），结果展示在读取区
-      $('#ic-sector').value = String(Math.floor(block / 4))
-      $('#ic-key').value = $('#ic-wkey').value
-      $('#ic-keytype').value = $('#ic-wkeytype').value
-      await readIcCard()
-    }
-    else {
-      status.textContent = `写入失败：${r.error?.code ?? 'UNKNOWN'} · ${r.error?.message ?? '未知错误'}`
-      toast(status.textContent, false)
-    }
+    status.textContent = `块 ${block} 写入成功`
+    toast(`块 ${block} 写入成功`)
+    // 写后回读验证（同一扇区密钥），结果展示在读取区
+    $('#ic-sector').value = String(Math.floor(block / 4))
+    $('#ic-key').value = $('#ic-wkey').value
+    $('#ic-keytype').value = $('#ic-wkeytype').value
+    await readIcCard()
   }
   catch (e) {
-    status.textContent = `调用失败：${e.message}`
-    toast(e.message, false)
+    status.textContent = `写入失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`
+    toast(status.textContent, false)
   }
   finally {
     btn.disabled = false

@@ -161,6 +161,9 @@ export function applySessionPermissionGuards(
   session.setDisplayMediaRequestHandler((_request, callback) => {
     void desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
       callback(sources.length ? { video: sources[0] } : {})
+    }).catch(() => {
+      // 枚举失败按无可用源处理（Chromium 收到空负载等同拒绝捕获）
+      callback({})
     })
   })
 }

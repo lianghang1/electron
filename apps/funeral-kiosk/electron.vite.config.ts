@@ -12,6 +12,14 @@ import { getPascalCaseRouteName, VueRouterAutoImports } from 'vue-router/unplugi
 import VueRouter from 'vue-router/vite'
 
 export default createElectronViteConfig({
+  main: {
+    resolve: {
+      alias: {
+        '@shared': path.join(process.cwd(), './shared'),
+        '@electron': path.join(process.cwd(), './electron'),
+      },
+    },
+  },
   renderer: ({ mode }) => {
     const env = loadEnv(mode)
 

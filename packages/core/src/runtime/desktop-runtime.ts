@@ -7,7 +7,7 @@ import type { SignatureSystem } from '../devices/signature'
 import type { Logger } from '../logger/logger'
 import type { PermissionStoreSchema } from '../permission/permission-service'
 import type { BootstrapOptions } from '../types'
-import { isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import process from 'node:process'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow } from 'electron'
@@ -18,6 +18,7 @@ import { loadLocalAppManifests, loadRemoteAppManifests } from '../app/app-source
 import { AuditService } from '../audit/audit-service'
 import { CacheService } from '../cache/cache-service'
 import { createCaptureSystem } from '../devices/capture'
+import { DeviceHost } from '../devices/host/device-host'
 import { createIdCardSystem } from '../devices/idcard'
 import { createPrintSystem } from '../devices/print'
 import { createScannerSystem, SCANNER_DEFAULTS } from '../devices/scanner'
@@ -26,6 +27,7 @@ import { DownloadService } from '../download/download-service'
 import { EventBus } from '../event/event-bus'
 import { registerPlatformIpc } from '../ipc'
 import { CallerResolver } from '../ipc/caller-context'
+import { attachHandleLogger } from '../ipc/handle'
 import { createRootLogger } from '../logger/logger'
 import { attachSystemLogging } from '../logger/system'
 import { PermissionService } from '../permission/permission-service'
@@ -68,6 +70,8 @@ export class DesktopRuntime {
   private overlayService!: OverlayWindowService
   /** 设备系统：证卡读取（dll 真实驱动 + devices.mock 显式开启的 stub 模拟器） */
   private idCardSystem?: IdCardSystem
+  /** 设备守护进程：厂商 DLL 的 koffi 调用全部在此进程执行（native 崩溃隔离 + 退避重启自愈） */
+  private deviceHost?: DeviceHost
   /** 设备系统：扫码枪（键盘仿真观察，恒创建） */
   private scannerSystem!: ScannerSystem
   /** 设备系统：图像采集（UVC/DLL 双路线，恒创建） */
@@ -152,7 +156,13 @@ export class DesktopRuntime {
       scope: this.options.app.id.split('.').pop() ?? 'desktop',
     })
     attachSystemLogging(this.logger, this.resolver, this.events)
-    this.logger.info('desktop application starting', { appId: this.options.app.id })
+    // 崩溃防护第 1 层：IPC handler 异常统一留痕（主进程排障盲区补齐）
+    attachHandleLogger(this.logger.scope('ipc'))
+    this.logger.info('desktop application starting', {
+      appId: this.options.app.id,
+      // 崩溃防护第 0 层：crashDumps 本地落盘路径（bootstrap 已启动 CrashReporter，minidump 不上报）
+      crashDumpsDir: app.getPath('crashDumps'),
+    })
   }
 
   /** 形态无关的基础服务：审计 / 会话 / 存储 / 权限 / 窗口 / 韧性 / 下载 */
@@ -213,8 +223,12 @@ export class DesktopRuntime {
       : resolveResourcePath('resources')
     const mock = this.options.devices?.mock ?? false
 
+    // 设备守护进程：入口 bundle 与主进程同目录（out/main/device-host.js，electron-vite 多入口）
+    this.deviceHost = new DeviceHost(this.logger.scope('device:host'), resolveHostEntryPath())
+
     this.idCardSystem = createIdCardSystem({
       resourcesRoot,
+      host: this.deviceHost,
       logger: this.logger.scope('device:idcard'),
       mock,
     })
@@ -403,6 +417,7 @@ export class DesktopRuntime {
     this.scannerSystem?.destroy()
     this.captureSystem?.destroy()
     this.printSystem?.destroy()
+    this.deviceHost?.dispose()
     this.resilienceService?.dispose()
     this.auditService?.dispose()
     this.events.clear()
@@ -418,4 +433,15 @@ export class DesktopRuntime {
     for (const [scheme, handler] of Object.entries(this.options.protocols ?? {}))
       appSession.protocol.handle(scheme, handler)
   }
+}
+
+/**
+ * 守护进程入口解析：宿主构建产物 out/main/device-host.js 与主进程 bundle 同目录。
+ * CJS 产物取 __filename 基准；ESM 直跑源码联调无 __filename，退回 cwd 相对名（fork 失败即暴露）。
+ */
+function resolveHostEntryPath(): string {
+  if (typeof __filename === 'string') {
+    return join(dirname(__filename), 'device-host.js')
+  }
+  return 'device-host.js'
 }

@@ -1,4 +1,5 @@
-import type { SignActionResult, SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint } from '../types'
+import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint } from '../types'
+import { signatureError } from '../errors'
 
 /** 模拟板面尺寸（点坐标系上限，renderer 画布等比缩放基准） */
 const WIDTH = 420
@@ -45,23 +46,22 @@ export class StubSignAdapter implements SignAdapter {
 
   async start(_device: SignDevice, onStroke: (point: SignStrokePoint) => void): Promise<SignStartResult> {
     if (this.session) {
-      return { ok: false, error: { code: 'SESSION_ACTIVE', message: '签名会话进行中（先 stopSign/cancelSign）' } }
+      throw signatureError('SESSION_ACTIVE', '签名会话进行中（先 stopSign/cancelSign）')
     }
     // 两条错开的正弦笔画入队，定时逐点上报模拟真实书写节奏
     const session: StubSession = { queue: [...wave(110, 40), ...wave(190, 55)], strokes: [], timer: null, onStroke }
     session.timer = setInterval(() => this.tick(), TICK_MS)
     this.session = session
-    return { ok: true, width: WIDTH, height: HEIGHT, meta: { transport: 'stub', simulated: true } }
+    return { width: WIDTH, height: HEIGHT, meta: { transport: 'stub', simulated: true } }
   }
 
   async stop(): Promise<SignSessionResult> {
     if (!this.session) {
-      return { ok: false, error: { code: 'SESSION_NOT_ACTIVE', message: '无进行中的签名会话' } }
+      throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
     }
     const { strokes } = this.session
     this.endSession()
     return {
-      ok: true,
       strokeCount: strokes.length,
       strokes: strokes.map(stroke => ({ points: [...stroke.points] })),
       width: WIDTH,
@@ -70,22 +70,20 @@ export class StubSignAdapter implements SignAdapter {
     }
   }
 
-  async clear(): Promise<SignActionResult> {
+  async clear(): Promise<void> {
     if (!this.session) {
-      return { ok: false, error: { code: 'SESSION_NOT_ACTIVE', message: '无进行中的签名会话' } }
+      throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
     }
     // 清空已成笔画 + 冲掉待发队列（模拟清屏：板面与回收数据同步归零）
     this.session.strokes = []
     this.session.queue = []
-    return { ok: true }
   }
 
-  async cancel(): Promise<SignActionResult> {
+  async cancel(): Promise<void> {
     if (!this.session) {
-      return { ok: false, error: { code: 'SESSION_NOT_ACTIVE', message: '无进行中的签名会话' } }
+      throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
     }
     this.endSession()
-    return { ok: true }
   }
 
   destroy(): void {

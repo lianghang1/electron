@@ -11,9 +11,9 @@ export interface CaptureSystem {
   capture: (req: CaptureRequest) => Promise<CaptureResult>
   /** UVC 路线（渲染层 getUserMedia）拍到的 dataURL 落盘为图片文件 */
   saveDataUrl: (dataUrl: string, ext?: 'jpg' | 'png') => Promise<string>
-  /** 实时预览（ws/camsdk）：预览帧经 onFrame 回调（由 IPC 层转发发起窗口） */
-  startPreview: (deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }) => Promise<CaptureResult>
-  stopPreview: (deviceId: string) => Promise<CaptureResult>
+  /** 实时预览（ws/camsdk）：预览帧经 onFrame 回调（由 IPC 层转发发起窗口）；失败抛 CaptureError */
+  startPreview: (deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }) => Promise<void>
+  stopPreview: (deviceId: string) => Promise<void>
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo） */
   listCameras: (deviceId: string) => Promise<CaptureCameraInfo[]>
   destroy: () => void

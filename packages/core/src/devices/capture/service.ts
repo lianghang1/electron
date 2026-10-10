@@ -1,4 +1,4 @@
-import type { CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureErrorCode, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -97,29 +97,23 @@ export class CaptureService {
 
   /**
    * 实时预览：路由到设备所属适配器（仅支持常驻连接的适配器，如 ws/camsdk）。
-   * onFrame 回调持续收到预览帧（JPEG base64），由 IPC 层转发给发起窗口。
+   * onFrame 回调持续收到预览帧（JPEG base64），由 IPC 层转发给发起窗口。失败抛 CaptureError。
    */
-  async startPreview(deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }): Promise<CaptureResult> {
+  async startPreview(deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }): Promise<void> {
     try {
       const adapter = this.previewAdapter(deviceId)
-      return await adapter.startPreview!(deviceId, onFrame, opts)
+      await adapter.startPreview(deviceId, onFrame, opts)
     }
     catch (err) {
       const ce = toCaptureError(err)
       this.log('warn', `开启预览失败 ${deviceId}: ${ce.message}`)
-      return fail(ce.code, ce.message, ce.detail)
+      throw ce
     }
   }
 
-  async stopPreview(deviceId: string): Promise<CaptureResult> {
-    try {
-      const adapter = this.previewAdapter(deviceId)
-      return await adapter.stopPreview!(deviceId)
-    }
-    catch (err) {
-      const ce = toCaptureError(err)
-      return fail(ce.code, ce.message, ce.detail)
-    }
+  async stopPreview(deviceId: string): Promise<void> {
+    const adapter = this.previewAdapter(deviceId)
+    await adapter.stopPreview(deviceId)
   }
 
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo，不占用摄像头） */
@@ -138,43 +132,43 @@ export class CaptureService {
     return adapter as CaptureAdapter & Required<Pick<CaptureAdapter, 'startPreview' | 'stopPreview' | 'listCameras'>>
   }
 
-  /** 采集：路由到设备所属适配器执行；同一设备串行化（硬件一次一格） */
+  /** 采集：路由到设备所属适配器执行；同一设备串行化（硬件一次一格）。失败抛 CaptureError */
   async capture(req: CaptureRequest): Promise<CaptureResult> {
     try {
       if (!req?.deviceId) {
-        return fail('VALIDATION_FAILED', '缺少 deviceId')
+        throw captureError('VALIDATION_FAILED', '缺少 deviceId')
       }
       const transport = req.deviceId.split(':')[0]
       const adapter = this.adapters.get(transport)
       if (!adapter) {
-        return fail('ADAPTER_UNAVAILABLE', `未知接入方式: ${transport}`)
+        throw captureError('ADAPTER_UNAVAILABLE', `未知接入方式: ${transport}`)
       }
       const devices = await adapter.listDevices()
       const device = devices.find(d => d.id === req.deviceId)
-      if (!device)
-        return fail('DEVICE_NOT_FOUND', `未找到设备: ${req.deviceId}`)
-      if (device.status === 'offline')
-        return fail('DEVICE_OFFLINE', `设备离线: ${device.displayName}`)
+      if (!device) {
+        throw captureError('DEVICE_NOT_FOUND', `未找到设备: ${req.deviceId}`)
+      }
+      if (device.status === 'offline') {
+        throw captureError('DEVICE_OFFLINE', `设备离线: ${device.displayName}`)
+      }
       if (device.status === 'unavailable') {
-        return fail('ADAPTER_UNAVAILABLE', `设备适配器不可用: ${String(device.meta.note ?? transport)}`)
+        throw captureError('ADAPTER_UNAVAILABLE', `设备适配器不可用: ${String(device.meta.note ?? transport)}`)
       }
       const prev = this.locks.get(req.deviceId) ?? Promise.resolve()
       // 调用方未指定保存目录时注入模块默认目录（绝对路径）
       const reqWithDir: CaptureRequest = { ...req, saveDir: req.saveDir ?? this.defaultSaveDir }
-      // 链上已 catch，永不 reject，单分支即可
+      // 链上已 catch（登记锁不吞结果），单分支即可
       const task = prev.then(() => adapter.capture(reqWithDir, device))
       this.locks.set(req.deviceId, task.catch(() => undefined))
       this.log('info', `开始采集 ${device.displayName}`, { deviceId: device.id, transport })
       const result = await task
-      this.log(result.ok ? 'info' : 'warn', `采集完成 ${device.displayName}: ${result.ok ? '成功' : result.error?.code}`, {
-        deviceId: device.id,
-      })
+      this.log('info', `采集完成 ${device.displayName}`, { deviceId: device.id })
       return result
     }
     catch (err) {
       const ce = toCaptureError(err)
-      this.log('error', `采集异常 ${req.deviceId}: ${ce.message}`)
-      return fail(ce.code, ce.message, ce.detail)
+      this.log('error', `采集异常 ${req?.deviceId ?? ''}: ${ce.message}`)
+      throw ce
     }
   }
 
@@ -197,8 +191,4 @@ export class CaptureService {
     await writeFile(file, Buffer.from(m[1], 'base64'))
     return file
   }
-}
-
-function fail(code: CaptureErrorCode, message: string, detail?: unknown): CaptureResult {
-  return { ok: false, error: { code, message, detail } }
 }

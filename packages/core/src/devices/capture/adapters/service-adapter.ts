@@ -91,7 +91,6 @@ export class ServiceAdapter implements CaptureAdapter {
 
     const saved = await readFile(file)
     return {
-      ok: true,
       imagePath: file,
       thumbDataUrl: `data:image/${req.format ?? 'jpg'};base64,${saved.toString('base64')}`,
       meta: { transport: 'service', brand: profile.brand, url },

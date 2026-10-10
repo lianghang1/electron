@@ -66,6 +66,9 @@ export class DownloadService {
           catch (error) {
             this.logger.warn('download item gone before permission applied', { appId, error: String(error) })
           }
+        }).catch((error) => {
+          item.cancel()
+          this.logger.error('download runtime permission failed', { appId, error: String(error) })
         })
         return
       }

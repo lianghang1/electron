@@ -93,6 +93,6 @@ export class WiaAdapter implements CaptureAdapter {
       throw captureError('CAPTURE_FAILED', `WIA 采集失败: ${String(err)}`, { wiaId })
     }
 
-    return { ok: true, imagePath: file, meta: { transport: 'wia', wiaId } }
+    return { imagePath: file, meta: { transport: 'wia', wiaId } }
   }
 }

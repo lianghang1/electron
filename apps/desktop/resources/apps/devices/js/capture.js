@@ -103,17 +103,13 @@ async function startWsPreview() {
   if (!deviceId) { toast('请先选择采集设备', false); return }
   try {
     const opts = { resolutionNum: currentResolutionNum() }
-    const r = await window.desktop.capture.startPreview(deviceId, opts)
-    if (!r.ok) {
-      toast(`预览失败：${r.error?.message ?? '未知错误'}`, false)
-      return
-    }
+    await window.desktop.capture.startPreview(deviceId, opts)
     wsPreviewOn = true
     $('#cap-stage').innerHTML = '<img id="cap-live" alt="实时预览">'
     applyPreviewTransform()
     toast('预览已开启，可随时拍摄')
   }
-  catch (e) { toast(e.message, false) }
+  catch (e) { toast(`预览失败：${e.message ?? '未知错误'}`, false) }
   finally { capToggleOpButtons() }
 }
 
@@ -165,7 +161,7 @@ async function captureUvcFrame() {
   const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
   try {
     const imagePath = await window.desktop.capture.saveDataUrl(dataUrl, 'jpg')
-    pushRecord({ ok: true, imagePath, thumbDataUrl: dataUrl }, '本机摄像头')
+    pushRecord({ imagePath, thumbDataUrl: dataUrl }, '本机摄像头')
     toast('拍摄完成')
   }
   catch (e) { toast(e.message, false) }
@@ -176,13 +172,10 @@ async function captureByDevice() {
   if (!deviceId) { toast('请先选择采集设备', false); return }
   try {
     const r = await window.desktop.capture.capture({ deviceId, resolutionNum: currentResolutionNum() })
-    if (r.ok) {
-      pushRecord(r, captureDevices.find(d => d.id === deviceId)?.displayName ?? '设备')
-      toast('拍摄完成')
-    }
-    else { toast(`拍摄失败：${r.error?.message ?? '未知错误'}`, false) }
+    pushRecord(r, captureDevices.find(d => d.id === deviceId)?.displayName ?? '设备')
+    toast('拍摄完成')
   }
-  catch (e) { toast(e.message, false) }
+  catch (e) { toast(`拍摄失败：${e.message ?? '未知错误'}`, false) }
 }
 
 $('#cap-device').addEventListener('change', async () => {
@@ -242,9 +235,9 @@ $('#btn-cap-print').addEventListener('click', async () => {
       payload: { kind: 'file', path: current.imagePath },
       options: { paper: { preset: 'a4' }, copies: 1, silent: true, jobName: '高拍仪图片' },
     })
-    r.ok ? toast(`已提交打印：${r.jobId}`) : toast(`打印失败：${r.error?.message ?? '未知错误'}`, false)
+    toast(`已提交打印：${r.jobId}`)
   }
-  catch (e) { toast(e.message, false) }
+  catch (e) { toast(`打印失败：${e.message ?? '未知错误'}`, false) }
 })
 
 // ── 分辨率选择：camsdk 用设备枚举档位（存 localStorage），UVC 常用档走 applyConstraints ──

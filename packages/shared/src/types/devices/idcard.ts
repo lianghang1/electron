@@ -42,13 +42,10 @@ export interface IdCardData {
   photoDataUrl?: string
 }
 
-export interface IdReaderResult {
-  ok: boolean
-  data?: IdCardData
-  meta?: Record<string, unknown>
-  error?: { code: IdReaderErrorCode, message: string, detail?: unknown }
-}
-
+/**
+ * 读卡错误码：失败以异常跨 IPC 传递（IpcRemoteError.code），渲染层按码分支。
+ * PII 红线：错误消息不得携带证件号/照片。
+ */
 export type IdReaderErrorCode
   = | 'DEVICE_NOT_FOUND'
     | 'DEVICE_OFFLINE'
@@ -79,14 +76,7 @@ export interface IcCardData {
   blocks: Record<number, string>
 }
 
-export interface IcReaderResult {
-  ok: boolean
-  data?: IcCardData
-  meta?: Record<string, unknown>
-  error?: { code: IdReaderErrorCode, message: string, detail?: unknown }
-}
-
-/** M1 IC 卡单块写入参数：按绝对块地址写 16 字节数据 */
+/** M1 IC 卡写入参数：按绝对块地址写 16 字节数据 */
 export interface IcCardWriteRequest {
   /** 绝对块地址 0-63（Mifare Classic 1K）；驱动强制拒绝密钥控制块（每扇区末块）与 0 扇区 0 块（厂商块） */
   block: number
@@ -96,11 +86,4 @@ export interface IcCardWriteRequest {
   key?: string
   /** 密钥类型，缺省 A */
   keyType?: 'A' | 'B'
-}
-
-/** IC 卡写入结果（写操作无回读数据） */
-export interface IcCardWriteResult {
-  ok: boolean
-  meta?: Record<string, unknown>
-  error?: { code: IdReaderErrorCode, message: string, detail?: unknown }
 }

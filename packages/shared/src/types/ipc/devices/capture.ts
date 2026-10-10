@@ -3,7 +3,7 @@ import { invoke, push } from '../../../domain'
 
 /**
  * capture 域契约 —— 图像采集（高拍仪/扫描仪/摄像头，多品牌多接入方式）。
- * 永不 reject，失败以 CaptureResult.error 字段回传。
+ * 失败统一 reject（IpcRemoteError，code 见 CaptureErrorCode），渲染层 try/catch 按错误码分支。
  */
 export const captureDomainDefs = {
   /** 设备列表：各适配器上报后合并（含连通性探测状态） */
@@ -17,9 +17,9 @@ export const captureDomainDefs = {
   /** UVC 路线（渲染层 getUserMedia）拍到的 dataURL 落盘为图片文件，返回绝对路径 */
   saveDataUrl: invoke<(dataUrl: string, ext?: 'jpg' | 'png') => Promise<string>>(),
   /** 开启实时预览（ws/camsdk 高拍仪）：预览帧经 onPreviewFrame 推给发起窗口，会话保持供 capture 拍照 */
-  startPreview: invoke<(deviceId: string, opts?: { resolutionNum?: number }) => Promise<CaptureResult>>(),
+  startPreview: invoke<(deviceId: string, opts?: { resolutionNum?: number }) => Promise<void>>(),
   /** 关闭实时预览 */
-  stopPreview: invoke<(deviceId: string) => Promise<CaptureResult>>(),
+  stopPreview: invoke<(deviceId: string) => Promise<void>>(),
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo；不占用摄像头） */
   listCameras: invoke<(deviceId: string) => Promise<CaptureCameraInfo[]>>(),
   /** 实时预览帧推送（JPEG base64；仅推给发起预览的窗口） */

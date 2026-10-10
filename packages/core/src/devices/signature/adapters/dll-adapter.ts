@@ -1,6 +1,7 @@
-import type { SignActionResult, SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from '../types'
+import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from '../types'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { signatureError } from '../errors'
 
 /**
  * DLL 路线签名适配器（汉王 SPTabletSign.dll，x64，会话式纯取点库）。
@@ -45,24 +46,18 @@ export class DllSignAdapter implements SignAdapter {
   }
 
   async start(_device: SignDevice, _onStroke: (point: SignStrokePoint) => void): Promise<SignStartResult> {
-    return {
-      ok: false,
-      error: {
-        code: 'PROTOCOL_PENDING',
-        message: '汉王签名回调协议待真机实测（SPRegisterPenInfoCallBack 原型未验证），暂未启用原生会话',
-      },
-    }
+    throw signatureError('PROTOCOL_PENDING', '汉王签名回调协议待真机实测（SPRegisterPenInfoCallBack 原型未验证），暂未启用原生会话')
   }
 
   async stop(): Promise<SignSessionResult> {
-    return { ok: false, error: { code: 'SESSION_NOT_ACTIVE', message: '无进行中的签名会话' } }
+    throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
   }
 
-  async clear(): Promise<SignActionResult> {
-    return { ok: false, error: { code: 'SESSION_NOT_ACTIVE', message: '无进行中的签名会话' } }
+  async clear(): Promise<void> {
+    throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
   }
 
-  async cancel(): Promise<SignActionResult> {
-    return { ok: false, error: { code: 'SESSION_NOT_ACTIVE', message: '无进行中的签名会话' } }
+  async cancel(): Promise<void> {
+    throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
   }
 }
