@@ -11,7 +11,7 @@ import { registerFuneralKioskIpc } from './ipc'
  */
 bootstrap({
   app: {
-    id: 'com.company.funeral-kiosk',
+    id: 'com.sfi.app.funeral.service',
     name: 'FuneralKiosk',
     version: '1.0.0',
   },

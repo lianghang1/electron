@@ -1,36 +1,37 @@
-appId: com.company.funeral-kiosk
-productName: FuneralKiosk
+appId: com.company.desktop
+productName: Desktop
 directories:
   buildResources: build
 # asar 热更引导器结构：app.asar → app.core.asar（真实代码），app.asar 重写为 KB 级引导器
-# 本文件是薄壳，共享实现在 packages/core/scripts/after-pack.cjs（见彼处头注释）
+# 钩子与引导器为全 app 共享（packages/core），接入方式见钩子头注释
 afterPack: scripts/after-pack.cjs
 files:
   - '!**/.vscode/*'
   - '!src/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json,contracts.d.ts}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  # 资源源文件不进 asar：icon 经 ?asset 构建进 out/；路径读取的资源（设备 SDK DLL/
-  # 授权文件等）经 extraResources 随包发布到 resourcesPath/resources
+  # 根 resources 走 extraResources（asar 外真实文件），不进 asar；icon 已由 ?asset 构建进 out/
   - '!resources/**'
+# 运行时资源（SumatraPDF / 厂商 DLL / 内置应用页面，需真实文件路径）：
+# dev 取 <应用根>/resources，打包注入 <resourcesPath>/resources，路径解析统一走 core resolveResourcePath
 extraResources:
   - from: resources
     to: resources
 win:
-  target:
-    - target: nsis
-      arch: [x64]
-  icon: build/icon.ico
+  target: nsis
 nsis:
-  artifactName: FuneralKiosk-Setup-${version}.${ext}
-  # 无人值守终端：一键静默装 + 用户级目录，更新链路（整包重装/热更）全程零 UAC
-  oneClick: true
-  perMachine: false
-  runAfterFinish: true
-  createDesktopShortcut: always
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
   unicode: true
   language: 2052
+mac:
+  target: dmg
+  notarize: false
+linux:
+  target: AppImage
+  category: Utility
 npmRebuild: false
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/

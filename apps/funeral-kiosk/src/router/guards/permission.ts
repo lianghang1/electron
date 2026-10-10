@@ -3,6 +3,6 @@ import type { Router } from 'vue-router'
 export function createPermissionGuard(router: Router) {
   router.beforeEach((to) => {
     // TODO
-    console.log(to)
+    console.debug(to)
   })
 }

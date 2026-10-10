@@ -15,6 +15,7 @@ import { JobStore } from './job-store'
 import { assertPaperSupported, resolvePaper } from './paper'
 import { mergePresets } from './preset'
 import { IMAGE_MIME, renderImageViewerHtml, renderTemplateHtml } from './templates'
+import { downloadUrlContent } from './url-content'
 
 /**
  * PrintService = 统一打印 API 的实现体（归一化层）。
@@ -165,7 +166,7 @@ export class PrintService {
         businessType: req.businessType,
         paper,
         options: req.options,
-        content: await this.normalizeContent(req, paper),
+        content: await this.normalizeContent(req, paper, jobId),
       }
 
       const outcome = await channel.execute(job, printer)
@@ -308,13 +309,14 @@ export class PrintService {
     }
   }
 
-  /** 内容归一：四种负载 → 通道可执行形态（HTML / PDF / 指令流）。paper 已归一为 PaperSpec */
-  private async normalizeContent(req: PrintRequest, paper: PaperSpec): Promise<PreparedContent> {
+  /** 内容归一：五种负载 → 通道可执行形态（HTML / PDF / 指令流）。paper 已归一为 PaperSpec（PDF 直通可为 undefined） */
+  private async normalizeContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> {
     const p = req.payload
     switch (p.kind) {
       case 'template': {
         // 同一份业务数据双形态：HTML 给系统队列，结构化数据给指令直写渲染器
-        const html = await renderTemplateHtml(p.templateId, p.data, paper)
+        // （validate 已保证模板负载必带 options.paper，PDF 直通豁免仅限 file/url 负载）
+        const html = await renderTemplateHtml(p.templateId, p.data, paper!)
         return { type: 'html', html, structured: { templateId: p.templateId, data: p.data } }
       }
       case 'html':
@@ -323,22 +325,33 @@ export class PrintService {
         if (!existsSync(p.path)) {
           throw printError('VALIDATION_FAILED', `文件不存在: ${p.path}`)
         }
-        const ext = extname(p.path).toLowerCase()
-        if (ext === '.pdf') {
-          // PDF 版式由文件自身页面决定，options.paper 不作用于 PDF 直通
-          return { type: 'pdf', path: p.path }
-        }
-        const mime = IMAGE_MIME[ext]
-        if (mime) {
-          const dataUrl = `data:${mime};base64,${readFileSync(p.path).toString('base64')}`
-          const html = renderImageViewerHtml(dataUrl, paper)
-          return { type: 'html', html }
-        }
-        throw printError('VALIDATION_FAILED', `不支持的文件类型: ${ext}（支持 PDF 与常见图片格式）`)
+        return this.contentFromLocalFile(p.path, paper)
+      }
+      case 'url': {
+        const downloaded = await downloadUrlContent(p, this.archiveDir, jobId, this.log.bind(this))
+        return this.contentFromLocalFile(downloaded.path, paper)
       }
       case 'raw':
         return { type: 'raw', bytes: p.bytes, dialect: p.dialect }
     }
+  }
+
+  /** 本地文件 → 通道内容：PDF 直通 / 图片转 base64 查看器（file 与 url 负载共用） */
+  private contentFromLocalFile(filePath: string, paper: PaperSpec | undefined): PreparedContent {
+    const ext = extname(filePath).toLowerCase()
+    if (ext === '.pdf') {
+      // PDF 版式由文件自身页面决定，options.paper 不作用于 PDF 直通
+      return { type: 'pdf', path: filePath }
+    }
+    const mime = IMAGE_MIME[ext]
+    if (mime) {
+      if (!paper) {
+        throw printError('VALIDATION_FAILED', '图片内容需要 options.paper 指定版式')
+      }
+      const dataUrl = `data:${mime};base64,${readFileSync(filePath).toString('base64')}`
+      return { type: 'html', html: renderImageViewerHtml(dataUrl, paper) }
+    }
+    throw printError('VALIDATION_FAILED', `不支持的文件类型: ${ext}（支持 PDF 与常见图片格式）`)
   }
 
   private validate(req: PrintRequest): void {
@@ -348,8 +361,8 @@ export class PrintService {
     if (!req.payload?.kind) {
       throw printError('VALIDATION_FAILED', '缺少 payload（打印内容）')
     }
-    // PDF 文件直通按 PDF 自身页面尺寸打印，不依赖纸张规格；其余内容必须显式指定
-    const isPdfPassthrough = req.businessType === 'pdf' && req.payload.kind === 'file'
+    // PDF 文件/URL 直通按 PDF 自身页面尺寸打印，不依赖纸张规格；其余内容必须显式指定
+    const isPdfPassthrough = req.businessType === 'pdf' && (req.payload.kind === 'file' || req.payload.kind === 'url')
     if (!isPdfPassthrough && !req.options?.paper) {
       throw printError('VALIDATION_FAILED', '缺少 options.paper（纸张规格）')
     }

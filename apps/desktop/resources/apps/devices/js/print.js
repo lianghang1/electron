@@ -1,5 +1,5 @@
 'use strict'
-/* 打印域：统一信封提交（7 种内容类型）+ 纸型库 + 版式 + 小票硬件控制 + 渲染预览 + 打印机/任务管理 */
+/* 打印域：统一信封提交（8 种内容类型）+ 纸型库 + 版式 + 小票硬件控制 + 渲染预览 + 打印机/任务管理 */
 
 const KINDS = {
   receipt80: { businessType: 'receipt', templateId: 'receipt-default', sampleKey: 'receipt', paper: 'receipt80', receipt: true },
@@ -8,6 +8,7 @@ const KINDS = {
   label: { businessType: 'label', templateId: 'label-default', sampleKey: 'label', paper: 'label-40x30' },
   image: { businessType: 'image', payload: 'file', paper: 'a4', docLike: true },
   pdf: { businessType: 'pdf', payload: 'file', paper: 'a4', docLike: true },
+  pdfurl: { businessType: 'pdf', payload: 'url', paper: 'a4', docLike: true },
   html: { businessType: 'document', payload: 'html', paper: 'a4', docLike: true },
 }
 
@@ -51,8 +52,9 @@ function switchKind(k) {
   $('#data-template').hidden = !kind.templateId
   $('#data-html').hidden = kind.payload !== 'html'
   $('#data-file').hidden = kind.payload !== 'file'
+  $('#data-url').hidden = kind.payload !== 'url'
   $('#layout-grid').hidden = !kind.docLike
-  $('#pdf-extra-grid').hidden = currentKind !== 'pdf'
+  $('#pdf-extra-grid').hidden = currentKind !== 'pdf' && currentKind !== 'pdfurl'
   $('#hardware-grid').hidden = !kind.receipt
   $('#btn-preview').hidden = !kind.templateId
   if (kind.paper && papers.some(p => p.id === kind.paper)) $('#opt-paper').value = kind.paper
@@ -79,6 +81,10 @@ function buildPayload() {
   const kind = KINDS[currentKind]
   if (kind.payload === 'file') {
     return { kind: 'file', path: $('#file-path').value.trim() }
+  }
+  if (kind.payload === 'url') {
+    const fileType = $('#opt-file-type').value
+    return { kind: 'url', url: $('#file-url').value.trim(), ...(fileType ? { fileType } : {}) }
   }
   if (kind.payload === 'html') {
     return { kind: 'html', html: $('#html-data').value }
@@ -150,6 +156,10 @@ async function submitPrint() {
   }
   if (kind.payload === 'file' && !$('#file-path').value.trim()) {
     toast('请先填写文件绝对路径', false)
+    return
+  }
+  if (kind.payload === 'url' && !$('#file-url').value.trim()) {
+    toast('请先填写 PDF 链接', false)
     return
   }
   $('#print-result').textContent = '提交中…'

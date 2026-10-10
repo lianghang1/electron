@@ -1,8 +1,9 @@
 import type { CallerContext } from '@desktop/shared'
-import Store from 'electron-store'
+import type Store from 'electron-store'
+import { createStore } from './store'
 
 /**
- * App 隔离的本地 KV 存储：每个 App 一个独立 JSON 文件（userData/app-<appId>.json），
+ * App 隔离的本地 KV 存储：每个 App 一个独立 JSON 文件（userData/storage/app-<appId>.json），
  * 由 electron-store 负责原子写入。App 身份来自 Main 反查的 CallerContext，
  * Renderer 无法指定读取其他 App 的数据。
  */
@@ -34,7 +35,7 @@ export class StorageService {
   private store(appId: string): Store {
     let store = this.stores.get(appId)
     if (!store) {
-      store = new Store({ name: `app-${appId}` })
+      store = createStore({ name: `app-${appId}` })
       this.stores.set(appId, store)
     }
     return store

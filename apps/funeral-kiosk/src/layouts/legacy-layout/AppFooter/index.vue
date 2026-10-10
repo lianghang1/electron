@@ -28,7 +28,7 @@ function generateCopyright() {
       <p>{{ generateCopyright() }}</p>
     </div>
     <div class="info-right">
-      <p>资源版本号：{{ appStore.version }}</p>
+      <!-- <p>资源版本号：{{ appStore.version }}</p> -->
     </div>
   </div>
 </template>

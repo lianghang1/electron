@@ -19,6 +19,13 @@ export interface FilePayload {
   kind: 'file'
   path: string
 }
+/** URL 负载：main 进程下载到任务归档目录后复用 file 通道（PDF 直通 / 图片转查看器） */
+export interface UrlPayload {
+  kind: 'url'
+  url: string
+  /** 内容类型提示：显式声明优先于自动识别；缺省走识别链（Content-Type → URL 扩展名 → PDF 兜底） */
+  fileType?: 'pdf' | 'image'
+}
 export interface HtmlPayload {
   kind: 'html'
   html: string
@@ -28,7 +35,7 @@ export interface RawPayload {
   bytes: Uint8Array
   dialect: 'escpos' | 'zpl' | 'tspl'
 }
-export type PrintPayload = TemplatePayload | FilePayload | HtmlPayload | RawPayload
+export type PrintPayload = TemplatePayload | FilePayload | UrlPayload | HtmlPayload | RawPayload
 
 /** 纸张 —— 业务语义，各通道自行翻译；也支持传纸型库 ID（见 PaperProfile） */
 export type PaperSpec

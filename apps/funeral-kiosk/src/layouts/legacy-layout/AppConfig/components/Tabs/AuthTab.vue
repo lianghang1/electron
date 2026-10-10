@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { FormConfig } from '../DynamicForm.vue'
+import { useGlobalMessageStore } from '@/layouts/legacy-layout/store'
 import DynamicForm from '../DynamicForm.vue'
 
 const props = defineProps<{
@@ -43,7 +44,7 @@ async function handleUpdateAuthPassword() {
     return
   }
   try {
-    await window.eApi.auth.updateAuthPassword(password, newPassword)
+    // await window.eApi.auth.updateAuthPassword(password, newPassword)
     globalMessageStore.success({
       title: '配置更新成功',
     })

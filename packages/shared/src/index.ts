@@ -77,6 +77,7 @@ export type {
   RawPrinterConfig,
   TemplatePayload,
   UnifiedPrinter,
+  UrlPayload,
 } from './types/devices/print'
 export type { ScanErrorCode, ScannerConfig, ScannerLogFn, ScanOptions, ScanResult } from './types/devices/scanner'
 export type { SignDevice, SignDeviceTransport, SignErrorCode, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint } from './types/devices/signature'

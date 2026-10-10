@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import type { AppConfigData } from '@shared/types'
 import type { FormConfig } from '../DynamicForm.vue'
+import type { AppConfig } from '@/store/modules/app/types'
+
+import { useGlobalMessageStore } from '@/layouts/legacy-layout/store'
 import DynamicForm from '../DynamicForm.vue'
 
 const appStore = useAppStore()
@@ -22,7 +24,7 @@ const formConfig = reactive<FormConfig>({
       label: '超时关闭时间',
     },
     {
-      field: 'scannerValidatePrefixe',
+      field: 'scannerRequirePrefix',
       type: 'switch',
       label: '验证二维码前缀',
     },
@@ -32,7 +34,7 @@ const formConfig = reactive<FormConfig>({
 const formData = ref({
   deviceId: appStore.deviceId,
   inactivityTimeout: appStore.inactivityTimeout,
-  scannerValidatePrefixe: appStore.scannerValidatePrefixe,
+  scannerRequirePrefix: appStore.scannerRequirePrefix,
 })
 
 function handleGetData() {
@@ -46,11 +48,11 @@ function handleGetData() {
 function handleBlur(data: any) {
   let isChanged = false
   for (const attr in data) {
-    const newValue = data[attr as keyof AppConfigData]
-    const oldValue = appStore.getFieldConfigValue(attr as keyof AppConfigData)
+    const newValue = data[attr as keyof AppConfig]
+    const oldValue = appStore.getFieldConfigValue(attr as keyof AppConfig)
     if (newValue !== oldValue) {
       isChanged = true
-      appStore.setFieldConfigValue(attr as keyof AppConfigData, newValue)
+      appStore.setFieldConfigValue(attr as keyof AppConfig, newValue)
       if (attr === 'deviceId') {
         const device = appStore.devices.find(device => device.value === newValue)
         appStore.setFieldConfigValue('deviceName', device?.label || '')

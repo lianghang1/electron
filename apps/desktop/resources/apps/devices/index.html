@@ -164,6 +164,7 @@
         <button class="kind-btn" data-kind="label">标签</button>
         <button class="kind-btn" data-kind="image">图片文件</button>
         <button class="kind-btn" data-kind="pdf">PDF 文件</button>
+        <button class="kind-btn" data-kind="pdfurl">PDF 链接</button>
         <button class="kind-btn" data-kind="html">HTML</button>
       </div>
 
@@ -181,6 +182,17 @@
       <div class="data-block" id="data-file" hidden>
         <div class="hint" style="margin-bottom: 6px;">文件绝对路径（高拍仪 / 采集拍摄的产物路径可直接粘贴打印）</div>
         <input id="file-path" class="input mono" style="width: 100%;" placeholder="如 D:\data\capture\shot.jpg" spellcheck="false">
+      </div>
+      <div class="data-block" id="data-url" hidden>
+        <div class="hint" style="margin-bottom: 6px;">PDF 链接（http/https，主进程下载后按 PDF 直通打印，产物归档于打印任务可重打）</div>
+        <input id="file-url" class="input mono" style="width: 100%;" placeholder="https://…/report.pdf" spellcheck="false">
+        <label class="field" style="margin-top: 8px;"><span>内容类型提示（识别不出来时按 PDF 处理）</span>
+          <select class="input" id="opt-file-type" style="width: 160px;">
+            <option value="">自动识别</option>
+            <option value="pdf">PDF</option>
+            <option value="image">图片</option>
+          </select>
+        </label>
       </div>
 
       <div class="form-grid" style="margin-top: 12px;">

@@ -11,7 +11,6 @@ import { dirname, isAbsolute, join } from 'node:path'
 import process from 'node:process'
 import { electronApp, is, optimizer } from '@electron-toolkit/utils'
 import { app, BrowserWindow } from 'electron'
-import Store from 'electron-store'
 import { AppRegistry } from '../app/app-registry'
 import { AppService } from '../app/app-service'
 import { loadLocalAppManifests, loadRemoteAppManifests } from '../app/app-source'
@@ -34,6 +33,7 @@ import { PermissionService } from '../permission/permission-service'
 import { ResilienceService } from '../resilience/resilience'
 import { SessionService } from '../session/session-service'
 import { StorageService } from '../storage/storage-service'
+import { createStore } from '../storage/store'
 import { TabService } from '../tab/tab-service'
 import { AsarUpdateService } from '../updater/asar-update-service'
 import { UpdateService } from '../updater/update-service'
@@ -179,7 +179,7 @@ export class DesktopRuntime {
       this.events,
       this.logger.scope('permission'),
       // 运行时权限决策持久化：重启后不再重复询问（平台级存储）
-      new Store<PermissionStoreSchema>({ name: 'platform-permissions' }),
+      createStore<PermissionStoreSchema>({ name: 'platform-permissions' }),
     )
     this.windowService = new WindowService(
       this.events,
@@ -240,7 +240,7 @@ export class DesktopRuntime {
     })
 
     // 扫码枪：配置持久化 + 键盘观察接入所有窗口（before-input-event，全局生效）
-    const scannerStore = new Store<ScannerConfig>({ name: 'device-scanner', defaults: SCANNER_DEFAULTS })
+    const scannerStore = createStore<ScannerConfig>({ name: 'device-scanner', defaults: SCANNER_DEFAULTS })
     this.scannerSystem = createScannerSystem({
       initialConfig: scannerStore.store,
       persist: config => scannerStore.set(config),
@@ -249,7 +249,7 @@ export class DesktopRuntime {
     app.on('browser-window-created', (_, win) => this.scannerSystem?.attachWindow(win))
 
     // 图像采集：设备档案持久化，图片默认落 userData/capture
-    const captureStore = new Store<{ devices?: CaptureDeviceProfile[] }>({ name: 'device-capture-profiles' })
+    const captureStore = createStore<{ devices?: CaptureDeviceProfile[] }>({ name: 'device-capture-profiles' })
     this.captureSystem = createCaptureSystem({
       resourcesRoot,
       mock,
@@ -261,8 +261,8 @@ export class DesktopRuntime {
 
     // 打印：预设与网络打印机档案均持久化（运行时编辑热生效）；打印机档案缺键时回落宿主注入
     // （mock: true 档案为指令落盘模拟）；SumatraPDF 相对资源根解析（缺省 devices/print/SumatraPDF.exe），绝对路径原样
-    const presetStore = new Store<{ presets?: PrintPreset[] }>({ name: 'device-print-presets' })
-    const printerStore = new Store<{ printers?: RawPrinterConfig[] }>({ name: 'device-print-printers' })
+    const presetStore = createStore<{ presets?: PrintPreset[] }>({ name: 'device-print-presets' })
+    const printerStore = createStore<{ printers?: RawPrinterConfig[] }>({ name: 'device-print-printers' })
     const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'devices/print/SumatraPDF.exe'
     this.printSystem = createPrintSystem({
       stateDir: app.getPath('userData'),

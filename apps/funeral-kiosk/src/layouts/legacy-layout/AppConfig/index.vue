@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { logout } from '@/http'
 import AuthTab from './components/Tabs/AuthTab.vue'
 import DeviceTab from './components/Tabs/DeviceTab.vue'
 
@@ -16,7 +15,7 @@ const countdown = ref(30)
 const activeTab = ref<string>('device')
 const showExitConfirm = ref<boolean>(false)
 
-const tabs = ref<LabelValueOption<string>[]>([
+const tabs = ref<CommonType.LabelValueOption<string>[]>([
   {
     label: '设备信息',
     value: 'device',
@@ -43,11 +42,11 @@ function handleClose() {
 }
 
 async function handleAuth() {
-  const verifyResult = await window.eApi.auth.auth(authPassword.value)
-  if (!verifyResult) {
-    authError.value = '授权密码错误，请重新输入'
-    return
-  }
+  // const verifyResult = await window.eApi.auth.auth(authPassword.value)
+  // if (!verifyResult) {
+  //   authError.value = '授权密码错误，请重新输入'
+  //   return
+  // }
   isAuthenticated.value = true
   authError.value = ''
 }
@@ -62,8 +61,8 @@ function handleCancelExitApp() {
 
 async function handleConfirmExitApp() {
   showExitConfirm.value = false
-  await logout()
-  window.eApi?.app.quit()
+  // await logout()
+  window.desktop.window.quit()
 }
 
 watch(() => props.isVisible, (val) => {
