@@ -8,6 +8,8 @@ const props = defineProps<{
 }>()
 
 const globalMessageStore = useGlobalMessageStore()
+const appStore = useAppStore()
+
 const loading = ref(false)
 
 const formConfig = reactive<FormConfig>({
@@ -44,14 +46,13 @@ async function handleUpdateAuthPassword() {
     return
   }
   try {
-    // await window.eApi.auth.updateAuthPassword(password, newPassword)
+    await appStore.updateConfigAuthPassword(password, newPassword)
     globalMessageStore.success({
       title: '配置更新成功',
     })
     props.close()
   }
-  catch (err) {
-    console.log(err)
+  catch (_) {
     globalMessageStore.error({
       title: '密码验证失败',
     })

@@ -8,6 +8,8 @@ const props = defineProps<{
 
 const emit = defineEmits(['close', 'save', 'exit-app'])
 
+const appStore = useAppStore()
+
 const isAuthenticated = ref<boolean>(false)
 const authPassword = ref<string>('')
 const authError = ref<string>('')
@@ -42,11 +44,11 @@ function handleClose() {
 }
 
 async function handleAuth() {
-  // const verifyResult = await window.eApi.auth.auth(authPassword.value)
-  // if (!verifyResult) {
-  //   authError.value = '授权密码错误，请重新输入'
-  //   return
-  // }
+  const verifyResult = appStore.validateConfigAuthPassword(authPassword.value)
+  if (!verifyResult) {
+    authError.value = '授权密码错误，请重新输入'
+    return
+  }
   isAuthenticated.value = true
   authError.value = ''
 }

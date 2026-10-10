@@ -1,7 +1,6 @@
-import type { AuthState, TenantInfo } from './types'
+import type { AuthState } from './types'
 
 import { defineStore } from 'pinia'
-import { getUserInfo } from '@/api/auth'
 import { kioskApi } from '@/api/kiosk'
 import { httpContext } from '@/http'
 
@@ -16,10 +15,6 @@ export const useAuthStore = defineStore('auth-store', () => {
 
   // getters
   const accessToken = computed(() => state.accessInfo?.token)
-  const userId = computed(() => state.userInfo?.id)
-  const isLoggedIn = computed(() => !!(userId.value && accessToken.value))
-  const safeTenantId = computed(() => state.tenantId || '')
-  const mobile = computed(() => state.userInfo?.mobile)
 
   const accessTokenWithType = computed(() => {
     const tokenValue = accessToken?.value
@@ -29,27 +24,6 @@ export const useAuthStore = defineStore('auth-store', () => {
     const tokenType = state.accessInfo?.tokenType
     return tokenType ? `${tokenType} ${tokenValue}` : tokenValue
   })
-
-  async function loadUserInfo() {
-    const data = await getUserInfo({
-      skipAuth: true,
-    })
-    state.userInfo = {
-      id: data.id,
-      nickname: data.nickName || '',
-      avatar: data.avatar || '',
-      mobile: data.mobile || '',
-      tenants: data.tenants?.map((item) => {
-        return {
-          id: item.id,
-          name: item.showName,
-        } as TenantInfo
-      }),
-    }
-
-    state.tenantId = data.tenant?.id || ''
-    return state.userInfo
-  }
 
   function logout() {
     resetAuth({ redirectLogin: true })
@@ -67,8 +41,6 @@ export const useAuthStore = defineStore('auth-store', () => {
       token: data.token,
       tokenType: data.tokenType,
     }
-
-    await loadUserInfo()
   }
 
   httpContext.set({
@@ -84,11 +56,7 @@ export const useAuthStore = defineStore('auth-store', () => {
 
     // getters
     accessToken,
-    userId,
-    isLoggedIn,
     accessTokenWithType,
-    safeTenantId,
-    mobile,
 
     // actions
     logout,

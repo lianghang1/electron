@@ -48,7 +48,7 @@ async function loadData(type) {
     searchDate = formatDate(addDays(new Date(), 2), 'YYYY-MM-DD')
   }
 
-  const { data } = await FuneralApi.getBBsHallSchedule({ selectDate: searchDate })
+  const data = await FuneralApi.getBBsHallSchedule({ selectDate: searchDate })
   const { list } = data
 
   scheduleData.value = list

@@ -2,7 +2,7 @@ import { createAlovaAxios } from '@fun-design/http-alova-axios'
 
 import { httpContext } from './context'
 
-export const baseURL = __VITE_API_BASE_URL__
+export const baseURL = import.meta.env.VITE_API_BASE_URL
 
 const http = createAlovaAxios({
   baseURL,

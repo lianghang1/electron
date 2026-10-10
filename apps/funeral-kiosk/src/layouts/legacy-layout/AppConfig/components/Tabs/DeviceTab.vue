@@ -24,6 +24,11 @@ const formConfig = reactive<FormConfig>({
       label: '超时关闭时间',
     },
     {
+      field: 'scannerPrefixes',
+      type: 'text',
+      label: '二维码前缀,逗号分割',
+    },
+    {
       field: 'scannerRequirePrefix',
       type: 'switch',
       label: '验证二维码前缀',
@@ -35,6 +40,7 @@ const formData = ref({
   deviceId: appStore.deviceId,
   inactivityTimeout: appStore.inactivityTimeout,
   scannerRequirePrefix: appStore.scannerRequirePrefix,
+  scannerPrefixes: appStore.scannerPrefixes?.join(',') || '',
 })
 
 function handleGetData() {
@@ -45,17 +51,20 @@ function handleGetData() {
   visible.value = true
 }
 
-function handleBlur(data: any) {
+async function handleBlur(data: any) {
   let isChanged = false
   for (const attr in data) {
-    const newValue = data[attr as keyof AppConfig]
+    let newValue = data[attr as keyof AppConfig]
+    if (['scannerPrefixes'].includes(attr)) {
+      newValue = newValue.split(',')
+    }
     const oldValue = appStore.getFieldConfigValue(attr as keyof AppConfig)
     if (newValue !== oldValue) {
       isChanged = true
-      appStore.setFieldConfigValue(attr as keyof AppConfig, newValue)
+      await appStore.setFieldConfigValue(attr as keyof AppConfig, newValue)
       if (attr === 'deviceId') {
         const device = appStore.devices.find(device => device.value === newValue)
-        appStore.setFieldConfigValue('deviceName', device?.label || '')
+        await appStore.setFieldConfigValue('deviceName', device?.label || '')
       }
     }
   }

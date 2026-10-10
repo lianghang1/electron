@@ -13,7 +13,7 @@ export function registerLoginHandle(): void {
     const data = await http.PostForm<{
       access_token: string
       token_type: string
-    }>(`/api-uaa/oauth/token`, {
+    }>(`${import.meta.env.MAIN_VITE_PLATFORM_API_BASE_URL}/api-uaa/oauth/token`, {
       username: account,
       password,
       grant_type: 'password_sdk_pwd',

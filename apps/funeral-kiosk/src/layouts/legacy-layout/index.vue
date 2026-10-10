@@ -20,7 +20,11 @@ const globalLoadingStore = useGlobalLoadingStore()
 const globalMessageStore = useGlobalMessageStore()
 const appStore = useAppStore()
 
-const countdownTimer = ref()
+const countdownTimer = ref<{
+  start: () => void
+  stop: () => void
+  trigger: () => void
+}>()
 const countdown = ref<number>(0)
 const inactivityTimeout = ref<number>(appStore.inactivityTimeout)
 const scanLoading = ref(false)
@@ -48,12 +52,21 @@ countdownTimer.value = useTimeTask((start, stop) => {
   start()
 }, 1000, false)
 
+let diifStartCountdownTask: number | null = null
+
 function startCountdown() {
-  if (countdownTimer.value) {
-    countdownTimer.value.stop()
+  if (diifStartCountdownTask) {
+    console.log('quxiao')
+    clearTimeout(diifStartCountdownTask)
   }
-  countdown.value = inactivityTimeout.value
-  countdownTimer.value!.start()
+  diifStartCountdownTask = setTimeout(() => {
+    console.log('zhixing')
+    if (countdownTimer.value) {
+      countdownTimer.value.stop()
+    }
+    countdown.value = inactivityTimeout.value
+    countdownTimer.value?.trigger()
+  }, 1000)
 }
 
 function handleBack() {

@@ -1,6 +1,6 @@
 <script setup>
-import FuneralApi from '@renderer/api/funeral'
 import dayjs from 'dayjs'
+import FuneralApi from '@/api/funeral'
 import { addDays, formatDate } from '@/utils'
 
 dayjs.locale('zh-cn')
