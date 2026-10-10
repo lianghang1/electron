@@ -17,7 +17,10 @@ interface CamSdkFrame {
   func: string
   result?: number
   errorMsg?: string
+  /** 拍照响应：图片数组（实测 CameraCapture 返回 imgBase64） */
   imgBase64?: string[]
+  /** 预览帧：单串图片数据（实测 GetCameraVideoBuff 预览帧返回 imgBase64Str，无 result/reqId） */
+  imgBase64Str?: string
   [key: string]: unknown
 }
 
@@ -104,8 +107,10 @@ export function captureCamSdkBase64(cfg: CamSdkConfig): Promise<string> {
           break
         }
         case 'GetCameraVideoBuff': {
-          // 预览帧带图像数据（imgBase64 非空数组）；enable 开关的 ACK 只带 result，按普通响应校验
-          if (msg.imgBase64?.length) {
+          // 预览帧带图像数据（不同 SDK 版本字段名为 imgBase64Str / imgBase64）；
+          // enable 开关的 ACK 只带 result，按普通响应校验
+          const preview = msg.imgBase64Str ?? msg.imgBase64?.[0]
+          if (preview) {
             // 预览帧持续推送：只等首帧到达（设备就绪标志），图片内容不处理
             if (!previewArrived) {
               previewArrived = true
@@ -122,7 +127,7 @@ export function captureCamSdkBase64(cfg: CamSdkConfig): Promise<string> {
         case 'CameraCapture': {
           if (!check(msg))
             return
-          const base64 = msg.imgBase64?.[0]
+          const base64 = msg.imgBase64?.[0] ?? msg.imgBase64Str
           if (!base64) {
             fail('CAPTURE_FAILED', '华视高拍仪拍照成功但未返回图片数据')
             return

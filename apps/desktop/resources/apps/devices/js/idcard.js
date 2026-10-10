@@ -13,25 +13,44 @@ const ID_FIELDS = [
 
 const ID_TRANSPORT_LABEL = { dll: 'SDK 直连', stub: '模拟' }
 
+/** 最近一次枚举的读卡器列表（能力联动与回读选中态使用） */
+let readers = []
+
+/** 区块显隐跟随所选读卡器的能力：身份证 / IC 读 / IC 写三块互不越界 */
+function syncIdSections() {
+  const caps = readers.find(d => d.id === $('#id-reader').value)?.capabilities ?? []
+  $('#sec-id-read').hidden = !caps.includes('idcard')
+  $('#sec-ic-read').hidden = !caps.includes('iccard')
+  $('#sec-ic-write').hidden = !caps.includes('iccard-write')
+}
+
 async function refreshReaders() {
   const sel = $('#id-reader')
   try {
     const r = await window.desktop.device.listReaders()
     if (!r.ok) {
       sel.innerHTML = `<option value="">读卡器不可用（${esc(r.error.message)}）</option>`
+      readers = []
+      syncIdSections()
       return
     }
     if (!r.readers.length) {
       sel.innerHTML = '<option value="">未检测到读卡器</option>'
+      readers = []
+      syncIdSections()
       return
     }
+    readers = r.readers
     const prev = sel.value
     sel.innerHTML = r.readers.map(d =>
       `<option value="${esc(d.id)}">${esc(d.displayName)}（${esc(ID_TRANSPORT_LABEL[d.transport] ?? d.transport)}${d.status === 'ready' ? '' : ` · ${d.status === 'offline' ? '离线' : '不可用'}`}）</option>`).join('')
     sel.value = prev && r.readers.some(d => d.id === prev) ? prev : sel.options[0].value
+    syncIdSections()
   }
   catch (e) {
     sel.innerHTML = `<option value="">检测失败（${esc(e.message)}）</option>`
+    readers = []
+    syncIdSections()
   }
 }
 
@@ -90,6 +109,7 @@ async function readIdCard() {
 }
 
 $('#btn-id-read').addEventListener('click', () => void readIdCard())
+$('#id-reader').addEventListener('change', syncIdSections)
 
 // ── IC 卡读取（Mifare：寻卡 → 防碰撞 → 选卡 → 认证 → 读块，与身份证共用设备串行锁） ──
 

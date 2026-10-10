@@ -330,72 +330,79 @@
       <span class="spacer"></span>
       <span class="hint">打开 → 认证 → 读取 → 关闭全程锁定；dev 无硬件时为 stub 模拟数据，PII 用完即弃不入日志</span>
     </div>
-    <div class="panel padded">
-      <div class="form-grid" style="align-items: center;">
-        <button class="btn" id="btn-id-read">读取证卡</button>
-        <span class="hint" id="id-status">选择读卡器后点击读取</span>
+
+    <div id="sec-id-read">
+      <div class="panel padded">
+        <div class="form-grid" style="align-items: center;">
+          <button class="btn" id="btn-id-read">读取证卡</button>
+          <span class="hint" id="id-status">选择读卡器后点击读取</span>
+        </div>
       </div>
-    </div>
-    <div class="panel" id="id-result" style="margin-top: 12px;" hidden>
-      <div class="id-body">
-        <img id="id-photo" class="id-photo" alt="证件照片">
-        <div class="id-fields" id="id-fields"></div>
+      <div class="panel" id="id-result" style="margin-top: 12px;" hidden>
+        <div class="id-body">
+          <img id="id-photo" class="id-photo" alt="证件照片">
+          <div class="id-fields" id="id-fields"></div>
+        </div>
       </div>
     </div>
 
-    <div class="toolbar">
-      <span class="section-label">IC 卡读取（Mifare）</span>
-      <span class="hint">与身份证共用读卡器，同一时刻串行；出厂白键卡片无需输入密钥</span>
-    </div>
-    <div class="panel padded">
-      <div class="form-grid" style="align-items: center;">
-        <label class="field"><span>扇区（0-15）</span>
-          <input class="input" id="ic-sector" type="number" min="0" max="15" value="1" style="width: 70px;">
-        </label>
-        <label class="field"><span>密钥（12 位 hex，留空 = 出厂白键）</span>
-          <input class="input mono" id="ic-key" placeholder="FFFFFFFFFFFF" style="width: 150px;" spellcheck="false" maxlength="12">
-        </label>
-        <label class="field"><span>密钥类型</span>
-          <select class="input" id="ic-keytype" style="width: 80px;">
-            <option value="A">A 键</option>
-            <option value="B">B 键</option>
-          </select>
-        </label>
-        <button class="btn" id="btn-ic-read" style="align-self: flex-end; margin-bottom: 1px;">读取 IC 卡</button>
-        <span class="hint" id="ic-status">选择读卡器后点击读取</span>
+    <div id="sec-ic-read" hidden>
+      <div class="toolbar">
+        <span class="section-label">IC 卡读取（Mifare）</span>
+        <span class="hint">与身份证共用读卡器，同一时刻串行；出厂白键卡片无需输入密钥</span>
       </div>
-    </div>
-    <div class="panel" id="ic-result" style="margin-top: 12px;" hidden>
-      <div class="row"><span class="hint" style="width: 80px; flex-shrink: 0;">UID</span><span class="name mono selectable" id="ic-uid"></span></div>
-      <div class="row"><span class="hint" style="width: 80px; flex-shrink: 0;">卡类型</span><span class="name mono" id="ic-type"></span></div>
-      <div class="row" style="display: block;">
-        <span class="hint">数据块（每块 16 字节 hex；密钥控制块不回读）</span>
-        <div id="ic-blocks" class="mono selectable" style="margin-top: 6px; line-height: 1.9;"></div>
+      <div class="panel padded">
+        <div class="form-grid" style="align-items: center;">
+          <label class="field"><span>扇区（0-15）</span>
+            <input class="input" id="ic-sector" type="number" min="0" max="15" value="1" style="width: 70px;">
+          </label>
+          <label class="field"><span>密钥（12 位 hex，留空 = 出厂白键）</span>
+            <input class="input mono" id="ic-key" placeholder="FFFFFFFFFFFF" style="width: 150px;" spellcheck="false" maxlength="12">
+          </label>
+          <label class="field"><span>密钥类型</span>
+            <select class="input" id="ic-keytype" style="width: 80px;">
+              <option value="A">A 键</option>
+              <option value="B">B 键</option>
+            </select>
+          </label>
+          <button class="btn" id="btn-ic-read" style="align-self: flex-end; margin-bottom: 1px;">读取 IC 卡</button>
+          <span class="hint" id="ic-status">选择读卡器后点击读取</span>
+        </div>
+      </div>
+      <div class="panel" id="ic-result" style="margin-top: 12px;" hidden>
+        <div class="row"><span class="hint" style="width: 80px; flex-shrink: 0;">UID</span><span class="name mono selectable" id="ic-uid"></span></div>
+        <div class="row"><span class="hint" style="width: 80px; flex-shrink: 0;">卡类型</span><span class="name mono" id="ic-type"></span></div>
+        <div class="row" style="display: block;">
+          <span class="hint">数据块（每块 16 字节 hex；密钥控制块不回读）</span>
+          <div id="ic-blocks" class="mono selectable" style="margin-top: 6px; line-height: 1.9;"></div>
+        </div>
       </div>
     </div>
 
-    <div class="toolbar">
-      <span class="section-label">IC 卡写入（单块）</span>
-      <span class="hint">覆盖写入 16 字节、不可恢复；驱动强制拒绝密钥控制块（每扇区末块）与厂商块（块 0）</span>
-    </div>
-    <div class="panel padded">
-      <div class="form-grid" style="align-items: center;">
-        <label class="field"><span>块地址（0-63）</span>
-          <input class="input" id="ic-wblock" type="number" min="0" max="63" value="4" style="width: 70px;">
-        </label>
-        <label class="field"><span>数据（32 位 hex = 16 字节）</span>
-          <input class="input mono" id="ic-wdata" placeholder="000102030405060708090A0B0C0D0E0F" style="width: 250px;" spellcheck="false" maxlength="32">
-        </label>
-        <label class="field"><span>扇区密钥（留空 = 白键）</span>
-          <input class="input mono" id="ic-wkey" placeholder="FFFFFFFFFFFF" style="width: 130px;" spellcheck="false" maxlength="12">
-        </label>
-        <label class="field"><span>密钥类型</span>
-          <select class="input" id="ic-wkeytype" style="width: 80px;">
-            <option value="A">A 键</option>
-            <option value="B">B 键</option>
-          </select>
-        </label>
-        <button class="btn danger-ghost" id="btn-ic-write" style="align-self: flex-end; margin-bottom: 1px;">写入块</button>
+    <div id="sec-ic-write" hidden>
+      <div class="toolbar">
+        <span class="section-label">IC 卡写入（单块）</span>
+        <span class="hint">覆盖写入 16 字节、不可恢复；驱动强制拒绝密钥控制块（每扇区末块）与厂商块（块 0）</span>
+      </div>
+      <div class="panel padded">
+        <div class="form-grid" style="align-items: center;">
+          <label class="field"><span>块地址（0-63）</span>
+            <input class="input" id="ic-wblock" type="number" min="0" max="63" value="4" style="width: 70px;">
+          </label>
+          <label class="field"><span>数据（32 位 hex = 16 字节）</span>
+            <input class="input mono" id="ic-wdata" placeholder="000102030405060708090A0B0C0D0E0F" style="width: 250px;" spellcheck="false" maxlength="32">
+          </label>
+          <label class="field"><span>扇区密钥（留空 = 白键）</span>
+            <input class="input mono" id="ic-wkey" placeholder="FFFFFFFFFFFF" style="width: 130px;" spellcheck="false" maxlength="12">
+          </label>
+          <label class="field"><span>密钥类型</span>
+            <select class="input" id="ic-wkeytype" style="width: 80px;">
+              <option value="A">A 键</option>
+              <option value="B">B 键</option>
+            </select>
+          </label>
+          <button class="btn danger-ghost" id="btn-ic-write" style="align-self: flex-end; margin-bottom: 1px;">写入块</button>
+        </div>
       </div>
     </div>
   </section>
@@ -427,13 +434,10 @@
 
     <div class="toolbar">
       <span class="section-label">设备档案配置</span>
-      <span class="hint">本地服务地址（IP/端口）与摄像头编号可运行时编辑，保存即热重建适配器</span>
+      <span class="hint">跟随上方所选采集设备；本地服务地址与摄像头编号可运行时编辑，保存即热重建适配器</span>
     </div>
-    <div class="panel padded">
+    <div class="panel padded" id="cap-cfg-ws" hidden>
       <div class="form-grid" style="align-items: center;">
-        <label class="field"><span>档案</span>
-          <select class="input" id="cap-profile" style="min-width: 220px;"><option value="">加载中…</option></select>
-        </label>
         <label class="field"><span>服务地址</span>
           <input class="input mono" id="cap-url" placeholder="ws://127.0.0.1:9000" style="width: 190px;" spellcheck="false">
         </label>
@@ -443,6 +447,9 @@
         <button class="btn" id="btn-cap-save" style="align-self: flex-end; margin-bottom: 1px;">保存配置</button>
         <span class="hint" id="cap-profile-note"></span>
       </div>
+    </div>
+    <div class="panel padded" id="cap-cfg-none" hidden>
+      <span class="hint" id="cap-cfg-none-text">所选设备无需本地服务配置</span>
     </div>
   </section>
 

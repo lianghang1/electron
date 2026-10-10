@@ -40,6 +40,7 @@ async function refreshCaptureDevices() {
   if (!sel.innerHTML) sel.innerHTML = '<option value="">未检测到设备</option>'
   sel.value = prev && [...sel.options].some(o => o.value === prev) ? prev : sel.options[0]?.value ?? ''
   capToggleOpButtons()
+  syncCapConfig()
 }
 
 function stopStream() {
@@ -127,6 +128,7 @@ $('#cap-device').addEventListener('change', () => {
   current = null
   $('#btn-cap-print').disabled = true
   capToggleOpButtons()
+  syncCapConfig()
 })
 $('#btn-cap-open').addEventListener('click', () => void openCamera())
 $('#btn-cap-close').addEventListener('click', () => {
@@ -164,39 +166,46 @@ $('#btn-cap-print').addEventListener('click', async () => {
 registerRefresher(refreshCaptureDevices)
 void refreshCaptureDevices()
 
-// ── 设备档案配置：ws 档案的服务地址（IP/端口）与摄像头编号运行时编辑，保存即热重建适配器 ──
+// ── 设备档案配置：跟随所选采集设备联动；ws 设备可编辑服务地址/摄像头编号，保存即热重建适配器 ──
 
 let capProfiles = []
+
+/** 当前选中采集设备对应的 ws 档案（非 ws 设备或档案缺失返回 null） */
+function capSelectedProfile() {
+  const id = $('#cap-device').value
+  if (!id.startsWith('ws:')) return null
+  return capProfiles.find(p => p.id === id.slice(3) && p.ws) ?? null
+}
+
+/** 配置面板跟随所选设备：ws 档案出编辑表单，其余设备给无配置提示 */
+function syncCapConfig() {
+  const p = capSelectedProfile()
+  $('#cap-cfg-ws').hidden = !p
+  $('#cap-cfg-none').hidden = !!p
+  if (!p) {
+    const id = $('#cap-device').value
+    $('#cap-cfg-none-text').textContent = id.startsWith(UVC_PREFIX)
+      ? '本机摄像头走 getUserMedia，无需设备档案配置'
+      : '所选设备为 SDK 直连 / 模拟接入，无需本地服务配置'
+    return
+  }
+  $('#cap-url').value = p.ws.url ?? ''
+  $('#cap-camid').value = p.ws.camId ?? 0
+  $('#cap-profile-note').textContent = `协议：${p.ws.protocol ?? 'dianyipai'}`
+}
 
 async function refreshCapProfiles() {
   try {
     capProfiles = await window.desktop.capture.getProfiles()
   }
   catch { capProfiles = [] }
-  const sel = $('#cap-profile')
-  const prev = sel.value
-  const wsProfiles = capProfiles.filter(p => p.ws)
-  sel.innerHTML = wsProfiles.length
-    ? wsProfiles.map(p => `<option value="${esc(p.id)}">${esc(p.displayName)}</option>`).join('')
-    : '<option value="">无 ws 档案</option>'
-  sel.value = prev && wsProfiles.some(p => p.id === prev) ? prev : sel.options[0]?.value ?? ''
-  syncCapProfileForm()
+  syncCapConfig()
 }
-
-function syncCapProfileForm() {
-  const p = capProfiles.find(x => x.id === $('#cap-profile').value)
-  $('#cap-url').value = p?.ws?.url ?? ''
-  $('#cap-camid').value = p?.ws?.camId ?? 0
-  const proto = p?.ws?.protocol ?? (p?.ws ? 'dianyipai' : '')
-  $('#cap-profile-note').textContent = p ? `协议：${proto}` : ''
-}
-
-$('#cap-profile').addEventListener('change', syncCapProfileForm)
 
 $('#btn-cap-save').addEventListener('click', async () => {
-  const p = capProfiles.find(x => x.id === $('#cap-profile').value)
+  const p = capSelectedProfile()
   if (!p?.ws) {
-    toast('请先选择一个 ws 档案', false)
+    toast('当前所选设备没有可编辑的 ws 档案', false)
     return
   }
   const url = $('#cap-url').value.trim()
