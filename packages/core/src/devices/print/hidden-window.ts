@@ -1,5 +1,7 @@
-import { Buffer } from 'node:buffer'
 import { BrowserWindow } from 'electron'
+import { rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { printError } from './errors'
 
 type HiddenTarget = 'utility' | 'pdf'
@@ -94,11 +96,19 @@ export class HiddenWindowPool {
 
 /** 在指定窗口加载 HTML 并等待渲染与字体就绪（打印前必须等到，否则截到半渲染页面） */
 export async function loadHtmlInto(win: BrowserWindow, html: string): Promise<BrowserWindow> {
-  const dataUrl = `data:text/html;charset=utf-8;base64,${Buffer.from(html, 'utf8').toString('base64')}`
-  await win.loadURL(dataUrl)
-  await win.webContents.executeJavaScript(
-    'new Promise(r => { const f = document.fonts ? document.fonts.ready : Promise.resolve(); f.then(() => requestAnimationFrame(() => setTimeout(r, 30))) })',
-  )
+  // 图片打印的 HTML 内嵌整图 base64（可达数 MB），超出 data: URL 导航长度上限会报
+  // ERR_INVALID_URL(-300)，因此统一落临时文件走 loadFile；模板资源必须内联，加载完即可删除
+  const tmpFile = join(tmpdir(), `print-${Date.now()}-${Math.random().toString(36).slice(2, 10)}.html`)
+  await writeFile(tmpFile, html, 'utf8')
+  try {
+    await win.loadFile(tmpFile)
+    await win.webContents.executeJavaScript(
+      'new Promise(r => { const f = document.fonts ? document.fonts.ready : Promise.resolve(); f.then(() => requestAnimationFrame(() => setTimeout(r, 30))) })',
+    )
+  }
+  finally {
+    await rm(tmpFile, { force: true }).catch(() => {})
+  }
   return win
 }
 

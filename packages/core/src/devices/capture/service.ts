@@ -1,4 +1,4 @@
-import type { CaptureAdapter, CaptureDevice, CaptureDeviceProfile, CaptureErrorCode, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureErrorCode, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -55,6 +55,8 @@ export class CaptureService {
   }
 
   private buildAdapters(): Map<string, CaptureAdapter> {
+    // 热重建前销毁旧适配器持有的资源（ws 预览会话等），防连接泄漏；构造首调时 adapters 尚未初始化
+    for (const a of this.adapters?.values() ?? []) a.destroy?.()
     const adapters: [string, CaptureAdapter][] = [
       ['service', new ServiceAdapter(this.profiles)],
       ['wia', new WiaAdapter()],
@@ -91,6 +93,49 @@ export class CaptureService {
   async listDevices(): Promise<CaptureDevice[]> {
     const groups = await Promise.all([...this.adapters.values()].map(a => a.listDevices().catch(() => [])))
     return groups.flat()
+  }
+
+  /**
+   * 实时预览：路由到设备所属适配器（仅支持常驻连接的适配器，如 ws/camsdk）。
+   * onFrame 回调持续收到预览帧（JPEG base64），由 IPC 层转发给发起窗口。
+   */
+  async startPreview(deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }): Promise<CaptureResult> {
+    try {
+      const adapter = this.previewAdapter(deviceId)
+      return await adapter.startPreview!(deviceId, onFrame, opts)
+    }
+    catch (err) {
+      const ce = toCaptureError(err)
+      this.log('warn', `开启预览失败 ${deviceId}: ${ce.message}`)
+      return fail(ce.code, ce.message, ce.detail)
+    }
+  }
+
+  async stopPreview(deviceId: string): Promise<CaptureResult> {
+    try {
+      const adapter = this.previewAdapter(deviceId)
+      return await adapter.stopPreview!(deviceId)
+    }
+    catch (err) {
+      const ce = toCaptureError(err)
+      return fail(ce.code, ce.message, ce.detail)
+    }
+  }
+
+  /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo，不占用摄像头） */
+  async listCameras(deviceId: string): Promise<CaptureCameraInfo[]> {
+    const adapter = this.previewAdapter(deviceId)
+    return adapter.listCameras!(deviceId)
+  }
+
+  /** 预览/枚举能力路由：按 transport 找适配器并校验可选能力已实现 */
+  private previewAdapter(deviceId: string): CaptureAdapter & Required<Pick<CaptureAdapter, 'startPreview' | 'stopPreview' | 'listCameras'>> {
+    const transport = deviceId.split(':')[0]
+    const adapter = this.adapters.get(transport)
+    if (!adapter?.startPreview || !adapter.stopPreview || !adapter.listCameras) {
+      throw captureError('ADAPTER_UNAVAILABLE', `设备 ${deviceId} 不支持实时预览/摄像头枚举`)
+    }
+    return adapter as CaptureAdapter & Required<Pick<CaptureAdapter, 'startPreview' | 'stopPreview' | 'listCameras'>>
   }
 
   /** 采集：路由到设备所属适配器执行；同一设备串行化（硬件一次一格） */

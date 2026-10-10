@@ -223,5 +223,20 @@ async function writeIcBlock() {
 
 $('#btn-ic-write').addEventListener('click', () => void writeIcBlock())
 
+// ── 清空：读卡结果（证件/IC）一次清掉，回到未读状态 ──
+
+$('#btn-id-clear').addEventListener('click', () => {
+  $('#id-result').hidden = true
+  $('#id-photo').hidden = true
+  $('#id-fields').innerHTML = ''
+  $('#ic-result').hidden = true
+  $('#ic-uid').textContent = ''
+  $('#ic-type').textContent = ''
+  $('#ic-blocks').innerHTML = ''
+  $('#id-status').textContent = '选择读卡器后点击读取'
+  $('#ic-status').textContent = '选择读卡器后点击读取'
+  toast('已清空读卡结果')
+})
+
 registerRefresher(refreshReaders)
 void refreshReaders()

@@ -328,6 +328,7 @@
       <span class="section-label">证卡读取</span>
       <select class="input" id="id-reader" style="min-width: 260px;"><option value="">检测读卡器中…</option></select>
       <span class="spacer"></span>
+      <button class="btn danger-ghost" id="btn-id-clear">清空</button>
       <span class="hint">打开 → 认证 → 读取 → 关闭全程锁定；dev 无硬件时为 stub 模拟数据，PII 用完即弃不入日志</span>
     </div>
 
@@ -426,22 +427,30 @@
       <button class="btn" id="btn-cap-shot">拍摄</button>
       <button class="btn ghost" id="btn-cap-close" hidden>关闭</button>
       <span class="sep"></span>
+      <label class="field" style="flex-direction: row; align-items: center; gap: 6px;">
+        <span>分辨率</span>
+        <select class="input" id="cap-resolution" style="width: 122px;"><option value="">默认</option></select>
+      </label>
       <button class="btn ghost toggle" id="btn-cap-rotate">旋转 90°</button>
       <button class="btn ghost toggle" id="btn-cap-mirror">镜像</button>
       <span class="spacer"></span>
+      <button class="btn danger-ghost" id="btn-cap-clear">清空</button>
       <button class="btn ghost" id="btn-cap-print" disabled>打印此图</button>
     </div>
 
     <div class="toolbar">
       <span class="section-label">设备档案配置</span>
-      <span class="hint">跟随上方所选采集设备；本地服务地址与摄像头编号可运行时编辑，保存即热重建适配器</span>
+      <span class="hint">跟随上方所选采集设备；本地服务地址与摄像头可运行时编辑，保存即热重建适配器</span>
     </div>
     <div class="panel padded" id="cap-cfg-ws" hidden>
       <div class="form-grid" style="align-items: center;">
         <label class="field"><span>服务地址</span>
           <input class="input mono" id="cap-url" placeholder="ws://127.0.0.1:9000" style="width: 190px;" spellcheck="false">
         </label>
-        <label class="field"><span>摄像头编号</span>
+        <label class="field" id="fld-cap-camera" hidden><span>摄像头</span>
+          <select class="input" id="cap-camera" style="min-width: 230px;"><option value="">获取中…</option></select>
+        </label>
+        <label class="field" id="fld-cap-camid"><span>摄像头编号</span>
           <input class="input" id="cap-camid" type="number" min="0" value="0" style="width: 70px;">
         </label>
         <button class="btn" id="btn-cap-save" style="align-self: flex-end; margin-bottom: 1px;">保存配置</button>
@@ -536,6 +545,7 @@
 <script src="js/print.js"></script>
 <script src="js/idcard.js"></script>
 <script src="js/capture.js"></script>
+<script src="js/capture-config.js"></script>
 <script src="js/scanner.js"></script>
 <script src="js/signature.js"></script>
 </body>

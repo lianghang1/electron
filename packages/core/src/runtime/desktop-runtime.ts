@@ -202,7 +202,7 @@ export class DesktopRuntime {
   /**
    * 设备系统装配：资源根统一经 resolveResourcePath 解析（缺省 resources/ —— dev 为
    * <应用根>/resources，打包为 <resourcesPath>/resources），DLL 与外置 exe 均相对它寻址
-   * （idcard/capture/signature 的 devices/<brand>/、print 的 sumatra/）。
+   * （idcard/capture/signature 的 devices/<brand>/、print 的 devices/print/）。
    * 模拟设备零隐式注册：devices.mock 显式开启才注册 stub 读卡器/采集设备；mock 打印机
    * 由宿主在 printers 档案里显式声明（mock: true）。运行时编辑持久化由 electron-store 托管
    * （userData），capture/print 的存储缺键时回落出厂档案/出厂预设（不设 defaults，避免空值覆盖）。
@@ -246,10 +246,10 @@ export class DesktopRuntime {
     })
 
     // 打印：预设与网络打印机档案均持久化（运行时编辑热生效）；打印机档案缺键时回落宿主注入
-    // （mock: true 档案为指令落盘模拟）；SumatraPDF 相对资源根解析（缺省 sumatra/SumatraPDF.exe），绝对路径原样
+    // （mock: true 档案为指令落盘模拟）；SumatraPDF 相对资源根解析（缺省 devices/print/SumatraPDF.exe），绝对路径原样
     const presetStore = new Store<{ presets?: PrintPreset[] }>({ name: 'device-print-presets' })
     const printerStore = new Store<{ printers?: RawPrinterConfig[] }>({ name: 'device-print-printers' })
-    const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'sumatra/SumatraPDF.exe'
+    const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'devices/print/SumatraPDF.exe'
     this.printSystem = createPrintSystem({
       stateDir: app.getPath('userData'),
       printers: printerStore.get('printers') ?? this.options.devices?.print?.printers ?? [],

@@ -36,7 +36,7 @@ export interface WindowOverrides {
     /**
      * SDK 资源根（厂商 DLL 与外置 exe 的共同基准目录）：缺省 resources/ ——
      * dev 为 <应用根>/resources，打包为 <resourcesPath>/resources。
-     * DLL 位置如 devices/huashi/Termb.dll，外置 exe 如 sumatra/SumatraPDF.exe。
+     * DLL 位置如 devices/huashi/Termb.dll，外置 exe 如 devices/print/SumatraPDF.exe。
      */
     resourcesRoot?: string
     /** 注册内置 stub 模拟设备（读卡器 + 采集，无硬件联调/演示用）；缺省不注册，正式环境零模拟 */
@@ -47,7 +47,7 @@ export interface WindowOverrides {
     print?: {
       /** 静态打印机档案清单；mock: true 档案为指令落盘模拟（无真机联调用），按需显式声明 */
       printers?: RawPrinterConfig[]
-      /** SumatraPDF 可执行文件位置（PDF 打印后端）：相对 resourcesRoot（缺省 sumatra/SumatraPDF.exe）或绝对路径 */
+      /** SumatraPDF 可执行文件位置（PDF 打印后端）：相对 resourcesRoot（缺省 devices/print/SumatraPDF.exe）或绝对路径 */
       sumatraPath?: string
     }
   }

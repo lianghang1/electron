@@ -1,7 +1,8 @@
 'use strict'
-/* 采集域：capture 通道（高拍仪/扫描仪）+ UVC 路线（getUserMedia 预览/抽帧），拍摄产物可一键打印 */
+/* 采集域：capture 通道（高拍仪/扫描仪）+ UVC 路线（getUserMedia 预览/抽帧）+ ws 高拍仪实时预览，拍摄产物可一键打印 */
 
 const UVC_PREFIX = 'uvc:'
+const UVC_RESOLUTIONS = ['1920x1080', '1280x720', '960x540', '640x480']
 let captureDevices = []
 let cameras = []
 let records = []
@@ -9,14 +10,26 @@ let stream = null
 let current = null
 let rot = 0
 let mirror = false
+/** ws 高拍仪预览会话是否开启（main 进程持会话，本页只跟踪状态） */
+let wsPreviewOn = false
 
 function capIsUvc() { return $('#cap-device').value.startsWith(UVC_PREFIX) }
+
+/** 当前所选设备类型：uvc（本机摄像头）/ camsdk（华视 WS 高拍仪）/ other（SDK 直连或未加载档案） */
+function capKind() {
+  if (capIsUvc()) return 'uvc'
+  const p = capSelectedProfile()
+  return p?.ws?.protocol === 'camsdk' ? 'camsdk' : 'other'
+}
+
 function capToggleOpButtons() {
-  const uvc = capIsUvc()
-  const on = uvc && !!stream
-  $('#btn-cap-open').hidden = !uvc || on
-  $('#btn-cap-close').hidden = !uvc || !on
-  $('#btn-cap-shot').textContent = uvc ? (on ? '拍摄（抽帧）' : '拍摄') : '拍摄'
+  const kind = capKind()
+  const live = kind === 'uvc' ? !!stream : kind === 'camsdk' && wsPreviewOn
+  $('#btn-cap-open').hidden = kind === 'other' || live
+  $('#btn-cap-open').textContent = kind === 'camsdk' ? '开启预览' : '开启摄像头'
+  $('#btn-cap-close').hidden = !live
+  $('#btn-cap-shot').textContent = kind === 'uvc' && live ? '拍摄（抽帧）' : '拍摄'
+  $('#cap-resolution').disabled = kind === 'other'
 }
 
 async function refreshCaptureDevices() {
@@ -48,13 +61,25 @@ function stopStream() {
   stream = null
 }
 
+/** 关闭当前设备的实时画面（UVC 流 + ws 预览会话） */
+async function stopAllLive() {
+  stopStream()
+  const deviceId = $('#cap-device').value
+  if (wsPreviewOn && deviceId) {
+    wsPreviewOn = false
+    try { await window.desktop.capture.stopPreview(deviceId) }
+    catch { /* 会话可能已掉线，忽略 */ }
+  }
+}
+
 async function openCamera() {
   const deviceId = $('#cap-device').value.slice(UVC_PREFIX.length)
   if (!deviceId) { toast('请先选择一个本机摄像头', false); return }
   try {
     stopStream()
+    const [w, h] = $('#cap-resolution').value ? $('#cap-resolution').value.split('x').map(Number) : []
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      video: { deviceId: { exact: deviceId }, width: w ? { ideal: w } : { ideal: 1920 }, height: h ? { ideal: h } : { ideal: 1080 } },
       audio: false,
     })
     $('#cap-stage').innerHTML = '<video playsinline muted></video>'
@@ -71,9 +96,47 @@ async function openCamera() {
   }
 }
 
+// ── ws 高拍仪实时预览：main 进程常驻会话推帧，本页只负责展示与状态 ──
+
+async function startWsPreview() {
+  const deviceId = $('#cap-device').value
+  if (!deviceId) { toast('请先选择采集设备', false); return }
+  try {
+    const opts = { resolutionNum: currentResolutionNum() }
+    const r = await window.desktop.capture.startPreview(deviceId, opts)
+    if (!r.ok) {
+      toast(`预览失败：${r.error?.message ?? '未知错误'}`, false)
+      return
+    }
+    wsPreviewOn = true
+    $('#cap-stage').innerHTML = '<img id="cap-live" alt="实时预览">'
+    applyPreviewTransform()
+    toast('预览已开启，可随时拍摄')
+  }
+  catch (e) { toast(e.message, false) }
+  finally { capToggleOpButtons() }
+}
+
+window.desktop?.events?.on('capture:onPreviewFrame', (frame) => {
+  if (!wsPreviewOn || frame.deviceId !== $('#cap-device').value) return
+  // 新帧到达即回到实时画面（浏览拍摄记录时来新帧 = 自动回直播）
+  const live = $('#cap-live')
+  if (!live) return
+  live.src = `data:image/jpeg;base64,${frame.base64}`
+  live.hidden = false
+  const shot = $('#cap-shot')
+  if (shot) shot.hidden = true
+})
+
 function applyPreviewTransform() {
-  const media = $('#cap-stage video') ?? $('#cap-stage img')
-  if (media) media.style.transform = `rotate(${rot}deg) ${mirror ? 'scaleX(-1)' : ''}`
+  const medias = document.querySelectorAll('#cap-stage video, #cap-stage img')
+  medias.forEach((m) => { m.style.transform = `rotate(${rot}deg) ${mirror ? 'scaleX(-1)' : ''}` })
+}
+
+/** 分辨率下拉当前值 → camsdk 分辨率序号（空 = 默认，不传） */
+function currentResolutionNum() {
+  const v = $('#cap-resolution').value
+  return v === '' ? undefined : Number(v)
 }
 
 function pushRecord(result, source) {
@@ -112,7 +175,7 @@ async function captureByDevice() {
   const deviceId = $('#cap-device').value
   if (!deviceId) { toast('请先选择采集设备', false); return }
   try {
-    const r = await window.desktop.capture.capture({ deviceId })
+    const r = await window.desktop.capture.capture({ deviceId, resolutionNum: currentResolutionNum() })
     if (r.ok) {
       pushRecord(r, captureDevices.find(d => d.id === deviceId)?.displayName ?? '设备')
       toast('拍摄完成')
@@ -122,17 +185,18 @@ async function captureByDevice() {
   catch (e) { toast(e.message, false) }
 }
 
-$('#cap-device').addEventListener('change', () => {
-  stopStream()
+$('#cap-device').addEventListener('change', async () => {
+  await stopAllLive()
   $('#cap-stage').innerHTML = '<span class="placeholder">选择设备后拍摄</span>'
   current = null
   $('#btn-cap-print').disabled = true
   capToggleOpButtons()
   syncCapConfig()
+  void syncResolutionOptions()
 })
-$('#btn-cap-open').addEventListener('click', () => void openCamera())
-$('#btn-cap-close').addEventListener('click', () => {
-  stopStream()
+$('#btn-cap-open').addEventListener('click', () => void (capKind() === 'camsdk' ? startWsPreview() : openCamera()))
+$('#btn-cap-close').addEventListener('click', async () => {
+  await stopAllLive()
   $('#cap-stage').innerHTML = '<span class="placeholder">选择设备后拍摄</span>'
   capToggleOpButtons()
 })
@@ -147,8 +211,28 @@ $('#cap-records').addEventListener('click', (e) => {
   const r = records[e.target.dataset?.rec]
   if (!r) return
   current = r.result
-  $('#cap-stage').innerHTML = `<img src="${current.thumbDataUrl}">`
+  const stage = $('#cap-stage')
+  let shot = $('#cap-shot')
+  if (!shot) {
+    stage.insertAdjacentHTML('beforeend', '<img id="cap-shot" alt="拍摄记录">')
+    shot = $('#cap-shot')
+  }
+  shot.src = current.thumbDataUrl
+  shot.hidden = false
+  const live = $('#cap-live')
+  if (live) live.hidden = true
   applyPreviewTransform()
+})
+$('#btn-cap-clear').addEventListener('click', () => {
+  records = []
+  current = null
+  $('#cap-records').innerHTML = ''
+  $('#btn-cap-print').disabled = true
+  $('#cap-shot')?.remove()
+  if (!wsPreviewOn && !stream) {
+    $('#cap-stage').innerHTML = '<span class="placeholder">选择设备后拍摄</span>'
+  }
+  toast('已清空拍摄记录')
 })
 $('#btn-cap-print').addEventListener('click', async () => {
   if (!current?.imagePath) return
@@ -163,64 +247,62 @@ $('#btn-cap-print').addEventListener('click', async () => {
   catch (e) { toast(e.message, false) }
 })
 
-registerRefresher(refreshCaptureDevices)
-void refreshCaptureDevices()
+// ── 分辨率选择：camsdk 用设备枚举档位（存 localStorage），UVC 常用档走 applyConstraints ──
 
-// ── 设备档案配置：跟随所选采集设备联动；ws 设备可编辑服务地址/摄像头编号，保存即热重建适配器 ──
-
-let capProfiles = []
-
-/** 当前选中采集设备对应的 ws 档案（非 ws 设备或档案缺失返回 null） */
-function capSelectedProfile() {
-  const id = $('#cap-device').value
-  if (!id.startsWith('ws:')) return null
-  return capProfiles.find(p => p.id === id.slice(3) && p.ws) ?? null
-}
-
-/** 配置面板跟随所选设备：ws 档案出编辑表单，其余设备给无配置提示 */
-function syncCapConfig() {
+function capResolutionKey() {
+  const kind = capKind()
+  if (kind === 'uvc') return 'cap-res:uvc'
   const p = capSelectedProfile()
-  $('#cap-cfg-ws').hidden = !p
-  $('#cap-cfg-none').hidden = !!p
-  if (!p) {
-    const id = $('#cap-device').value
-    $('#cap-cfg-none-text').textContent = id.startsWith(UVC_PREFIX)
-      ? '本机摄像头走 getUserMedia，无需设备档案配置'
-      : '所选设备为 SDK 直连 / 模拟接入，无需本地服务配置'
+  return p ? `cap-res:${p.id}` : null
+}
+
+async function syncResolutionOptions() {
+  const sel = $('#cap-resolution')
+  const kind = capKind()
+  if (kind === 'other') {
+    sel.innerHTML = '<option value="">由设备端输出</option>'
     return
   }
-  $('#cap-url').value = p.ws.url ?? ''
-  $('#cap-camid').value = p.ws.camId ?? 0
-  $('#cap-profile-note').textContent = `协议：${p.ws.protocol ?? 'dianyipai'}`
-}
-
-async function refreshCapProfiles() {
-  try {
-    capProfiles = await window.desktop.capture.getProfiles()
+  if (kind === 'uvc') {
+    sel.innerHTML = '<option value="">默认</option>' + UVC_RESOLUTIONS.map(r => `<option value="${r}">${r}</option>`).join('')
+    sel.value = localStorage.getItem('cap-res:uvc') ?? ''
+    return
   }
-  catch { capProfiles = [] }
-  syncCapConfig()
-}
-
-$('#btn-cap-save').addEventListener('click', async () => {
+  // camsdk：所选摄像头（档案 camId）的枚举分辨率；服务离线时退回默认档
   const p = capSelectedProfile()
-  if (!p?.ws) {
-    toast('当前所选设备没有可编辑的 ws 档案', false)
+  const cams = p ? await fetchCamerasSafe(`ws:${p.id}`) : null
+  const cam = cams?.find(c => c.id === (p.ws.camId ?? 0)) ?? cams?.[0]
+  if (!cam?.resolutions?.length) {
+    sel.innerHTML = '<option value="">默认</option>'
     return
   }
-  const url = $('#cap-url').value.trim()
-  if (!/^wss?:\/\/.+:/.test(url)) {
-    toast('服务地址格式应为 ws://IP:端口', false)
+  sel.innerHTML = '<option value="">默认</option>' + cam.resolutions.map((r, i) => `<option value="${i}">${esc(r)}</option>`).join('')
+  const saved = localStorage.getItem(`cap-res:${p.id}`)
+  sel.value = saved !== null && Number(saved) < cam.resolutions.length ? saved : ''
+}
+
+$('#cap-resolution').addEventListener('change', async () => {
+  const key = capResolutionKey()
+  if (key) localStorage.setItem(key, $('#cap-resolution').value)
+  if (capKind() === 'uvc') {
+    const track = stream?.getVideoTracks()[0]
+    if (!track) return
+    const [w, h] = $('#cap-resolution').value ? $('#cap-resolution').value.split('x').map(Number) : []
+    try {
+      await track.applyConstraints({ width: w ? { ideal: w } : undefined, height: h ? { ideal: h } : undefined })
+      toast(w ? `分辨率已切换为 ${w}×${h}` : '分辨率已恢复默认')
+    }
+    catch (e) { toast(`分辨率切换失败：${e.message}`, false) }
     return
   }
-  try {
-    await window.desktop.capture.upsertProfile({ ...p, ws: { ...p.ws, url, camId: Math.max(0, Number($('#cap-camid').value) || 0) } })
-    toast('档案已保存，适配器已热重建')
-    await refreshCapProfiles()
-    await refreshCaptureDevices()
+  // camsdk：预览开启中则用新分辨率重启会话
+  if (wsPreviewOn) {
+    const deviceId = $('#cap-device').value
+    wsPreviewOn = false
+    try { await window.desktop.capture.stopPreview(deviceId) }
+    catch { /* 忽略 */ }
+    await startWsPreview()
   }
-  catch (e) { toast(e.message, false) }
 })
 
-registerRefresher(refreshCapProfiles)
-void refreshCapProfiles()
+registerRefresher(refreshCaptureDevices)

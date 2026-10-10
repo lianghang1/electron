@@ -1,10 +1,11 @@
-import type { CaptureAdapter, CaptureDevice, CaptureDeviceProfile, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureRequest, CaptureResult } from '@desktop/shared'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { WebSocket } from 'ws'
-import { captureCamSdkBase64 } from './camsdk-session'
 import { captureError } from '../errors'
+import { CamSdkPreviewSession, listCamSdkCameras } from './camsdk-preview'
+import { captureCamSdkBase64 } from './camsdk-session'
 
 /**
  * WebSocket 本地服务适配器（多协议：点易拍 BaucheSDK 二进制帧 / 华视 CamSDKServer JSON 帧）。
@@ -72,6 +73,9 @@ function parseWsUrl(url: string): { host: string, port: number } {
 export class WsAdapter implements CaptureAdapter {
   readonly transport = 'ws' as const
 
+  /** 常驻预览会话（deviceId → 会话）：capture 优先走会话内拍照，档案重建时统一销毁 */
+  private readonly previews = new Map<string, CamSdkPreviewSession>()
+
   constructor(private readonly profiles: CaptureDeviceProfile[]) {}
 
   async listDevices(): Promise<CaptureDevice[]> {
@@ -104,36 +108,95 @@ export class WsAdapter implements CaptureAdapter {
   }
 
   async capture(req: CaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
-    const profile = this.profiles.find(p => `ws:${p.id}` === device.id)
-    if (!profile?.ws) {
-      throw captureError('DEVICE_NOT_FOUND', `ws 适配器下不存在设备: ${device.id}`)
-    }
+    const { profile, ws } = this.findProfile(device.id)
     // 协议未经验证（verified: false）：服务探活在 listDevices 可见，但绝不套用其他厂商协议采集
-    if (profile.ws.verified === false) {
+    if (ws.verified === false) {
       throw captureError('ADAPTER_UNAVAILABLE', `${profile.brand}设备 ws 协议帧待真机实测（不套用点易拍协议），暂未适配采集`)
     }
-    const { host, port } = parseWsUrl(profile.ws.url)
-    const alive = await tcpProbe(host, port)
-    if (!alive) {
-      throw captureError('DEVICE_OFFLINE', `${profile.brand}本地采集服务未运行（${host}:${port}），请确认厂商 SDK 服务端已安装`, {
-        url: profile.ws.url,
-      })
-    }
-
-    const dir = req.saveDir ?? path.join('out', 'capture')
-    await mkdir(dir, { recursive: true })
-    const file = path.join(dir, `ws-${profile.id}-${Date.now()}.jpg`)
-
-    const base64 = profile.ws.protocol === 'camsdk'
-      ? await captureCamSdkBase64(profile.ws)
-      : await this.captureBase64(profile.ws)
-    await writeFile(file, Buffer.from(base64, 'base64'))
+    // 预览会话开启时走会话内拍照（摄像头不重开）；否则按协议一次性开采集
+    const session = ws.protocol === 'camsdk' ? this.previews.get(device.id) : undefined
+    const live = session?.active ?? false
+    const base64 = live ? await session!.capture() : await this.captureOnce(req, profile, ws)
+    const file = await this.saveCaptureBase64(req, profile.id, base64)
     return {
       ok: true,
       imagePath: file,
       thumbDataUrl: `data:image/jpeg;base64,${base64}`,
-      meta: { transport: 'ws', url: profile.ws.url },
+      meta: { transport: 'ws', url: ws.url, ...(live ? { via: 'preview' } : {}) },
     }
+  }
+
+  /** 一次性采集（无预览会话时）：探活后按协议开摄像头拍照并关闭 */
+  private async captureOnce(req: CaptureRequest, profile: CaptureDeviceProfile, ws: NonNullable<CaptureDeviceProfile['ws']>): Promise<string> {
+    const { host, port } = parseWsUrl(ws.url)
+    const alive = await tcpProbe(host, port)
+    if (!alive) {
+      throw captureError('DEVICE_OFFLINE', `${profile.brand}本地采集服务未运行（${host}:${port}），请确认厂商 SDK 服务端已安装`, {
+        url: ws.url,
+      })
+    }
+    return ws.protocol === 'camsdk'
+      ? captureCamSdkBase64(ws, req.resolutionNum ?? 0)
+      : this.captureBase64(ws)
+  }
+
+  private async saveCaptureBase64(req: CaptureRequest, profileId: string, base64: string): Promise<string> {
+    const dir = req.saveDir ?? path.join('out', 'capture')
+    await mkdir(dir, { recursive: true })
+    const file = path.join(dir, `ws-${profileId}-${Date.now()}.jpg`)
+    await writeFile(file, Buffer.from(base64, 'base64'))
+    return file
+  }
+
+  // ── 实时预览与摄像头枚举（仅华视 CamSDK 路线支持常驻连接） ──
+
+  startPreview(deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }): Promise<CaptureResult> {
+    return this.previewOp(deviceId, async (ws) => {
+      // 重复开启先释放旧会话（换摄像头/分辨率重启走同一路径）
+      this.previews.get(deviceId)?.close()
+      const session = new CamSdkPreviewSession(ws, opts?.resolutionNum ?? 0, onFrame)
+      await session.open()
+      this.previews.set(deviceId, session)
+      return { ok: true, meta: { transport: 'ws', url: ws.url, preview: true } }
+    })
+  }
+
+  async stopPreview(deviceId: string): Promise<CaptureResult> {
+    this.previews.get(deviceId)?.close()
+    this.previews.delete(deviceId)
+    return { ok: true }
+  }
+
+  async listCameras(deviceId: string): Promise<CaptureCameraInfo[]> {
+    return this.previewOp(deviceId, ws => listCamSdkCameras(ws))
+  }
+
+  /** 预览/枚举公共壳：定位档案 → 校验 camsdk 协议 → 探活（不通过即抛统一错误） */
+  private async previewOp<T>(deviceId: string, fn: (ws: NonNullable<CaptureDeviceProfile['ws']>) => Promise<T>): Promise<T> {
+    const { profile, ws } = this.findProfile(deviceId)
+    if (ws.protocol !== 'camsdk') {
+      throw captureError('ADAPTER_UNAVAILABLE', `${profile.brand}设备不支持实时预览/摄像头枚举（仅华视 CamSDK 路线）`)
+    }
+    const { host, port } = parseWsUrl(ws.url)
+    if (!await tcpProbe(host, port)) {
+      throw captureError('DEVICE_OFFLINE', `${profile.brand}本地采集服务未运行（${host}:${port}），请确认厂商 SDK 服务端已安装`, { url: ws.url })
+    }
+    return fn(ws)
+  }
+
+  /** 销毁：关闭全部预览会话（档案热重建/系统停机时防 ws 泄漏） */
+  destroy(): void {
+    for (const session of this.previews.values()) session.close()
+    this.previews.clear()
+  }
+
+  /** 按 deviceId 定位 ws 档案（预览/枚举/采集共用） */
+  private findProfile(deviceId: string): { profile: CaptureDeviceProfile, ws: NonNullable<CaptureDeviceProfile['ws']> } {
+    const profile = this.profiles.find(p => `ws:${p.id}` === deviceId)
+    if (!profile?.ws) {
+      throw captureError('DEVICE_NOT_FOUND', `ws 适配器下不存在设备: ${deviceId}`)
+    }
+    return { profile, ws: profile.ws }
   }
 
   /** 单次采集会话：开预览 → 拍照 → 收 GetPicBase64 → 关预览 */

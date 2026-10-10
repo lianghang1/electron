@@ -38,6 +38,7 @@ export type { AppContext, AppInstance, AppLifecycleState, CallerContext } from '
 
 export type {
   CaptureAdapter,
+  CaptureCameraInfo,
   CaptureCaps,
   CaptureDevice,
   CaptureDeviceProfile,

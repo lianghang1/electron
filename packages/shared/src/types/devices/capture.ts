@@ -34,6 +34,18 @@ export interface CaptureRequest {
   /** 图片保存目录，默认 userData/capture */
   saveDir?: string
   format?: 'jpg' | 'png' | 'bmp'
+  /** 分辨率序号（设备枚举 resolutionList 的索引；ws/camsdk 路线生效，缺省 0 = 设备默认） */
+  resolutionNum?: number
+}
+
+/** 摄像头枚举条目（ws/camsdk GetCameraInfo）：name 供下拉展示、id 即 devNum */
+export interface CaptureCameraInfo {
+  id: number
+  name: string
+  /** 1=文档摄像头，2=人像摄像头（厂商协议定义） */
+  funcType: number
+  /** 分辨率串列表（如 "1280x720"），序号即 OpenCamera 的 resolutionNum */
+  resolutions: string[]
 }
 
 export interface CaptureError {
@@ -100,4 +112,13 @@ export interface CaptureAdapter {
   listDevices: () => Promise<CaptureDevice[]>
   capture: (req: CaptureRequest, device: CaptureDevice) => Promise<CaptureResult>
   destroy?: () => void
+  /**
+   * 实时预览（可选能力）：开启后预览帧经 onFrame 持续回调（JPEG base64），
+   * 会话保持开启供 capture 走会话内拍照；仅支持常驻连接的适配器（ws/camsdk）实现。
+   */
+  startPreview?: (deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }) => Promise<CaptureResult>
+  /** 关闭实时预览（可选能力） */
+  stopPreview?: (deviceId: string) => Promise<CaptureResult>
+  /** 枚举设备下的摄像头与分辨率（可选能力，ws/camsdk GetCameraInfo） */
+  listCameras?: (deviceId: string) => Promise<CaptureCameraInfo[]>
 }

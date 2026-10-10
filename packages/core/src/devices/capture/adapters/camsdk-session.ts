@@ -13,7 +13,7 @@ import { captureError } from '../errors'
 /** 采集所需的最小档案 ws 配置（protocol 由 WsAdapter 分发，本模块固定 camsdk） */
 export type CamSdkConfig = NonNullable<CaptureDeviceProfile['ws']>
 
-interface CamSdkFrame {
+export interface CamSdkFrame {
   func: string
   result?: number
   errorMsg?: string
@@ -21,10 +21,23 @@ interface CamSdkFrame {
   imgBase64?: string[]
   /** 预览帧：单串图片数据（实测 GetCameraVideoBuff 预览帧返回 imgBase64Str，无 result/reqId） */
   imgBase64Str?: string
+  /** GetCameraInfo 响应：摄像头清单 */
+  devInfo?: CamSdkDevInfo[]
   [key: string]: unknown
 }
 
-interface MiniWS {
+/** GetCameraInfo.devInfo 条目（funcType：1=文档摄像头，2=人像摄像头） */
+export interface CamSdkDevInfo {
+  id: number
+  devName: string
+  funcType: number
+  /** 多数固件直接给分辨率串列表（"1280x720"） */
+  resolutionList?: string[]
+  /** 部分固件按 mediaTypes[0].resolutions 给（官方 Demo idFace.js 兼容两种） */
+  mediaTypes?: Array<{ resolutions?: string[] }>
+}
+
+export interface MiniWS {
   send: (data: string) => void
   close: () => void
   onopen: (() => void) | null
@@ -33,16 +46,21 @@ interface MiniWS {
   onclose: (() => void) | null
 }
 
-function newSession(cfg: CamSdkConfig): MiniWS {
+export function newSession(cfg: CamSdkConfig): MiniWS {
   // ws 包实现浏览器兼容事件属性（onopen/onmessage...），文本帧 ev.data 为 string
   return new WebSocket(cfg.url) as unknown as MiniWS
+}
+
+/** 预览/拍照帧的图片字段兼容取值（不同固件字段名不同） */
+export function frameImage(msg: CamSdkFrame): string | undefined {
+  return msg.imgBase64Str ?? msg.imgBase64?.[0]
 }
 
 /**
  * 单次采集会话：开摄像头 → 等预览首帧 → 设裁切 → 拍照（base64）→ 关摄像头。
  * 返回 JPEG base64（服务端 mime 固定 image/jpeg）。
  */
-export function captureCamSdkBase64(cfg: CamSdkConfig): Promise<string> {
+export function captureCamSdkBase64(cfg: CamSdkConfig, resolutionNum = 0): Promise<string> {
   return new Promise((resolve, reject) => {
     const devNum = cfg.camId ?? 0
     let settled = false
@@ -87,7 +105,7 @@ export function captureCamSdkBase64(cfg: CamSdkConfig): Promise<string> {
     }
 
     ws.onopen = () => {
-      send({ func: 'OpenCamera', mediaNum: 0, resolutionNum: 0, fps: 5 })
+      send({ func: 'OpenCamera', mediaNum: 0, resolutionNum, fps: 5 })
       send({ func: 'GetCameraVideoBuff', enable: true })
     }
     ws.onmessage = (ev) => {
@@ -101,15 +119,14 @@ export function captureCamSdkBase64(cfg: CamSdkConfig): Promise<string> {
         return
       }
       switch (msg.func) {
-        case 'OpenCamera': {
-          if (!check(msg))
-            return
+        case 'OpenCamera':
+          // 校验失败时 check 内部已结束会话（done 幂等），后续分支不再产生副作用
+          check(msg)
           break
-        }
         case 'GetCameraVideoBuff': {
           // 预览帧带图像数据（不同 SDK 版本字段名为 imgBase64Str / imgBase64）；
           // enable 开关的 ACK 只带 result，按普通响应校验
-          const preview = msg.imgBase64Str ?? msg.imgBase64?.[0]
+          const preview = frameImage(msg)
           if (preview) {
             // 预览帧持续推送：只等首帧到达（设备就绪标志），图片内容不处理
             if (!previewArrived) {
@@ -127,7 +144,7 @@ export function captureCamSdkBase64(cfg: CamSdkConfig): Promise<string> {
         case 'CameraCapture': {
           if (!check(msg))
             return
-          const base64 = msg.imgBase64?.[0] ?? msg.imgBase64Str
+          const base64 = frameImage(msg)
           if (!base64) {
             fail('CAPTURE_FAILED', '华视高拍仪拍照成功但未返回图片数据')
             return

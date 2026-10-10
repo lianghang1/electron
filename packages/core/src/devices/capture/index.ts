@@ -1,4 +1,4 @@
-import type { CaptureDevice, CaptureDeviceProfile, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import { CaptureService } from './service'
 
@@ -11,6 +11,11 @@ export interface CaptureSystem {
   capture: (req: CaptureRequest) => Promise<CaptureResult>
   /** UVC 路线（渲染层 getUserMedia）拍到的 dataURL 落盘为图片文件 */
   saveDataUrl: (dataUrl: string, ext?: 'jpg' | 'png') => Promise<string>
+  /** 实时预览（ws/camsdk）：预览帧经 onFrame 回调（由 IPC 层转发发起窗口） */
+  startPreview: (deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }) => Promise<CaptureResult>
+  stopPreview: (deviceId: string) => Promise<CaptureResult>
+  /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo） */
+  listCameras: (deviceId: string) => Promise<CaptureCameraInfo[]>
   destroy: () => void
 }
 
@@ -39,6 +44,9 @@ export function createCaptureSystem(options: CaptureSystemOptions): CaptureSyste
     upsertProfile: p => service.upsertProfile(p),
     capture: req => service.capture(req),
     saveDataUrl: (dataUrl, ext) => service.saveDataUrl(dataUrl, ext),
+    startPreview: (deviceId, onFrame, opts) => service.startPreview(deviceId, onFrame, opts),
+    stopPreview: deviceId => service.stopPreview(deviceId),
+    listCameras: deviceId => service.listCameras(deviceId),
     destroy: () => service.destroy(),
   }
 }

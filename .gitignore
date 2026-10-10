@@ -33,6 +33,3 @@ components.d.ts
 uni-pages.d.ts
 typed-router.d.ts
 .eslintrc-auto-import.json
-
-# 三方可再分发二进制（SumatraPDF，需手工放置：apps/desktop/resources/sumatra/SumatraPDF.exe）
-apps/desktop/resources/sumatra/SumatraPDF.exe
