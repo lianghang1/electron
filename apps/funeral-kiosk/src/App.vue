@@ -11,6 +11,9 @@ onMounted(async () => {
   try {
     const context = await window.desktop.app.getCurrent()
     current.value = context.appId
+    console.log(context)
+    console.log(current.value)
+    console.log(context.appId)
   }
   catch {
     current.value = 'IPC 桥接失败'

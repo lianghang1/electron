@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Props } from './types'
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 
 const props = withDefaults(defineProps<Props>(), {
   overlay: false,
