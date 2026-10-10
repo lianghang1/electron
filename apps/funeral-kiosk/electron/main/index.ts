@@ -2,6 +2,7 @@ import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import { is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { appId, displayName, productName } from '../identity.mjs'
 import { registerFuneralKioskIpc } from './ipc'
 
 /**
@@ -10,13 +11,15 @@ import { registerFuneralKioskIpc } from './ipc'
  * 进程级安全基线（sandbox / contextIsolation / 导航防护）仍由 core 写死生效。
  */
 bootstrap({
+  // 运行时身份（setAppUserModelId / 单实例锁 / app:// 协议源），dev 模式必需；
+  // 运行时身份与打包身份同源于 electron/identity.mjs（electron-builder.js 同样引用）
   app: {
-    id: 'com.sfi.app.funeral.service',
-    name: 'FuneralKiosk',
+    id: appId,
+    name: productName,
     version: '1.0.0',
   },
   window: {
-    title: '殡仪服务自助机',
+    title: displayName,
     // dev 用小窗口便于调试；生产铺满全屏由 kiosk 接管（尺寸仅作窗口创建参数）
     ...(is.dev ? { width: 1280, height: 800 } : { width: 1920, height: 1080 }),
   },
@@ -46,9 +49,15 @@ bootstrap({
       }),
   icon,
   browserWindowOptions: {
-    // dev：可拖动普通窗口；生产：kiosk 系统级锁死全屏（隐含 fullscreen，防 Alt+Tab 逃逸）
-    ...(is.dev ? { frame: true } : { kiosk: true, frame: false }),
-    backgroundColor: '#10131a', // 与 renderer 底色一致，避免全屏启动闪白
+    autoHideMenuBar: true,
+    ...(is.dev
+      ? {
+          kiosk: false,
+        }
+      : {
+          kiosk: true,
+        }
+    ),
   },
   permissions: 'all',
 })

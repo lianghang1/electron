@@ -5,6 +5,7 @@ import process from 'node:process'
 import { bootstrap, resolveResourcePath } from '@desktop/core'
 import { protocol } from 'electron'
 import icon from '../../resources/icon.png?asset'
+import { appId, productName } from '../identity.mjs'
 
 // 内部 App 页面协议：app://<appId>/index.html。
 // standard + secure 使其成为标准安全源——cookie / origin 语义等同 https（file:// 源禁止写 cookie），
@@ -164,9 +165,10 @@ const builtinApps: DesktopAppManifest[] = [
 ]
 
 bootstrap({
+  // 运行时身份与打包身份同源于 electron/identity.mjs（electron-builder.js 同样引用）
   app: {
-    id: 'com.company.desktop',
-    name: 'Desktop',
+    id: appId,
+    name: productName,
     version: '1.0.0',
   },
   window: {
