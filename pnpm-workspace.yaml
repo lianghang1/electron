@@ -7,17 +7,25 @@ catalog:
   '@electron-toolkit/utils': 4.0.0
   '@fun-design/http-alova-axios': 0.0.5
   '@fun-design/utils': 2.0.0
-  '@types/node': 22.19.1
-  '@vitejs/plugin-vue': 6.0.2
+  '@types/node': 24.13.3
+  '@unocss/preset-rem-to-px': 66.10.5
+  '@vitejs/plugin-vue': 6.0.9
+  '@vitejs/plugin-vue-jsx': 5.1.6
   '@vueuse/core': 15.0.0
+  alova: 3.5.5
+  axios: 1.20.0
   dayjs: 1.11.21
   electron: 39.2.6
   electron-builder: 26.0.12
   electron-vite: 5.0.0
   eslint: 9.39.5
+  sass: 1.105.1
   tsx: 4.20.6
   typescript: 5.8.3
-  vite: 7.2.6
+  unocss: 66.10.5
+  unplugin-auto-import: 21.1.0
+  unplugin-vue-components: 32.1.0
+  vite: 7.3.6
   vitest: 3.2.4
   vue: 3.5.25
-  vue-tsc: 3.1.6
+  vue-tsc: 3.3.12

@@ -61,6 +61,9 @@ const files: Array<[string, string]> = [
       '@electron-toolkit/utils': 'catalog:',
       '@fun-design/http-alova-axios': 'catalog:',
       '@vueuse/core': 'catalog:',
+      'alova': 'catalog:',
+      'axios': 'catalog:',
+      'dayjs': 'catalog:',
     },
     devDependencies: {
       '@desktop/config': 'workspace:*',

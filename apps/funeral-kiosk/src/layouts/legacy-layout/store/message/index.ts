@@ -1,4 +1,4 @@
-import type { Props } from '@/components/common/AppGlobalMessage/types'
+import type { Props } from '@/layouts/legacy-layout/AppGlobalMessage/types'
 
 export const useGlobalMessageStore = defineStore('global-message-store', () => {
   const messageState = {

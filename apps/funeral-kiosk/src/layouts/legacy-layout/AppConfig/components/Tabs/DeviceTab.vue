@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FormConfig } from '../DynamicForm.vue'
+import type { FormConfig } from '../types'
 import type { AppConfig } from '@/store/modules/app/types'
 
 import { useGlobalMessageStore } from '@/layouts/legacy-layout/store'
