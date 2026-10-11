@@ -61,6 +61,10 @@ function assertArtifacts(): void {
   const koffiNode = path.join(resources, 'node_modules', 'koffi', 'build', triplet, 'koffi.node')
   if (!existsSync(koffiNode))
     fail(`缺少 koffi 平台二进制 ${koffiNode}`)
+  // 设备资源经 postinstall junction 从仓库级单一来源 resources/devices 打包（缺失 = 同步链路断裂）
+  const huashiDll = path.join(resources, 'resources', 'devices', 'huashi', 'Termb.dll')
+  if (!existsSync(huashiDll))
+    fail(`缺少设备资源 ${huashiDll}（检查 resources/devices junction 与打包解引用）`)
   // asar 头部含 out 与 CJS 入口标记（字节级检查，无需 asar 依赖）
   const header = readFileSync(path.join(resources, 'app.core.asar')).subarray(0, 4_000_000).toString('latin1')
   if (!header.includes('"out":{"files"'))

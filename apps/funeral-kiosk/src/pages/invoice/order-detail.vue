@@ -322,6 +322,8 @@ onUnmounted(() => {
 </template>
 
 <style lang="scss" scoped>
+@use "sass:color";
+
 $primary: #003594;
 $primary-light: #0066cc;
 $primary-bg: rgba(0, 53, 148, 0.08);
@@ -424,7 +426,7 @@ $shadow-hover: 0 4px 15px rgba(0, 0, 0, 0.12);
 
     .status-icon { svg { color: $warning; } }
     .status-title { color: $warning; }
-    .status-text { color: darken($warning, 10%); }
+    .status-text { color: color.adjust($warning, $lightness: -10%); }
   }
 }
 

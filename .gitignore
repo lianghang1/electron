@@ -14,6 +14,8 @@ out
 # 例外：packages/core/launcher/out 是引导器源码（asar 内布局镜像，非构建产物），必须入库
 !packages/core/launcher/out/
 !packages/core/launcher/out/**
+# 设备资源单一来源在根 resources/devices（已跟踪）；app 侧是 postinstall 建的 junction，不入库
+apps/*/resources/devices/
 *.tsbuildinfo
 *.local
 unpackage/release

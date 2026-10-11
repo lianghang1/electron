@@ -117,6 +117,10 @@ cpSync(join(kioskDir, 'resources/icon.png'), join(appDir, 'resources/icon.png'))
 cpSync(join(kioskDir, 'build/icon.png'), join(appDir, 'build/icon.png'))
 cpSync(join(kioskDir, 'build/icon.ico'), join(appDir, 'build/icon.ico'))
 
+// 设备资源无需生成：resources/devices 由 postinstall 的 sync-dev-resources 建 junction
+// 指向仓库级单一来源（厂商 DLL 跟 packages/core 的驱动代码同仓演进），打包时自动解引用
+spawnSync(process.execPath, [join(ROOT, 'scripts', 'sync-dev-resources.cjs')], { stdio: 'inherit' })
+
 verifyGenerated(templateFiles)
 
 console.log(`created apps/${slug}`)

@@ -17,9 +17,9 @@ export interface CamSdkFrame {
   func: string
   result?: number
   errorMsg?: string
-  /** 拍照响应：图片数组（实测 CameraCapture 返回 imgBase64） */
+  /** 拍照响应：图片数组（CameraCapture 返回 imgBase64） */
   imgBase64?: string[]
-  /** 预览帧：单串图片数据（实测 GetCameraVideoBuff 预览帧返回 imgBase64Str，无 result/reqId） */
+  /** 预览帧：单串图片数据（GetCameraVideoBuff 预览帧返回 imgBase64Str，无 result/reqId） */
   imgBase64Str?: string
   /** GetCameraInfo 响应：摄像头清单 */
   devInfo?: CamSdkDevInfo[]

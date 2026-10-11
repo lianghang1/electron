@@ -18,9 +18,10 @@ pnpm typecheck               # 全仓类型检查
 pnpm lint                    # ESLint
 pnpm test                    # core 单元测试
 
-pnpm hotfix <app>            # 热更发布（详见 docs/update-server.md）
+pnpm hotfix <app>            # 热更发布（详见 docs/release.md）
+pnpm sync:resources          # 重建设备资源 junction（postinstall 自动执行，一般无需手动）
 pnpm exec tsx scripts/e2e-packaged.ts <app> [--hot]   # 打包产物自动冒烟（树外裸环境）
-pnpm gen:app <slug> <中文名>  # 脚手架生成新应用
+pnpm gen:app <slug> <中文名>  # 脚手架生成新应用（详见 docs/app-scaffold.md）
 ```
 
 ## 架构要点：asar 双层热更
@@ -37,6 +38,17 @@ pnpm gen:app <slug> <中文名>  # 脚手架生成新应用
 
 配置公共部分集中在 `@desktop/config/electron-builder` 工厂与 `@desktop/config/vite` 工厂，
 应用侧只声明差异；新增应用用 `pnpm gen:app` 脚手架，自动继承全部契约。
+
+**设备资源单一来源**：厂商 DLL / 打印组件等硬件文件在仓库根 `resources/devices/`（与
+`packages/core` 驱动代码同仓演进），各应用 `resources/devices` 是 postinstall 建立的
+junction——更新驱动文件只改一处，所有应用开发与打包自动生效。
+
+## 文档
+
+- [`docs/update-server.md`](docs/update-server.md) —— 更新服务器对接要求（feed 目录、清单协议、版本纪律）
+- [`docs/release.md`](docs/release.md) —— 发布手册（热更 / 整包 checklist、回滚、事故速查）
+- [`docs/deploy.md`](docs/deploy.md) —— 部署手册（环境变量、安装形态、目录速查、排查入口）
+- [`docs/app-scaffold.md`](docs/app-scaffold.md) —— 脚手架与模板扩展指南
 
 ## 更新与发布
 

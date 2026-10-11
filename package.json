@@ -12,6 +12,8 @@
     "gen:brand": "tsx resources/brand/generate.ts",
     "gen:app": "tsx scripts/generate-app.ts",
     "hotfix": "tsx scripts/pack-hotfix.ts",
+    "sync:resources": "node scripts/sync-dev-resources.cjs",
+    "postinstall": "node scripts/sync-dev-resources.cjs",
     "test": "pnpm --filter @desktop/core test",
     "typecheck": "pnpm -r typecheck"
   },
