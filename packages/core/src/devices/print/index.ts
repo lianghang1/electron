@@ -1,4 +1,5 @@
 import type { JobStatus, PaperInput, PaperProfile, PrinterCaps, PrintLogFn, PrintPreset, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
+import type { BrowserWindow } from 'electron'
 import type { Logger } from '../../logger/logger'
 import { join } from 'node:path'
 import { HiddenWindowPool } from './hidden-window'
@@ -55,6 +56,8 @@ export interface PrintSystemOptions {
   persistPresets?: (presets: PrintPreset[]) => void
   /** 打印机档案运行时编辑持久化（未注入则编辑仅内存生效） */
   persistPrinters?: (printers: RawPrinterConfig[]) => void
+  /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁（无主隐藏窗会让 window-all-closed 永不触发，进程常驻） */
+  getParent?: () => BrowserWindow | undefined
   /** 结构化日志（模块内不直接 console） */
   logger?: Logger
 }
@@ -63,7 +66,7 @@ export interface PrintSystemOptions {
  * 创建打印系统（print 域通道由 core/src/ipc/print.ts 注册）。宿主 app 退出前调 destroy()。
  */
 export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
-  const windows = new HiddenWindowPool()
+  const windows = new HiddenWindowPool(options.getParent)
   const archiveDir = join(options.stateDir, 'print-archive')
   // registry 与 service 共享同一 printers 数组实例：service 原地 upsert，registry 视图即时生效
   const registry = new PrinterRegistry(windows, options.printers)

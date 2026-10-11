@@ -271,6 +271,8 @@ export class DesktopRuntime {
       customPresets: presetStore.get('presets'),
       persistPresets: presets => presetStore.set('presets', presets),
       persistPrinters: printers => printerStore.set('printers', printers),
+      // 打印隐藏窗挂主窗口为 parent：主窗关闭级联销毁池窗，退出链路才能走完
+      getParent: () => this.windowService.getMainWindow(),
       logger: this.logger.scope('device:print'),
     })
   }

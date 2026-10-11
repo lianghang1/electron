@@ -19,6 +19,13 @@ export class HiddenWindowPool {
   private pdfViewer: BrowserWindow | null = null
   private queues: Map<HiddenTarget, Promise<unknown>> = new Map()
 
+  /**
+   * getParent：主窗口引用。池窗必须挂 parent——无 parent 的隐藏窗会在主窗口销毁后继续存活，
+   * 使 window-all-closed 永不触发（进程常驻，表现为"应用已退出但任务管理器还有进程"）。
+   * 挂 parent 后主窗销毁即级联销毁池窗，退出链路自然走完。
+   */
+  constructor(private readonly getParent?: () => BrowserWindow | undefined) {}
+
   /** 串行执行占用目标窗口的完整任务（渲染→打印必须在同一个锁内完成） */
   async runExclusive<T>(target: HiddenTarget, fn: (win: BrowserWindow) => Promise<T>): Promise<T> {
     const prev = this.queues.get(target) ?? Promise.resolve()
@@ -42,6 +49,7 @@ export class HiddenWindowPool {
     this.utility = new BrowserWindow({
       show: false,
       skipTaskbar: true,
+      parent: this.getParent?.(),
       webPreferences: {
         sandbox: true,
         nodeIntegration: false,
@@ -61,6 +69,7 @@ export class HiddenWindowPool {
     this.pdfViewer = new BrowserWindow({
       show: false,
       skipTaskbar: true,
+      parent: this.getParent?.(),
       webPreferences: {
         sandbox: true,
         nodeIntegration: false,
