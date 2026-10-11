@@ -1,10 +1,8 @@
 import type { CaptureAdapter, CaptureDevice, CaptureDeviceProfile, CaptureRequest, CaptureResult } from '@desktop/shared'
 import { existsSync } from 'node:fs'
-import { createRequire } from 'node:module'
 import path from 'node:path'
+import { koffiAvailable } from '../../idcard/drivers/koffi'
 import { captureError } from '../errors'
-
-const nodeRequire = createRequire(__filename)
 
 /**
  * DLL 路线适配器（华视/哲林等厂商 C 接口 SDK）。
@@ -37,7 +35,7 @@ export class DllAdapter implements CaptureAdapter {
       .map((p) => {
         const file = p.dll!.file
         const dllPath = path.isAbsolute(file) ? file : path.join(this.resourcesRoot, file)
-        const koffiInstalled = moduleAvailable('koffi')
+        const koffiInstalled = koffiAvailable()
         return {
           id: `dll:${p.id}`,
           displayName: p.displayName,
@@ -65,15 +63,5 @@ export class DllAdapter implements CaptureAdapter {
       + '生产建议将 DLL 调用移入 utilityProcess 子进程（崩溃隔离）',
       { deviceId: device.id, profile: device.meta },
     )
-  }
-}
-
-function moduleAvailable(name: string): boolean {
-  try {
-    nodeRequire.resolve(name)
-    return true
-  }
-  catch {
-    return false
   }
 }

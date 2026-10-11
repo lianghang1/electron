@@ -41,7 +41,7 @@ const files: Array<[string, string]> = [
     type: 'module',
     version: '1.0.0',
     private: true,
-    main: './out/main/index.js',
+    main: './out/main/index.cjs',
     scripts: {
       'dev': 'electron-vite dev',
       'start': 'electron-vite preview',
@@ -330,16 +330,29 @@ module.exports = {
     buildResources: 'build',
   },
   // asar 热更引导器结构：app.asar → app.core.asar（真实代码），app.asar 重写为 KB 级引导器
-  // 钩子与引导器为全 app 共享（packages/core），接入方式见钩子头注释
+  // 钩子与引导器为全 app 共享（packages/core），接入方式与打包架构契约见钩子头注释
   afterPack: 'scripts/after-pack.cjs',
   files: [
     '!**/.vscode/*',
     '!src/*',
     '!scripts/*',
+    '!electron/**',
+    '!shared/**',
+    // bundle 自包含（共享 vite 工厂不外部化依赖），node_modules 整体不进 asar（契约见钩子头注释）
+    '!node_modules/**',
     '!electron.vite.config.{js,ts,mjs,cjs}',
+    '!electron-builder.cjs',
     '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json}',
     '!{.env,.env.*,.npmrc,pnpm-lock.yaml}',
+    // resources 接入 extraResources 后走 asar 外分发，不进 asar
+    '!resources/**',
   ],
+  // 整包更新（electron-updater）：publish 使产物生成 resources/app-update.yml；
+  // 运行时 feedURL 由 DESKTOP_UPDATE_FEED 注入覆盖（见 electron/main 的 updates 配置），此处为占位地址
+  publish: {
+    provider: 'generic',
+    url: 'https://updates.example.com/${slug}',
+  },
   win: {
     // Windows 自助一体机交付均为 x64；如需 Windows on ARM 在 arch 里追加 arm64
     target: [

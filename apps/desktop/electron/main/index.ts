@@ -178,7 +178,7 @@ bootstrap({
     minHeight: 640,
   },
   // 飞书式沉浸顶栏：隐藏系统标题栏（自绘窗口控制是唯一入口），backgroundColor 防启动闪白
-  browserWindowOptions: { titleBarStyle: 'hidden', backgroundColor: '#f6f7f9' },
+  browserWindowOptions: { autoHideMenuBar: true, titleBarStyle: 'hidden', backgroundColor: '#f6f7f9' },
   // 内部页标准源协议：处理器挂到每个 App 的 persist 分区 Session 上（core 统一注册）
   protocols: { app: handleAppRequest },
   // 设备模拟联调开关：DESKTOP_DEVICES_MOCK=1 注册 stub 读卡器/采集/签名（无硬件验证链路；正式环境不设置即零模拟）

@@ -436,12 +436,13 @@ export class DesktopRuntime {
 }
 
 /**
- * 守护进程入口解析：宿主构建产物 out/main/device-host.js 与主进程 bundle 同目录。
- * CJS 产物取 __filename 基准；ESM 直跑源码联调无 __filename，退回 cwd 相对名（fork 失败即暴露）。
+ * 守护进程入口解析：宿主构建产物 out/main/device-host.cjs 与主进程 bundle 同目录
+ * （共享 vite 工厂把 main 段固定输出为 CJS .cjs）。
+ * CJS 产物取 __filename 基准；tsx 直跑源码联调无 __filename，退回 cwd 相对名（fork 失败即暴露）。
  */
 function resolveHostEntryPath(): string {
   if (typeof __filename === 'string') {
-    return join(dirname(__filename), 'device-host.js')
+    return join(dirname(__filename), 'device-host.cjs')
   }
-  return 'device-host.js'
+  return 'device-host.cjs'
 }

@@ -11,6 +11,9 @@ node_modules
 .DS_Store
 dist
 out
+# 例外：packages/core/launcher/out 是引导器源码（asar 内布局镜像，非构建产物），必须入库
+!packages/core/launcher/out/
+!packages/core/launcher/out/**
 *.tsbuildinfo
 *.local
 unpackage/release

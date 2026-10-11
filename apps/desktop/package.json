@@ -5,7 +5,7 @@
   "private": true,
   "description": "Desktop platform shell",
   "author": "company",
-  "main": "./out/main/index.js",
+  "main": "./out/main/index.cjs",
   "scripts": {
     "dev": "electron-vite dev",
     "start": "electron-vite preview",

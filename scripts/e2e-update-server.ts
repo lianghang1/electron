@@ -19,7 +19,7 @@ const DIST = join(ROOT, 'apps', APP, 'dist')
 const HOTFIX = join(DIST, 'hotfix')
 const PORT = Number(process.env.E2E_UPDATE_PORT ?? 8799)
 
-const hotfixManifest = JSON.parse(readFileSync(join(HOTFIX, 'update-manifest.json'), 'utf-8')) as {
+const hotfixManifest = JSON.parse(readFileSync(join(HOTFIX, 'asar-manifest.json'), 'utf-8')) as {
   version: string
   url: string
   sha256: string
@@ -46,7 +46,7 @@ function sha512Base64(file: string): string {
 
 /** 每请求实时读盘：hotfix 重新生成（如 --version 提版本）后服务器无需重启 */
 function readHotfix() {
-  const manifest = JSON.parse(readFileSync(join(HOTFIX, 'update-manifest.json'), 'utf-8')) as {
+  const manifest = JSON.parse(readFileSync(join(HOTFIX, 'asar-manifest.json'), 'utf-8')) as {
     version: string
     url: string
     sha256: string

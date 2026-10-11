@@ -19,15 +19,24 @@ module.exports = {
     buildResources: 'build',
   },
   // asar 热更引导器结构：app.asar → app.core.asar（真实代码），app.asar 重写为 KB 级引导器
-  // 钩子与引导器为全 app 共享（packages/core），接入方式见钩子头注释
+  // 钩子与引导器为全 app 共享（packages/core），接入方式与打包架构契约见钩子头注释
   afterPack: 'scripts/after-pack.cjs',
   files: [
     '!**/.vscode/*',
     '!src/*',
     '!scripts/*',
+    '!electron/**',
+    '!shared/**',
+    // bundle 自包含（共享 vite 工厂不外部化依赖），node_modules 整体不进 asar：
+    // 热更包体积的前提（曾误收 @embedpdf 全字体包/devDep 达 283MB），也规避依赖收集器在 pnpm 下的不确定行为
+    '!node_modules/**',
     '!electron.vite.config.{js,ts,mjs,cjs}',
+    '!electron-builder.cjs',
     '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json}',
     '!{.env,.env.*,.npmrc,pnpm-lock.yaml}',
+    // electron-builder 只自动排除"当前"输出目录；输出目录一旦改名/迁移，旧产物会被打进 asar，显式排除兜底
+    '!dist/**',
+    '!dist-*/**',
     // resources 走 extraResources（asar 外真实文件），不进 asar；icon 已由 ?asset 构建进 out/
     '!resources/**',
   ],
@@ -39,6 +48,12 @@ module.exports = {
       to: 'resources',
     },
   ],
+  // 整包更新（electron-updater）：publish 使产物生成 resources/app-update.yml；
+  // 运行时 feedURL 由 DESKTOP_UPDATE_FEED 注入覆盖（见 electron/main 的 updates 配置），此处为占位地址
+  publish: {
+    provider: 'generic',
+    url: 'https://updates.example.com/funeral-kiosk',
+  },
   win: {
     // Windows 自助一体机交付均为 x64；如需 Windows on ARM 在 arch 里追加 arm64
     target: [
@@ -93,6 +108,8 @@ module.exports = {
     language: '2052',
     // 安装器可选语言列表（多语言时首启动页会弹语言选择；只配 zh_CN 则全程中文无选择步骤）
     installerLanguages: 'zh_CN',
+    // 一键安装页顶部横幅 150×57（resources/brand/generate.ts 生成；一键安装无向导侧边栏）
+    installerHeader: '../../resources/brand/installerHeader.bmp',
     // 安装/卸载程序 exe 自身显示的图标（资源管理器里 FuneralKiosk-Setup.exe 的图标）
     installerIcon: 'build/icon.ico',
     uninstallerIcon: 'build/icon.ico',

@@ -70,6 +70,13 @@ export function createElectronViteConfig(options: CreateElectronViteConfigOption
         // Electron 内置模块不在 electron-vite 默认 external 列表里，显式声明
         // （运行时由 Electron 提供，删真实 .asar 文件必须用它绕过 asar fs 补丁）
         external: ['original-fs'],
+        // 强制 CJS（.cjs 后缀）：与 preload 一致，asar 内 package.json 的 type:module
+        // 不再影响主进程 bundle 的模块判定（ESM 输出在 asar 热更场景存在解析差异）
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].cjs',
+          chunkFileNames: '[name]-[hash].cjs',
+        },
       },
     },
   }
@@ -88,6 +95,14 @@ export function createElectronViteConfig(options: CreateElectronViteConfigOption
       },
     },
   }
+
+  // electron-vite 对 vite build 的扩展键 build.externalizeDeps（默认 true：把 package.json
+  // dependencies 外部化为裸导入）。裸导入在打包后依赖 asar 内 node_modules 解析——与 asar
+  // 热更架构（asar 纯 JS、node_modules 整体排除）冲突，且开发机上会因目录树恰好存在
+  // node_modules 侥幸通过。关闭后主进程/preload bundle 完全自包含（asar 热更架构契约 2）。
+  // 该键 vite 类型未收录、双 vite 实例下不宜引入其类型，经定向断言写入
+  ;(mainDefaults.build as { externalizeDeps?: boolean }).externalizeDeps = false
+  ;(preloadDefaults.build as { externalizeDeps?: boolean }).externalizeDeps = false
 
   const rendererDefaults: UserConfig = {
     root: '.',

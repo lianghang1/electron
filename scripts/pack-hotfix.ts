@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import readline from 'node:readline/promises'
@@ -37,7 +38,12 @@ function readAppMeta(dir: string): AppMeta | null {
   }
   if (!pkg.scripts?.['build:win'])
     return null
-  return { dir, productName: pkg.productName ?? dir, version: pkg.version ?? '0.0.0' }
+  // productName 真源在 electron/identity.cjs（package.json 不维护该字段），identity 缺失时回退目录名
+  const identityPath = join(APPS_DIR, dir, 'electron', 'identity.cjs')
+  const productName = existsSync(identityPath)
+    ? createRequire(import.meta.url)(identityPath).productName
+    : pkg.productName ?? dir
+  return { dir, productName, version: pkg.version ?? '0.0.0' }
 }
 
 function listApps(): AppMeta[] {
@@ -69,9 +75,8 @@ function packHotfix(app: AppMeta, version: string): void {
   // 引导器架构（全 app 已统一）：真实代码为 app.core.asar；app.asar 是永不更新的引导器，不能当热更包
   const unpackedResources = join(APPS_DIR, app.dir, 'dist', 'win-unpacked', 'resources')
   const coreAsar = join(unpackedResources, 'app.core.asar')
-  const asarSource = existsSync(coreAsar) ? coreAsar : join(unpackedResources, 'app.asar')
-  if (!existsSync(asarSource)) {
-    console.error(`未找到打包产物 ${asarSource}`)
+  if (!existsSync(coreAsar)) {
+    console.error(`未找到打包产物 ${coreAsar}`)
     console.error('请重跑（去掉 --no-build，脚本会自动打包）')
     process.exit(1)
   }
@@ -79,16 +84,17 @@ function packHotfix(app: AppMeta, version: string): void {
   const outDir = join(APPS_DIR, app.dir, 'dist', 'hotfix')
   mkdirSync(outDir, { recursive: true })
   const asarName = `core-${version.replace(/[^\w.-]/g, '_')}.asar`
-  copyFileSync(asarSource, join(outDir, asarName))
+  copyFileSync(coreAsar, join(outDir, asarName))
 
-  // sha256 强校验（与 AsarUpdateService 的 UpdateManifest.sha256 协议对齐）
+  // sha256 强校验（与 AsarUpdateService 的 UpdateManifest.sha256 协议对齐）；
+  // 清单文件名与客户端约定一致（bootstrap updates.asar → /updates/asar-manifest.json）
   const sha256 = createHash('sha256').update(readFileSync(join(outDir, asarName))).digest('hex')
   const manifest = { version, url: `./${asarName}`, sha256 }
-  writeFileSync(join(outDir, 'update-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf-8')
+  writeFileSync(join(outDir, 'asar-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf-8')
 
   console.log(`\n热更发布物已生成: apps/${app.dir}/dist/hotfix/`)
   console.log(`  core-${version}.asar`)
-  console.log(`  update-manifest.json  (version=${version}, sha256=${sha256.slice(0, 12)}...)`)
+  console.log(`  asar-manifest.json  (version=${version}, sha256=${sha256.slice(0, 12)}...)`)
   console.log('部署：把这两个文件一起上传到 updates.asar 指向的服务器目录，发布完成')
 }
 
