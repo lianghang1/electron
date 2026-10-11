@@ -54,7 +54,7 @@ const files: Array<[string, string]> = [
       'build:linux': 'pnpm run build && electron-builder --linux',
       'postinstall': 'electron-builder install-app-deps',
     },
-    // 应用身份唯一真源在 electron/identity.mjs（类型声明见 identity.d.mts，打包配置 electron-builder.js
+    // 应用身份唯一真源在 electron/identity.cjs（类型声明见 identity.d.cts，打包配置 electron-builder.cjs
     // 与运行时 bootstrap 共同引用；package.json 的 build 节点会整体覆盖配置文件，禁止使用）
     dependencies: {
       '@desktop/utils': 'workspace:*',
@@ -206,7 +206,7 @@ li + li {
 
   ['electron/main/index.ts', `import { bootstrap } from '@desktop/core'
 import icon from '../resources/icon.png?asset'
-import { appId, displayName, productName } from '../identity.mjs'
+import { appId, displayName, productName } from '../identity.cjs'
 
 /**
  * ${displayName}：单应用全屏形态（Kiosk 同构骨架）。
@@ -214,7 +214,7 @@ import { appId, displayName, productName } from '../identity.mjs'
  * 进程级安全基线（sandbox / contextIsolation / 导航防护）仍由 core 写死生效。
  */
 bootstrap({
-  // 运行时身份与打包身份同源于 electron/identity.ts（electron-builder.ts 同样引用）
+  // 运行时身份与打包身份同源于 electron/identity.cjs（electron-builder.cjs 同样引用）
   app: {
     id: appId,
     name: productName,
@@ -269,56 +269,60 @@ exposeDesktop()
 module.exports = require('@desktop/core/scripts/after-pack.cjs')
 `],
 
-  ['electron/identity.mjs', `/**
- * 应用身份唯一真源：运行时（electron/main 的 bootstrap）与打包（electron-builder.js）共同引用，
+  ['electron/identity.cjs', `/**
+ * 应用身份唯一真源：运行时（electron/main 的 bootstrap）与打包（electron-builder.cjs）共同引用，
  * 改产品名只需要改这里，构建产物各处（exe 名/目录/安装包文件名/快捷方式/卸载列表）均由此派生。
  *
- * 用 .mjs 而非 .ts 的原因：electron-builder 26 的 .ts 配置走 config-file-ts 编译缓存，
- * 编译后需在用户缓存目录创建 node_modules 符号链接，Windows 无符号链接特权（未开开发者模式）时
- * EPERM 直接崩溃；.js 配置走原生 ESM import，零编译零符号链接。
+ * 用 .cjs 的原因：electron-builder 只自动探测 electron-builder.{yml,yaml,json,json5,toml,js,cjs,ts}，
+ * 其中 .js 会被 cmd 当作 postinstall 命令误执行（PATHEXT 含 .js），.cjs 是唯一无撞名的 JS 后缀；
+ * .ts 配置走 config-file-ts 编译缓存，Windows 无符号链接特权时 EPERM，一并排除。
+ * CJS 同步 require 决定了本文件不能用 ESM（.mjs 不被探测，也无法被 .cjs 同步引用）。
  */
 
 /** 打包身份 ID：appId（对应 bootstrap.app.id，Windows App User Model ID / 单实例锁等运行时身份的基础） */
-export const appId = '${appId}'
+const appId = '${appId}'
 
 /**
  * 英文产品名：exe 名 / 安装目录 / 安装包文件名前缀（对应 bootstrap.app.name）。必须 ASCII：
  * electron-builder 对非 ASCII productName 强制回退 sanitized name，@app/${slug} 会变成难看的 @app${slug.replace(/-/g, '')} 目录
  */
-export const productName = '${productName}'
+const productName = '${productName}'
 
 /** 面向用户的中文显示名：窗口标题 / 桌面快捷方式名称 / 「应用和功能」卸载列表显示名 */
-export const displayName = '${displayName}'
+const displayName = '${displayName}'
+
+module.exports = { appId, productName, displayName }
 `],
 
-  ['electron/identity.d.mts', `/**
- * 应用身份的类型声明：实现在同目录 identity.mjs，TS 侧（electron/main）引用 identity.mjs 时
- * 由此文件获得显式类型；打包配置（electron-builder.js）为 JS，直接引用 .mjs，无需本文件。
+  ['electron/identity.d.cts', `/**
+ * 应用身份的类型声明：实现在同目录 identity.cjs，TS 侧（electron/main）引用 identity.cjs 时
+ * 由此文件获得显式类型；打包配置（electron-builder.cjs）为 JS，直接 require .cjs，无需本文件。
  */
 
 /** 打包身份 ID：appId（对应 bootstrap.app.id，Windows App User Model ID / 单实例锁等运行时身份的基础） */
 export declare const appId: string
 
-/** 英文产品名：exe 名 / 安装目录 / 安装包文件名前缀（对应 bootstrap.app.name）。必须 ASCII（原因见 identity.mjs 注释） */
+/** 英文产品名：exe 名 / 安装目录 / 安装包文件名前缀（对应 bootstrap.app.name）。必须 ASCII（原因见 identity.cjs 注释） */
 export declare const productName: string
 
 /** 面向用户的中文显示名：窗口标题 / 桌面快捷方式名称 / 「应用和功能」卸载列表显示名 */
 export declare const displayName: string
 `],
 
-  ['electron-builder.js', `/**
- * 打包配置：与 electron/main/index.ts 的 bootstrap({ app }) 共同引用 electron/identity.mjs，
- * 应用身份（appId / productName / 中文显示名）以 identity.mjs 为唯一真源，此处不重复维护。
+  ['electron-builder.cjs', `/**
+ * 打包配置：与 electron/main/index.ts 的 bootstrap({ app }) 共同引用 electron/identity.cjs，
+ * 应用身份（appId / productName / 中文显示名）以 identity.cjs 为唯一真源，此处不重复维护。
  *
- * 文件名必须保持 electron-builder.js：electron-builder 26 只自动探测
- * electron-builder.{yml,yaml,json,json5,toml,js,cjs,ts}，.mjs 与 .config.* 命名不会被加载。
+ * 文件名用 .cjs 而非 .js：cmd 解析 postinstall 里的 electron-builder 命令时会先搜当前目录
+ * 且 PATHEXT 含 .js，同名 electron-builder.js 会被当作命令打开导致安装卡死；.cjs 同样被
+ * electron-builder 自动探测，但不属于 PATHEXT，无此风险。
  */
-import { appId, displayName, productName } from './electron/identity.mjs'
+const { appId, displayName, productName } = require('./electron/identity.cjs')
 
 /** @type {import('electron-builder').Configuration} */
-export default {
+module.exports = {
   appId,
-  // productName 决定安装目录与主 exe 名（ASCII 约束见 identity.mjs 注释）
+  // productName 决定安装目录与主 exe 名（ASCII 约束见 identity.cjs 注释）
   productName,
   // Linux 可执行文件名：package.json name 是 @app/${slug}，sanitize 后的 @app${slug.replace(/-/g, '')} 不合法，需显式指定
   executableName: productName,

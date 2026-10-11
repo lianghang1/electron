@@ -1,16 +1,17 @@
 /**
- * 打包配置：与 electron/main/index.ts 的 bootstrap({ app }) 共同引用 electron/identity.mjs，
- * 应用身份（appId / productName / 中文显示名）以 identity.mjs 为唯一真源，此处不重复维护。
+ * 打包配置：与 electron/main/index.ts 的 bootstrap({ app }) 共同引用 electron/identity.cjs，
+ * 应用身份（appId / productName / 中文显示名）以 identity.cjs 为唯一真源，此处不重复维护。
  *
- * 文件名必须保持 electron-builder.js：electron-builder 26 只自动探测
- * electron-builder.{yml,yaml,json,json5,toml,js,cjs,ts}，.mjs 与 .config.* 命名不会被加载。
+ * 文件名用 .cjs 而非 .js：cmd 解析 postinstall 里的 electron-builder 命令时会先搜当前目录
+ * 且 PATHEXT 含 .js，同名 electron-builder.js 会被当作命令打开导致安装卡死；.cjs 同样被
+ * electron-builder 自动探测，但不属于 PATHEXT，无此风险。
  */
-import { appId, displayName, productName } from './electron/identity.mjs'
+const { appId, displayName, productName } = require('./electron/identity.cjs')
 
 /** @type {import('electron-builder').Configuration} */
-export default {
+module.exports = {
   appId,
-  // productName 决定安装目录与主 exe 名（ASCII 约束见 identity.mjs 注释）
+  // productName 决定安装目录与主 exe 名（ASCII 约束见 identity.cjs 注释）
   productName,
   // Linux 可执行文件名：package.json name 是 @app/funeral-kiosk，sanitize 后的 @appfuneralkiosk 不合法，需显式指定
   executableName: productName,

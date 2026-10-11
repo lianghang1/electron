@@ -25,22 +25,14 @@ export function createEslintConfig(...blocks: EslintBlock[]) {
     },
     {
       rules: {
+        'no-useless-return': 'warn',
         'no-console': 'off',
+        'vue/no-unused-refs': 'off',
+        'no-unused-vars': 'off',
         '@typescript-eslint/no-explicit-any': 'off',
         '@typescript-eslint/no-unused-vars': 'off',
-        'no-unused-vars': 'off',
-        'unused-imports/no-unused-vars': [
-          'warn',
-          {
-            vars: 'all',
-            varsIgnorePattern: '^_',
-            args: 'after-used',
-            argsIgnorePattern: '^_',
-          },
-        ],
+        'unused-imports/no-unused-vars': 'off',
         'unused-imports/no-unused-imports': 'error',
-        'no-useless-return': 'warn',
-        'vue/no-unused-refs': 'warn',
         'eslint-comments/no-unlimited-disable': 'error',
       },
     },

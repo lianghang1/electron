@@ -2,7 +2,7 @@ import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import { is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { appId, displayName, productName } from '../identity.mjs'
+import { appId, displayName, productName } from '../identity.cjs'
 import { registerFuneralKioskIpc } from './ipc'
 
 /**
@@ -12,7 +12,7 @@ import { registerFuneralKioskIpc } from './ipc'
  */
 bootstrap({
   // 运行时身份（setAppUserModelId / 单实例锁 / app:// 协议源），dev 模式必需；
-  // 运行时身份与打包身份同源于 electron/identity.mjs（electron-builder.js 同样引用）
+  // 运行时身份与打包身份同源于 electron/identity.cjs（electron-builder.cjs 同样引用）
   app: {
     id: appId,
     name: productName,

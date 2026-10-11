@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { SettlementMethod } from '@/api/types/payment'
 import dayjs from 'dayjs'
-// @ts-expect-error vue-qr
-import QrCode from 'vue-qr/src/packages/vue-qr.vue'
+import VueQr from 'vue-qr'
 import PaymentApi from '@/api/payment'
 import { isBooleanTrue, isEmpty } from '@/utils'
 
@@ -201,7 +200,7 @@ function goHome() {
           <div class="payment-qr-code">
             <div class="qr-placeholder">
               <div v-if="qrUrl">
-                <QrCode :text="qrUrl" :margin="0" />
+                <VueQr :text="qrUrl" :margin="0" />
               </div>
               <div class="text-hex-000000 font-600">
                 <div>{{ paymentMethodName }}</div>
