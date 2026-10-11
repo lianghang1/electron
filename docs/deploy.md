@@ -23,8 +23,9 @@
 ## 设备资源（厂商 DLL / 打印组件）
 
 - 设备驱动文件**单一来源在仓库根 `resources/devices/`**（与消费它们的 `packages/core` 驱动代码同仓演进）。
-- 各应用目录下的 `resources/devices` 是 postinstall 自动创建的 junction（`pnpm sync:resources` 可手动重建），
-  开发与打包全部透明，**不存在也不允许任何"逐应用复制"动作**。
+- 各应用目录下的 `resources/devices` 是 postinstall 自动**单向复制**的产物（`pnpm sync:resources` 可手动重建）：
+  根目录是唯一真源，应用侧是再生成的普通目录。**不要往应用侧放文件**——手工添加的内容会在下次同步时
+  丢失（同步脚本会大声警告）。
 - 设备资源更新 = 更新仓库根 `resources/devices/` 下的文件 → 随**整包更新**发布（热更不带 resources，
   热更代码依赖新版驱动能力时用 `pnpm hotfix --min-resources-version` 做配对保护）。
 

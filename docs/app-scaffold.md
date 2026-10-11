@@ -31,7 +31,7 @@
 - **新增/修改模板文件**：直接编辑 `scripts/templates/app/` 下的真实文件；需要应用差异处放令牌，
   并确认 `generate-app.ts` 的 TOKENS 已覆盖（生成一次即可验证）。
 - **继承的契约不可在生成物里破坏**：files 白名单、`asarUnpack` 永不配置、bundle 自包含、
-  设备资源走根 `resources/devices` 单一来源（junction 由 postinstall 自动建立，生成后无需复制）。
+  设备资源走根 `resources/devices` 单一来源（同步脚本单向复制，生成后无需手动操作）。
 - **业务 IPC**：参照 `apps/funeral-kiosk/electron/main/ipc` 的域通道表模式；模板的
   `electron/main/index.ts` 与 `preload/index.ts` 已留锚点注释。
 - **渲染层骨架已对齐 kiosk**：vue-router（auto-routes）+ pinia（persistedstate）+ UnoCSS +
@@ -40,7 +40,7 @@
 ## 生成之后
 
 ```bash
-pnpm install                                       # 建 workspace 链接 + 设备资源 junction
+pnpm install                                       # 建 workspace 链接 + 设备资源单向复制
 pnpm --filter @app/<slug> dev                      # 开发冒烟
 pnpm --filter @app/<slug> build:win                # 打包
 pnpm exec tsx scripts/e2e-packaged.ts <slug>       # 打包冒烟（建议作为生成应用的验收步骤）

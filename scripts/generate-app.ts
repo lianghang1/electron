@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { syncDevResources } from './sync-dev-resources'
 
 /**
  * 新 App 脚手架：按 scripts/templates/app 模板树生成与 kiosk 同构的单应用全屏形态骨架。
@@ -102,6 +103,7 @@ function verifyGenerated(files: string[]): void {
 }
 
 const templateFiles = listTemplateFiles(TEMPLATE_DIR)
+try {
 for (const rel of templateFiles) {
   const target = join(appDir, rel)
   mkdirSync(dirname(target), { recursive: true })
@@ -117,11 +119,16 @@ cpSync(join(kioskDir, 'resources/icon.png'), join(appDir, 'resources/icon.png'))
 cpSync(join(kioskDir, 'build/icon.png'), join(appDir, 'build/icon.png'))
 cpSync(join(kioskDir, 'build/icon.ico'), join(appDir, 'build/icon.ico'))
 
-// 设备资源无需生成：resources/devices 由 postinstall 的 sync-dev-resources 建 junction
-// 指向仓库级单一来源（厂商 DLL 跟 packages/core 的驱动代码同仓演进），打包时自动解引用
-spawnSync(process.execPath, [join(ROOT, 'scripts', 'sync-dev-resources.cjs')], { stdio: 'inherit' })
+// 设备资源无需生成：resources/devices 由同步脚本从仓库级单一来源单向复制（postinstall 也会自动执行）
+syncDevResources()
 
-verifyGenerated(templateFiles)
+  verifyGenerated(templateFiles)
+}
+catch (error) {
+  rmSync(appDir, { recursive: true, force: true })
+  console.error('[gen:app] 生成失败，已回滚删除半成品目录')
+  throw error
+}
 
 console.log(`created apps/${slug}`)
 console.log(`  形态        Kiosk（全屏单应用）`)

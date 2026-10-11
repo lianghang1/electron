@@ -51,6 +51,10 @@ export class DownloadService {
         const url = item.getURL()
         const context = this.resolver.resolve(webContents)
         this.logger.info('download not declared, pausing for runtime permission', { appId, url })
+        // 必须在挂起前同步预设保存路径：pause 只挂起网络传输，未设路径时 Electron
+        // 会在 will-download 返回后立即弹默认另存对话框，保存动作绕过权限把关。
+        // 授权恢复的下载沿用预设路径（beginTask 跳过二次指定），授权后才真正落盘
+        item.setSavePath(join(app.getPath('downloads'), item.getFilename() || 'download'))
         item.pause()
         void this.permissionService.requestRuntime(context, 'download').then((allowed) => {
           // 决策返回时 item 可能已随 Tab 关闭销毁（DownloadItem 无 isDestroyed，操作会抛）
@@ -82,12 +86,15 @@ export class DownloadService {
   private beginTask(appId: string, item: Electron.DownloadItem): void {
     const id = `dl-${Date.now()}-${++this.seq}`
     const filename = item.getFilename() || 'download'
-    // 保存位置：saveAs 配置弹系统另存对话框选目录；默认静默保存到系统下载目录（Kiosk 友好）
-    const defaultPath = join(app.getPath('downloads'), filename)
-    if (this.config.download?.saveAs)
-      item.setSaveDialogOptions({ title: '保存下载', defaultPath })
-    else
-      item.setSavePath(defaultPath)
+    // 保存位置：saveAs 配置弹系统另存对话框选目录；默认静默保存到系统下载目录（Kiosk 友好）。
+    // 运行时授权恢复的下载已在挂起前预设路径（抑制默认对话框），沿用不再二次指定
+    if (!item.getSavePath()) {
+      const defaultPath = join(app.getPath('downloads'), filename)
+      if (this.config.download?.saveAs)
+        item.setSaveDialogOptions({ title: '保存下载', defaultPath })
+      else
+        item.setSavePath(defaultPath)
+    }
     const task: DownloadTask = {
       id,
       appId,

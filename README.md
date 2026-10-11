@@ -19,7 +19,7 @@ pnpm lint                    # ESLint
 pnpm test                    # core 单元测试
 
 pnpm hotfix <app>            # 热更发布（详见 docs/release.md）
-pnpm sync:resources          # 重建设备资源 junction（postinstall 自动执行，一般无需手动）
+pnpm sync:resources          # 重建设备资源复制（postinstall 自动执行，一般无需手动）
 pnpm exec tsx scripts/e2e-packaged.ts <app> [--hot]   # 打包产物自动冒烟（树外裸环境）
 pnpm gen:app <slug> <中文名>  # 脚手架生成新应用（详见 docs/app-scaffold.md）
 ```
@@ -40,8 +40,8 @@ pnpm gen:app <slug> <中文名>  # 脚手架生成新应用（详见 docs/app-sc
 应用侧只声明差异；新增应用用 `pnpm gen:app` 脚手架，自动继承全部契约。
 
 **设备资源单一来源**：厂商 DLL / 打印组件等硬件文件在仓库根 `resources/devices/`（与
-`packages/core` 驱动代码同仓演进），各应用 `resources/devices` 是 postinstall 建立的
-junction——更新驱动文件只改一处，所有应用开发与打包自动生效。
+`packages/core` 驱动代码同仓演进），各应用 `resources/devices` 由 postinstall 单向复制生成——
+更新驱动文件只改一处，所有应用自动生效。
 
 ## 文档
 

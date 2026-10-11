@@ -59,5 +59,5 @@ pnpm exec tsx scripts/e2e-packaged.ts <app>
 |---|---|---|
 | 客户端始终"已是最新" | 清单版本号未严格递增 / CDN 缓存旧清单 | 递增版本；清单 `Cache-Control: no-cache` |
 | 热更下载后反复重新下载 | 清单版本含无法比较的段（历史 NaN bug 已修，老安装包需整包升级） | 换标准 `x.y.z` 版本 |
-| 设备状态全部 offline | 整包未含 resources/devices（junction 断裂） | 重跑 `pnpm sync:resources` 后重打包；e2e 会拦 |
+| 设备状态全部 offline | 整包未含 resources/devices（同步脚本未执行） | 重跑 `pnpm sync:resources` 后重打包；e2e 会拦 |
 | 热更加载失败回退内置 | 看 `launcher.log` 的 `failed to load hot core` 原因 | 修复后发更高版本；客户端已自动回退无风险 |

@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -239,28 +239,87 @@ async function main(): Promise<void> {
     }
   }
   finally {
-    if (!KEEP) {
-      spawnSync('taskkill', ['/IM', exeName, '/F'], { stdio: 'ignore' })
-      // 等进程完全退出再删目录（Windows 文件锁释放有延迟，热更重启的新实例也在跑）
-      for (let i = 0; i < 20; i++) {
-        const running = spawnSync('tasklist', ['/FI', `IMAGENAME eq ${exeName}`], { encoding: 'utf-8' })
-          .stdout
-          ?.includes(exeName)
-        if (!running)
-          break
-        await new Promise(resolve => setTimeout(resolve, 500))
-      }
-      hotServer?.close()
-      try {
-        rmSync(tempDir, { recursive: true, force: true })
-        rmSync(path.join(userDataDir, 'desktop-updater'), { recursive: true, force: true })
-      }
-      catch (error) {
-        console.warn(`  [WARN] 清理不完整（文件仍被占用，可手动删除）: ${String(error).slice(0, 80)}`)
-      }
+    hotServer?.close()
+  }
+
+  // 7. 退出洁净度断言：优雅关闭（等价点 X 的 WM_CLOSE）→ 进程应归零。
+  // 无主隐藏窗（如打印窗未挂 parent）会阻断 window-all-closed——这类"退出后进程残留"
+  // 的 bug 曾被 taskkill /F 强杀收尾掩盖，此断言专为其设。
+  // 配置了 exitGuard 的应用（kiosk 无人值守）关窗常驻属预期，降级为 WARN。
+  sendWmCloseToVisibleWindows(exeName)
+  const exitedClean = await pollProcessCount(exeName, 10_000)
+  const exitVerdict = exitedClean ? 'PASS' : 'WARN'
+  console.log(`  [${exitVerdict}] 退出洁净度（优雅关闭后${exitedClean ? '进程归零' : '进程仍存活——exitGuard 常驻属预期；否则为退出残留 bug，收集 logs/main.log 排查'}）`)
+
+  // 8. 无孤儿子进程断言：强制结束后 utility/renderer 必须随之消亡
+  spawnSync('taskkill', ['/IM', exeName, '/F'], { stdio: 'ignore' })
+  await new Promise(resolve => setTimeout(resolve, 1500))
+  const orphansGone = await pollProcessCount(exeName, 5_000)
+  if (!orphansGone)
+    fail('强制结束后仍存在孤儿子进程（utility/renderer 未随主进程消亡）')
+  console.log('  [PASS] 无孤儿子进程')
+
+  if (!KEEP) {
+    try {
+      rmSync(tempDir, { recursive: true, force: true })
+      rmSync(path.join(userDataDir, 'desktop-updater'), { recursive: true, force: true })
+    }
+    catch (error) {
+      console.warn(`  [WARN] 清理不完整（文件仍被占用，可手动删除）: ${String(error).slice(0, 80)}`)
     }
   }
   console.log('\nE2E PASS')
+}
+
+/** 向目标 exe 的所有可见窗口发送 WM_CLOSE（等价用户点关闭按钮） */
+function sendWmCloseToVisibleWindows(exeName: string): void {
+  const script = `$exe = "${exeName}"
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Collections.Generic;
+public class WMC {
+  public delegate bool EnumWindowsProc(IntPtr h, IntPtr p);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc cb, IntPtr p);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
+  public static uint TargetPid;
+  public static bool Callback(IntPtr h, IntPtr p) {
+    uint pid; GetWindowThreadProcessId(h, out pid);
+    if (pid == TargetPid && IsWindowVisible(h)) PostMessage(h, 0x0010, IntPtr.Zero, IntPtr.Zero);
+    return true;
+  }
+  public static void Send(uint pid) { TargetPid = pid; EnumWindows(Callback, IntPtr.Zero); }
+}
+'@
+Get-Process -Name $exe.Replace('.exe', '') -ErrorAction SilentlyContinue | ForEach-Object { [WMC]::Send([uint32]$_.Id) }
+`
+  const ps1 = path.join(process.env.TEMP ?? '.', `e2e-wmclose-${Date.now()}.ps1`)
+  writeFileSync(ps1, script, 'utf-8')
+  try {
+    spawnSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ps1], { stdio: 'ignore' })
+  }
+  finally {
+    rmSync(ps1, { force: true })
+  }
+}
+
+/** 轮询目标 exe 的进程数是否归零 */
+function pollProcessCount(exeName: string, timeoutMs: number): Promise<boolean> {
+  const processName = exeName.replace(/\.exe$/, '')
+  return new Promise((resolve) => {
+    const started = Date.now()
+    const timer = setInterval(() => {
+      const result = spawnSync('powershell', ['-NoProfile', '-Command', `(Get-Process -Name '${processName}' -ErrorAction SilentlyContinue | Measure-Object).Count`], { encoding: 'utf-8' })
+      const count = Number.parseInt(result.stdout?.trim() ?? '0', 10)
+      if (count === 0 || Date.now() - started > timeoutMs) {
+        clearInterval(timer)
+        resolve(count === 0)
+      }
+    }, 500)
+  })
 }
 
 /** 递归拷贝目录树（打包产物为普通文件树，无需符号链接处理） */
