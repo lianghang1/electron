@@ -32,4 +32,11 @@ export interface UpdateManifest {
   url: string
   /** asar 包 sha256（hex），下载后强校验，不一致即丢弃 */
   sha256: string
+  /**
+   * 可选：热更代码要求的最低 resources 版本（安装期整包版本）。
+   * 热更只换代码不换 resources（厂商 DLL / 内置页面 / SumatraPDF），热更代码若依赖新版
+   * resources 能力，发布时必须携带此字段；客户端发现本机 resources 旧于要求则拒绝应用该热更
+   * （字段缺失 = 不设限，旧清单天然兼容）。
+   */
+  minResourcesVersion?: string
 }

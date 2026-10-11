@@ -12,13 +12,23 @@ import { fileURLToPath } from 'node:url'
  *   pnpm hotfix                ← 交互引导（选 App → 确认版本 → 自动打包出发布物）
  *   pnpm hotfix funeral        ← 直通模式（非交互，CI/熟手用），参数兼容 @app/funeral
  *   --version 1.0.1            ← 覆盖发布版本（默认取 package.json version）
+ *   --sync-version             ← 把发布版本写回 app package.json（下次整包构建的内置基准与热更对齐）
+ *   --min-resources-version 1.2.0 ← 清单携带资源配对要求：热更代码依赖新版 resources（DLL/内置页面）时，
+ *                                  旧 resources 设备自动跳过该热更，等待整包更新先行
  *   --no-build                 ← 跳过打包，直接用现有产物（仅调试用）
- * 输出 apps/<app>/dist/hotfix/：core-<version>.asar + update-manifest.json，
+ * 输出 apps/<app>/dist/hotfix/：core-<version>.asar + asar-manifest.json，
  * 二者一起上传到更新服务器（updates.asar 指向清单所在目录）即完成发布。
  */
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const APPS_DIR = join(ROOT, 'apps')
+
+interface HotfixOptions {
+  /** 清单携带的资源配对要求（可选，缺省不设限） */
+  minResourcesVersion?: string
+  /** 把发布版本写回 app package.json */
+  syncVersion?: boolean
+}
 
 interface AppMeta {
   dir: string
@@ -71,7 +81,7 @@ function buildApp(app: AppMeta): void {
   }
 }
 
-function packHotfix(app: AppMeta, version: string): void {
+function packHotfix(app: AppMeta, version: string, options: HotfixOptions = {}): void {
   // 引导器架构（全 app 已统一）：真实代码为 app.core.asar；app.asar 是永不更新的引导器，不能当热更包
   const unpackedResources = join(APPS_DIR, app.dir, 'dist', 'win-unpacked', 'resources')
   const coreAsar = join(unpackedResources, 'app.core.asar')
@@ -89,12 +99,30 @@ function packHotfix(app: AppMeta, version: string): void {
   // sha256 强校验（与 AsarUpdateService 的 UpdateManifest.sha256 协议对齐）；
   // 清单文件名与客户端约定一致（bootstrap updates.asar → /updates/asar-manifest.json）
   const sha256 = createHash('sha256').update(readFileSync(join(outDir, asarName))).digest('hex')
-  const manifest = { version, url: `./${asarName}`, sha256 }
+  // minResourcesVersion 缺省不写入（字段缺失 = 不设限，旧清单天然兼容）
+  const manifest = {
+    version,
+    url: `./${asarName}`,
+    sha256,
+    ...(options.minResourcesVersion ? { minResourcesVersion: options.minResourcesVersion } : {}),
+  }
   writeFileSync(join(outDir, 'asar-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf-8')
+
+  if (options.syncVersion) {
+    // 发布版本写回 package.json：下次整包构建的内置版本基准与热更对齐（否则内置永远落后热更）
+    const pkgPath = join(APPS_DIR, app.dir, 'package.json')
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>
+    pkg.version = version
+    writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`, 'utf-8')
+  }
 
   console.log(`\n热更发布物已生成: apps/${app.dir}/dist/hotfix/`)
   console.log(`  core-${version}.asar`)
   console.log(`  asar-manifest.json  (version=${version}, sha256=${sha256.slice(0, 12)}...)`)
+  if (options.minResourcesVersion)
+    console.log(`  资源配对要求: resources >= ${options.minResourcesVersion}（旧 resources 设备跳过该热更）`)
+  if (options.syncVersion)
+    console.log(`  已同步 package.json version → ${version}`)
   console.log('部署：把这两个文件一起上传到 updates.asar 指向的服务器目录，发布完成')
 }
 
@@ -130,14 +158,15 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2)
   const versionFlagIndex = args.indexOf('--version')
   const versionOverride = versionFlagIndex >= 0 ? args[versionFlagIndex + 1] : undefined
-  // 剔除 --version 及其值（仅当存在时）后，第一个非选项参数即 app 名
+  // 跳过带值参数（--version / --min-resources-version）后，第一个非选项参数即 app 名
+  const flagsWithValues = new Set(['--version', '--min-resources-version'])
   const appArg = args
-    .filter((arg, i) => !(versionFlagIndex >= 0 && (i === versionFlagIndex || i === versionFlagIndex + 1)))
+    .filter((arg, i) => !(args[i - 1] !== undefined && flagsWithValues.has(args[i - 1])))
     .find(arg => !arg.startsWith('-'))
   const app = findApp(appArg)
   const interactive = process.stdin.isTTY && args.length === 0
 
-  // 直通模式：pnpm hotfix <app> [--version x.y.z] [--no-build]
+  // 直通模式：pnpm hotfix <app> [--version x.y.z] [--min-resources-version v] [--sync-version] [--no-build]
   if (!interactive) {
     if (!app) {
       const dirs = listApps().map(meta => meta.dir).join(' / ')
@@ -146,9 +175,14 @@ async function main(): Promise<void> {
       process.exit(1)
     }
     const version = versionOverride ?? app.version
+    const minResourcesFlagIndex = args.indexOf('--min-resources-version')
+    const options: HotfixOptions = {
+      minResourcesVersion: minResourcesFlagIndex >= 0 ? args[minResourcesFlagIndex + 1] : undefined,
+      syncVersion: args.includes('--sync-version'),
+    }
     if (!args.includes('--no-build'))
       buildApp(app)
-    packHotfix(app, version)
+    packHotfix(app, version, options)
     return
   }
 

@@ -8,6 +8,7 @@
       "types": "./dist/vite/index.d.ts",
       "default": "./dist/vite/index.js"
     },
+    "./electron-builder": "./electron-builder.cjs",
     "./eslint": "./eslint/index.ts",
     "./tsconfig.base.json": "./tsconfig.base.json"
   },

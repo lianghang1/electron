@@ -67,6 +67,12 @@ exports.default = async function afterPack(context) {
 
   // 4. koffi（FFI，原生模块）asar 外分发，运行时由 devices/idcard/drivers/koffi 访问器显式锚定
   copyKoffi(context.packager.projectDir || process.cwd(), resourcesDir)
+
+  // 5. resources 版本标记：热更协议 minResourcesVersion 的比对基准（热更只换代码，热更代码
+  //    依赖新版 resources 能力时由 AsarUpdateService 据此拒绝旧 resources 设备的热更）
+  const markerDir = path.join(resourcesDir, 'resources')
+  fs.mkdirSync(markerDir, { recursive: true })
+  fs.writeFileSync(path.join(markerDir, '.resources-version'), info.version)
 }
 
 /**

@@ -1,18 +1,26 @@
-import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 /**
- * 新 App 脚手架：生成与 kiosk 同构的单应用全屏形态骨架（三件套：入口 / 配置 / 脚本）。
+ * 新 App 脚手架：按 scripts/templates/app 模板树生成与 kiosk 同构的单应用全屏形态骨架。
  *   pnpm gen:app <slug> <中文名>
  *   例如：pnpm gen:app census 人口普查自助终端
- * 生成的是 Kiosk 形态（全屏 + 韧性 + 无 Tab）；Desktop Shell 形态（Tab 多应用）
- * 请复制 apps/desktop 改造。完成后执行 pnpm install 建立 workspace 链接。
+ * 生成的是 Kiosk 形态（全屏 + 韧性 + 无 Tab）；Desktop Shell 形态（Tab 多应用）请复制 apps/desktop 改造。
+ * 完成后执行 pnpm install 建立 workspace 链接。
+ *
+ * 模板即真实文件（可直接编辑、lint、diff），令牌 @@XXX@@ 在生成时替换
+ * （不用 __XXX__：会与 vite define 全局常量 __VITE_API_BASE_URL__ 等命名冲突）。
+ * 生成后自检：残留令牌扫描 + package.json 合法性 + .cjs 语法 + identity 导出断言——
+ * 模板扩展漏改令牌会在生成时立刻报错并回滚，而不是生成一个静默残缺的应用。
  */
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const APPS_DIR = join(ROOT, 'apps')
+const TEMPLATE_DIR = join(ROOT, 'scripts', 'templates', 'app')
 
 const [slug, displayName] = process.argv.slice(2)
 if (!slug || !displayName) {
@@ -35,406 +43,84 @@ if (existsSync(appDir)) {
 const productName = slug.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')
 const appId = `com.company.${slug}`
 
-const files: Array<[string, string]> = [
-  ['package.json', `${JSON.stringify({
-    name: `@app/${slug}`,
-    type: 'module',
-    version: '1.0.0',
-    private: true,
-    main: './out/main/index.cjs',
-    scripts: {
-      'dev': 'electron-vite dev',
-      'start': 'electron-vite preview',
-      'typecheck:node': 'tsc --noEmit -p tsconfig.node.json --composite false',
-      'typecheck:web': 'vue-tsc --noEmit -p tsconfig.web.json --composite false',
-      'typecheck': 'pnpm run typecheck:node && pnpm run typecheck:web',
-      'build': 'pnpm run typecheck && electron-vite build',
-      'build:win': 'pnpm run build && electron-builder --win',
-      'build:mac': 'pnpm run build && electron-builder --mac',
-      'build:linux': 'pnpm run build && electron-builder --linux',
-      'postinstall': 'electron-builder install-app-deps',
-    },
-    // 应用身份唯一真源在 electron/identity.cjs（类型声明见 identity.d.cts，打包配置 electron-builder.cjs
-    // 与运行时 bootstrap 共同引用；package.json 的 build 节点会整体覆盖配置文件，禁止使用）
-    dependencies: {
-      '@desktop/utils': 'workspace:*',
-      '@electron-toolkit/utils': 'catalog:',
-      '@fun-design/http-alova-axios': 'catalog:',
-      '@vueuse/core': 'catalog:',
-      'alova': 'catalog:',
-      'axios': 'catalog:',
-      'dayjs': 'catalog:',
-    },
-    devDependencies: {
-      '@desktop/config': 'workspace:*',
-      '@desktop/core': 'workspace:*',
-      '@desktop/shared': 'workspace:*',
-      '@types/node': 'catalog:',
-      '@vitejs/plugin-vue': 'catalog:',
-      'electron': 'catalog:',
-      'electron-builder': 'catalog:',
-      'electron-vite': 'catalog:',
-      'typescript': 'catalog:',
-      'vite': 'catalog:',
-      'vue': 'catalog:',
-      'vue-tsc': 'catalog:',
-    },
-  }, null, 2)}\n`],
+const TOKENS: Record<string, string> = {
+  '@@SLUG@@': slug,
+  '@@APP_ID@@': appId,
+  '@@PRODUCT_NAME@@': productName,
+  '@@DISPLAY_NAME@@': displayName,
+}
 
-  ['electron.vite.config.ts', `// 工厂经 tsc 预构建为 JS（@desktop/config 的 dist），Node 可直接执行 bare import
-import { createElectronViteConfig } from '@desktop/config/vite'
-import vue from '@vitejs/plugin-vue'
+function listTemplateFiles(dir: string, base = ''): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const rel = base ? `${base}/${entry.name}` : entry.name
+    return entry.isDirectory() ? listTemplateFiles(join(dir, entry.name), rel) : [rel]
+  })
+}
 
-export default createElectronViteConfig({
-  renderer: {
-    plugins: [vue()],
-  },
-})
-`],
+function render(content: string): string {
+  return content.replace(/@@(SLUG|APP_ID|PRODUCT_NAME|DISPLAY_NAME)@@/g, (_, key: string) => TOKENS[`@@${key}@@`])
+}
 
-  ['tsconfig.node.json', `${JSON.stringify({
-    extends: '@desktop/config/tsconfig.base.json',
-    compilerOptions: {
-      composite: true,
-      types: ['electron-vite/node'],
-    },
-    include: ['electron.vite.config.*', 'electron/**/*'],
-  }, null, 2)}\n`],
+function fail(message: string): never {
+  console.error(`[gen:app] ${message}`)
+  // 自检失败回滚：删除半成品应用目录，避免未替换的 catalog 依赖污染后续 pnpm install
+  if (existsSync(appDir))
+    rmSync(appDir, { recursive: true, force: true })
+  process.exit(1)
+}
 
-  ['tsconfig.web.json', `${JSON.stringify({
-    extends: '@desktop/config/tsconfig.base.json',
-    compilerOptions: {
-      composite: true,
-      lib: ['ES2022', 'DOM', 'DOM.Iterable'],
-    },
-    include: ['src/env.d.ts', 'src/**/*', 'src/**/*.vue'],
-  }, null, 2)}\n`],
-
-  ['index.html', `<!doctype html>
-<html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <title>${productName}</title>
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
-    />
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
-</html>
-`],
-
-  ['src/main.ts', `import { createApp } from 'vue'
-import App from './App.vue'
-
-createApp(App).mount('#app')
-`],
-
-  ['src/env.d.ts', `/// <reference types="vite/client" />
-import type { DesktopApi } from '@desktop/shared'
-
-declare global {
-  interface Window {
-    desktop: DesktopApi
+/** 生成后自检：模板扩展遗漏在此立刻暴露 */
+function verifyGenerated(files: string[]): void {
+  for (const rel of files) {
+    const content = readFileSync(join(appDir, rel), 'utf-8')
+    const leftover = content.match(/@@[A-Z][A-Z_]*@@/g)
+    if (leftover)
+      fail(`${rel} 存在未替换令牌 ${[...new Set(leftover)].join(', ')}——检查模板与 TOKENS 是否同步`)
   }
-}
-`],
 
-  ['src/App.vue', `<script setup lang="ts">
-import { onMounted, ref } from 'vue'
+  const pkg = JSON.parse(readFileSync(join(appDir, 'package.json'), 'utf-8')) as { name: string, main: string }
+  if (pkg.name !== `@app/${slug}`)
+    fail(`package.json name 异常: ${pkg.name}`)
+  // main 指向构建产物（生成时尚未构建），校验契约值而非文件存在性
+  if (pkg.main !== './out/main/index.cjs')
+    fail(`package.json main 异常: ${pkg.main}（CJS 入口契约）`)
 
-const loadedAt = new Date().toLocaleString()
-const current = ref('查询中…')
-
-onMounted(async () => {
-  try {
-    const context = await window.desktop.app.getCurrent()
-    current.value = context.appId
+  for (const rel of files.filter(file => file.endsWith('.cjs'))) {
+    const check = spawnSync(process.execPath, ['--check', join(appDir, rel)], { encoding: 'utf-8' })
+    if (check.status !== 0)
+      fail(`${rel} 语法错误:\n${check.stderr}`)
   }
-  catch {
-    current.value = 'IPC 桥接失败'
+
+  // identity 是身份唯一真源：值与命令行参数一致才算生成成功
+  const identity = createRequire(import.meta.url)(join(appDir, 'electron/identity.cjs')) as {
+    appId: string
+    productName: string
+    displayName: string
   }
-})
-</script>
-
-<template>
-  <main class="screen">
-    <h1>${displayName}</h1>
-    <ul>
-      <li>应用：{{ current }}</li>
-      <li>加载时间：{{ loadedAt }}</li>
-    </ul>
-  </main>
-</template>
-
-<style scoped>
-.screen {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-  background: #10131a;
-  color: #e8ecf4;
-  font-family: system-ui, sans-serif;
-  user-select: none;
+  if (identity.appId !== appId || identity.productName !== productName || identity.displayName !== displayName)
+    fail(`identity.cjs 导出与参数不一致: ${JSON.stringify(identity)}`)
 }
 
-h1 {
-  margin: 0 0 40px;
-  font-size: 48px;
-  letter-spacing: 6px;
-}
-
-ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: 14px;
-  color: #9aa5b8;
-  text-align: left;
-}
-
-li + li {
-  margin-top: 8px;
-}
-</style>
-`],
-
-  ['electron/main/index.ts', `import { bootstrap } from '@desktop/core'
-import icon from '../resources/icon.png?asset'
-import { appId, displayName, productName } from '../identity.cjs'
-
-/**
- * ${displayName}：单应用全屏形态（Kiosk 同构骨架）。
- * 自有受信业务，session 权限走 'all'（逃生口语义，直接 Chromium 名）；
- * 进程级安全基线（sandbox / contextIsolation / 导航防护）仍由 core 写死生效。
- */
-bootstrap({
-  // 运行时身份与打包身份同源于 electron/identity.cjs（electron-builder.cjs 同样引用）
-  app: {
-    id: appId,
-    name: productName,
-    version: '1.0.0',
-  },
-  window: {
-    title: displayName,
-    width: 1920,
-    height: 1080,
-  },
-  apps: {
-    allowThirdParty: false,
-  },
-  // 更新体系开关：DESKTOP_UPDATE_FEED 指向更新服务器（整包 latest.yml + asar 清单同源），
-  // 生产部署写进部署环境；未配置则两种更新都禁用
-  updates: process.env.DESKTOP_UPDATE_FEED
-    ? { url: process.env.DESKTOP_UPDATE_FEED, asar: 'asar-manifest.json' }
-    : undefined,
-  // 单应用形态：不装配 Tab 体系（Tab/App/Web 服务不实例化，tabs:* 通道不注册）
-  features: {
-    tabs: false,
-  },
-  // 无人值守韧性：崩溃自恢复 + 开机自启 + 防退出 + 每日 3:00 定时重启（应用更新/释放内存）
-  resilience: {
-    crashReload: true,
-    autoLaunch: true,
-    exitGuard: true,
-    scheduledRestart: {},
-  },
-  icon,
-  browserWindowOptions: {
-    fullscreen: true,
-    kiosk: true,
-    frame: false,
-    autoHideMenuBar: true,
-    backgroundColor: '#10131a', // 与 renderer 底色一致，避免全屏启动闪白
-  },
-  permissions: 'all',
-})
-`],
-
-  ['electron/preload/index.ts', `import { exposeDesktop } from '@desktop/core/preload'
-
-// 平台桥：无 App 业务通道；有业务通道时传白名单，如 exposeDesktop(['${slug}:query'])
-exposeDesktop()
-`],
-
-  ['scripts/after-pack.cjs', `/**
- * electron-builder afterPack 薄壳：electron-builder 校验钩子路径必须在 projectDir 内，
- * 共享实现（packages/core/scripts/after-pack.cjs）经包名 require 接入，全部逻辑见彼处。
- */
-module.exports = require('@desktop/core/scripts/after-pack.cjs')
-`],
-
-  ['electron/identity.cjs', `/**
- * 应用身份唯一真源：运行时（electron/main 的 bootstrap）与打包（electron-builder.cjs）共同引用，
- * 改产品名只需要改这里，构建产物各处（exe 名/目录/安装包文件名/快捷方式/卸载列表）均由此派生。
- *
- * 用 .cjs 的原因：electron-builder 只自动探测 electron-builder.{yml,yaml,json,json5,toml,js,cjs,ts}，
- * 其中 .js 会被 cmd 当作 postinstall 命令误执行（PATHEXT 含 .js），.cjs 是唯一无撞名的 JS 后缀；
- * .ts 配置走 config-file-ts 编译缓存，Windows 无符号链接特权时 EPERM，一并排除。
- * CJS 同步 require 决定了本文件不能用 ESM（.mjs 不被探测，也无法被 .cjs 同步引用）。
- */
-
-/** 打包身份 ID：appId（对应 bootstrap.app.id，Windows App User Model ID / 单实例锁等运行时身份的基础） */
-const appId = '${appId}'
-
-/**
- * 英文产品名：exe 名 / 安装目录 / 安装包文件名前缀（对应 bootstrap.app.name）。必须 ASCII：
- * electron-builder 对非 ASCII productName 强制回退 sanitized name，@app/${slug} 会变成难看的 @app${slug.replace(/-/g, '')} 目录
- */
-const productName = '${productName}'
-
-/** 面向用户的中文显示名：窗口标题 / 桌面快捷方式名称 / 「应用和功能」卸载列表显示名 */
-const displayName = '${displayName}'
-
-module.exports = { appId, productName, displayName }
-`],
-
-  ['electron/identity.d.cts', `/**
- * 应用身份的类型声明：实现在同目录 identity.cjs，TS 侧（electron/main）引用 identity.cjs 时
- * 由此文件获得显式类型；打包配置（electron-builder.cjs）为 JS，直接 require .cjs，无需本文件。
- */
-
-/** 打包身份 ID：appId（对应 bootstrap.app.id，Windows App User Model ID / 单实例锁等运行时身份的基础） */
-export declare const appId: string
-
-/** 英文产品名：exe 名 / 安装目录 / 安装包文件名前缀（对应 bootstrap.app.name）。必须 ASCII（原因见 identity.cjs 注释） */
-export declare const productName: string
-
-/** 面向用户的中文显示名：窗口标题 / 桌面快捷方式名称 / 「应用和功能」卸载列表显示名 */
-export declare const displayName: string
-`],
-
-  ['electron-builder.cjs', `/**
- * 打包配置：与 electron/main/index.ts 的 bootstrap({ app }) 共同引用 electron/identity.cjs，
- * 应用身份（appId / productName / 中文显示名）以 identity.cjs 为唯一真源，此处不重复维护。
- *
- * 文件名用 .cjs 而非 .js：cmd 解析 postinstall 里的 electron-builder 命令时会先搜当前目录
- * 且 PATHEXT 含 .js，同名 electron-builder.js 会被当作命令打开导致安装卡死；.cjs 同样被
- * electron-builder 自动探测，但不属于 PATHEXT，无此风险。
- */
-const { appId, displayName, productName } = require('./electron/identity.cjs')
-
-/** @type {import('electron-builder').Configuration} */
-module.exports = {
-  appId,
-  // productName 决定安装目录与主 exe 名（ASCII 约束见 identity.cjs 注释）
-  productName,
-  // Linux 可执行文件名：package.json name 是 @app/${slug}，sanitize 后的 @app${slug.replace(/-/g, '')} 不合法，需显式指定
-  executableName: productName,
-  directories: {
-    buildResources: 'build',
-  },
-  // asar 热更引导器结构：app.asar → app.core.asar（真实代码），app.asar 重写为 KB 级引导器
-  // 钩子与引导器为全 app 共享（packages/core），接入方式与打包架构契约见钩子头注释
-  afterPack: 'scripts/after-pack.cjs',
-  files: [
-    '!**/.vscode/*',
-    '!src/*',
-    '!scripts/*',
-    '!electron/**',
-    '!shared/**',
-    // bundle 自包含（共享 vite 工厂不外部化依赖），node_modules 整体不进 asar（契约见钩子头注释）
-    '!node_modules/**',
-    '!electron.vite.config.{js,ts,mjs,cjs}',
-    '!electron-builder.cjs',
-    '!{.eslintcache,eslint.config.mjs,tsconfig.json,tsconfig.node.json,tsconfig.web.json}',
-    '!{.env,.env.*,.npmrc,pnpm-lock.yaml}',
-    // resources 接入 extraResources 后走 asar 外分发，不进 asar
-    '!resources/**',
-  ],
-  // 整包更新（electron-updater）：publish 使产物生成 resources/app-update.yml；
-  // 运行时 feedURL 由 DESKTOP_UPDATE_FEED 注入覆盖（见 electron/main 的 updates 配置），此处为占位地址
-  publish: {
-    provider: 'generic',
-    url: 'https://updates.example.com/${slug}',
-  },
-  win: {
-    // Windows 自助一体机交付均为 x64；如需 Windows on ARM 在 arch 里追加 arm64
-    target: [
-      {
-        target: 'nsis',
-        arch: ['x64'],
-      },
-    ],
-    icon: 'build/icon.ico',
-  },
-  mac: {
-    // 注意：dmg 只能在 macOS 上构建（Windows/Linux 无法交叉打 mac 包），
-    // 对外分发还需 Apple Developer 证书签名公证（identity: null 时本地自签仅限自测）；
-    // icon.icns 在 mac 交付前生成放入 build/（缺失时构建回退默认图标，仅告警）
-    target: 'dmg',
-    category: 'public.app-category.utilities',
-    icon: 'build/icon.icns',
-  },
-  linux: {
-    // 国产化（信创）说明：
-    // - UOS 统信 / 麒麟均为 Debian 系 → deb 直接适用
-    // - arch 覆盖：x64 = 海光/兆芯，arm64 = 飞腾/鲲鹏（Electron 官方均有二进制）
-    // - 龙芯 LoongArch 需龙芯社区移植版 Electron，electron-builder 不原生支持，未配置
-    // - AppImage 在 Windows 上交叉构建需要 symlink 特权（EPERM），且 UOS/麒麟走 deb，不配置
-    // - 真正的适配门槛在硬件外设（读卡器/打印机厂商 SDK 均为 Windows DLL），打包配置仅解决安装介质
-    target: [
-      {
-        target: 'deb',
-        arch: ['x64', 'arm64'],
-      },
-    ],
-    category: 'Utility',
-    icon: 'build/icon.png',
-  },
-  nsis: {
-    // 安装包文件名：\${version}/\${ext} 是 electron-builder 模板变量（运行时注入，勿改成 TS 插值）。
-    // 英文文件名便于部署脚本/网盘分发
-    artifactName: \`\${productName}-Setup-\\\${version}.\\\${ext}\`,
-    // 面向用户的中文显示名：桌面快捷方式名称与「应用和功能」卸载列表里显示的名称
-    shortcutName: displayName,
-    uninstallDisplayName: displayName,
-    // true = 一键安装（无向导，双击直接装完，无任何确认按钮）；false = 分步向导
-    oneClick: true,
-    // false = 仅当前用户：装进 %LocalAppData%，安装与更新全程零 UAC（无人值守更新链路的前提）
-    perMachine: false,
-    // 完成页显示「运行 应用」复选框，装完可直接勾选启动
-    runAfterFinish: true,
-    // 桌面快捷方式：always = 每次安装/升级都确保存在；true = 仅首次安装创建；false = 不创建
-    createDesktopShortcut: 'always',
-    // 安装器以 Unicode 模式构建。false 时 NSIS 无法正确显示中文界面，必须为 true
-    unicode: true,
-    // 安装器界面语言 ID：'2052' = 简体中文（NSISOptions.language 类型为 string，须用字符串）
-    language: '2052',
-    // 安装器可选语言列表（多语言时首启动页会弹语言选择；只配 zh_CN 则全程中文无选择步骤）
-    installerLanguages: 'zh_CN',
-    // 安装/卸载程序 exe 自身显示的图标（资源管理器里 ${productName}-Setup.exe 的图标）
-    installerIcon: 'build/icon.ico',
-    uninstallerIcon: 'build/icon.ico',
-  },
-  npmRebuild: false,
-  electronDownload: {
-    mirror: 'https://npmmirror.com/mirrors/electron/',
-  },
-}
-`],
-]
-
-for (const [relativePath, content] of files) {
-  const target = join(appDir, relativePath)
+const templateFiles = listTemplateFiles(TEMPLATE_DIR)
+for (const rel of templateFiles) {
+  const target = join(appDir, rel)
   mkdirSync(dirname(target), { recursive: true })
-  writeFileSync(target, content, 'utf-8')
+  writeFileSync(target, render(readFileSync(join(TEMPLATE_DIR, rel), 'utf-8')))
 }
 
 // 统一莲花占位图标（正式图标用 resources/brand/generate.ts 流程生成后替换）：
-// electron/resources/icon.png 供 bootstrap 窗口图标；build/icon.ico 供 NSIS/exe；build/icon.png 供 linux deb
+// resources/icon.png 供 bootstrap 窗口图标（main 经 ?asset 相对引用，与 kiosk 同构）；
+// build/icon.ico 供 NSIS/exe；build/icon.png 供 linux deb
 const kioskDir = join(APPS_DIR, 'funeral-kiosk')
-cpSync(join(kioskDir, 'resources/icon.png'), join(appDir, 'electron/resources/icon.png'))
-cpSync(join(kioskDir, 'resources/icon.png'), join(appDir, 'build/icon.png'))
+mkdirSync(join(appDir, 'resources'), { recursive: true })
+cpSync(join(kioskDir, 'resources/icon.png'), join(appDir, 'resources/icon.png'))
+cpSync(join(kioskDir, 'build/icon.png'), join(appDir, 'build/icon.png'))
 cpSync(join(kioskDir, 'build/icon.ico'), join(appDir, 'build/icon.ico'))
 
+verifyGenerated(templateFiles)
+
 console.log(`created apps/${slug}`)
-console.log(`  形态       Kiosk（全屏单应用）`)
-console.log(`  appId      ${appId}`)
+console.log(`  形态        Kiosk（全屏单应用）`)
+console.log(`  appId       ${appId}`)
 console.log(`  productName ${productName}（ASCII，面向用户的中文见窗口标题）`)
 console.log(`next: pnpm install → pnpm --filter @app/${slug} dev`)

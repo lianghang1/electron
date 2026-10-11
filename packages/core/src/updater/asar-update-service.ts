@@ -3,14 +3,16 @@ import type { Buffer } from 'node:buffer'
 import type { EventBus } from '../event/event-bus'
 import type { Logger } from '../logger/logger'
 import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import process from 'node:process'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { is } from '@electron-toolkit/utils'
 import { app, net } from 'electron'
 import originalFs from 'original-fs'
+import { compareVersions } from './version'
 
 /** asar 热更工作目录（userData 下，用户可写，与安装位置权限无关） */
 export function getAsarUpdateDir(): string {
@@ -37,6 +39,17 @@ interface CurrentMark {
 /** 热更包文件名：版本化命名，下载即终名，引导器永不 rename */
 function asarFileName(version: string): string {
   return `core-${version.replace(/[^\w.-]/g, '_')}.asar`
+}
+
+/** 本机 resources 版本标记（afterPack 写入；dev 环境 / 无标记的旧安装返回 null = 不设限） */
+function readResourcesVersion(): string | null {
+  try {
+    const marker = path.join(process.resourcesPath, 'resources', '.resources-version')
+    return existsSync(marker) ? readFileSync(marker, 'utf8').trim() : null
+  }
+  catch {
+    return null
+  }
 }
 
 /** 下载进度推送节流 */
@@ -93,17 +106,30 @@ export class AsarUpdateService {
       const builtin = app.getVersion()
       const current = await this.readCurrentVersion()
       // 重装新版后残留旧热更（热更版本 < 内置版本）：清理，保证版本单调
-      if (current && this.compareVersions(current, builtin) < 0) {
+      if (current && compareVersions(current, builtin) < 0) {
         this.logger.info(`stale hot asar ${current} < builtin ${builtin}, cleaning up`)
         await rmAsar(getAsarUpdateDir(), { recursive: true })
       }
 
       // 生效版本 = max(内置版本, 当前热更版本)；清单不比它新则无需更新
-      const effective = current && this.compareVersions(current, builtin) > 0 ? current : builtin
-      if (this.compareVersions(manifest.version, effective) <= 0) {
+      const effective = current && compareVersions(current, builtin) > 0 ? current : builtin
+      if (compareVersions(manifest.version, effective) <= 0) {
         this.logger.info(`asar up to date: ${manifest.version}`)
         push({ status: 'idle', version: manifest.version })
         return
+      }
+
+      // 资源配对：热更只换代码，热更代码依赖新版 resources（厂商 DLL/内置页面）而本机
+      // resources 旧于要求时拒绝应用，等待整包更新先行（清单不带该字段 = 不设限）
+      if (manifest.minResourcesVersion) {
+        const localResources = readResourcesVersion()
+        if (localResources && compareVersions(manifest.minResourcesVersion, localResources) > 0) {
+          this.logger.warn(
+            `asar update ${manifest.version} requires resources >= ${manifest.minResourcesVersion}, local ${localResources}; skipped until full update`,
+          )
+          push({ status: 'idle' })
+          return
+        }
       }
 
       await this.downloadAndVerify(manifest, push)
@@ -207,18 +233,6 @@ export class AsarUpdateService {
     catch {
       return null
     }
-  }
-
-  /** 数字段版本比较（>0: a 新于 b） */
-  private compareVersions(a: string, b: string): number {
-    const pa = a.split(/[.-]/)
-    const pb = b.split(/[.-]/)
-    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-      const diff = Number.parseInt(pa[i] ?? '0', 10) - Number.parseInt(pb[i] ?? '0', 10)
-      if (diff !== 0)
-        return diff
-    }
-    return 0
   }
 }
 

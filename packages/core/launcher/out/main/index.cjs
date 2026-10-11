@@ -32,14 +32,23 @@ const STABLE_MS = 60_000
 // 内置包版本基准：asar 根 package.json 由 afterPack 按 app 打包元数据生成（本文件在 out/main 下，根在两级之上）
 const BUILTIN_VERSION = require('../../package.json').version ?? '0.0.0'
 
-/** 数字段版本比较（>0: a 新于 b），与 AsarUpdateService.compareVersions 同规则 */
+/** 数字段版本比较（>0: a 新于 b），与 AsarUpdateService.compareVersions 同规则（改动需两侧同步）。
+ * 缺段按 '0' 补齐（'1.0' 与 '1.0.0' 相等）；非数字段（预发布后缀）退化为字符串比较，
+ * 不得返回 NaN——NaN 会让"清单是否更新"的判定失效（每次启动重复下载） */
 function compareVersions(a, b) {
   const pa = String(a).split(/[.-]/)
   const pb = String(b).split(/[.-]/)
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = Number.parseInt(pa[i] ?? '0', 10) - Number.parseInt(pb[i] ?? '0', 10)
-    if (diff !== 0)
-      return diff
+    const av = pa[i] ?? '0'
+    const bv = pb[i] ?? '0'
+    const an = Number.parseInt(av, 10)
+    const bn = Number.parseInt(bv, 10)
+    if (!Number.isNaN(an) && !Number.isNaN(bn)) {
+      if (an !== bn)
+        return an - bn
+    } else if (av !== bv) {
+      return av < bv ? -1 : 1
+    }
   }
   return 0
 }
@@ -177,6 +186,12 @@ async function loadCore() {
   log('no core could be loaded')
 }
 
-settleOrRollback()
-applyPending()
-loadCore()
+// Electron 主入口 = 本文件（require.main 指向自身）时执行启动时序；
+// 被测试环境导入时跳过副作用，仅暴露时序函数与版本比较供单测
+if (require.main === module) {
+  settleOrRollback()
+  applyPending()
+  loadCore()
+}
+
+module.exports = { compareVersions, settleOrRollback, applyPending }
