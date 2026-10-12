@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import readline from 'node:readline/promises'
 import { fileURLToPath } from 'node:url'
+import AdmZip from 'adm-zip'
 
 /**
  * asar 热更发布工具
@@ -28,6 +29,8 @@ interface HotfixOptions {
   minResourcesVersion?: string
   /** 把发布版本写回 app package.json */
   syncVersion?: boolean
+  /** 载荷打成 zip 容器（对接以 zip 为载体的后端发布体系；客户端自动解包） */
+  zip?: boolean
 }
 
 interface AppMeta {
@@ -96,13 +99,24 @@ function packHotfix(app: AppMeta, version: string, options: HotfixOptions = {}):
   const asarName = `core-${version.replace(/[^\w.-]/g, '_')}.asar`
   copyFileSync(coreAsar, join(outDir, asarName))
 
+  // 载荷形态：缺省裸 asar；--zip 打成 zip 容器（单条目 app.core.asar，客户端自动解包）。
+  // manifest.sha256 恒为 url 指向文件的哈希（客户端对下载文件整体强校验）
+  let payloadName = asarName
+  if (options.zip) {
+    // 条目名固定 app.core.asar（与客户端解包逻辑精确对齐；用 addLocalFile 会带绝对路径被 adm-zip 拒绝）
+    const zip = new AdmZip()
+    zip.addFile('app.core.asar', readFileSync(join(outDir, asarName)))
+    payloadName = asarName.replace(/\.asar$/, '.zip')
+    zip.writeZip(join(outDir, payloadName))
+  }
+
   // sha256 强校验（与 AsarUpdateService 的 UpdateManifest.sha256 协议对齐）；
   // 清单文件名与客户端约定一致（bootstrap updates.asar → /updates/asar-manifest.json）
-  const sha256 = createHash('sha256').update(readFileSync(join(outDir, asarName))).digest('hex')
+  const sha256 = createHash('sha256').update(readFileSync(join(outDir, payloadName))).digest('hex')
   // minResourcesVersion 缺省不写入（字段缺失 = 不设限，旧清单天然兼容）
   const manifest = {
     version,
-    url: `./${asarName}`,
+    url: `./${payloadName}`,
     sha256,
     ...(options.minResourcesVersion ? { minResourcesVersion: options.minResourcesVersion } : {}),
   }
@@ -117,7 +131,7 @@ function packHotfix(app: AppMeta, version: string, options: HotfixOptions = {}):
   }
 
   console.log(`\n热更发布物已生成: apps/${app.dir}/dist/hotfix/`)
-  console.log(`  core-${version}.asar`)
+  console.log(`  ${payloadName}`)
   console.log(`  asar-manifest.json  (version=${version}, sha256=${sha256.slice(0, 12)}...)`)
   if (options.minResourcesVersion)
     console.log(`  资源配对要求: resources >= ${options.minResourcesVersion}（旧 resources 设备跳过该热更）`)
@@ -179,6 +193,7 @@ async function main(): Promise<void> {
     const options: HotfixOptions = {
       minResourcesVersion: minResourcesFlagIndex >= 0 ? args[minResourcesFlagIndex + 1] : undefined,
       syncVersion: args.includes('--sync-version'),
+      zip: args.includes('--zip'),
     }
     if (!args.includes('--no-build'))
       buildApp(app)

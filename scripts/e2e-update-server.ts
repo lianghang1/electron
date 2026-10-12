@@ -24,7 +24,8 @@ const hotfixManifest = JSON.parse(readFileSync(join(HOTFIX, 'asar-manifest.json'
   url: string
   sha256: string
 }
-const asarFile = join(HOTFIX, `core-${hotfixManifest.version}.asar`)
+// 载荷文件名跟随清单 url（asar 或 zip 容器皆可）
+const asarFile = join(HOTFIX, hotfixManifest.url.replace(/^\.\//, ''))
 // 整包 exe：命名因形态而异（desktop=Desktop-1.0.0-x64.exe / kiosk 形态=Kiosk-Setup-1.0.0.exe），从 dist 根探测
 const exeFile = readdirSync(DIST)
   .filter(f => f.endsWith('.exe') && !f.includes('uninstaller'))
@@ -51,7 +52,7 @@ function readHotfix() {
     url: string
     sha256: string
   }
-  return { manifest, asarPath: join(HOTFIX, `core-${manifest.version}.asar`) }
+  return { manifest, asarPath: join(HOTFIX, manifest.url.replace(/^\.\//, '')) }
 }
 
 const server = createServer((req, res) => {
@@ -63,10 +64,12 @@ const server = createServer((req, res) => {
     console.log(`[asar-manifest] ${JSON.stringify(manifest)}`)
     return
   }
-  if (url.pathname === `/updates/core-${manifest.version}.asar`) {
+  // 载荷路由跟随清单 url（asar 或 zip 容器皆可）
+  const payloadPathname = `/updates/${manifest.url.replace(/^\.\//, '')}`
+  if (url.pathname === payloadPathname) {
     res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': statSync(asarPath).size })
     createReadStream(asarPath).pipe(res)
-    console.log(`[asar] served core-${manifest.version}.asar`)
+    console.log(`[asar] served ${manifest.url.replace(/^\.\//, '')}`)
     return
   }
   if (url.pathname === '/updates/latest.yml') {

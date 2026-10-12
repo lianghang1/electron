@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@desktop/config": "workspace:*",
+    "adm-zip": "^0.5.16",
     "eslint": "catalog:",
     "tsx": "catalog:",
     "typescript": "catalog:",

@@ -1,4 +1,5 @@
 import type { DesktopAppManifest } from './manifest'
+import type { UpdateAsarSource } from './update'
 
 /**
  * 桌面平台统一配置：bootstrap 的唯一配置入口，不散落在各 Service 里。
@@ -55,13 +56,15 @@ export interface DesktopConfig {
   }
   /** 自动更新：不配置 url 则更新体系整体关闭 */
   updates?: {
-    /** 更新服务器地址（latest.yml 所在目录，整包更新 electron-updater 用） */
+    /** 更新服务器地址（latest.yml 所在目录，整包更新 electron-updater 用；asar 清单相对它解析） */
     url: string
     /**
-     * asar 热更清单地址（相对 url 解析，也可绝对地址），不配置则关闭 asar 热更。
-     * 清单协议见 UpdateManifest；下载校验通过后写 pending 标记，重启应用由引导器完成替换。
+     * asar 热更源：字符串 = 原生清单文件地址（相对 url 解析，也可绝对地址）；
+     * 对象 = 后端判断接口适配器（endpoint 拉取响应，transform 适配为内部清单 UpdateManifest）。
+     * 后端接口格式变化只改 transform（位于 electron/main，随热更下发），core 链路零改动。
+     * 不配置则关闭 asar 热更。下载校验通过后写 pending 标记，重启应用由引导器完成替换。
      */
-    asar?: string
+    asar?: string | UpdateAsarSource
   }
   /**
    * 运行韧性：自助机（Kiosk）等无人值守场景的平台级行为，默认全关。

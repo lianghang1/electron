@@ -139,3 +139,57 @@ describe('permissionService.listPermissionStates', () => {
     expect(states.every(s => s.declared)).toBe(true)
   })
 })
+
+describe('permissionService.resetRuntime（应用中心「重置授权」语义）', () => {
+  it('重置后：运行时决策清空，同权限再次请求重新询问', async () => {
+    const { service, events } = createService()
+    const asked: Array<{ permission: Permission }> = []
+    events.on('permission:request', (request) => {
+      asked.push({ permission: request.permission })
+      service.respond(request.requestId, true)
+    })
+
+    // 第一次请求：询问 → 允许 → 持久化（内存有决策）
+    await expect(service.requestRuntime(crm, 'media')).resolves.toBe(true)
+    expect(service.hasRuntimeDecision('crm', 'media')).toBe(true)
+
+    // 重置（应用中心「重置授权」）：决策清空
+    service.resetRuntime('crm')
+
+    // 重置后：再次请求必须重新询问（这就是"重置生效"的判定标准）
+    await expect(service.requestRuntime(crm, 'media')).resolves.toBe(true)
+    expect(asked.filter(r => r.permission === 'media').length).toBe(2)
+    expect(service.hasRuntimeDecision('crm', 'media')).toBe(true)
+  })
+
+  it('重置只影响目标 app，不波及其他应用的决策', async () => {
+    const { service, events } = createService()
+    events.on('permission:request', request => service.respond(request.requestId, true))
+    await service.requestRuntime(crm, 'media')
+
+    const other: CallerContext = { appId: 'kiosk', instanceId: 'kiosk-1' }
+    const registry = (service as unknown as { registry: AppRegistry }).registry
+    registry.register({
+      id: 'kiosk',
+      name: 'Kiosk',
+      version: '1.0.0',
+      type: 'internal',
+      entry: { type: 'web', url: 'https://kiosk.example.com' },
+      permissions: [],
+    })
+    await service.requestRuntime(other, 'notification')
+    expect(service.hasRuntimeDecision('kiosk', 'notification')).toBe(true)
+
+    service.resetRuntime('crm')
+
+    expect(service.hasRuntimeDecision('kiosk', 'notification')).toBe(true)
+    expect(service.hasRuntimeDecision('crm', 'media')).toBe(false)
+  })
+
+  it('声明权限不受重置影响（声明 = 平台直接放行，重置只针对运行时决策）', () => {
+    const { service } = createService(['media'])
+    service.resetRuntime('crm')
+    // 声明制权限的授权来自 manifest，重置运行时决策不改变其放行语义
+    expect(service.check(crm, 'media')).toBe(true)
+  })
+})

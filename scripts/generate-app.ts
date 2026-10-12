@@ -104,23 +104,23 @@ function verifyGenerated(files: string[]): void {
 
 const templateFiles = listTemplateFiles(TEMPLATE_DIR)
 try {
-for (const rel of templateFiles) {
-  const target = join(appDir, rel)
-  mkdirSync(dirname(target), { recursive: true })
-  writeFileSync(target, render(readFileSync(join(TEMPLATE_DIR, rel), 'utf-8')))
-}
+  for (const rel of templateFiles) {
+    const target = join(appDir, rel)
+    mkdirSync(dirname(target), { recursive: true })
+    writeFileSync(target, render(readFileSync(join(TEMPLATE_DIR, rel), 'utf-8')))
+  }
 
-// 统一莲花占位图标（正式图标用 resources/brand/generate.ts 流程生成后替换）：
-// resources/icon.png 供 bootstrap 窗口图标（main 经 ?asset 相对引用，与 kiosk 同构）；
-// build/icon.ico 供 NSIS/exe；build/icon.png 供 linux deb
-const kioskDir = join(APPS_DIR, 'funeral-kiosk')
-mkdirSync(join(appDir, 'resources'), { recursive: true })
-cpSync(join(kioskDir, 'resources/icon.png'), join(appDir, 'resources/icon.png'))
-cpSync(join(kioskDir, 'build/icon.png'), join(appDir, 'build/icon.png'))
-cpSync(join(kioskDir, 'build/icon.ico'), join(appDir, 'build/icon.ico'))
+  // 统一莲花占位图标（正式图标用 resources/brand/generate.ts 流程生成后替换）：
+  // resources/icon.png 供 bootstrap 窗口图标（main 经 ?asset 相对引用，与 kiosk 同构）；
+  // build/icon.ico 供 NSIS/exe；build/icon.png 供 linux deb
+  const kioskDir = join(APPS_DIR, 'funeral-kiosk')
+  mkdirSync(join(appDir, 'resources'), { recursive: true })
+  cpSync(join(kioskDir, 'resources/icon.png'), join(appDir, 'resources/icon.png'))
+  cpSync(join(kioskDir, 'build/icon.png'), join(appDir, 'build/icon.png'))
+  cpSync(join(kioskDir, 'build/icon.ico'), join(appDir, 'build/icon.ico'))
 
-// 设备资源无需生成：resources/devices 由同步脚本从仓库级单一来源单向复制（postinstall 也会自动执行）
-syncDevResources()
+  // 设备资源无需生成：resources/devices 由同步脚本从仓库级单一来源单向复制（postinstall 也会自动执行）
+  syncDevResources()
 
   verifyGenerated(templateFiles)
 }

@@ -4,7 +4,8 @@ import type { CallerResolver } from '../ipc/caller-context'
 import type { Logger } from '../logger/logger'
 import type { PermissionService } from '../permission/permission-service'
 import type { SessionService } from '../session/session-service'
-import { join } from 'node:path'
+import { rm } from 'node:fs/promises'
+import { basename, join } from 'node:path'
 import { app, shell } from 'electron'
 
 /** 进度推送节流间隔（毫秒） */
@@ -41,38 +42,43 @@ export class DownloadService {
     this.attached.add(appSession)
 
     appSession.on('will-download', (_event, item, webContents) => {
-      // 权限把关：manifest 声明 / 已持久化允许 → 直接放行；
-      // 未声明 → item.pause() 挂起下载走运行时授权：允许后 resume 继续原下载，
-      // 拒绝/超时 cancel。不采用「取消后重发 downloadURL」——blob: URL 重发不可靠，
-      // pause/resume 保持原下载会话，任意 URL 形态（blob:/data:/http）都天然可用
+      // 权限把关：manifest 声明 / 已持久化允许 → 直接放行；未声明 → 放行下载同时异步请用户决策
+      // （允许：静默继续；拒绝：取消并清理部分文件）。
+      // 不采用 pause/resume 等待授权：will-download 阶段 pause 存在已知不可靠窗口
+      // （首包未落地时 pause，resume 可能不续传——表现为"首次不下载，下次才下载"），
+      // 且等待决策期间页面可能放弃下载（blob: URL revoke / 超时），挂起的 item 会失效
       const declared = this.permissionService.getPermissions(appId).includes('download')
         || this.permissionService.hasRuntimeDecision(appId, 'download')
+      const url = item.getURL()
       if (!declared) {
-        const url = item.getURL()
         const context = this.resolver.resolve(webContents)
-        this.logger.info('download not declared, pausing for runtime permission', { appId, url })
-        // 必须在挂起前同步预设保存路径：pause 只挂起网络传输，未设路径时 Electron
-        // 会在 will-download 返回后立即弹默认另存对话框，保存动作绕过权限把关。
-        // 授权恢复的下载沿用预设路径（beginTask 跳过二次指定），授权后才真正落盘
-        item.setSavePath(join(app.getPath('downloads'), item.getFilename() || 'download'))
-        item.pause()
+        this.logger.info('download not declared, running while asking runtime permission', { appId, url })
+        this.beginTask(appId, item)
         void this.permissionService.requestRuntime(context, 'download').then((allowed) => {
-          // 决策返回时 item 可能已随 Tab 关闭销毁（DownloadItem 无 isDestroyed，操作会抛）
+          if (allowed) {
+            this.logger.info('download runtime permission granted (already running)', { appId, url })
+            return
+          }
+          // 拒绝：取消下载并清理部分文件
+          this.logger.info('download denied by user', { appId, url })
+          const savePath = item.getSavePath()
           try {
-            if (!allowed) {
-              this.logger.info('download denied', { appId, url })
-              item.cancel()
-              return
-            }
-            this.beginTask(appId, item)
-            item.resume()
+            item.cancel()
           }
           catch (error) {
-            this.logger.warn('download item gone before permission applied', { appId, error: String(error) })
+            this.logger.warn('download item gone before deny applied', { appId, error: String(error) })
+          }
+          if (savePath) {
+            void rm(savePath, { force: true }).catch((error) => {
+              this.logger.warn('denied download partial cleanup failed', { appId, savePath, error: String(error) })
+            })
           }
         }).catch((error) => {
-          item.cancel()
           this.logger.error('download runtime permission failed', { appId, error: String(error) })
+          try {
+            item.cancel()
+          }
+          catch { /* item 已随页面销毁 */ }
         })
         return
       }
@@ -85,7 +91,8 @@ export class DownloadService {
   /** 从已放行的 DownloadItem 开始任务：落盘路径 + 进度/完成事件接线（直接下载与授权后恢复共用） */
   private beginTask(appId: string, item: Electron.DownloadItem): void {
     const id = `dl-${Date.now()}-${++this.seq}`
-    const filename = item.getFilename() || 'download'
+    // basename 加固：Content-Disposition 的文件名来自服务器，防路径穿越逃出下载目录
+    const filename = basename(item.getFilename() || 'download')
     // 保存位置：saveAs 配置弹系统另存对话框选目录；默认静默保存到系统下载目录（Kiosk 友好）。
     // 运行时授权恢复的下载已在挂起前预设路径（抑制默认对话框），沿用不再二次指定
     if (!item.getSavePath()) {

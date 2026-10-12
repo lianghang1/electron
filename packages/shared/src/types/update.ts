@@ -40,3 +40,20 @@ export interface UpdateManifest {
    */
   minResourcesVersion?: string
 }
+
+/**
+ * asar 热更源适配器：对接后端自定义的"判断接口"（响应格式由后端定）。
+ * transform 把后端响应适配为内部清单 UpdateManifest——后端接口格式变化只改此函数
+ * （位于 electron/main，随热更下发），core 的拉取 / 校验 / 指针链路零改动。
+ * 不配置 transform = 响应即原生清单（version/url/sha256）。
+ * 载荷约定：url 指向的文件经 sha256 校验后，若是 zip 容器则解出其中的 asar，
+ * 否则按 asar 直接使用（zip 只是传输容器，引导器只认 asar）。
+ */
+export interface UpdateAsarSource {
+  /** 判断接口地址（相对 updates.url 解析，也可绝对地址） */
+  endpoint: string
+  /** 请求头（鉴权等，可选） */
+  headers?: Record<string, string>
+  /** 响应适配：后端响应 → 内部清单；缺省 = 响应即原生清单 */
+  transform?: (raw: unknown) => UpdateManifest
+}

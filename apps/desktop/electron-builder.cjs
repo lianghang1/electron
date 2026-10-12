@@ -24,6 +24,8 @@ module.exports = createElectronBuilderConfig({
     nsis: {
       // 安装包文件名：${version}/${arch}/${ext} 是 electron-builder 模板变量（运行时注入，勿改成 JS 插值）
       artifactName: `${productName}-\${version}-\${arch}.\${ext}`,
+      // 自定义 NSIS 脚本：跨卸载记忆安装目录（默认记忆存于卸载器会清除的 Uninstall 键）
+      include: 'build/installer.nsh',
       oneClick: false,
       allowToChangeInstallationDirectory: true,
       unicode: true,
