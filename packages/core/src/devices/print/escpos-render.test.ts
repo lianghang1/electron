@@ -26,9 +26,9 @@ function makeApi() {
   return api
 }
 
-const P58: PaperSpec = { preset: 'receipt58' }
-const P80: PaperSpec = { preset: 'receipt80' }
-const OPTS: PrintOptions = { paper: P80 } as PrintOptions
+const P58: PaperSpec = { widthMm: 58, heightMm: 0 }
+const P80: PaperSpec = { widthMm: 80, heightMm: 0 }
+const OPTS: PrintOptions = { paper: '80' }
 
 const RECEIPT = {
   shopName: '黑猫咖啡·旗舰店',

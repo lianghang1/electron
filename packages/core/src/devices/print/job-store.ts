@@ -185,7 +185,6 @@ export class JobStore {
     return {
       jobId: rec.jobId,
       jobName: rec.jobName,
-      businessType: rec.request?.businessType,
       state: rec.state,
       createdAt: rec.createdAt,
       finishedAt: rec.finishedAt,

@@ -2,7 +2,6 @@
 import type { PaperSpec } from '@desktop/shared'
 import QRCode from 'qrcode'
 import { printError } from './errors'
-import { paperHeightMm, paperWidthMm } from './paper'
 import { renderTemplate } from './template-engine'
 
 import documentHtml from './templates/document-a4.html?raw'
@@ -29,19 +28,24 @@ export function listTemplateIds(): string[] {
   return Object.keys(TEMPLATE_HTML)
 }
 
-/** 热敏纸实际可打宽度：58 纸≈48mm，80 纸≈72mm，标签/自定义留 2mm */
-export function printableWidthMm(paper: PaperSpec): number {
-  switch (paper.preset) {
-    case 'receipt58':
-      return 48
-    case 'receipt80':
-      return 72
-    case 'label':
-    case 'custom':
-      return paper.widthMm - 2
-    default:
-      return paperWidthMm(paper) - 32 // A4 等由 @page margin 控制，此值仅供模板参考
+/**
+ * 热敏纸实际可打宽度（模板内容区参考值）：58 纸≈48mm，80 纸≈72mm；
+ * 固定纸窄幅（标签类）留 2mm；A4 等文档纸由 @page margin 控制，此值仅供模板参考。
+ * 未指定纸型按 80mm 常规宽度。
+ */
+export function printableWidthMm(paper: PaperSpec | undefined): number {
+  if (!paper) {
+    return 72
   }
+  const w = paper.widthMm
+  if (paper.heightMm <= 0) {
+    if (w <= 60)
+      return w - 10
+    if (w <= 84)
+      return w - 8
+    return w - 2
+  }
+  return w <= 84 ? w - 2 : w - 32
 }
 
 /**
@@ -51,7 +55,7 @@ export function printableWidthMm(paper: PaperSpec): number {
 export async function renderTemplateHtml(
   templateId: string,
   data: Record<string, unknown>,
-  paper: PaperSpec,
+  paper: PaperSpec | undefined,
 ): Promise<string> {
   const tpl = TEMPLATE_HTML[templateId]
   if (!tpl) {
@@ -59,8 +63,8 @@ export async function renderTemplateHtml(
   }
   const enriched: Record<string, unknown> = {
     ...data,
-    pageWidthMm: paperWidthMm(paper),
-    pageHeightMm: paperHeightMm(paper) ?? 'auto',
+    pageWidthMm: paper?.widthMm ?? 80,
+    pageHeightMm: paper && paper.heightMm > 0 ? paper.heightMm : 'auto',
     printableWidthMm: printableWidthMm(paper),
   }
   // HTML 通道的二维码：业务数据 qrData → 内嵌 dataURL 图片（指令直写通道由打印机指令生成）
@@ -72,19 +76,14 @@ export async function renderTemplateHtml(
   return renderTemplate(tpl, enriched)
 }
 
-/** 图片打印：包一层图片查看模板（图片以 dataURL 内嵌，避免 file:// 安全限制） */
-export function renderImageViewerHtml(imageDataUrl: string, paper: PaperSpec): string {
-  const cssPageSize
-    = paper.preset === 'receipt58' || paper.preset === 'receipt80'
-      ? `${paperWidthMm(paper)}mm auto`
-      : paper.preset === 'a4'
-        ? 'A4'
-        : paper.preset === 'a5'
-          ? 'A5'
-          : paper.preset === 'letter'
-            ? 'Letter'
-            : `${paperWidthMm(paper)}mm ${paperHeightMm(paper)}mm`
-  const pageMarginMm = paper.preset === 'receipt58' || paper.preset === 'receipt80' ? 0 : 10
+/** 图片打印：包一层图片查看模板（图片以 dataURL 内嵌，避免 file:// 安全限制）；未指定纸型交驱动默认 */
+export function renderImageViewerHtml(imageDataUrl: string, paper: PaperSpec | undefined): string {
+  if (!paper) {
+    return renderTemplate(imageViewerHtml, { imageDataUrl, cssPageSize: 'auto', pageMarginMm: 10 })
+  }
+  // 统一物理尺寸写法：连续纸高度交由内容自然分页（'auto'）
+  const cssPageSize = `${paper.widthMm}mm ${paper.heightMm > 0 ? `${paper.heightMm}mm` : 'auto'}`
+  const pageMarginMm = paper.heightMm > 0 ? 10 : 0
   return renderTemplate(imageViewerHtml, { imageDataUrl, cssPageSize, pageMarginMm })
 }
 

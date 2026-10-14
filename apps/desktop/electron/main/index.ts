@@ -124,12 +124,22 @@ async function handleAppRequest(request: Request): Promise<Response> {
  */
 const builtinApps: DesktopAppManifest[] = [
   {
+    id: 'test',
+    name: '测试',
+    version: '1.0.0',
+    type: 'internal',
+    entry: { type: 'web', url: 'http://localhost:8080/' },
+    permissions: ['storage'],
+  },
+  {
     id: 'fsy',
     name: 'FSY',
     version: '1.0.0',
     type: 'internal',
     entry: { type: 'web', url: 'https://gmuat.fsygroup.com/' },
     permissions: ['storage'],
+    // 套壳模式：激活时隐藏外壳、Web 铺满窗口（Ctrl+Alt+A 临时唤出外壳）
+    chrome: 'single',
   },
   {
     // 平台功能实验室：声明全部权限，与 FSY（仅 storage）对照——

@@ -16,6 +16,11 @@ export interface DesktopAppManifest {
     url: string
   }
   icon?: string
+  /**
+   * Shell 外壳形态：full = 完整外壳（左侧导航 + 顶栏，默认）；
+   * single = 套壳模式，该 App 的 Tab 激活时隐藏外壳、Web 铺满窗口（Ctrl+Alt+A 临时唤出外壳）
+   */
+  chrome?: 'full' | 'single'
   /** App 声明需要的平台权限，实际放行以 Main 的 PermissionService 为准 */
   permissions?: Permission[]
   security?: AppSecurityPolicy

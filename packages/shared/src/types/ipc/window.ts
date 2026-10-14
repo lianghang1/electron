@@ -16,4 +16,6 @@ export const windowDomain = defineDomain('window', {
   // ---- Main → Renderer 推送 ----
   /** 窗口最大化状态变化（含标题栏双击等系统触发的场景） */
   maximizedChanged: push<[boolean]>(),
+  /** 套壳模式快捷键（Ctrl+Alt+A）：Main 拦截后推送，Shell 切换外壳临时显隐 */
+  toggleChrome: push<[]>(),
 })

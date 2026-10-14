@@ -2,6 +2,7 @@
 import type { DesktopTab } from '@desktop/shared'
 import type { ShellTheme } from '../composables/use-theme'
 import { ref } from 'vue'
+import WindowControls from './WindowControls.vue'
 
 defineProps<{
   tabs: DesktopTab[]
@@ -59,6 +60,15 @@ function onTabsWheel(e: WheelEvent): void {
         @click="$emit('activate', tab.id)"
         @contextmenu.prevent="$emit('contextMenu', tab, $event.clientX, $event.clientY)"
       >
+        <svg
+          v-if="tab.isLoading"
+          class="dt-tab__spinner"
+          viewBox="0 0 16 16"
+          width="12"
+          height="12"
+        >
+          <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-dasharray="28" />
+        </svg>
         <span class="dt-tab__title">{{ tab.title }}</span>
         <span
           class="dt-tab__close"
@@ -77,16 +87,12 @@ function onTabsWheel(e: WheelEvent): void {
         <svg v-if="theme === 'light'" viewBox="0 0 16 16" width="14" height="14"><path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /></svg>
         <svg v-else viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="3.2" fill="currentColor" /><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1" /></g></svg>
       </button>
-      <button class="dt-winbtn" title="最小化" @click="$emit('minimize')">
-        <svg viewBox="0 0 10 10" width="10" height="10"><path d="M1 5h8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg>
-      </button>
-      <button class="dt-winbtn" :title="maximized ? '还原' : '最大化'" @click="$emit('toggleMaximize')">
-        <svg v-if="!maximized" viewBox="0 0 10 10" width="10" height="10"><rect x="1.5" y="1.5" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.2" /></svg>
-        <svg v-else viewBox="0 0 10 10" width="10" height="10"><rect x="1.5" y="3" width="5.5" height="5.5" rx="1" fill="none" stroke="currentColor" stroke-width="1.2" /><path d="M3.5 1.5h5v5" fill="none" stroke="currentColor" stroke-width="1.2" /></svg>
-      </button>
-      <button class="dt-winbtn dt-winbtn--close" title="关闭" @click="$emit('closeWindow')">
-        <svg viewBox="0 0 10 10" width="10" height="10"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" /></svg>
-      </button>
+      <WindowControls
+        :maximized="maximized"
+        @minimize="$emit('minimize')"
+        @toggle-maximize="$emit('toggleMaximize')"
+        @close-window="$emit('closeWindow')"
+      />
     </div>
   </div>
 </template>
@@ -191,6 +197,19 @@ function onTabsWheel(e: WheelEvent): void {
   border-radius: 2px;
   background: var(--dt-brand);
 }
+.dt-tab__spinner {
+  flex: none;
+  margin-right: 6px;
+  color: var(--dt-brand);
+  animation: dt-tab-spin 0.9s linear infinite;
+}
+
+@keyframes dt-tab-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .dt-tab__title {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -218,7 +237,7 @@ function onTabsWheel(e: WheelEvent): void {
   color: var(--dt-text);
 }
 
-/* 窗口控制按钮：SVG 细线图标，含主题切换 */
+/* 主题切换按钮：复用窗口控制按钮基类视觉（基类实现见 WindowControls.vue） */
 .dt-topbar__controls {
   display: flex;
   height: 100%;
@@ -243,9 +262,5 @@ function onTabsWheel(e: WheelEvent): void {
 }
 .dt-winbtn--theme {
   width: 36px;
-}
-.dt-winbtn--close:hover {
-  background: #e81123;
-  color: #ffffff;
 }
 </style>

@@ -3,9 +3,6 @@
  * 渲染进程 / preload / 主进程共用本文件，任何通道与平台差异都必须在主进程内部消化。
  */
 
-/** 业务语义类型 —— 决定排版引擎与默认路由，不绑定通道 */
-export type PrintKind = 'receipt' | 'label' | 'document' | 'image' | 'pdf'
-
 export type ChannelId = 'system' | 'raw' | 'ipp'
 export type ChannelPreference = ChannelId | 'auto'
 
@@ -33,25 +30,16 @@ export interface HtmlPayload {
 export interface RawPayload {
   kind: 'raw'
   bytes: Uint8Array
-  dialect: 'escpos' | 'zpl' | 'tspl'
+  dialect: 'escpos' | 'tspl'
 }
 export type PrintPayload = TemplatePayload | FilePayload | UrlPayload | HtmlPayload | RawPayload
 
-/** 纸张 —— 业务语义，各通道自行翻译；也支持传纸型库 ID（见 PaperProfile） */
-export type PaperSpec
-  = | { preset: 'receipt58' | 'receipt80' | 'a4' | 'a5' | 'b5' | 'letter' | 'legal' | 'tabloid' }
-    | { preset: 'label', widthMm: number, heightMm: number, gapMm?: number }
-    | { preset: 'custom', widthMm: number, heightMm: number }
-
-/** submit/renderPreview 的 paper 入参：纸型对象或纸型库 ID（PAPER_LIBRARY） */
-export type PaperInput = PaperSpec | string
-
-/** 纸型库条目 */
-export interface PaperProfile {
-  id: string
-  displayName: string
-  spec: PaperSpec
-  builtIn?: boolean
+/** 纸张 —— 物理尺寸（mm），各通道自行翻译；heightMm = 0 表示连续卷纸（高度由纸卷决定） */
+export interface PaperSpec {
+  /** 纸宽（mm） */
+  widthMm: number
+  /** 纸高（mm）；0 = 连续纸 */
+  heightMm: number
 }
 
 /** 硬件控制 —— 声明式；通道不支持时返回 OPTION_UNSUPPORTED，绝不静默忽略 */
@@ -67,8 +55,13 @@ export type Overlay
     | { type: 'barcode', data: string, format: 'code128' | 'ean13', heightMm?: number }
 
 export interface PrintOptions {
-  /** 纸型：PaperSpec 对象或纸型库 ID（PAPER_LIBRARY） */
-  paper: PaperInput
+  /**
+   * 纸张写法（主进程解析为物理尺寸）：ISO 216 序号纸 'a0'–'a10'/'b0'–'b10'
+   * 及 'letter'/'legal'/'tabloid'（大小写不敏感）、行业通称 'receipt58'/'receipt80'
+   * （连续小票纸）、纯宽 '80'（80mm 连续纸）、'宽x高' 如 '80x60'
+   * （分隔符支持 x/X/×/*，单位 mm）；无法识别 → VALIDATION_FAILED
+   */
+  paper: string
   copies?: number
   /** 默认 true；system 通道 false 时弹原生打印对话框，raw/ipp 恒静默 */
   silent?: boolean
@@ -109,28 +102,8 @@ export type PrintLogFn = (
   meta?: Record<string, unknown>,
 ) => void
 
-/** 打印预设：把"模板 + 纸型 + 打印机 + 参数"绑成一个业务单据，一键打印 */
-export interface PrintPreset {
-  id: string
-  displayName: string
-  businessType: PrintKind
-  /** template 负载时必填 */
-  templateId?: string
-  paper: PaperInput
-  printerId?: string
-  copies?: number
-  silent?: boolean
-  channel?: ChannelPreference
-  duplex?: 'simplex' | 'duplex' | 'duplexshort' | 'duplexlong'
-  pages?: string
-  /** 横向打印（默认纵向）；HTML 走 webContents.print landscape，PDF 直通走 SumatraPDF/lp */
-  landscape?: boolean
-  grayscale?: boolean
-  hardware?: HardwareControls
-}
-
+/** 统一打印请求信封：内容负载 + 打印选项。路由与校验全部由 payload 派生，无业务类型声明字段 */
 export interface PrintRequest {
-  businessType: PrintKind
   payload: PrintPayload
   options: PrintOptions
 }
@@ -171,6 +144,29 @@ export interface PrintResult {
   detail?: unknown
 }
 
+/** 设备驱动上报的纸张表单（名字 + 物理尺寸），来源 winspool DeviceCapabilitiesW / CUPS lpoptions+PPD */
+export interface PrinterPaper {
+  /** 驱动表单名（打印机属性里展示的纸型名） */
+  name: string
+  /** 物理尺寸（mm，保留 0.1mm 精度）；连续纸高度为 0 */
+  widthMm?: number
+  heightMm?: number
+}
+
+/** 打印机驱动默认值（打印首选项：Windows DEVMODE / CUPS 默认选项） */
+export interface PrinterDefaults {
+  /** 默认纸张的驱动表单名（对应 paperList 中一项） */
+  formName?: string
+  /** 默认方向（默认纵向） */
+  orientation?: 'portrait' | 'landscape'
+  /** 默认单双面 */
+  duplex?: 'simplex' | 'duplexlong' | 'duplexshort'
+  /** 默认是否彩色输出 */
+  color?: boolean
+  /** 默认份数（>1 时才有意义） */
+  copies?: number
+}
+
 export interface PrinterCaps {
   cut?: boolean
   openCashbox?: boolean
@@ -178,9 +174,14 @@ export interface PrinterCaps {
   qrcodeDirect?: boolean
   barcodeDirect?: boolean
   maxWidthMm?: number
-  paperPresets?: string[]
-  /** 设备驱动上报的纸张表单名（Windows: Win32_Printer.PrinterPaperNames；Linux: lpoptions PageSize） */
-  paperForms?: string[]
+  /** 设备上报的纸张列表（系统打印机来自驱动 winspool/CUPS）；网络直连无驱动查询通道，数据为空 */
+  paperList?: PrinterPaper[]
+  /** 驱动默认值（打印首选项）；平台读取失败时缺省 */
+  defaults?: PrinterDefaults
+  /** 支持双面打印（Windows DC_DUPLEX / CUPS Duplex 选项） */
+  duplexSupported?: boolean
+  /** 支持彩色打印（Windows DC_COLORDEVICE / CUPS ColorModel） */
+  colorSupported?: boolean
 }
 
 export interface UnifiedPrinter {
@@ -198,7 +199,6 @@ export interface UnifiedPrinter {
 export interface JobStatus {
   jobId: string
   jobName?: string
-  businessType?: PrintKind
   state: 'accepted' | 'printing' | 'done' | 'failed'
   createdAt: string
   finishedAt?: string
@@ -212,7 +212,7 @@ export interface JobStatus {
 export interface RawPrinterConfig {
   id: string
   displayName: string
-  protocol: 'escpos' | 'star' | 'zpl'
+  protocol: 'escpos' | 'star'
   transport: { type: 'tcp', host: string, port: number }
   mock?: boolean
   mockOutputDir?: string

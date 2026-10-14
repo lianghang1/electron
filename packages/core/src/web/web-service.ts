@@ -17,6 +17,8 @@ import {
 export interface WebAppRuntime {
   runtimeId: string
   view: WebContentsView
+  /** 首次 dom-ready 前为 false：视图保持零尺寸，Shell 视图区显示加载骨架屏而非白屏 */
+  ready: boolean
 }
 
 /** 平台受管弹窗的 webPreferences 安全基线（与 Web 容器一致，写死不配置） */
@@ -55,7 +57,11 @@ export class WebService {
   ) {}
 
   /** 创建 Web 运行时并挂到主窗口（零尺寸挂载，等 focus / setWorkArea 再展开） */
-  create(context: CallerContext, manifest: DesktopAppManifest): WebAppRuntime {
+  create(
+    context: CallerContext,
+    manifest: DesktopAppManifest,
+    onLoadingChange?: (isLoading: boolean) => void,
+  ): WebAppRuntime {
     const tabId = context.tabId
     if (!tabId)
       throw new Error('[web-service] tabId is required to create a web runtime')
@@ -73,7 +79,8 @@ export class WebService {
     this.attachHtmlFullscreen(view)
     this.resolver.register(view.webContents, context)
 
-    const runtime: WebAppRuntime = { runtimeId: tabId, view }
+    const runtime: WebAppRuntime = { runtimeId: tabId, view, ready: false }
+    this.attachLoadingSignals(view, runtime, onLoadingChange)
     this.runtimes.set(runtime.runtimeId, runtime)
 
     const win = this.windowService.getMainWindow()
@@ -150,7 +157,8 @@ export class WebService {
         runtime.view.setBounds({ x: 0, y: 0, width: content.width, height: content.height })
         continue
       }
-      const area = id === this.focusedId ? this.workArea : null
+      // 首帧（dom-ready）前保持零尺寸：加载骨架屏由 Shell 视图区呈现，避免视图区白屏
+      const area = id === this.focusedId && runtime.ready ? this.workArea : null
       runtime.view.setBounds(
         area
           ? {
@@ -162,6 +170,34 @@ export class WebService {
           : { x: 0, y: 0, width: 0, height: 0 },
       )
     }
+  }
+
+  /**
+   * 加载信号接线：loading 状态经回调回传编排层（Tab 条 spinner / 骨架屏消费）；
+   * 首次 dom-ready（或主框架加载失败）时展开视图。监听器挂在 webContents 上，销毁即随之失效。
+   */
+  private attachLoadingSignals(
+    view: WebContentsView,
+    runtime: WebAppRuntime,
+    onLoadingChange?: (isLoading: boolean) => void,
+  ): void {
+    const webContents = view.webContents
+    if (onLoadingChange) {
+      webContents.on('did-start-loading', () => onLoadingChange(true))
+      webContents.on('did-stop-loading', () => onLoadingChange(false))
+    }
+    const markReady = (): void => {
+      if (runtime.ready)
+        return
+      runtime.ready = true
+      this.applyBounds()
+    }
+    webContents.on('dom-ready', markReady)
+    // 主框架加载失败也要展开：Electron 错误页需可见可交互，否则骨架屏永久悬挂
+    webContents.on('did-fail-load', (_event, _code, _desc, _url, isMainFrame) => {
+      if (isMainFrame)
+        markReady()
+    })
   }
 
   /**

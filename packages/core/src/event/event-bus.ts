@@ -17,6 +17,8 @@ export interface PlatformEventMap {
   'app:opened': [AppInstance]
   'app:closed': [AppInstance]
   'tab:created': [DesktopTab]
+  /** Tab 可变状态变化（如 isLoading）：与 created/activated/closed 一样触发 Shell 全量列表推送 */
+  'tab:updated': [DesktopTab]
   'tab:activated': [DesktopTab]
   'tab:closed': [DesktopTab]
   'permission:denied': [{ context: CallerContext, permission: Permission }]
@@ -26,6 +28,8 @@ export interface PlatformEventMap {
   'notification:received': [PlatformNotification]
   'renderer:crashed': [{ appId: string, reason: string }]
   'window:maximizedChanged': [boolean]
+  /** 套壳模式热键命中（Ctrl+Alt+A）：runtime 桥接后推送 Shell 切换外壳显隐 */
+  'shell:toggleChrome': []
   'download:updated': [DownloadTask[]]
   'update:state': [UpdateState]
   'update:asarState': [AsarUpdateState]

@@ -1,4 +1,4 @@
-import type { JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintPreset, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
+import type { JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
 import type { PreparedContent, PreparedJob } from './channels/channel-types'
 import type { PrintChannel } from './channels/print-channel'
 import type { HiddenWindowPool } from './hidden-window'
@@ -13,7 +13,6 @@ import { SystemChannel } from './channels/system-channel'
 import { printError, toPrintError } from './errors'
 import { JobStore } from './job-store'
 import { assertPaperSupported, resolvePaper } from './paper'
-import { mergePresets } from './preset'
 import { IMAGE_MIME, renderImageViewerHtml, renderTemplateHtml } from './templates'
 import { downloadUrlContent } from './url-content'
 
@@ -25,16 +24,14 @@ import { downloadUrlContent } from './url-content'
 export class PrintService {
   private readonly jobs: JobStore
   private readonly channels: Map<string, PrintChannel>
-  private presets: PrintPreset[]
   /** 网络直连打印机档案（与 PrinterRegistry 同一数组实例，原地变更即时生效） */
   private readonly printers: RawPrinterConfig[]
   /** 可选日志注入（PII 域外的打印数据可记录） */
   private readonly logger: PrintLogFn
   private readonly archiveDir: string
-  private readonly persistPresets?: (presets: PrintPreset[]) => void
   private readonly persistPrinters?: (printers: RawPrinterConfig[]) => void
 
-  /** 装配注入的依赖与现场数据（文件路径/打印机/预设），设备层不自行寻址 */
+  /** 装配注入的依赖与现场数据（文件路径/打印机），设备层不自行寻址 */
   constructor(
     private readonly windows: HiddenWindowPool,
     private readonly registry: PrinterRegistry,
@@ -45,10 +42,6 @@ export class PrintService {
       jobsFile: string
       /** SumatraPDF 路径（资源根解析；缺省禁用 PDF 直通通道回退） */
       sumatraPath?: string
-      /** 运行时自定义预设（持久化回注，按 id 覆盖出厂） */
-      customPresets?: PrintPreset[]
-      /** 预设编辑持久化 */
-      persistPresets?: (presets: PrintPreset[]) => void
       /** 网络直连打印机档案（初始档案，与 registry 共享实例） */
       printers: RawPrinterConfig[]
       /** 打印机档案运行时编辑持久化 */
@@ -59,8 +52,6 @@ export class PrintService {
     this.logger = deps.logger ?? (() => {})
     this.archiveDir = deps.archiveDir
     this.jobs = new JobStore(deps.jobsFile)
-    this.persistPresets = deps.persistPresets
-    this.presets = mergePresets(deps.customPresets)
     this.printers = deps.printers
     this.persistPrinters = deps.persistPrinters
     this.channels = new Map<string, PrintChannel>([
@@ -68,24 +59,6 @@ export class PrintService {
       ['raw', new RawChannel()],
       ['ipp', new IppChannel()],
     ])
-  }
-
-  /** 打印预设库：出厂预设 + 持久化回注的运行时自定义 */
-  listPresets(): PrintPreset[] {
-    return this.presets.slice()
-  }
-
-  upsertPreset(preset: PrintPreset): void {
-    if (!preset?.id || !preset.displayName || !preset.businessType) {
-      throw printError('VALIDATION_FAILED', '打印预设缺少 id/displayName/businessType')
-    }
-    const list = this.presets.slice()
-    const i = list.findIndex(p => p.id === preset.id)
-    if (i >= 0)
-      list[i] = preset
-    else list.push(preset)
-    this.presets = list
-    this.persistPresets?.(list)
   }
 
   /** 网络直连打印机档案列表（运行时编辑数据源） */
@@ -110,52 +83,23 @@ export class PrintService {
     return this.printers.slice()
   }
 
-  /** 按预设一键打印：调用方只提供业务数据（失败抛 PrintError，与 submit 一致） */
-  async submitByPreset(presetId: string, data: Record<string, unknown>): Promise<PrintResult> {
-    const preset = this.presets.find(p => p.id === presetId)
-    if (!preset) {
-      throw printError('VALIDATION_FAILED', `未知打印预设: ${presetId}`, { available: this.presets.map(p => p.id) })
-    }
-    if (!preset.templateId) {
-      throw printError('VALIDATION_FAILED', `预设 ${presetId} 未绑定模板，无法注入数据`)
-    }
-    const request: PrintRequest = {
-      businessType: preset.businessType,
-      payload: { kind: 'template', templateId: preset.templateId, data },
-      options: {
-        paper: preset.paper,
-        printerId: preset.printerId,
-        copies: preset.copies,
-        silent: preset.silent,
-        channel: preset.channel,
-        duplex: preset.duplex,
-        pages: preset.pages,
-        grayscale: preset.grayscale,
-        landscape: preset.landscape,
-        hardware: preset.hardware,
-        jobName: preset.displayName,
-      },
-    }
-    return this.submit(request)
-  }
-
   async submit(req: PrintRequest): Promise<PrintResult> {
     const jobId = randomUUID()
-    const jobName = req?.options?.jobName?.trim() || `${req?.businessType ?? 'print'}-${Date.now()}`
+    const jobName = req?.options?.jobName?.trim() || `${req?.payload?.kind ?? 'print'}-${Date.now()}`
     // 先登记任务簿：任何阶段失败（含打印机解析/校验）都有任务可查，status 语义一致
     this.jobs.create(req, jobId, jobName)
     try {
       const printer = await this.registry.resolve(req?.options?.printerId)
       this.validate(req)
-      // paper 支持 PaperSpec 对象或纸型库 ID，这里归一为 PaperSpec
-      const paper = resolvePaper(req.options.paper)
-      assertPaperSupported(paper, printer.capabilities.maxWidthMm, printer.id)
+      // 纸张归一：字符串便捷写法（'a4'/'80x60'…）→ 物理尺寸，识别不了 → undefined 交驱动默认；PDF 直通豁免纸型
+      const paper = req.options.paper ? resolvePaper(req.options.paper) : undefined
+      if (paper)
+        assertPaperSupported(paper, printer.capabilities.maxWidthMm, printer.id)
       const channel = this.pickChannel(req, printer)
       this.jobs.markPrinting(jobId)
       const startedAt = Date.now()
       this.log('info', `提交打印任务 ${jobName}`, {
         jobId,
-        businessType: req.businessType,
         channel: channel.id,
         printerId: printer.id,
       })
@@ -163,7 +107,6 @@ export class PrintService {
       const job: PreparedJob = {
         jobId,
         jobName,
-        businessType: req.businessType,
         paper,
         options: req.options,
         content: await this.normalizeContent(req, paper, jobId),
@@ -225,7 +168,7 @@ export class PrintService {
     return this.jobs.clear()
   }
 
-  /** 渲染预览：模板 + 数据 + 纸张 → 完整 HTML（供渲染进程 iframe 实时预览，不送打） */
+  /** 渲染预览：模板 + 数据 + 纸张（字符串写法或物理尺寸）→ 完整 HTML（供渲染进程 iframe 实时预览，不送打） */
   async renderPreview(templateId: string, data: Record<string, unknown>, paper: PrintOptions['paper']): Promise<string> {
     return renderTemplateHtml(templateId, data, resolvePaper(paper))
   }
@@ -250,7 +193,6 @@ export class PrintService {
     const archived = rec.result?.archivedPdfPath
     if ((p.kind === 'template' || p.kind === 'html') && archived && existsSync(archived)) {
       return this.submit({
-        businessType: rec.request.businessType,
         payload: { kind: 'file', path: archived },
         options: {
           ...rec.request.options,
@@ -273,14 +215,14 @@ export class PrintService {
       return ch
     }
 
-    const receiptLike = req.businessType === 'receipt' || req.businessType === 'label'
-    if (receiptLike && printer.source === 'network') {
-      return this.channels.get('raw')!
-    }
+    // 网络直连打印机仅收指令流：模板负载可译成 ESC/POS 指令（模板不支持指令渲染时 raw 通道显式报错），raw 负载原样直发
     if (printer.source === 'network') {
+      if (req.payload.kind === 'template' || req.payload.kind === 'raw') {
+        return this.channels.get('raw')!
+      }
       throw printError(
         'OPTION_UNSUPPORTED',
-        '选中的网络直连打印机不支持文档/图片/PDF 打印，请在打印机列表中选择系统打印机（或配置 IPP 通道）',
+        '选中的网络直连打印机仅支持模板/指令负载，文档/图片/PDF 打印请在打印机列表中选择系统打印机（或配置 IPP 通道）',
         { printerId: printer.id },
       )
     }
@@ -309,14 +251,13 @@ export class PrintService {
     }
   }
 
-  /** 内容归一：五种负载 → 通道可执行形态（HTML / PDF / 指令流）。paper 已归一为 PaperSpec（PDF 直通可为 undefined） */
+  /** 内容归一：五种负载 → 通道可执行形态（HTML / PDF / 指令流）。paper 为宽松解析结果（undefined = 交驱动默认纸张） */
   private async normalizeContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> {
     const p = req.payload
     switch (p.kind) {
       case 'template': {
         // 同一份业务数据双形态：HTML 给系统队列，结构化数据给指令直写渲染器
-        // （validate 已保证模板负载必带 options.paper，PDF 直通豁免仅限 file/url 负载）
-        const html = await renderTemplateHtml(p.templateId, p.data, paper!)
+        const html = await renderTemplateHtml(p.templateId, p.data, paper)
         return { type: 'html', html, structured: { templateId: p.templateId, data: p.data } }
       }
       case 'html':
@@ -345,9 +286,6 @@ export class PrintService {
     }
     const mime = IMAGE_MIME[ext]
     if (mime) {
-      if (!paper) {
-        throw printError('VALIDATION_FAILED', '图片内容需要 options.paper 指定版式')
-      }
       const dataUrl = `data:${mime};base64,${readFileSync(filePath).toString('base64')}`
       return { type: 'html', html: renderImageViewerHtml(dataUrl, paper) }
     }
@@ -360,11 +298,6 @@ export class PrintService {
     }
     if (!req.payload?.kind) {
       throw printError('VALIDATION_FAILED', '缺少 payload（打印内容）')
-    }
-    // PDF 文件/URL 直通按 PDF 自身页面尺寸打印，不依赖纸张规格；其余内容必须显式指定
-    const isPdfPassthrough = req.businessType === 'pdf' && (req.payload.kind === 'file' || req.payload.kind === 'url')
-    if (!isPdfPassthrough && !req.options?.paper) {
-      throw printError('VALIDATION_FAILED', '缺少 options.paper（纸张规格）')
     }
   }
 }

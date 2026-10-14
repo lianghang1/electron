@@ -1,3 +1,4 @@
+import type { Buffer } from 'node:buffer'
 import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -10,6 +11,15 @@ export type KoffiFn = (...args: unknown[]) => unknown
 /** koffi LoadLibrary 句柄面 */
 export interface KoffiLib {
   func: (signature: string) => KoffiFn
+}
+
+/** koffi 模块面：LoadLibrary + 出参缓冲区分配/解码/取址（结构体与指针出参经 Buffer 手工解析） */
+export interface KoffiModule {
+  load: (path: string) => KoffiLib
+  alloc: (type: string, count: number) => Buffer
+  decode: (value: unknown, offset?: number, type?: string | object) => unknown
+  /** 取 Buffer 的内存地址（BigInt），用于把"指向缓冲区内部的指针"换算成偏移 */
+  address: (value: unknown) => bigint | number
 }
 
 // createRequire 基准：CJS（electron-vite 产物）取 __filename；ESM（tsx 直跑源码联调）无 __filename，退回 cwd（koffi 经根依赖解析）
@@ -50,8 +60,8 @@ export function koffiAvailable(): boolean {
  * 运行时加载 koffi 模块（构建期零依赖）；
  * 缺失时抛 ADAPTER_UNAVAILABLE（dll-adapter 先用 koffiAvailable 预检产出设备状态，这里兜底）。
  */
-export function requireKoffi(detail?: unknown): { load: (path: string) => KoffiLib } {
-  let koffi: { load: (path: string) => KoffiLib }
+export function requireKoffi(detail?: unknown): KoffiModule {
+  let koffi: KoffiModule
   try {
     const dir = packagedKoffiDir
     koffi = dir && packagedKoffiPresent() ? nodeRequire(dir) : nodeRequire('koffi')

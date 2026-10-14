@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { DesktopTab, WorkAreaRect } from '@desktop/shared'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppCenter from './components/AppCenter.vue'
 import AppLauncher from './components/AppLauncher.vue'
 import TopBar from './components/TopBar.vue'
 import UpdateBar from './components/UpdateBar.vue'
+import WindowControls from './components/WindowControls.vue'
 import { useApps } from './composables/use-apps'
 import { useTabs } from './composables/use-tabs'
 import { useTheme } from './composables/use-theme'
@@ -17,6 +18,23 @@ const maximized = ref(false)
 const viewport = ref<HTMLElement | null>(null)
 /** 应用中心面板显隐：flex 成员推开 dt-main，Web 容器经 ResizeObserver 自动跟随 */
 const appCenterOpen = ref(false)
+
+const activeTab = computed(() => tabs.value.find(tab => tab.active))
+
+/** 套壳模式：激活 App 声明 chrome: 'single' 时隐藏外壳，Web 铺满窗口；Ctrl+Alt+A 临时唤出 */
+const chromeRevealed = ref(false)
+const chromeHidden = computed(() => {
+  const tab = activeTab.value
+  if (!tab)
+    return false
+  const single = apps.value.some(app => app.manifest.id === tab.appId && app.manifest.chrome === 'single')
+  return single && !chromeRevealed.value
+})
+
+// 切换激活 Tab 即收回临时唤出的外壳，回到套壳全窗形态
+watch(() => activeTab.value?.id, () => {
+  chromeRevealed.value = false
+})
 
 // ---- 窗口控制（顶栏自绘按钮，titleBarStyle: hidden 后为唯一入口） ----
 async function minimize(): Promise<void> {
@@ -55,6 +73,7 @@ function syncWorkArea(): void {
 
 let resizeObserver: ResizeObserver | null = null
 let unsubMaximized: (() => void) | null = null
+let unsubChromeToggle: (() => void) | null = null
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(syncWorkArea)
@@ -64,6 +83,10 @@ onMounted(() => {
   unsubMaximized = window.desktop.events.on('window:maximizedChanged', (value) => {
     maximized.value = value
   })
+  // 套壳模式快捷键（Main 侧 before-input-event 拦截后推送）：切换外壳临时显隐
+  unsubChromeToggle = window.desktop.events.on('window:toggleChrome', () => {
+    chromeRevealed.value = !chromeRevealed.value
+  })
   void window.desktop.window.isMaximized().then((value) => {
     maximized.value = value
   })
@@ -72,16 +95,27 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   unsubMaximized?.()
+  unsubChromeToggle?.()
 })
 </script>
 
 <template>
   <div class="dt-shell">
+    <!-- 套壳模式窄条：窗口无系统标题栏，自绘窗口控制不能随外壳一起隐藏；
+         整条为拖拽区，Web 视图区经 ResizeObserver 自动让位到条下方 -->
+    <div v-if="chromeHidden" class="dt-chromestrip">
+      <WindowControls
+        :maximized="maximized"
+        @minimize="minimize"
+        @toggle-maximize="toggleMaximize"
+        @close-window="closeWindow"
+      />
+    </div>
     <div class="flex flex-1 min-h-0">
-      <AppLauncher :apps="apps" :tabs="tabs" @open="open" />
+      <AppLauncher v-if="!chromeHidden" :apps="apps" :tabs="tabs" @open="open" />
       <Transition name="ac-slide">
         <AppCenter
-          v-if="appCenterOpen"
+          v-if="appCenterOpen && !chromeHidden"
           :apps="apps"
           :tabs="tabs"
           @open="open"
@@ -90,6 +124,7 @@ onBeforeUnmount(() => {
       </Transition>
       <main class="flex-1 flex flex-col min-w-0">
         <TopBar
+          v-if="!chromeHidden"
           :tabs="tabs"
           :maximized="maximized"
           :app-center-open="appCenterOpen"
@@ -110,6 +145,14 @@ onBeforeUnmount(() => {
             </p>
             <p class="dt-empty__desc">
               从左侧导航或应用中心进入
+            </p>
+          </div>
+          <div v-else-if="activeTab?.isLoading" class="dt-loading">
+            <svg class="dt-loading__spinner" viewBox="0 0 24 24" width="28" height="28">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="44" />
+            </svg>
+            <p class="dt-loading__text">
+              正在加载「{{ activeTab?.title }}」…
             </p>
           </div>
         </div>
@@ -135,6 +178,18 @@ onBeforeUnmount(() => {
     sans-serif;
   transition: background var(--dt-dur) var(--dt-ease);
 }
+/* 套壳模式窗口控制窄条：只保留最小化/最大化/关闭，整条可拖动窗口 */
+.dt-chromestrip {
+  height: 32px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: var(--dt-surface);
+  border-bottom: 1px solid var(--dt-line);
+  -webkit-app-region: drag;
+}
+
 .dt-empty {
   height: 100%;
   display: flex;
@@ -153,6 +208,31 @@ onBeforeUnmount(() => {
   color: var(--dt-text-3);
   opacity: 0.7;
   margin: 0;
+}
+
+/* 加载骨架：视图区居中 spinner（Main 侧 dom-ready 前视图零尺寸，骨架屏可见） */
+.dt-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.dt-loading__spinner {
+  color: var(--dt-brand);
+  animation: dt-loading-spin 0.9s linear infinite;
+}
+.dt-loading__text {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dt-text-3);
+}
+@keyframes dt-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 应用中心面板：推开式出现（flex 成员），淡入 + 轻微左移 */

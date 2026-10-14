@@ -4,7 +4,6 @@ export default function () {
   async function printPdf(fileUrl: string, options: PrintOptions) {
     try {
       const result = await window.desktop.print.submit({
-        businessType: 'pdf',
         payload: {
           kind: 'url',
           url: fileUrl,

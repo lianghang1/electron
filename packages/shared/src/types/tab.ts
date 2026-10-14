@@ -11,6 +11,8 @@ export interface DesktopTab {
   url: string
   active: boolean
   closable: boolean
+  /** 页面加载中（Main 侧 loading 事件维护）：Tab 条 spinner 与视图区骨架屏消费 */
+  isLoading: boolean
   createdAt: number
 }
 

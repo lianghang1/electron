@@ -154,7 +154,7 @@
   <section class="page active" id="page-print">
     <div class="toolbar">
       <span class="section-label">打印提交</span>
-      <span class="hint">统一信封：businessType + payload + options；submit 永不 reject，失败走返回值 error</span>
+      <span class="hint">统一信封：payload + options；失败 reject 抛 IpcRemoteError（code 见 PrintErrorCode）</span>
     </div>
     <div class="panel padded">
       <div class="kind-grid" id="kind-grid">
@@ -206,7 +206,7 @@
             <option value="raw">指令直写（raw）</option>
           </select>
         </label>
-        <label class="field"><span>纸张（纸型库）</span>
+        <label class="field"><span>纸张</span>
           <select class="input" id="opt-paper" style="min-width: 160px;"><option value="">加载中…</option></select>
         </label>
         <label class="field"><span>份数</span>
@@ -315,7 +315,6 @@
           <select class="input" id="netp-protocol">
             <option value="escpos">ESC/POS</option>
             <option value="star">Star</option>
-            <option value="zpl">ZPL（斑马标签）</option>
           </select>
         </label>
         <label class="check" style="padding-bottom: 7px;"><input type="checkbox" id="netp-mock"> 落盘模拟（不联网）</label>

@@ -231,9 +231,8 @@ $('#btn-cap-print').addEventListener('click', async () => {
   if (!current?.imagePath) return
   try {
     const r = await window.desktop.print.submit({
-      businessType: 'image',
       payload: { kind: 'file', path: current.imagePath },
-      options: { paper: { preset: 'a4' }, copies: 1, silent: true, jobName: '高拍仪图片' },
+      options: { paper: 'a4', copies: 1, silent: true, jobName: '高拍仪图片' },
     })
     toast(`已提交打印：${r.jobId}`)
   }

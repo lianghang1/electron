@@ -79,7 +79,7 @@ export function renderReceiptEscpos(
   api: EscposApi,
   data: Record<string, unknown>,
   options: PrintOptions,
-  paper: PaperSpec,
+  paper: PaperSpec | undefined,
 ): void {
   const cols = paperToColumns(paper)
   const hw = options.hardware ?? {}
@@ -162,7 +162,7 @@ export function renderTemplateEscpos(
   templateId: string,
   data: Record<string, unknown>,
   options: PrintOptions,
-  paper: PaperSpec,
+  paper: PaperSpec | undefined,
 ): void {
   if (templateId === 'receipt-default') {
     renderReceiptEscpos(api, data, options, paper)

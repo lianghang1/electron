@@ -1,4 +1,4 @@
-import type { ChannelId, PaperSpec, PrintKind, PrintOptions, PrintRequest } from '@desktop/shared'
+import type { ChannelId, PaperSpec, PrintOptions, PrintRequest } from '@desktop/shared'
 
 /**
  * 归一化后的打印任务：内容已按目标通道的可执行形态准备好。
@@ -9,8 +9,8 @@ import type { ChannelId, PaperSpec, PrintKind, PrintOptions, PrintRequest } from
 export interface PreparedJob {
   jobId: string
   jobName: string
-  businessType: PrintKind
-  paper: PaperSpec
+  /** 已归一为物理尺寸；PDF 文件/URL 直通可缺省（版式由 PDF 自身决定） */
+  paper?: PaperSpec
   options: PrintOptions
   content: PreparedContent
 }
@@ -18,6 +18,6 @@ export interface PreparedJob {
 export type PreparedContent
   = | { type: 'html', html: string, structured?: { templateId: string, data: Record<string, unknown> } }
     | { type: 'pdf', path: string }
-    | { type: 'raw', bytes: Uint8Array, dialect: 'escpos' | 'zpl' | 'tspl' }
+    | { type: 'raw', bytes: Uint8Array, dialect: 'escpos' | 'tspl' }
 
 export type { ChannelId, PrintRequest }

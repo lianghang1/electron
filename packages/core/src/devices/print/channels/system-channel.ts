@@ -57,6 +57,10 @@ export class SystemChannel implements PrintChannel {
   }
 
   private printHtml(job: PreparedJob, printer: UnifiedPrinter, html: string): Promise<ChannelOutcome> {
+    // HTML 内容必有纸张（validate 已强制）；显式守卫而非类型断言（局部常量保证闭包内类型收窄）
+    if (!job.paper)
+      throw printError('VALIDATION_FAILED', 'HTML 内容需要 options.paper 指定版式')
+    const paper = job.paper
     // 渲染+存档+打印必须在同一个窗口锁内完成，否则并发 submit 会互相打断渲染
     return this.windows.runExclusive('utility', async (win) => {
       await loadHtmlInto(win, html)
@@ -64,7 +68,7 @@ export class SystemChannel implements PrintChannel {
 
       // 连续纸（小票/连续标签）没有 pageSize 概念：省略后交给驱动纸卷设置；
       // 此时"默认边距"应视为零边距（模板自带内边距），否则 Chromium 默认边距会引起回流
-      const pageSize = paperToPrintPageSize(job.paper)
+      const pageSize = paperToPrintPageSize(paper)
       const continuous = pageSize === undefined
       const m = job.options.margin
       const effectiveMargin: PrintOptions['margin']
@@ -76,7 +80,7 @@ export class SystemChannel implements PrintChannel {
           landscape: job.options.landscape === true,
           printBackground: true,
           preferCSSPageSize: true,
-          pageSize: paperToPdfPageSize(job.paper),
+          pageSize: paperToPdfPageSize(paper),
           margins: pdfMarginsInches(effectiveMargin),
         }),
         30000,
@@ -265,18 +269,20 @@ function parsePageRanges(pages: string | undefined): Array<{ from: number, to: n
   return ranges.length > 0 ? ranges : null
 }
 
-/** 统一纸张 → SumatraPDF paper= 标准名（仅 Chromium/SumatraPDF 认识的标准系列；自定义尺寸交给 fit 缩放） */
+/** 物理尺寸 → SumatraPDF paper= 标准名（仅 SumatraPDF 认识的标准系列；其他尺寸不传 paper=，交给 fit 缩放） */
 function sumatraPaperName(paper?: PaperSpec): string | null {
-  switch (paper?.preset) {
-    case 'a4':
+  if (!paper || paper.heightMm <= 0)
+    return null
+  switch (`${paper.widthMm}x${paper.heightMm}`) {
+    case '210x297':
       return 'A4'
-    case 'a5':
+    case '148x210':
       return 'A5'
-    case 'letter':
+    case '216x279':
       return 'Letter'
-    case 'legal':
+    case '216x356':
       return 'Legal'
-    case 'tabloid':
+    case '279x432':
       return 'Tabloid'
     default:
       return null

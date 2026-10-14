@@ -49,6 +49,7 @@ export class TabService {
       url: manifest.entry.url,
       active: false,
       closable: true,
+      isLoading: true,
       createdAt: Date.now(),
     }
     this.tabs.set(tab.id, tab)
@@ -57,6 +58,7 @@ export class TabService {
     this.webService.create(
       { appId: tab.appId, instanceId: instance.instanceId, tabId: tab.id },
       manifest,
+      isLoading => this.setLoading(tab.id, isLoading),
     )
     this.appService.markOpened(instance.instanceId)
     await this.activate(tab.id)
@@ -101,5 +103,14 @@ export class TabService {
     if (!tab)
       throw new DesktopError('TAB_NOT_FOUND', `Tab not found: ${tabId}`)
     return tab
+  }
+
+  /** Web 加载状态回写：去重后广播 tab:updated（Shell 推送桥转全量列表） */
+  private setLoading(tabId: string, isLoading: boolean): void {
+    const tab = this.tabs.get(tabId)
+    if (!tab || tab.isLoading === isLoading)
+      return
+    tab.isLoading = isLoading
+    this.events.emit('tab:updated', { ...tab })
   }
 }

@@ -1,7 +1,7 @@
-import type { PrinterCaps, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
+import type { PrinterCaps, PrinterPaper, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
 import type { HiddenWindowPool } from './hidden-window'
 import { printError } from './errors'
-import { detectPaperForms, detectSystemDefaultPrinter } from './system-default'
+import { detectPrinterHardware, detectPrinterPapers, detectSystemDefaultPrinter } from './system-default'
 
 /**
  * 打印机注册表：把"系统打印机"（getPrintersAsync）与"网络直连打印机"（装配注入）合并为统一视图。
@@ -41,10 +41,16 @@ export class PrinterRegistry {
           driver: (p.options as unknown as Record<string, string>)?.['printer-make-and-model'] ?? '',
         },
       }))
-      // 设备驱动上报的纸张表单（Win: PrinterPaperNames / Unix: lpoptions PageSize）
-      for (const p of mapped) {
-        p.capabilities.paperForms = await detectPaperForms(p.id)
-      }
+      // 设备驱动上报的纸张（Win: winspool；Unix: lpoptions）与打印首选项默认值/能力位，纸型联动与默认值展示以此为准
+      await Promise.all(mapped.map(async (p) => {
+        p.capabilities.paperList = await detectPrinterPapers(p.id)
+        const hw = await detectPrinterHardware(p.id)
+        if (hw) {
+          p.capabilities.defaults = hw.defaults
+          p.capabilities.duplexSupported = hw.duplexSupported
+          p.capabilities.colorSupported = hw.colorSupported
+        }
+      }))
       return mapped
     }
     catch (err) {
@@ -69,7 +75,8 @@ export class PrinterRegistry {
           qrcodeDirect: true,
           barcodeDirect: true,
           maxWidthMm: 80,
-          paperPresets: ['receipt58', 'receipt80', 'label'],
+          // 无驱动查询通道：纸型数据为空（不伪造），显式提示由 UI 层负责
+          paperList: [] as PrinterPaper[],
           ...cfg.capabilities,
         },
         meta: { config: cfg, protocol: cfg.protocol },
@@ -143,6 +150,5 @@ function systemCaps(): PrinterCaps {
     openCashbox: false,
     qrcodeDirect: false,
     barcodeDirect: false,
-    paperPresets: ['a4', 'a5', 'letter'],
   }
 }

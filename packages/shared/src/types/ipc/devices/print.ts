@@ -1,9 +1,9 @@
-import type { JobStatus, PaperInput, PaperProfile, PrinterCaps, PrintPreset, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '../../devices/print'
+import type { JobStatus, PrinterCaps, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '../../devices/print'
 import { invoke } from '../../../domain'
 
 /**
  * print 域契约 —— 统一打印（系统队列 / 指令直写 / IPP 预留）。
- * submit / submitByPreset / reprint 失败统一 reject（IpcRemoteError，code 见 PrintErrorCode）；
+ * submit / reprint 失败统一 reject（IpcRemoteError，code 见 PrintErrorCode）；
  * 任务历史（含失败原因）经 status / listJobs 查询。
  */
 export const printDomainDefs = {
@@ -21,16 +21,8 @@ export const printDomainDefs = {
   removeJob: invoke<(jobId: string) => Promise<boolean>>(),
   /** 清空全部任务记录（连带删除归档 PDF），返回清除条数 */
   clearJobs: invoke<() => Promise<number>>(),
-  /** 纸型库 */
-  listPapers: invoke<() => Promise<PaperProfile[]>>(),
-  /** 打印预设库：业务单据一键打印 */
-  listPresets: invoke<() => Promise<PrintPreset[]>>(),
-  /** 按预设一键打印（调用方只提供业务数据） */
-  submitByPreset: invoke<(presetId: string, data: Record<string, unknown>) => Promise<PrintResult>>(),
-  /** 运行时编辑打印预设（持久化，热生效） */
-  savePreset: invoke<(preset: PrintPreset) => void>(),
-  /** 渲染预览：模板 + 数据 + 纸张 → 完整 HTML（iframe 实时预览用，不送打） */
-  renderPreview: invoke<(templateId: string, data: Record<string, unknown>, paper: PaperInput) => Promise<string>>(),
+  /** 渲染预览：模板 + 数据 + 纸张写法 → 完整 HTML（iframe 实时预览用，不送打） */
+  renderPreview: invoke<(templateId: string, data: Record<string, unknown>, paper: string) => Promise<string>>(),
   /** 重打：优先用 PDF 存档（版式一致），文件/指令负载任务原样重提交 */
   reprint: invoke<(jobId: string) => Promise<PrintResult>>(),
   /** 网络直连打印机档案列表（运行时编辑数据源） */

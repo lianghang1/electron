@@ -1,4 +1,4 @@
-import type { AppSource, CaptureDeviceProfile, DesktopAppManifest, PrintPreset, RawPrinterConfig, ScannerConfig } from '@desktop/shared'
+import type { AppSource, CaptureDeviceProfile, DesktopAppManifest, RawPrinterConfig, ScannerConfig } from '@desktop/shared'
 import type { CaptureSystem } from '../devices/capture'
 import type { IdCardSystem } from '../devices/idcard'
 import type { PrintSystem } from '../devices/print'
@@ -96,6 +96,8 @@ export class DesktopRuntime {
       })
 
       this.windowService.createMainWindow(this.options)
+      // --app=<appId> 直启：主窗就绪后打开指定 App（套壳部署用）
+      this.launchStartupApp()
       // 主窗就绪后预创建浮层窗：页面提前加载完成，首次弹出/授权弹窗即时呈现（免加载卡顿）
       this.overlayService.prewarm()
       // 运行韧性（无人值守场景，默认全关）：主窗口就绪后挂载；
@@ -143,6 +145,8 @@ export class DesktopRuntime {
     this.setupUpdaters()
     this.setupAppRegistry()
     this.setupIpcAndShellBridge()
+    this.setupChromeHotkey()
+    this.setupDevToolsHotkey()
 
     this.updateService.start()
     void this.asarUpdateService.start()
@@ -259,17 +263,14 @@ export class DesktopRuntime {
       logger: this.logger.scope('device:capture'),
     })
 
-    // 打印：预设与网络打印机档案均持久化（运行时编辑热生效）；打印机档案缺键时回落宿主注入
+    // 打印：网络打印机档案持久化（运行时编辑热生效）；档案缺键时回落宿主注入
     // （mock: true 档案为指令落盘模拟）；SumatraPDF 相对资源根解析（缺省 devices/print/SumatraPDF.exe），绝对路径原样
-    const presetStore = createStore<{ presets?: PrintPreset[] }>({ name: 'device-print-presets' })
     const printerStore = createStore<{ printers?: RawPrinterConfig[] }>({ name: 'device-print-printers' })
     const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'devices/print/SumatraPDF.exe'
     this.printSystem = createPrintSystem({
       stateDir: app.getPath('userData'),
       printers: printerStore.get('printers') ?? this.options.devices?.print?.printers ?? [],
       sumatraPath: isAbsolute(sumatraRel) ? sumatraRel : join(resourcesRoot, sumatraRel),
-      customPresets: presetStore.get('presets'),
-      persistPresets: presets => presetStore.set('presets', presets),
       persistPrinters: printers => printerStore.set('printers', printers),
       // 打印隐藏窗挂主窗口为 parent：主窗关闭级联销毁池窗，退出链路才能走完
       getParent: () => this.windowService.getMainWindow(),
@@ -375,6 +376,7 @@ export class DesktopRuntime {
       this.windowService.getMainWindow()?.webContents.send('tabs:updated', this.tabService?.list() ?? [])
     }
     this.events.on('tab:created', pushTabs)
+    this.events.on('tab:updated', pushTabs)
     this.events.on('tab:activated', pushTabs)
     this.events.on('tab:closed', (tab) => {
       pushTabs()
@@ -383,6 +385,10 @@ export class DesktopRuntime {
     })
     this.events.on('window:maximizedChanged', (maximized) => {
       this.windowService.getMainWindow()?.webContents.send('window:maximizedChanged', maximized)
+    })
+    // 套壳热键命中 → Shell 切换外壳临时显隐
+    this.events.on('shell:toggleChrome', () => {
+      this.windowService.getMainWindow()?.webContents.send('window:toggleChrome')
     })
     // 运行时权限请求 → 浮层权限弹窗（原生窗压过 Web 容器），用户决策经 permission:respond 回传
     this.events.on('permission:request', (request) => {
@@ -407,6 +413,86 @@ export class DesktopRuntime {
     // asar 热更状态 → Shell 更新横幅（pending = 重启应用生效）
     this.events.on('update:asarState', (state) => {
       this.windowService.getMainWindow()?.webContents.send('update:asarState', state)
+    })
+  }
+
+  /**
+   * --app=<appId> 直启：主窗就绪后打开指定 App。
+   * 目标 App 尚未注册（远程源异步拉取）时挂 app:registered 事件兜底，注册即开。
+   */
+  private launchStartupApp(): void {
+    const appId = process.argv.find(arg => arg.startsWith('--app='))?.slice('--app='.length)
+    if (!appId)
+      return
+    if (!this.tabService) {
+      this.logger.warn('--app launch skipped: tab services disabled')
+      return
+    }
+    const open = (): boolean => {
+      if (!this.registry.has(appId))
+        return false
+      void this.tabService?.open({ appId }).catch((error) => {
+        this.logger.warn(`startup app open failed: ${appId}`, { error: String(error) })
+      })
+      return true
+    }
+    if (open())
+      return
+    const offRegistered = this.events.on('app:registered', (manifest) => {
+      if (manifest.id === appId && open())
+        offRegistered()
+    })
+    this.logger.info('startup app pending registration', { appId })
+  }
+
+  /**
+   * 套壳模式兜底热键 Ctrl+Alt+A：临时唤出 / 收起 Shell 外壳（导航 + 顶栏）。
+   * 挂在 web-contents-created 的 before-input-event 上，Shell 与 Web 视图持有焦点时均可触发；
+   * 不用 globalShortcut，避免占用系统级组合键。仅激活 Tab 的 App 声明 chrome: 'single' 时生效。
+   */
+  private setupChromeHotkey(): void {
+    app.on('web-contents-created', (_, webContents) => {
+      webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown' || input.key.toLowerCase() !== 'a')
+          return
+        if (!input.control || !input.alt || input.shift || input.meta)
+          return
+        const activeTab = this.tabService?.list().find(tab => tab.active)
+        const manifest = activeTab ? this.registry.get(activeTab.appId) : undefined
+        if (manifest?.chrome !== 'single')
+          return
+        event.preventDefault()
+        this.events.emit('shell:toggleChrome')
+      })
+    })
+  }
+
+  /**
+   * dev 态 DevTools 快捷键 F12 / Ctrl+Shift+I：对焦点所在的 webContents 切换 DevTools。
+   * Tab 内容是独立 WebContentsView，optimizer 只给 BrowserWindow 挂快捷键够不到它；
+   * 全局 before-input-event 焦点在哪个 webContents 就切换哪个（Tab 视图 / Shell / 浮层窗各开各的）。
+   * 生产环境不注册，不给调试入口。
+   */
+  private setupDevToolsHotkey(): void {
+    if (!is.dev)
+      return
+    app.on('web-contents-created', (_, webContents) => {
+      webContents.on('before-input-event', (event, input) => {
+        if (input.type !== 'keyDown')
+          return
+        const key = input.key.toLowerCase()
+        const isF12 = key === 'f12'
+        const isInspect = (input.control || input.meta) && input.shift && key === 'i'
+        if (!isF12 && !isInspect)
+          return
+        event.preventDefault()
+        if (webContents.isDevToolsOpened()) {
+          webContents.closeDevTools()
+        }
+        else {
+          webContents.openDevTools()
+        }
+      })
     })
   }
 

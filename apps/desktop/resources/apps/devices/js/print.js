@@ -1,15 +1,15 @@
 'use strict'
-/* 打印域：统一信封提交（8 种内容类型）+ 纸型库 + 版式 + 小票硬件控制 + 渲染预览 + 打印机/任务管理 */
+/* 打印域：统一信封提交（8 种内容类型）+ 版式 + 小票硬件控制 + 渲染预览 + 打印机/任务管理 */
 
 const KINDS = {
-  receipt80: { businessType: 'receipt', templateId: 'receipt-default', sampleKey: 'receipt', paper: 'receipt80', receipt: true },
-  receipt58: { businessType: 'receipt', templateId: 'receipt-default', sampleKey: 'receipt', paper: 'receipt58', receipt: true },
-  document: { businessType: 'document', templateId: 'document-default', sampleKey: 'document', paper: 'a4', docLike: true },
-  label: { businessType: 'label', templateId: 'label-default', sampleKey: 'label', paper: 'label-40x30' },
-  image: { businessType: 'image', payload: 'file', paper: 'a4', docLike: true },
-  pdf: { businessType: 'pdf', payload: 'file', paper: 'a4', docLike: true },
-  pdfurl: { businessType: 'pdf', payload: 'url', paper: 'a4', docLike: true },
-  html: { businessType: 'document', payload: 'html', paper: 'a4', docLike: true },
+  receipt80: { templateId: 'receipt-default', sampleKey: 'receipt', paper: '80', paperWidth: 80, receipt: true },
+  receipt58: { templateId: 'receipt-default', sampleKey: 'receipt', paper: '58', paperWidth: 58, receipt: true },
+  document: { templateId: 'document-default', sampleKey: 'document', paper: 'a4', paperWidth: 210, docLike: true },
+  label: { templateId: 'label-default', sampleKey: 'label', paper: '40x30', paperWidth: 40 },
+  image: { payload: 'file', paper: 'a4', paperWidth: 210, docLike: true },
+  pdf: { payload: 'file', paper: 'a4', paperWidth: 210, docLike: true },
+  pdfurl: { payload: 'url', paper: 'a4', paperWidth: 210, docLike: true },
+  html: { payload: 'html', paper: 'a4', paperWidth: 210, docLike: true },
 }
 
 const SAMPLES = {
@@ -41,7 +41,6 @@ const SAMPLES = {
 
 let printers = []
 let jobs = []
-let papers = []
 let currentKind = 'receipt80'
 
 // ── 内容类型切换：联动数据区 / 版式 / 硬件控制 / 预览按钮 / 默认纸型 ──
@@ -57,7 +56,12 @@ function switchKind(k) {
   $('#pdf-extra-grid').hidden = currentKind !== 'pdf' && currentKind !== 'pdfurl'
   $('#hardware-grid').hidden = !kind.receipt
   $('#btn-preview').hidden = !kind.templateId
-  if (kind.paper && papers.some(p => p.id === kind.paper)) $('#opt-paper').value = kind.paper
+  // 尽量选中宽度匹配的驱动表单（如 80mm 小票切到 80 宽纸型），匹配不上保持当前选择
+  if (kind.paperWidth != null) {
+    const hit = [...$('#opt-paper').options].find(o => !o.disabled && o.value.startsWith(`custom:${kind.paperWidth}x`))
+    if (hit) $('#opt-paper').value = hit.value
+  }
+  syncPaperOptions()
   if (kind.templateId) loadSample()
 }
 
@@ -109,7 +113,7 @@ function buildMargin() {
 function buildOptions() {
   const kind = KINDS[currentKind]
   const options = {
-    paper: $('#opt-paper').value || { preset: 'a4' },
+    paper: parsePaperValue($('#opt-paper').value) || kind.paper,
     copies: Math.max(1, Math.min(999, Number($('#opt-copies').value) || 1)),
     silent: $('#opt-silent').checked,
     grayscale: $('#opt-grayscale').checked,
@@ -165,7 +169,6 @@ async function submitPrint() {
   $('#print-result').textContent = '提交中…'
   try {
     const r = await window.desktop.print.submit({
-      businessType: kind.businessType,
       payload: buildPayload(),
       options: buildOptions(),
     })
@@ -191,7 +194,7 @@ async function renderPreview() {
     return
   }
   try {
-    const html = await window.desktop.print.renderPreview(kind.templateId, data, $('#opt-paper').value || { preset: 'a4' })
+    const html = await window.desktop.print.renderPreview(kind.templateId, data, parsePaperValue($('#opt-paper').value) || kind.paper)
     $('#preview-wrap').hidden = false
     $('#preview-frame').srcdoc = html
   }
@@ -201,6 +204,19 @@ async function renderPreview() {
 }
 
 // ── 打印机列表（含能力标注）+ 下拉 ──
+/** 驱动默认值摘要（打印首选项 DEVMODE / CUPS 默认选项），无数据返回空串 */
+function defaultsText(d) {
+  if (!d) return ''
+  const parts = []
+  if (d.formName) parts.push(`默认纸型 ${d.formName}`)
+  if (d.orientation === 'landscape') parts.push('横向')
+  if (d.duplex === 'duplexlong') parts.push('默认双面（长边）')
+  else if (d.duplex === 'duplexshort') parts.push('默认双面（短边）')
+  if (d.color != null) parts.push(d.color ? '彩色' : '黑白')
+  if (d.copies > 1) parts.push(`默认 ${d.copies} 份`)
+  return parts.join(' / ')
+}
+
 function renderPrinters() {
   $('#printer-count').textContent = printers.length ? `共 ${printers.length} 台` : ''
   const box = $('#printer-list')
@@ -215,7 +231,10 @@ function renderPrinters() {
     const caps = [
       p.capabilities?.cut ? '切刀' : '',
       p.capabilities?.openCashbox ? '钱箱' : '',
-      p.capabilities?.paperForms?.length ? `纸型 ${p.capabilities.paperForms.length}` : '',
+      p.capabilities?.paperList?.length ? `纸型 ${p.capabilities.paperList.length}` : '',
+      defaultsText(p.capabilities?.defaults),
+      p.capabilities?.duplexSupported ? '支持双面' : '',
+      p.capabilities?.colorSupported ? '支持彩色' : '',
     ].filter(Boolean).join(' · ')
     return `<div class="row">
       <div class="grow">
@@ -237,23 +256,54 @@ function renderPrinters() {
 async function refreshPrinters() {
   try {
     printers = await window.desktop.print.listPrinters()
+    console.log(printers)
   }
   catch (e) {
     toast(`读取打印机失败：${e.message}`, false)
   }
   renderPrinters()
+  syncPaperOptions()
 }
 
-async function loadPapers() {
-  try {
-    papers = await window.desktop.print.listPapers()
-  }
-  catch {
-    papers = []
-  }
+// ── 纸型下拉随打印机联动：仅驱动上报纸型（原名原样），查询失败显式提示、绝不回落伪装数据 ──
+function paperSizeText(f) {
+  if (!f.widthMm) return ''
+  return `${f.widthMm}×${f.heightMm ? `${f.heightMm}mm` : '连续'}`
+}
+
+function optionsHtml(label, opts) {
+  const body = opts.map(o =>
+    `<option value="${esc(o.value)}"${o.disabled ? ' disabled' : ''}>${esc(o.label)}</option>`).join('')
+  return `<optgroup label="${esc(label)}">${body || '<option value="" disabled>（空）</option>'}</optgroup>`
+}
+
+/** 驱动表单组：名字原样展示；无尺寸表单无法换算提交参数（按尺寸送打），置灰 */
+function driverFormOptions(forms) {
+  return forms.map((f) => {
+    const size = paperSizeText(f)
+    if (!size) return { value: '', label: `${f.name}（驱动未上报尺寸）`, disabled: true }
+    return { value: `custom:${f.widthMm}x${f.heightMm || 0}`, label: `${f.name}（${size}）` }
+  })
+}
+
+function syncPaperOptions() {
   const sel = $('#opt-paper')
-  sel.innerHTML = papers.map(p => `<option value="${esc(p.id)}">${esc(p.displayName)}（${esc(p.id)}）</option>`).join('')
-  if (!papers.length) sel.innerHTML = '<option value="">纸型库为空</option>'
+  const prev = sel.value
+  const selected = printers.find(x => x.id === $('#opt-printer').value)
+  const forms = selected?.capabilities?.paperList ?? []
+  const opts = forms.length
+    ? driverFormOptions(forms)
+    : [{ value: '', label: selected ? '未读取到该打印机的纸型数据' : '先选择打印机', disabled: true }]
+  sel.innerHTML = optionsHtml('打印机纸型（驱动上报）', opts)
+  if (opts.some(o => o.value === prev && !o.disabled)) sel.value = prev
+}
+
+// 下拉值 → paper 入参：驱动表单尺寸转为 '宽x高' 写法（高 0 = 连续纸）
+function parsePaperValue(v) {
+  if (!v) return null
+  const m = v.match(/^custom:(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/)
+  if (m) return `${m[1]}x${m[2]}`
+  return v
 }
 
 // ── 打印任务 ──
@@ -299,6 +349,7 @@ $('#tpl-data').addEventListener('input', markJsonValid)
 $('#opt-margin').addEventListener('change', () => {
   $('#margin-custom').hidden = $('#opt-margin').value !== 'custom'
 })
+$('#opt-printer').addEventListener('change', syncPaperOptions)
 $('#opt-silent').addEventListener('change', () => {
   $('#silent-warn').hidden = $('#opt-silent').checked
 })
@@ -312,7 +363,6 @@ $('#printer-list').addEventListener('click', async (e) => {
   if (!p) return
   try {
     const r = await window.desktop.print.submit({
-      businessType: 'document',
       payload: {
         kind: 'template',
         templateId: 'document-default',
@@ -328,7 +378,7 @@ $('#printer-list').addEventListener('click', async (e) => {
           ],
         },
       },
-      options: { paper: { preset: 'a4' }, copies: 1, silent: true, printerId: p.id, jobName: `测试页 · ${p.displayName}` },
+      options: { paper: 'a4', copies: 1, silent: true, printerId: p.id, jobName: `测试页 · ${p.displayName}` },
     })
     toast(`已提交到 ${p.displayName}`)
     void refreshJobs()
@@ -373,14 +423,14 @@ $('#btn-clear-jobs').addEventListener('click', async () => {
 registerRefresher(refreshPrinters)
 registerRefresher(refreshJobs)
 void (async () => {
-  await Promise.all([refreshPrinters(), loadPapers()])
+  await refreshPrinters()
   switchKind('receipt80')
   await refreshJobs()
 })()
 
 // ── 网络直连打印机档案：运行时添加/编辑（upsert 持久化 + 即时生效）；新档案 id 按 raw:host:port 统一约定 ──
 
-const NETP_PROTOCOL_LABEL = { escpos: 'ESC/POS', star: 'Star', zpl: 'ZPL' }
+const NETP_PROTOCOL_LABEL = { escpos: 'ESC/POS', star: 'Star' }
 
 let netPrinters = []
 let editingNetPrinter = null

@@ -1,14 +1,12 @@
-import type { JobStatus, PaperInput, PaperProfile, PrinterCaps, PrintLogFn, PrintPreset, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
+import type { JobStatus, PrinterCaps, PrintLogFn, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
 import type { BrowserWindow } from 'electron'
 import type { Logger } from '../../logger/logger'
 import { join } from 'node:path'
 import { HiddenWindowPool } from './hidden-window'
-import { getPaperLibrary } from './paper'
 import { PrinterRegistry } from './printer-registry'
 import { PrintService } from './service'
 
 export * from './paper'
-export { BUILT_IN_PRESETS, mergePresets } from './preset'
 
 /** 打印系统句柄：平台与打印模块的唯一交互面 */
 export interface PrintSystem {
@@ -22,16 +20,8 @@ export interface PrintSystem {
   removeJob: (jobId: string) => Promise<boolean>
   /** 清空全部任务记录（连带删除归档 PDF），返回清除条数 */
   clearJobs: () => Promise<number>
-  /** 纸型库 */
-  listPapers: () => Promise<PaperProfile[]>
-  /** 打印预设库：业务单据一键打印 */
-  listPresets: () => Promise<PrintPreset[]>
-  /** 按预设一键打印（调用方只提供业务数据） */
-  submitByPreset: (presetId: string, data: Record<string, unknown>) => Promise<PrintResult>
-  /** 运行时编辑打印预设（持久化，热生效） */
-  savePreset: (preset: PrintPreset) => void
-  /** 渲染预览：模板 + 数据 + 纸张 → 完整 HTML（iframe 实时预览用，不送打） */
-  renderPreview: (templateId: string, data: Record<string, unknown>, paper: PaperInput) => Promise<string>
+  /** 渲染预览：模板 + 数据 + 纸张写法 → 完整 HTML（iframe 实时预览用，不送打） */
+  renderPreview: (templateId: string, data: Record<string, unknown>, paper: string) => Promise<string>
   reprint: (jobId: string) => Promise<PrintResult>
   /** 网络直连打印机档案列表（运行时编辑数据源） */
   getNetworkPrinters: () => RawPrinterConfig[]
@@ -50,10 +40,6 @@ export interface PrintSystemOptions {
   printers: RawPrinterConfig[]
   /** SumatraPDF 绝对路径（未传/未就位时 PDF 直通回退 Chromium 窗口） */
   sumatraPath?: string
-  /** 运行时自定义预设（持久化回注，按 id 覆盖出厂） */
-  customPresets?: PrintPreset[]
-  /** 预设编辑持久化 */
-  persistPresets?: (presets: PrintPreset[]) => void
   /** 打印机档案运行时编辑持久化（未注入则编辑仅内存生效） */
   persistPrinters?: (printers: RawPrinterConfig[]) => void
   /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁（无主隐藏窗会让 window-all-closed 永不触发，进程常驻） */
@@ -75,8 +61,6 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
     archiveDir,
     jobsFile: join(options.stateDir, 'print-jobs.json'),
     sumatraPath: options.sumatraPath,
-    customPresets: options.customPresets,
-    persistPresets: options.persistPresets,
     printers: options.printers,
     persistPrinters: options.persistPrinters,
     logger: log,
@@ -90,10 +74,6 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
     listJobs: async limit => service.listJobs(limit),
     removeJob: jobId => service.removeJob(jobId),
     clearJobs: () => service.clearJobs(),
-    listPapers: async () => getPaperLibrary(),
-    listPresets: async () => service.listPresets(),
-    submitByPreset: (presetId, data) => service.submitByPreset(presetId, data),
-    savePreset: preset => service.upsertPreset(preset),
     renderPreview: async (templateId, data, paper) => service.renderPreview(templateId, data, paper),
     reprint: jobId => service.reprint(jobId),
     getNetworkPrinters: () => service.getNetworkPrinters(),

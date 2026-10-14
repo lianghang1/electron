@@ -1,4 +1,4 @@
-import type { RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
+import type { PaperSpec, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
 import type { EscposApi } from '../escpos-render'
 import type { PreparedJob } from './channel-types'
 
@@ -10,12 +10,11 @@ import { CharacterSet, PrinterTypes, ThermalPrinter } from 'node-thermal-printer
 import { printError } from '../errors'
 import { renderTemplateEscpos } from '../escpos-render'
 import { paperToColumns } from '../paper'
-import { renderLabelZpl } from '../zpl-render'
 
 /**
- * 指令直写通道：ESC/POS（小票）/ ZPL（标签），网络打印机 TCP 9100 免驱动直发。
+ * 指令直写通道：ESC/POS（小票/标签），网络打印机 TCP 9100 免驱动直发。
  * 中文文本：库以 CharacterSet.CHINA（EUC-CN/GB2312）经 iconv-lite 编码，打印机内置字库渲染。
- * mock 模式：不连真机，把生成的指令流落盘（.bin/.zpl + 十六进制转储），
+ * mock 模式：不连真机，把生成的指令流落盘（.bin + 十六进制转储），
  * 供无真机环境验证指令正确性；真机到手后把配置里的 mock 改为 false 即可。
  */
 export class RawChannel implements PrintChannel {
@@ -43,69 +42,61 @@ export class RawChannel implements PrintChannel {
       })
     }
 
-    // 1) 归一化内容 → 指令字节流（标签走 ZPL，其余走 ESC/POS）
+    // 1) 归一化内容 → ESC/POS 指令字节流（模板无指令渲染器时显式报错）
     let bytes: Uint8Array
-    let dialect: 'escpos' | 'zpl'
-    if (job.content.type === 'html' && job.content.structured?.templateId === 'label-default') {
-      bytes = renderLabelZpl('label-default', job.content.structured.data, job.options, job.paper)
-      dialect = 'zpl'
-    }
-    else {
-      switch (job.content.type) {
-        case 'html': {
-          const structured = job.content.structured
-          if (!structured) {
-            throw printError('OPTION_UNSUPPORTED', 'raw 通道需要模板（结构化数据）负载或 raw 指令负载')
-          }
-          const thermal = this.createPrinter(cfg, job)
-          renderTemplateEscpos(asEscposApi(thermal), structured.templateId, structured.data, job.options, job.paper)
-          bytes = new Uint8Array(thermal.getBuffer())
-          break
+    switch (job.content.type) {
+      case 'html': {
+        const structured = job.content.structured
+        if (!structured) {
+          throw printError('OPTION_UNSUPPORTED', 'raw 通道需要模板（结构化数据）负载或 raw 指令负载')
         }
-        case 'raw': {
-          if (job.content.dialect !== 'escpos') {
-            throw printError('OPTION_UNSUPPORTED', `raw 通道当前仅支持 escpos 指令负载，收到 ${job.content.dialect}`)
-          }
-          // raw 负载 = 调用方自带完整指令流，硬件控制需自行编码在指令内
-          const hw = job.options.hardware
-          if (hw && ((hw.cut && hw.cut !== 'none') || hw.openCashbox || (hw.feedLines ?? 0) > 0)) {
-            throw printError('OPTION_UNSUPPORTED', 'raw 指令负载请把切纸/钱箱等控制编入指令流，不支持 options.hardware', {
-              printerId: printer.id,
-              requested: hw,
-            })
-          }
-          bytes = job.content.bytes
-          break
-        }
-        case 'pdf':
-          throw printError('OPTION_UNSUPPORTED', 'raw 通道不支持 PDF 内容，请改用系统队列通道或指令模板')
+        const thermal = this.createPrinter(cfg, job.paper)
+        renderTemplateEscpos(asEscposApi(thermal), structured.templateId, structured.data, job.options, job.paper)
+        bytes = new Uint8Array(thermal.getBuffer())
+        break
       }
-      dialect = 'escpos'
+      case 'raw': {
+        if (job.content.dialect !== 'escpos') {
+          throw printError('OPTION_UNSUPPORTED', `raw 通道当前仅支持 escpos 指令负载，收到 ${job.content.dialect}`)
+        }
+        // raw 负载 = 调用方自带完整指令流，硬件控制需自行编码在指令内
+        const hw = job.options.hardware
+        if (hw && ((hw.cut && hw.cut !== 'none') || hw.openCashbox || (hw.feedLines ?? 0) > 0)) {
+          throw printError('OPTION_UNSUPPORTED', 'raw 指令负载请把切纸/钱箱等控制编入指令流，不支持 options.hardware', {
+            printerId: printer.id,
+            requested: hw,
+          })
+        }
+        bytes = job.content.bytes
+        break
+      }
+      case 'pdf':
+        throw printError('OPTION_UNSUPPORTED', 'raw 通道不支持 PDF 内容，请改用系统队列通道或指令模板')
     }
 
     // 2) 发送：mock 落盘 或 TCP 直发
     if (cfg.mock) {
       const dir = cfg.mockOutputDir ?? path.join('out', 'mock-print')
       await mkdir(dir, { recursive: true })
-      const binPath = path.join(dir, `${job.jobId}.${dialect === 'zpl' ? 'zpl' : 'bin'}`)
+      const binPath = path.join(dir, `${job.jobId}.bin`)
       await writeFile(binPath, bytes)
       const hexPath = path.join(dir, `${job.jobId}.hex.txt`)
       await writeFile(hexPath, hexDump(bytes))
-      return { detail: { mock: true, binPath, hexPath, bytes: bytes.byteLength, dialect } }
+      return { detail: { mock: true, binPath, hexPath, bytes: bytes.byteLength, dialect: 'escpos' } }
     }
 
     await writeRawSocket(cfg, bytes)
-    return { detail: { via: 'tcp-raw', bytes: bytes.byteLength, dialect } }
+    return { detail: { via: 'tcp-raw', bytes: bytes.byteLength, dialect: 'escpos' } }
   }
 
-  private createPrinter(cfg: RawPrinterConfig, job: PreparedJob): ThermalPrinter {
+  private createPrinter(cfg: RawPrinterConfig, paper: PaperSpec | undefined): ThermalPrinter {
     return new ThermalPrinter({
       type: cfg.protocol === 'star' ? PrinterTypes.STAR : PrinterTypes.EPSON,
       // mock 模式不连接设备，interface 仅为满足构造签名（该路径只构建缓冲不发送）
       interface: cfg.mock ? '' : `tcp://${cfg.transport.host}:${cfg.transport.port}`,
       characterSet: CharacterSet.CHINA,
       removeSpecialCharacters: false,
-      width: paperToColumns(job.paper),
+      width: paperToColumns(paper),
       options: { timeout: 5000 },
     })
   }
