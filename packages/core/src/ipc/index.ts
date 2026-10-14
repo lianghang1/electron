@@ -88,6 +88,7 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService })
   registerOverlayIpc({
     overlayService: deps.overlayService,
+    registry: deps.registry,
     tabService: deps.tabService,
     cacheService: deps.cacheService,
     resolver: deps.resolver,

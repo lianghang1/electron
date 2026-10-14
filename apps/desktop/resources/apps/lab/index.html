@@ -537,10 +537,10 @@
     'device-idcard': async () => {
       try {
         const data = await window.desktop.device.readIdCard()
-        log(`readIdCard: ${data.name} · ${data.idNumber.replace(/^(.{4}).*(.{3})$/, '$1****$2')} · ${data.gender}（dev 内置 stub mock 兜底）`, 'ok')
+        log(`readIdCard: ${data.name} · ${data.idNumber.replace(/^(.{4}).*(.{3})$/, '$1****$2')} · ${data.gender}`, 'ok')
       }
       catch (err) {
-        log(`readIdCard: ${err.code ?? 'UNKNOWN'} ${err.message}（dev 内置 stub mock 兜底）`, 'fail')
+        log(`readIdCard: ${err.code ?? 'UNKNOWN'} ${err.message}`, 'fail')
       }
     },
     'update-check': async () => {

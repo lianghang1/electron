@@ -22,8 +22,6 @@ export interface CaptureSystem {
 export interface CaptureSystemOptions {
   /** 设备资源根（DLL 相对路径基准，宿主解析开发/打包差异） */
   resourcesRoot: string
-  /** 注册 stub 模拟采集设备（无硬件联调/演示用）；缺省不注册，正式环境零模拟 */
-  mock?: boolean
   /** 初始设备档案（持久化回注；不传 = 出厂档案） */
   initialProfiles?: CaptureDeviceProfile[]
   /** 运行时编辑持久化（未注入则编辑仅内存生效） */

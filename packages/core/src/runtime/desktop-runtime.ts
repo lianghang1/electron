@@ -68,7 +68,7 @@ export class DesktopRuntime {
   private windowService!: WindowService
   /** 全局浮层独立原生窗：右键菜单/确认弹窗渲染处（原生层级压过 WebContentsView） */
   private overlayService!: OverlayWindowService
-  /** 设备系统：证卡读取（dll 真实驱动 + devices.mock 显式开启的 stub 模拟器） */
+  /** 设备系统：证卡读取（dll 真实驱动） */
   private idCardSystem?: IdCardSystem
   /** 设备守护进程：厂商 DLL 的 koffi 调用全部在此进程执行（native 崩溃隔离 + 退避重启自愈） */
   private deviceHost?: DeviceHost
@@ -78,7 +78,7 @@ export class DesktopRuntime {
   private captureSystem!: CaptureSystem
   /** 设备系统：统一打印（系统队列，恒创建） */
   private printSystem!: PrintSystem
-  /** 设备系统：手写签名（dll 真实驱动 + devices.mock 显式开启的 stub 模拟器） */
+  /** 设备系统：手写签名（dll 真实驱动） */
   private signatureSystem?: SignatureSystem
 
   constructor(private readonly options: BootstrapOptions) {}
@@ -145,7 +145,6 @@ export class DesktopRuntime {
     this.setupUpdaters()
     this.setupAppRegistry()
     this.setupIpcAndShellBridge()
-    this.setupChromeHotkey()
     this.setupDevToolsHotkey()
 
     this.updateService.start()
@@ -217,14 +216,13 @@ export class DesktopRuntime {
    * 设备系统装配：资源根统一经 resolveResourcePath 解析（缺省 resources/ —— dev 为
    * <应用根>/resources，打包为 <resourcesPath>/resources），DLL 与外置 exe 均相对它寻址
    * （idcard/capture/signature 的 devices/<brand>/、print 的 devices/print/）。
-   * 模拟设备零隐式注册：devices.mock 显式开启才注册 stub 读卡器/采集设备。运行时编辑持久化
-   * 由 electron-store 托管（userData），capture 的存储缺键时回落出厂档案（不设 defaults，避免空值覆盖）。
+   * 运行时编辑持久化由 electron-store 托管（userData），capture 的存储缺键时回落出厂档案
+   * （不设 defaults，避免空值覆盖）。
    */
   private setupDevices(): void {
     const resourcesRoot = this.options.devices?.resourcesRoot
       ? resolveResourcePath(this.options.devices.resourcesRoot)
       : resolveResourcePath('resources')
-    const mock = this.options.devices?.mock ?? false
 
     // 设备守护进程：入口 bundle 与主进程同目录（out/main/device-host.js，electron-vite 多入口）
     this.deviceHost = new DeviceHost(this.logger.scope('device:host'), resolveHostEntryPath())
@@ -233,13 +231,11 @@ export class DesktopRuntime {
       resourcesRoot,
       host: this.deviceHost,
       logger: this.logger.scope('device:idcard'),
-      mock,
     })
 
     this.signatureSystem = createSignatureSystem({
       resourcesRoot,
       logger: this.logger.scope('device:signature'),
-      mock,
     })
 
     // 扫码枪：配置持久化 + 键盘观察接入所有窗口（before-input-event，全局生效）
@@ -255,7 +251,6 @@ export class DesktopRuntime {
     const captureStore = createStore<{ devices?: CaptureDeviceProfile[] }>({ name: 'device-capture-profiles' })
     this.captureSystem = createCaptureSystem({
       resourcesRoot,
-      mock,
       initialProfiles: captureStore.get('devices'),
       persist: devices => captureStore.set('devices', devices),
       defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(app.getPath('userData'), 'capture'),
@@ -381,10 +376,6 @@ export class DesktopRuntime {
     this.events.on('window:maximizedChanged', (maximized) => {
       this.windowService.getMainWindow()?.webContents.send('window:maximizedChanged', maximized)
     })
-    // 套壳热键命中 → Shell 切换外壳临时显隐
-    this.events.on('shell:toggleChrome', () => {
-      this.windowService.getMainWindow()?.webContents.send('window:toggleChrome')
-    })
     // 运行时权限请求 → 浮层权限弹窗（原生窗压过 Web 容器），用户决策经 permission:respond 回传
     this.events.on('permission:request', (request) => {
       this.overlayService.pushDialog(request)
@@ -438,28 +429,6 @@ export class DesktopRuntime {
         offRegistered()
     })
     this.logger.info('startup app pending registration', { appId })
-  }
-
-  /**
-   * 套壳模式兜底热键 Ctrl+Alt+A：临时唤出 / 收起 Shell 外壳（导航 + 顶栏）。
-   * 挂在 web-contents-created 的 before-input-event 上，Shell 与 Web 视图持有焦点时均可触发；
-   * 不用 globalShortcut，避免占用系统级组合键。仅激活 Tab 的 App 声明 chrome: 'single' 时生效。
-   */
-  private setupChromeHotkey(): void {
-    app.on('web-contents-created', (_, webContents) => {
-      webContents.on('before-input-event', (event, input) => {
-        if (input.type !== 'keyDown' || input.key.toLowerCase() !== 'a')
-          return
-        if (!input.control || !input.alt || input.shift || input.meta)
-          return
-        const activeTab = this.tabService?.list().find(tab => tab.active)
-        const manifest = activeTab ? this.registry.get(activeTab.appId) : undefined
-        if (manifest?.chrome !== 'single')
-          return
-        event.preventDefault()
-        this.events.emit('shell:toggleChrome')
-      })
-    })
   }
 
   /**

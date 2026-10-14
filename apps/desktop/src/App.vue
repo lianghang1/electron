@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import type { DesktopTab, WorkAreaRect } from '@desktop/shared'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppCenter from './components/AppCenter.vue'
 import AppLauncher from './components/AppLauncher.vue'
 import TopBar from './components/TopBar.vue'
 import UpdateBar from './components/UpdateBar.vue'
-import WindowControls from './components/WindowControls.vue'
 import { useApps } from './composables/use-apps'
 import { useTabs } from './composables/use-tabs'
 import { useTheme } from './composables/use-theme'
@@ -21,19 +20,12 @@ const appCenterOpen = ref(false)
 
 const activeTab = computed(() => tabs.value.find(tab => tab.active))
 
-/** 套壳模式：激活 App 声明 chrome: 'single' 时隐藏外壳，Web 铺满窗口；Ctrl+Alt+A 临时唤出 */
-const chromeRevealed = ref(false)
+/** 套壳模式：激活 App 声明 chrome: 'single' 时隐藏左侧导航与应用中心（顶栏保留固定 Tab 条），Web 铺满窗口 */
 const chromeHidden = computed(() => {
   const tab = activeTab.value
   if (!tab)
     return false
-  const single = apps.value.some(app => app.manifest.id === tab.appId && app.manifest.chrome === 'single')
-  return single && !chromeRevealed.value
-})
-
-// 切换激活 Tab 即收回临时唤出的外壳，回到套壳全窗形态
-watch(() => activeTab.value?.id, () => {
-  chromeRevealed.value = false
+  return apps.value.some(app => app.manifest.id === tab.appId && app.manifest.chrome === 'single')
 })
 
 // ---- 窗口控制（顶栏自绘按钮，titleBarStyle: hidden 后为唯一入口） ----
@@ -73,7 +65,6 @@ function syncWorkArea(): void {
 
 let resizeObserver: ResizeObserver | null = null
 let unsubMaximized: (() => void) | null = null
-let unsubChromeToggle: (() => void) | null = null
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(syncWorkArea)
@@ -83,10 +74,6 @@ onMounted(() => {
   unsubMaximized = window.desktop.events.on('window:maximizedChanged', (value) => {
     maximized.value = value
   })
-  // 套壳模式快捷键（Main 侧 before-input-event 拦截后推送）：切换外壳临时显隐
-  unsubChromeToggle = window.desktop.events.on('window:toggleChrome', () => {
-    chromeRevealed.value = !chromeRevealed.value
-  })
   void window.desktop.window.isMaximized().then((value) => {
     maximized.value = value
   })
@@ -95,22 +82,13 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   unsubMaximized?.()
-  unsubChromeToggle?.()
 })
 </script>
 
 <template>
   <div class="dt-shell">
-    <!-- 套壳模式窄条：窗口无系统标题栏，自绘窗口控制不能随外壳一起隐藏；
-         整条为拖拽区，Web 视图区经 ResizeObserver 自动让位到条下方 -->
-    <div v-if="chromeHidden" class="dt-chromestrip">
-      <WindowControls
-        :maximized="maximized"
-        @minimize="minimize"
-        @toggle-maximize="toggleMaximize"
-        @close-window="closeWindow"
-      />
-    </div>
+    <!-- 套壳模式：左侧导航与应用中心隐藏，TopBar 降级为「Tab 条 + 窗口控制」
+         （Tab 不可关闭），整栏仍为窗口拖拽区；Web 视图区经 ResizeObserver 自动让位 -->
     <div class="flex flex-1 min-h-0">
       <AppLauncher v-if="!chromeHidden" :apps="apps" :tabs="tabs" @open="open" />
       <Transition name="ac-slide">
@@ -124,11 +102,11 @@ onBeforeUnmount(() => {
       </Transition>
       <main class="flex-1 flex flex-col min-w-0">
         <TopBar
-          v-if="!chromeHidden"
           :tabs="tabs"
           :maximized="maximized"
           :app-center-open="appCenterOpen"
           :theme="theme"
+          :single="chromeHidden"
           @activate="activate"
           @close="close"
           @context-menu="openTabContextMenu"
@@ -178,18 +156,6 @@ onBeforeUnmount(() => {
     sans-serif;
   transition: background var(--dt-dur) var(--dt-ease);
 }
-/* 套壳模式窗口控制窄条：只保留最小化/最大化/关闭，整条可拖动窗口 */
-.dt-chromestrip {
-  height: 32px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  background: var(--dt-surface);
-  border-bottom: 1px solid var(--dt-line);
-  -webkit-app-region: drag;
-}
-
 .dt-empty {
   height: 100%;
   display: flex;

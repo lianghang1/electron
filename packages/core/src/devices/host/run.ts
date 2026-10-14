@@ -23,7 +23,7 @@ const DRIVERS: Record<string, new (resourcesRoot: string) => BrandDriver> = {
   decard: DecardDriver,
 }
 
-/** 崩溃注入环境变量（与 DESKTOP_DEVICES_MOCK 同类的联调开关）：由 DeviceHost 决定传给哪个进程实例 */
+/** 崩溃注入环境变量（联调开关）：由 DeviceHost 决定传给哪个进程实例 */
 export const DEVICE_HOST_CRASH_ENV = 'DESKTOP_DEVICE_HOST_CRASH'
 
 /** 请求载荷公共段：资源根（DLL 寻址基准）+ 驱动名（设备 id "dll:<name>" 的约定后段） */

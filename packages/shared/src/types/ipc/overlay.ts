@@ -14,6 +14,8 @@ export interface TabContextMenu {
   appId: string
   x: number
   y: number
+  /** 是否提供「关闭标签页」：Main 按激活 App 的 chrome 配置计算（套壳模式 Tab 固定不关） */
+  closable: boolean
 }
 
 /** 浮层页同步状态：页面 mounted 后主动拉取（杜绝 Main 推送早于页面订阅的竞态） */

@@ -4,7 +4,6 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { DllAdapter } from './adapters/dll-adapter'
 import { ServiceAdapter } from './adapters/service-adapter'
-import { StubAdapter } from './adapters/stub-adapter'
 import { WiaAdapter } from './adapters/wia-adapter'
 import { WsAdapter } from './adapters/ws-adapter'
 import { captureError, toCaptureError } from './errors'
@@ -13,8 +12,6 @@ import { BUILT_IN_CAPTURE_PROFILES } from './profiles'
 export interface CaptureServiceOptions {
   /** 设备资源根（DLL 相对路径基准，宿主解析开发/打包差异） */
   resourcesRoot: string
-  /** 注册 stub 模拟采集设备（无硬件联调/演示用）；缺省不注册，正式环境零模拟 */
-  mock?: boolean
   /** 初始设备档案（持久化回注；不传 = 出厂档案） */
   initialProfiles?: CaptureDeviceProfile[]
   /** 运行时编辑持久化（未注入则编辑仅内存生效） */
@@ -41,15 +38,12 @@ export class CaptureService {
   private readonly defaultSaveDir: string
   private readonly persist?: (profiles: CaptureDeviceProfile[]) => void
   private readonly resourcesRoot: string
-  /** stub 模拟设备注册开关（显式配置驱动，缺省关闭） */
-  private readonly useStub: boolean
 
   constructor(options: CaptureServiceOptions) {
     this.logger = options.logger ?? (() => {})
     this.defaultSaveDir = path.resolve(options.defaultSaveDir)
     this.persist = options.persist
     this.resourcesRoot = options.resourcesRoot
-    this.useStub = options.mock ?? false
     this.profiles = options.initialProfiles ?? BUILT_IN_CAPTURE_PROFILES
     this.adapters = this.buildAdapters()
   }
@@ -63,10 +57,6 @@ export class CaptureService {
       ['dll', new DllAdapter(this.profiles, this.resourcesRoot)],
       ['ws', new WsAdapter(this.profiles)],
     ]
-    // stub 模拟设备仅在显式开启时注册（不进正式设备列表）
-    if (this.useStub) {
-      adapters.unshift(['stub', new StubAdapter()])
-    }
     return new Map<string, CaptureAdapter>(adapters)
   }
 

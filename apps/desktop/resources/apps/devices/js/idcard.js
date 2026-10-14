@@ -11,7 +11,7 @@ const ID_FIELDS = [
   ['issuer', '签发机关'],
 ]
 
-const ID_TRANSPORT_LABEL = { dll: 'SDK 直连', stub: '模拟' }
+const ID_TRANSPORT_LABEL = { dll: 'SDK 直连' }
 
 /** 最近一次枚举的读卡器列表（能力联动与回读选中态使用） */
 let readers = []

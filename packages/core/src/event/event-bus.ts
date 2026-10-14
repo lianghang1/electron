@@ -28,8 +28,6 @@ export interface PlatformEventMap {
   'notification:received': [PlatformNotification]
   'renderer:crashed': [{ appId: string, reason: string }]
   'window:maximizedChanged': [boolean]
-  /** 套壳模式热键命中（Ctrl+Alt+A）：runtime 桥接后推送 Shell 切换外壳显隐 */
-  'shell:toggleChrome': []
   'download:updated': [DownloadTask[]]
   'update:state': [UpdateState]
   'update:asarState': [AsarUpdateState]

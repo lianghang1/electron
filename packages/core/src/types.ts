@@ -39,8 +39,6 @@ export interface WindowOverrides {
      * DLL 位置如 devices/huashi/Termb.dll，外置 exe 如 devices/print/SumatraPDF.exe。
      */
     resourcesRoot?: string
-    /** 注册内置 stub 模拟设备（读卡器 + 采集，无硬件联调/演示用）；缺省不注册，正式环境零模拟 */
-    mock?: boolean
     /** 摄像采集（capture 域） */
     capture?: { saveDir?: string }
     /** 打印（print 域） */

@@ -192,7 +192,7 @@ export class OverlayWindowService {
   // ---- Tab 右键菜单 ----
 
   /** Shell 发起：打开 Tab 右键菜单（原生浮层窗承载，页面内容保持可见） */
-  pushMenu(input: { tabId: string, appId: string, x: number, y: number }): void {
+  pushMenu(input: { tabId: string, appId: string, x: number, y: number, closable: boolean }): void {
     // 清场隐藏还没落地就有新菜单：取消延迟隐藏，窗口保持可见，卡片原地换新
     if (this.menuHideTimer) {
       clearTimeout(this.menuHideTimer)

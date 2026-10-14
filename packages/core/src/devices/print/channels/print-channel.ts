@@ -14,6 +14,6 @@ export interface PrintChannel {
 export interface ChannelOutcome {
   /** 存档 PDF 路径（重打依据；SystemChannel 必产，RawChannel 无） */
   archivedPdfPath?: string
-  /** 通道私有审计信息（如 mock 落盘路径），业务层不读 */
+  /** 通道私有审计信息，业务层不读 */
   detail?: unknown
 }

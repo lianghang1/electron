@@ -138,7 +138,7 @@ const builtinApps: DesktopAppManifest[] = [
     type: 'internal',
     entry: { type: 'web', url: 'https://gmuat.fsygroup.com/' },
     permissions: ['storage'],
-    // 套壳模式：激活时隐藏外壳、Web 铺满窗口（Ctrl+Alt+A 临时唤出外壳）
+    // 套壳模式：激活时隐藏外壳、Web 铺满窗口（顶栏保留固定 Tab 条与窗口控制，Tab 不可关闭）
     chrome: 'single',
   },
   {
@@ -191,8 +191,6 @@ bootstrap({
   browserWindowOptions: { autoHideMenuBar: true, titleBarStyle: 'hidden', backgroundColor: '#f6f7f9' },
   // 内部页标准源协议：处理器挂到每个 App 的 persist 分区 Session 上（core 统一注册）
   protocols: { app: handleAppRequest },
-  // 设备模拟联调开关：DESKTOP_DEVICES_MOCK=1 注册 stub 读卡器/采集/签名（无硬件验证链路；正式环境不设置即零模拟）
-  devices: { mock: process.env.DESKTOP_DEVICES_MOCK === '1' },
   apps: {
     allowThirdParty: false,
     manifests: builtinApps,

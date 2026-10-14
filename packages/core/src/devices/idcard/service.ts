@@ -3,7 +3,6 @@ import type { DeviceHost } from '../host/device-host'
 import type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IdCardAdapter, IdCardData, IdReaderDevice } from './types'
 
 import { DllIdAdapter } from './adapters/dll-adapter'
-import { StubIdAdapter } from './adapters/stub-adapter'
 import { idCardError, toIdCardError } from './errors'
 
 /**
@@ -17,15 +16,11 @@ export class IdCardService {
   /** 同一读卡器同一时刻只能执行一次读卡（硬件限制），按锁 key（设备或 lockGroup）串行化（身份证/IC 卡共享锁） */
   private locks = new Map<string, Promise<unknown>>()
 
-  constructor(resourcesRoot: string, host: DeviceHost, private readonly logger: Logger, mock = false) {
+  constructor(resourcesRoot: string, host: DeviceHost, private readonly logger: Logger) {
     this.adapters = new Map<string, IdCardAdapter>([
       // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程）
       ['dll', new DllIdAdapter(host, resourcesRoot)],
     ])
-    // mock 读卡器追加在真实适配器之后：自动选设备时真实硬件优先，无硬件时 stub 兜底
-    if (mock) {
-      this.adapters.set('stub', new StubIdAdapter())
-    }
   }
 
   async listReaders(): Promise<IdReaderDevice[]> {

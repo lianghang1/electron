@@ -141,6 +141,13 @@ const MENU_ITEMS: Array<{ action: TabMenuAction, label: string, danger?: boolean
   { action: 'close', label: '关闭标签页' },
 ]
 
+/** 实际渲染项：套壳模式（Main 按 chrome: 'single' 下发 closable=false）剔除「关闭标签页」 */
+const visibleMenuItems = computed(() =>
+  menu.value && !menu.value.closable
+    ? MENU_ITEMS.filter(item => item.action !== 'close')
+    : MENU_ITEMS,
+)
+
 /** 键盘导航高亮项（上下键移动 / Enter 选中） */
 const highlightIndex = ref(0)
 watch(menu, () => {
@@ -169,15 +176,15 @@ function onMenuKeydown(e: KeyboardEvent): void {
   }
   else if (e.key === 'ArrowDown') {
     e.preventDefault()
-    highlightIndex.value = (highlightIndex.value + 1) % MENU_ITEMS.length
+    highlightIndex.value = (highlightIndex.value + 1) % visibleMenuItems.value.length
   }
   else if (e.key === 'ArrowUp') {
     e.preventDefault()
-    highlightIndex.value = (highlightIndex.value - 1 + MENU_ITEMS.length) % MENU_ITEMS.length
+    highlightIndex.value = (highlightIndex.value - 1 + visibleMenuItems.value.length) % visibleMenuItems.value.length
   }
   else if (e.key === 'Enter') {
     e.preventDefault()
-    selectMenu(MENU_ITEMS[highlightIndex.value].action)
+    selectMenu(visibleMenuItems.value[highlightIndex.value].action)
   }
 }
 
@@ -353,8 +360,8 @@ function dialogBtnClass(primary: boolean): string {
         class="ov-menu__card ov-anim-pop fixed min-w-[184px] rounded-[10px] border border-[rgba(2,8,20,0.1)] bg-white p-[4px] shadow-[0_10px_28px_rgba(2,8,20,0.18),0_2px_8px_rgba(2,8,20,0.1)]"
         :style="menuPos"
       >
-        <template v-for="(item, i) in MENU_ITEMS" :key="item.action">
-          <div v-if="i === MENU_ITEMS.length - 1" class="ov-menu__sep mx-[6px] my-[4px] h-px bg-[#e8ecf1]" />
+        <template v-for="(item, i) in visibleMenuItems" :key="item.action">
+          <div v-if="i === visibleMenuItems.length - 1" class="ov-menu__sep mx-[6px] my-[4px] h-px bg-[#e8ecf1]" />
           <button
             class="ov-menu__item flex h-[28px] w-full cursor-pointer items-center rounded-[6px] border-none bg-transparent px-[10px] text-left text-[12.5px] font-[inherit] transition-colors duration-[120ms]"
             :class="[

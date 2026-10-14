@@ -3,7 +3,7 @@
    设备只产采样点，签名图完全由本页绘制（板面坐标系 → 画布等比映射）。
    调用失败统一 reject（IpcRemoteError：e.code / e.message），catch 分支展示。 */
 
-const SIGN_TRANSPORT_LABEL = { dll: 'SDK 直连', stub: '模拟' }
+const SIGN_TRANSPORT_LABEL = { dll: 'SDK 直连' }
 let signBoard = null // 板面宽高（笔迹点坐标系）
 let signActive = false
 let signStrokes = 0

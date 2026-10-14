@@ -1,4 +1,5 @@
 import type { TabMenuAction } from '@desktop/shared'
+import type { AppRegistry } from '../app/app-registry'
 import type { CacheService } from '../cache/cache-service'
 import type { TabService } from '../tab/tab-service'
 import type { OverlayWindowService } from '../window/overlay-window'
@@ -9,6 +10,8 @@ import { handle } from './handle'
 
 export interface OverlayIpcDeps {
   overlayService: OverlayWindowService
+  /** 菜单打开时按 manifest.chrome 计算 closable（套壳模式 Tab 不给关闭入口） */
+  registry: AppRegistry
   /** 菜单动作执行：选中项由 Main 直接调 service，Shell 无需中转 */
   tabService?: TabService
   cacheService: CacheService
@@ -44,7 +47,9 @@ export function registerOverlayIpc(deps: OverlayIpcDeps): void {
     const y = Number(menu.y)
     if (!Number.isFinite(x) || !Number.isFinite(y))
       throw new DesktopError('IPC_ERROR', 'invalid menu anchor')
-    deps.overlayService.pushMenu({ tabId: menu.tabId, appId: menu.appId, x, y })
+    // 套壳模式（chrome: 'single'）Tab 固定不可关：菜单不给「关闭标签页」入口
+    const closable = deps.registry.get(menu.appId)?.chrome !== 'single'
+    deps.overlayService.pushMenu({ tabId: menu.tabId, appId: menu.appId, x, y, closable })
   })
   // 菜单窗回传：选中菜单项 → Main 执行动作后关闭菜单
   handle('overlay:menuSelect', (e, action) => {

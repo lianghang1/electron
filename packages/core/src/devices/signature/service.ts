@@ -2,7 +2,6 @@ import type { Logger } from '../../logger/logger'
 import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
 
 import { DllSignAdapter } from './adapters/dll-adapter'
-import { StubSignAdapter } from './adapters/stub-adapter'
 import { signatureError, toSignatureError } from './errors'
 
 /**
@@ -16,14 +15,10 @@ export class SignatureService {
   /** 活动会话：设备 ID + 发起方的笔迹推送回调 */
   private active: { deviceId: string, onStroke: (point: SignStrokePoint) => void } | null = null
 
-  constructor(resourcesRoot: string, private readonly logger: Logger, mock = false) {
+  constructor(resourcesRoot: string, private readonly logger: Logger) {
     this.adapters = new Map<string, SignAdapter>([
       ['dll', new DllSignAdapter(resourcesRoot)],
     ])
-    // mock 签名板追加在真实适配器之后：自动选设备时真实硬件优先，无硬件时 stub 兜底
-    if (mock) {
-      this.adapters.set('stub', new StubSignAdapter())
-    }
   }
 
   async listDevices(): Promise<SignDevice[]> {

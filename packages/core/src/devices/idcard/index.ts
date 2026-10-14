@@ -9,8 +9,6 @@ export interface IdCardSystemOptions {
   /** 设备守护进程（DLL 的 koffi 调用崩溃隔离在 host 进程） */
   host: DeviceHost
   logger: Logger
-  /** 注册内置 mock 读卡器（stub）：缺省关闭，dev 环境或明确要求时开启 */
-  mock?: boolean
 }
 
 export interface IdCardSystem {
@@ -26,7 +24,7 @@ export interface IdCardSystem {
 
 /** 创建证卡读取系统（与 print/capture 系统同构，device 域通道由 core/src/ipc/device.ts 注册） */
 export function createIdCardSystem(options: IdCardSystemOptions): IdCardSystem {
-  const service = new IdCardService(options.resourcesRoot, options.host, options.logger, options.mock)
+  const service = new IdCardService(options.resourcesRoot, options.host, options.logger)
   return {
     listReaders: () => service.listReaders(),
     read: req => service.read(req),

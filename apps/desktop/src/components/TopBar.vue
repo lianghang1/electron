@@ -12,6 +12,8 @@ defineProps<{
   appCenterOpen?: boolean
   /** 当前主题：切换主题按钮图标 */
   theme: ShellTheme
+  /** 套壳模式：只保留 Tab 条与窗口控制（无品牌/应用中心/主题），Tab 不提供关闭入口 */
+  single?: boolean
 }>()
 
 defineEmits<{
@@ -38,10 +40,11 @@ function onTabsWheel(e: WheelEvent): void {
   <!-- 沉浸式顶栏（飞书式）：品牌 / 应用中心 / Tab / 主题 / 窗口控制合一，
        整栏为窗口拖拽区，可交互控件一律 no-drag -->
   <div class="dt-topbar">
-    <div class="dt-topbar__brand">
+    <div v-if="!single" class="dt-topbar__brand">
       Desktop
     </div>
     <button
+      v-if="!single"
       class="dt-topbar__center"
       :class="{ 'dt-topbar__center--open': appCenterOpen }"
       title="应用中心"
@@ -55,7 +58,7 @@ function onTabsWheel(e: WheelEvent): void {
         v-for="tab in tabs"
         :key="tab.id"
         class="dt-tab"
-        :class="{ 'dt-tab--active': tab.active }"
+        :class="{ 'dt-tab--active': tab.active, 'dt-tab--fixed': single }"
         :title="tab.title"
         @click="$emit('activate', tab.id)"
         @contextmenu.prevent="$emit('contextMenu', tab, $event.clientX, $event.clientY)"
@@ -71,6 +74,7 @@ function onTabsWheel(e: WheelEvent): void {
         </svg>
         <span class="dt-tab__title">{{ tab.title }}</span>
         <span
+          v-if="!single"
           class="dt-tab__close"
           title="关闭"
           @click.stop="$emit('close', tab.id)"
@@ -83,7 +87,7 @@ function onTabsWheel(e: WheelEvent): void {
     <div class="dt-topbar__spacer" />
 
     <div class="dt-topbar__controls">
-      <button class="dt-winbtn dt-winbtn--theme" title="切换主题" @click="$emit('toggleTheme')">
+      <button v-if="!single" class="dt-winbtn dt-winbtn--theme" title="切换主题" @click="$emit('toggleTheme')">
         <svg v-if="theme === 'light'" viewBox="0 0 16 16" width="14" height="14"><path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /></svg>
         <svg v-else viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="3.2" fill="currentColor" /><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1" /></g></svg>
       </button>
@@ -160,7 +164,7 @@ function onTabsWheel(e: WheelEvent): void {
   height: 100%;
 }
 
-/* Tab：hover 浅灰圆角块，激活 = 青玉浅底 + 底部主色指示条 + 常显关闭钮 */
+/* Tab：hover 浅灰圆角块，激活 = 青玉浅底 + 底部主色指示条 + 常显关闭钮（套壳模式不渲染） */
 .dt-tab {
   position: relative;
   display: flex;
@@ -196,6 +200,10 @@ function onTabsWheel(e: WheelEvent): void {
   height: 2px;
   border-radius: 2px;
   background: var(--dt-brand);
+}
+/* 固定 Tab（套壳模式）：无关闭钮，左右内边距对称 */
+.dt-tab--fixed {
+  padding: 0 12px;
 }
 .dt-tab__spinner {
   flex: none;
