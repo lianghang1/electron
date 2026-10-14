@@ -18,7 +18,6 @@ const MAX_RECORDS = 200
 /**
  * 任务簿：状态查询 / 任务列表 / 重打 / 审计的数据源。
  * 持久化文件路径由装配方注入（userData/print-jobs.json）——重启后任务历史与重打仍可用。
- * raw 指令负载的字节经 JSON 会退化为对象，加载时还原；损坏则保留记录但放弃其重打能力。
  */
 export class JobStore {
   private jobs = new Map<string, JobRecord>()
@@ -40,25 +39,11 @@ export class JobStore {
       for (const rec of parsed.slice(0, MAX_RECORDS)) {
         if (!rec?.jobId)
           continue
-        this.reviveRawBytes(rec)
         this.jobs.set(rec.jobId, rec)
       }
     }
     catch (err) {
       console.error('[print] 任务簿加载失败:', err)
-    }
-  }
-
-  private reviveRawBytes(rec: JobRecord): void {
-    const payload = rec.request?.payload as { kind?: string, bytes?: unknown } | undefined
-    if (payload?.kind !== 'raw' || !payload.bytes || ArrayBuffer.isView(payload.bytes))
-      return
-    const values = Object.values(payload.bytes as Record<string, number>)
-    if (values.every(v => typeof v === 'number' && v >= 0 && v <= 255)) {
-      payload.bytes = new Uint8Array(values)
-    }
-    else {
-      rec.request = { ...rec.request, payload: { kind: 'html', html: '' } }
     }
   }
 

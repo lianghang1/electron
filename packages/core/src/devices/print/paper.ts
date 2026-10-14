@@ -52,16 +52,6 @@ export function resolvePaper(paper: string): PaperSpec | undefined {
   return undefined
 }
 
-/** 热敏打印机字符列数（203dpi 下 58mm≈32 列，80mm≈48 列）；未指定纸型按 80mm 常规宽度 */
-export function paperToColumns(paper: PaperSpec | undefined): number {
-  const widthMm = paper?.widthMm ?? 80
-  if (widthMm <= 60)
-    return 32
-  if (widthMm <= 84)
-    return 48
-  return 64
-}
-
 /**
  * webContents.print 的 pageSize（单位：微米 micron，1mm = 1000 micron）。
  * 返回 undefined = 连续卷纸（小票/连续标签）或未指定纸型：Electron 37 要求对象

@@ -322,9 +322,6 @@ importers:
       iconv-lite:
         specifier: ^0.6.3
         version: 0.6.3
-      node-thermal-printer:
-        specifier: ^4.5.0
-        version: 4.6.1
       qrcode:
         specifier: ^1.5.4
         version: 1.5.4
@@ -2918,9 +2915,6 @@ packages:
     resolution: {integrity: sha512-MOqHvMWF9/9MX6nza0KgvFH4HpMU0EF5uUDXqX/BtxtU8NfB0QzRtJ8Oe/6SuS4kbhyzVJwjd97EA4PKrzJ8bw==}
     engines: {node: '>=0.12'}
 
-  dank-do-while@0.1.2:
-    resolution: {integrity: sha512-pyMrgXfugjvdernLCcXNixYqGijUZzYxrb+hAeED2EBpNbctCCxdA/O6NIQXn6vIjwzY1IMmV29d2Y6vaayrwQ==}
-
   danmu.js@1.2.1:
     resolution: {integrity: sha512-evDEImUBo94c846fC92K//Dzll8jXnZ3zKmYlQHwMzmvw6IW2IyjWL3Ew2SqEAzuqauFnDkwJEgZauu3uW/p1Q==}
 
@@ -4290,9 +4284,6 @@ packages:
     resolution: {integrity: sha512-BdiKAgbfRlvfMq/XzO/AF9NPmaA8a+YpLAyAFTVFBj3gARrAIfWvNq7Q7NE4se3KgFu0KkrvQMxTS0XVnsGzHg==}
     engines: {node: '>=18'}
 
-  node-thermal-printer@4.6.1:
-    resolution: {integrity: sha512-1suzv26np5eBWkdy2INszPNjd7mgqXISY5qVHgszge6VMWZ485GWsvOUCNWZbVhQVw9QtUzV1dHoCFKg9mIPPg==}
-
   nopt@6.0.0:
     resolution: {integrity: sha512-ZwLpbTgdhuZUnZzjd7nb1ZV+4DoiC6/sfiVKok72ym/4Tlf+DFdlHYmT2JPmcNNWV6Pi3SDf1kT+A4r9RTuT9g==}
     engines: {node: ^12.13.0 || ^14.15.0 || >=16.0.0}
@@ -4492,10 +4483,6 @@ packages:
   pngjs@5.0.0:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
     engines: {node: '>=10.13.0'}
-
-  pngjs@7.0.0:
-    resolution: {integrity: sha512-LKWqWJRhstyYo9pGvgor/ivk2w94eSjE3RGVuzLGlr3NmD8bf7RcYGze1mNdEHRP6TRP6rMuDHk5t44hnTRyow==}
-    engines: {node: '>=14.19.0'}
 
   pnpm-workspace-yaml@1.9.1:
     resolution: {integrity: sha512-Xj/T2X6DNAWbtk/9UQ0/TJRswltiHZevmcMjqoL7WrpJi67lu3qaslU4+I+zJ8wtwqmuvAE0KkB8rbv2ZdogBg==}
@@ -5065,10 +5052,6 @@ packages:
       '@unocss/webpack':
         optional: true
 
-  unorm@1.6.0:
-    resolution: {integrity: sha512-b2/KCUlYZUeA7JFUuRJZPUtr4gZvBh7tavtv4fvk4+KV9pfGiR6CQAQAWl49ZpR3ts2dk4FYkP7EIgDJoiOLDA==}
-    engines: {node: '>= 0.4.0'}
-
   unplugin-auto-import@21.1.0:
     resolution: {integrity: sha512-EzrSqWIBulEqCuP7idADXH+tVKYrbwKlR5+r/lOWik0o+Ksny1kitmtryHGNSv7puzzORlcIwT/x2JStiszlHA==}
     engines: {node: '>=20.19.0'}
@@ -5363,9 +5346,6 @@ packages:
 
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
-
-  write-file-queue@0.0.1:
-    resolution: {integrity: sha512-uUInKYzJjhvZ5UJA27tsqbw6s9EEpwe6r4mdpN95t2E4aKzJEJbZg2EvIleTGaja+xtZYx376Jd2WWu5LEQP0w==}
 
   ws@8.22.0:
     resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
@@ -8064,8 +8044,6 @@ snapshots:
       es5-ext: 0.10.64
       type: 2.7.3
 
-  dank-do-while@0.1.2: {}
-
   danmu.js@1.2.1:
     dependencies:
       event-emitter: 0.3.5
@@ -9805,13 +9783,6 @@ snapshots:
 
   node-releases@2.0.58: {}
 
-  node-thermal-printer@4.6.1:
-    dependencies:
-      iconv-lite: 0.6.3
-      pngjs: 7.0.0
-      unorm: 1.6.0
-      write-file-queue: 0.0.1
-
   nopt@6.0.0:
     dependencies:
       abbrev: 1.1.1
@@ -10014,8 +9985,6 @@ snapshots:
   pluralize@8.0.0: {}
 
   pngjs@5.0.0: {}
-
-  pngjs@7.0.0: {}
 
   pnpm-workspace-yaml@1.9.1:
     dependencies:
@@ -10615,8 +10584,6 @@ snapshots:
       - srvx
       - vite
 
-  unorm@1.6.0: {}
-
   unplugin-auto-import@21.1.0(@vueuse/core@15.0.0(vue@3.5.25(typescript@5.8.3)))(esbuild@0.28.2)(oxc-parser@0.150.0)(rollup@4.64.5)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1)):
     dependencies:
       local-pkg: 1.2.1
@@ -10916,10 +10883,6 @@ snapshots:
       strip-ansi: 7.2.0
 
   wrappy@1.0.2: {}
-
-  write-file-queue@0.0.1:
-    dependencies:
-      dank-do-while: 0.1.2
 
   ws@8.22.0: {}
 

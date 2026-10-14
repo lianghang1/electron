@@ -1,4 +1,4 @@
-import type { AppSource, CaptureDeviceProfile, DesktopAppManifest, RawPrinterConfig, ScannerConfig } from '@desktop/shared'
+import type { AppSource, CaptureDeviceProfile, DesktopAppManifest, ScannerConfig } from '@desktop/shared'
 import type { CaptureSystem } from '../devices/capture'
 import type { IdCardSystem } from '../devices/idcard'
 import type { PrintSystem } from '../devices/print'
@@ -76,7 +76,7 @@ export class DesktopRuntime {
   private scannerSystem!: ScannerSystem
   /** 设备系统：图像采集（UVC/DLL 双路线，恒创建） */
   private captureSystem!: CaptureSystem
-  /** 设备系统：统一打印（系统队列 + 网络直连，恒创建） */
+  /** 设备系统：统一打印（系统队列，恒创建） */
   private printSystem!: PrintSystem
   /** 设备系统：手写签名（dll 真实驱动 + devices.mock 显式开启的 stub 模拟器） */
   private signatureSystem?: SignatureSystem
@@ -217,9 +217,8 @@ export class DesktopRuntime {
    * 设备系统装配：资源根统一经 resolveResourcePath 解析（缺省 resources/ —— dev 为
    * <应用根>/resources，打包为 <resourcesPath>/resources），DLL 与外置 exe 均相对它寻址
    * （idcard/capture/signature 的 devices/<brand>/、print 的 devices/print/）。
-   * 模拟设备零隐式注册：devices.mock 显式开启才注册 stub 读卡器/采集设备；mock 打印机
-   * 由宿主在 printers 档案里显式声明（mock: true）。运行时编辑持久化由 electron-store 托管
-   * （userData），capture/print 的存储缺键时回落出厂档案/出厂预设（不设 defaults，避免空值覆盖）。
+   * 模拟设备零隐式注册：devices.mock 显式开启才注册 stub 读卡器/采集设备。运行时编辑持久化
+   * 由 electron-store 托管（userData），capture 的存储缺键时回落出厂档案（不设 defaults，避免空值覆盖）。
    */
   private setupDevices(): void {
     const resourcesRoot = this.options.devices?.resourcesRoot
@@ -263,15 +262,11 @@ export class DesktopRuntime {
       logger: this.logger.scope('device:capture'),
     })
 
-    // 打印：网络打印机档案持久化（运行时编辑热生效）；档案缺键时回落宿主注入
-    // （mock: true 档案为指令落盘模拟）；SumatraPDF 相对资源根解析（缺省 devices/print/SumatraPDF.exe），绝对路径原样
-    const printerStore = createStore<{ printers?: RawPrinterConfig[] }>({ name: 'device-print-printers' })
+    // 打印：SumatraPDF 相对资源根解析（缺省 devices/print/SumatraPDF.exe），绝对路径原样
     const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'devices/print/SumatraPDF.exe'
     this.printSystem = createPrintSystem({
       stateDir: app.getPath('userData'),
-      printers: printerStore.get('printers') ?? this.options.devices?.print?.printers ?? [],
       sumatraPath: isAbsolute(sumatraRel) ? sumatraRel : join(resourcesRoot, sumatraRel),
-      persistPrinters: printers => printerStore.set('printers', printers),
       // 打印隐藏窗挂主窗口为 parent：主窗关闭级联销毁池窗，退出链路才能走完
       getParent: () => this.windowService.getMainWindow(),
       logger: this.logger.scope('device:print'),

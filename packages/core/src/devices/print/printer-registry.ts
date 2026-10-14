@@ -1,26 +1,18 @@
-import type { PrinterCaps, PrinterPaper, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
+import type { PrinterCaps, UnifiedPrinter } from '@desktop/shared'
 import type { HiddenWindowPool } from './hidden-window'
 import { printError } from './errors'
 import { detectPrinterHardware, detectPrinterPapers, detectSystemDefaultPrinter } from './system-default'
 
-/**
- * 打印机注册表：把"系统打印机"（getPrintersAsync）与"网络直连打印机"（装配注入）合并为统一视图。
- * 业务层只见 UnifiedPrinter，不感知来源差异。
- */
+/** 打印机注册表：枚举系统打印机（getPrintersAsync），业务层只见 UnifiedPrinter。 */
 export class PrinterRegistry {
-  constructor(
-    private readonly windows: HiddenWindowPool,
-    /** 网络直连打印机档案（装配注入的现场数据：IP/端口/协议） */
-    private readonly networkPrinters: RawPrinterConfig[],
-  ) {}
+  constructor(private readonly windows: HiddenWindowPool) {}
 
   async list(): Promise<UnifiedPrinter[]> {
-    const [system, network] = await Promise.all([this.listSystem(), this.listNetwork()])
-    const merged = [...system, ...network]
-    const hasDefault = merged.some(p => p.isDefault)
-    if (!hasDefault && merged.length > 0)
-      merged[0].isDefault = true
-    return merged
+    const system = await this.listSystem()
+    const hasDefault = system.some(p => p.isDefault)
+    if (!hasDefault && system.length > 0)
+      system[0].isDefault = true
+    return system
   }
 
   private async listSystem(): Promise<UnifiedPrinter[]> {
@@ -35,7 +27,8 @@ export class PrinterRegistry {
         source: 'system' as const,
         isDefault: !!osDefault && osDefault === p.name,
         status: 'unknown' as const,
-        capabilities: systemCaps(),
+        // 能力保守声明：纸宽未知（不设限）；纸张列表/驱动默认值由下方探测填充
+        capabilities: {} as PrinterCaps,
         meta: {
           description: p.description ?? '',
           driver: (p.options as unknown as Record<string, string>)?.['printer-make-and-model'] ?? '',
@@ -59,66 +52,6 @@ export class PrinterRegistry {
     }
   }
 
-  /** 网络直连打印机：TCP 连通性探测（1.2s 超时，结果缓存 15s），状态真实反映可达性 */
-  private async listNetwork(): Promise<UnifiedPrinter[]> {
-    return Promise.all(
-      this.networkPrinters.map(async cfg => ({
-        id: cfg.id,
-        displayName: cfg.displayName || cfg.id,
-        source: 'network' as const,
-        isDefault: !!cfg.isDefault,
-        // mock 打印机不走网络（指令落盘），视为恒可用
-        status: cfg.mock ? ('ready' as const) : await this.probeNetwork(cfg),
-        capabilities: {
-          cut: true,
-          openCashbox: true,
-          qrcodeDirect: true,
-          barcodeDirect: true,
-          maxWidthMm: 80,
-          // 无驱动查询通道：纸型数据为空（不伪造），显式提示由 UI 层负责
-          paperList: [] as PrinterPaper[],
-          ...cfg.capabilities,
-        },
-        meta: { config: cfg, protocol: cfg.protocol },
-      })),
-    )
-  }
-
-  private probeCache = new Map<string, { at: number, status: UnifiedPrinter['status'] }>()
-
-  private async probeNetwork(cfg: RawPrinterConfig): Promise<UnifiedPrinter['status']> {
-    const cached = this.probeCache.get(cfg.id)
-    if (cached && Date.now() - cached.at < 15_000)
-      return cached.status
-    const reachable = await new Promise<boolean>((resolve) => {
-      let settled = false
-      const done = (v: boolean): void => {
-        if (!settled) {
-          settled = true
-          resolve(v)
-        }
-      }
-      import('node:net')
-        .then((net) => {
-          const socket = net.createConnection({ host: cfg.transport.host, port: cfg.transport.port }, () => {
-            socket.destroy()
-            done(true)
-          })
-          socket.setTimeout(1200)
-          socket.on('timeout', () => {
-            socket.destroy()
-            done(false)
-          })
-          socket.on('error', () => done(false))
-          socket.on('close', () => done(false))
-        })
-        .catch(() => done(false))
-    })
-    const status: UnifiedPrinter['status'] = reachable ? 'ready' : 'offline'
-    this.probeCache.set(cfg.id, { at: Date.now(), status })
-    return status
-  }
-
   async resolve(printerId?: string): Promise<UnifiedPrinter> {
     const all = await this.list()
     if (printerId) {
@@ -132,7 +65,7 @@ export class PrinterRegistry {
     }
     const fallback = all.find(p => p.isDefault) ?? all[0]
     if (!fallback) {
-      throw printError('PRINTER_DEFAULT_MISSING', '系统未检测到任何打印机，也未配置网络直连打印机')
+      throw printError('PRINTER_DEFAULT_MISSING', '系统未检测到任何打印机')
     }
     return fallback
   }
@@ -140,15 +73,5 @@ export class PrinterRegistry {
   async capabilities(printerId: string): Promise<PrinterCaps> {
     const printer = await this.resolve(printerId)
     return printer.capabilities
-  }
-}
-
-/** 系统打印机能力保守声明：硬件控制不可用；纸宽未知（不设限） */
-function systemCaps(): PrinterCaps {
-  return {
-    cut: false,
-    openCashbox: false,
-    qrcodeDirect: false,
-    barcodeDirect: false,
   }
 }

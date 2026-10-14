@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   assertPaperSupported,
-  paperToColumns,
   paperToPdfPageSize,
   paperToPrintPageSize,
   resolvePaper,
@@ -72,19 +71,6 @@ describe('paperToPdfPageSize（printToPDF 存档）', () => {
 
   it('连续纸 → 高度退 297mm 占位（实际分页由 preferCSSPageSize 走模板 @page）', () => {
     expect(paperToPdfPageSize({ widthMm: 76, heightMm: 0 })).toEqual({ width: 76 / 25.4, height: 297 / 25.4 })
-  })
-})
-
-describe('paperToColumns（热敏字符列数）', () => {
-  it('58mm → 32 列，80mm → 48 列，A4 宽 → 64 列', () => {
-    expect(paperToColumns({ widthMm: 58, heightMm: 0 })).toBe(32)
-    expect(paperToColumns({ widthMm: 80, heightMm: 0 })).toBe(48)
-    expect(paperToColumns({ widthMm: 210, heightMm: 297 })).toBe(64)
-  })
-
-  it('按物理宽度归列', () => {
-    expect(paperToColumns({ widthMm: 58, heightMm: 30 })).toBe(32)
-    expect(paperToColumns({ widthMm: 100, heightMm: 150 })).toBe(64)
   })
 })
 

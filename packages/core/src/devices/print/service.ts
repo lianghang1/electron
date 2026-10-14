@@ -1,4 +1,4 @@
-import type { JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintRequest, PrintResult, RawPrinterConfig, UnifiedPrinter } from '@desktop/shared'
+import type { JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
 import type { PreparedContent, PreparedJob } from './channels/channel-types'
 import type { PrintChannel } from './channels/print-channel'
 import type { HiddenWindowPool } from './hidden-window'
@@ -8,7 +8,6 @@ import { existsSync, readFileSync } from 'node:fs'
 import { extname } from 'node:path'
 import { cleanupArchiveDir } from './archive-cleanup'
 import { IppChannel } from './channels/ipp-channel'
-import { RawChannel } from './channels/raw-channel'
 import { SystemChannel } from './channels/system-channel'
 import { printError, toPrintError } from './errors'
 import { JobStore } from './job-store'
@@ -24,12 +23,9 @@ import { downloadUrlContent } from './url-content'
 export class PrintService {
   private readonly jobs: JobStore
   private readonly channels: Map<string, PrintChannel>
-  /** 网络直连打印机档案（与 PrinterRegistry 同一数组实例，原地变更即时生效） */
-  private readonly printers: RawPrinterConfig[]
   /** 可选日志注入（PII 域外的打印数据可记录） */
   private readonly logger: PrintLogFn
   private readonly archiveDir: string
-  private readonly persistPrinters?: (printers: RawPrinterConfig[]) => void
 
   /** 装配注入的依赖与现场数据（文件路径/打印机），设备层不自行寻址 */
   constructor(
@@ -42,45 +38,16 @@ export class PrintService {
       jobsFile: string
       /** SumatraPDF 路径（资源根解析；缺省禁用 PDF 直通通道回退） */
       sumatraPath?: string
-      /** 网络直连打印机档案（初始档案，与 registry 共享实例） */
-      printers: RawPrinterConfig[]
-      /** 打印机档案运行时编辑持久化 */
-      persistPrinters?: (printers: RawPrinterConfig[]) => void
       logger?: PrintLogFn
     },
   ) {
     this.logger = deps.logger ?? (() => {})
     this.archiveDir = deps.archiveDir
     this.jobs = new JobStore(deps.jobsFile)
-    this.printers = deps.printers
-    this.persistPrinters = deps.persistPrinters
     this.channels = new Map<string, PrintChannel>([
       ['system', new SystemChannel(windows, deps.archiveDir, deps.sumatraPath)],
-      ['raw', new RawChannel()],
       ['ipp', new IppChannel()],
     ])
-  }
-
-  /** 网络直连打印机档案列表（运行时编辑数据源） */
-  getNetworkPrinters(): RawPrinterConfig[] {
-    return this.printers.slice()
-  }
-
-  /**
-   * 运行时编辑网络直连打印机档案：upsert 按 id 覆盖或新增 → 持久化。
-   * 原地变更共享数组（PrinterRegistry 同一实例），listPrinters/submit 无需重建即读到新档案。
-   */
-  upsertNetworkPrinter(printer: RawPrinterConfig): RawPrinterConfig[] {
-    if (!printer?.id || !printer.transport?.host || !printer.transport?.port) {
-      throw printError('VALIDATION_FAILED', '打印机档案缺少 id 或 transport.host/port')
-    }
-    const i = this.printers.findIndex(p => p.id === printer.id)
-    if (i >= 0)
-      this.printers.splice(i, 1, printer)
-    else
-      this.printers.push(printer)
-    this.persistPrinters?.(this.printers.slice())
-    return this.printers.slice()
   }
 
   async submit(req: PrintRequest): Promise<PrintResult> {
@@ -183,7 +150,7 @@ export class PrintService {
     return this.registry.capabilities(printerId)
   }
 
-  /** 重打：优先用 PDF 存档（版式完全一致，保持原通道、剥离指令专有硬件控制）；文件/指令负载任务原样重提交 */
+  /** 重打：优先用 PDF 存档（版式完全一致，保持原通道）；文件负载任务原样重提交 */
   async reprint(jobId: string): Promise<PrintResult> {
     const rec = this.jobs.get(jobId)
     if (!rec) {
@@ -197,7 +164,6 @@ export class PrintService {
         options: {
           ...rec.request.options,
           channel: rec.result?.channel ?? rec.request.options.channel,
-          hardware: undefined,
         },
       })
     }
@@ -211,54 +177,31 @@ export class PrintService {
       const ch = this.channels.get(pref)
       if (!ch)
         throw printError('VALIDATION_FAILED', `未知通道: ${pref}`)
-      this.assertChannelCompatible(pref, req, printer)
+      this.assertChannelCompatible(pref, printer)
       return ch
     }
 
-    // 网络直连打印机仅收指令流：模板负载可译成 ESC/POS 指令（模板不支持指令渲染时 raw 通道显式报错），raw 负载原样直发
-    if (printer.source === 'network') {
-      if (req.payload.kind === 'template' || req.payload.kind === 'raw') {
-        return this.channels.get('raw')!
-      }
-      throw printError(
-        'OPTION_UNSUPPORTED',
-        '选中的网络直连打印机仅支持模板/指令负载，文档/图片/PDF 打印请在打印机列表中选择系统打印机（或配置 IPP 通道）',
-        { printerId: printer.id },
-      )
-    }
     return this.channels.get('system')!
   }
 
-  private assertChannelCompatible(pref: string, req: PrintRequest, printer: UnifiedPrinter): void {
+  private assertChannelCompatible(pref: string, printer: UnifiedPrinter): void {
     if (pref === 'ipp') {
       throw printError('CHANNEL_UNAVAILABLE', 'IPP 通道为预留扩展点，尚未启用')
-    }
-    if (pref === 'raw') {
-      if (printer.source !== 'network') {
-        throw printError('VALIDATION_FAILED', 'raw 通道需要网络直连打印机', { printerId: printer.id })
-      }
-      if (req.payload.kind === 'file' || req.payload.kind === 'html') {
-        throw printError('OPTION_UNSUPPORTED', 'raw 通道仅支持 template（指令渲染）或 raw 指令负载')
-      }
     }
     if (pref === 'system') {
       if (printer.source !== 'system') {
         throw printError('VALIDATION_FAILED', 'system 通道需要系统已安装驱动的打印机', { printerId: printer.id })
       }
-      if (req.payload.kind === 'raw') {
-        throw printError('OPTION_UNSUPPORTED', '系统打印队列不支持原始指令负载')
-      }
     }
   }
 
-  /** 内容归一：五种负载 → 通道可执行形态（HTML / PDF / 指令流）。paper 为宽松解析结果（undefined = 交驱动默认纸张） */
+  /** 内容归一：四种负载 → 通道可执行形态（HTML / PDF）。paper 为宽松解析结果（undefined = 交驱动默认纸张） */
   private async normalizeContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> {
     const p = req.payload
     switch (p.kind) {
       case 'template': {
-        // 同一份业务数据双形态：HTML 给系统队列，结构化数据给指令直写渲染器
         const html = await renderTemplateHtml(p.templateId, p.data, paper)
-        return { type: 'html', html, structured: { templateId: p.templateId, data: p.data } }
+        return { type: 'html', html }
       }
       case 'html':
         return { type: 'html', html: p.html }
@@ -272,8 +215,6 @@ export class PrintService {
         const downloaded = await downloadUrlContent(p, this.archiveDir, jobId, this.log.bind(this))
         return this.contentFromLocalFile(downloaded.path, paper)
       }
-      case 'raw':
-        return { type: 'raw', bytes: p.bytes, dialect: p.dialect }
     }
   }
 

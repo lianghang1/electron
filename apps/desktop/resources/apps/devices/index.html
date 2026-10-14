@@ -203,7 +203,6 @@
           <select class="input" id="opt-channel">
             <option value="auto">自动选择</option>
             <option value="system">系统队列</option>
-            <option value="raw">指令直写（raw）</option>
           </select>
         </label>
         <label class="field"><span>纸张</span>
@@ -265,20 +264,6 @@
         <label class="field"><span>左 (mm)</span><input class="input" id="margin-left" type="number" min="0" step="0.5" value="10" style="width: 64px;"></label>
       </div>
 
-      <div class="form-grid" id="hardware-grid" style="margin-top: 10px;" hidden>
-        <label class="field"><span>切刀（raw 指令）</span>
-          <select class="input" id="hw-cut">
-            <option value="">不切刀</option>
-            <option value="full">全切</option>
-            <option value="partial">半切（留缺口）</option>
-          </select>
-        </label>
-        <label class="field"><span>切前走纸（行）</span>
-          <input class="input" id="hw-feed" type="number" min="0" max="20" value="0" style="width: 64px;">
-        </label>
-        <label class="check" style="padding-bottom: 6px;"><input type="checkbox" id="hw-cashbox"> 同时打开钱箱</label>
-      </div>
-
       <div class="form-grid" style="margin-top: 12px; align-items: center;">
         <button class="btn" id="btn-print">打印</button>
         <button class="btn ghost" id="btn-preview" hidden>渲染预览</button>
@@ -298,32 +283,6 @@
       <span class="hint" id="printer-count"></span>
     </div>
     <div class="panel" id="printer-list"><div class="empty">检测中…</div></div>
-
-    <div class="toolbar">
-      <span class="section-label">网络直连打印机</span>
-      <span class="hint">小票机/标签机 TCP 直连（指令直写），mock 档案指令落盘不联网；保存即时生效并持久化</span>
-      <span class="spacer"></span>
-      <button class="btn ghost" id="btn-netp-add">添加</button>
-    </div>
-    <div class="panel" id="netp-list"><div class="empty">加载中…</div></div>
-    <div class="panel padded" id="netp-form" hidden style="margin-top: 12px;">
-      <div class="form-grid" style="align-items: flex-end;">
-        <label class="field"><span>名称</span><input class="input" id="netp-name" placeholder="前台小票机" style="width: 130px;"></label>
-        <label class="field"><span>主机地址</span><input class="input mono" id="netp-host" placeholder="192.168.1.100" style="width: 140px;" spellcheck="false"></label>
-        <label class="field"><span>端口</span><input class="input" id="netp-port" type="number" min="1" max="65535" value="9100" style="width: 84px;"></label>
-        <label class="field"><span>协议</span>
-          <select class="input" id="netp-protocol">
-            <option value="escpos">ESC/POS</option>
-            <option value="star">Star</option>
-          </select>
-        </label>
-        <label class="check" style="padding-bottom: 7px;"><input type="checkbox" id="netp-mock"> 落盘模拟（不联网）</label>
-        <label class="check" style="padding-bottom: 7px;"><input type="checkbox" id="netp-default"> 设为默认</label>
-        <button class="btn" id="btn-netp-save">保存</button>
-        <button class="btn ghost" id="btn-netp-cancel">取消</button>
-      </div>
-      <div class="hint" id="netp-form-note" style="margin-top: 8px;"></div>
-    </div>
 
     <div class="toolbar">
       <span class="section-label">打印任务（最近 100 条）</span>

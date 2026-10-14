@@ -3,7 +3,7 @@
  * 渲染进程 / preload / 主进程共用本文件，任何通道与平台差异都必须在主进程内部消化。
  */
 
-export type ChannelId = 'system' | 'raw' | 'ipp'
+export type ChannelId = 'system' | 'ipp'
 export type ChannelPreference = ChannelId | 'auto'
 
 /** 内容来源 —— 统一信封 */
@@ -27,12 +27,7 @@ export interface HtmlPayload {
   kind: 'html'
   html: string
 }
-export interface RawPayload {
-  kind: 'raw'
-  bytes: Uint8Array
-  dialect: 'escpos' | 'tspl'
-}
-export type PrintPayload = TemplatePayload | FilePayload | UrlPayload | HtmlPayload | RawPayload
+export type PrintPayload = TemplatePayload | FilePayload | UrlPayload | HtmlPayload
 
 /** 纸张 —— 物理尺寸（mm），各通道自行翻译；heightMm = 0 表示连续卷纸（高度由纸卷决定） */
 export interface PaperSpec {
@@ -42,28 +37,16 @@ export interface PaperSpec {
   heightMm: number
 }
 
-/** 硬件控制 —— 声明式；通道不支持时返回 OPTION_UNSUPPORTED，绝不静默忽略 */
-export interface HardwareControls {
-  cut?: 'none' | 'partial' | 'full'
-  openCashbox?: boolean
-  /** 切纸前走纸 N 行 */
-  feedLines?: number
-}
-
-export type Overlay
-  = | { type: 'qrcode', data: string, sizeMm?: number }
-    | { type: 'barcode', data: string, format: 'code128' | 'ean13', heightMm?: number }
-
 export interface PrintOptions {
   /**
    * 纸张写法（主进程解析为物理尺寸）：ISO 216 序号纸 'a0'–'a10'/'b0'–'b10'
    * 及 'letter'/'legal'/'tabloid'（大小写不敏感）、行业通称 'receipt58'/'receipt80'
    * （连续小票纸）、纯宽 '80'（80mm 连续纸）、'宽x高' 如 '80x60'
-   * （分隔符支持 x/X/×/*，单位 mm）；无法识别 → VALIDATION_FAILED
+   * （分隔符支持 x/X/×/*，单位 mm）；无法识别或缺省 → 交打印机驱动默认纸张
    */
   paper: string
   copies?: number
-  /** 默认 true；system 通道 false 时弹原生打印对话框，raw/ipp 恒静默 */
+  /** 默认 true；system 通道 false 时弹原生打印对话框 */
   silent?: boolean
   grayscale?: boolean
   /** 页码范围，如 "1-3,5"（PDF 直通与系统队列 HTML 路径支持；macOS 仅支持单段范围） */
@@ -90,8 +73,6 @@ export interface PrintOptions {
   channel?: ChannelPreference
   /** 打印队列里显示的任务名 */
   jobName?: string
-  hardware?: HardwareControls
-  overlays?: Overlay[]
   /** 业务追踪字段（订单号等），结果原样带回 */
   meta?: Record<string, string>
 }
@@ -168,13 +149,8 @@ export interface PrinterDefaults {
 }
 
 export interface PrinterCaps {
-  cut?: boolean
-  openCashbox?: boolean
-  /** 是否支持指令级二维码（区别于模板内 HTML 渲染） */
-  qrcodeDirect?: boolean
-  barcodeDirect?: boolean
   maxWidthMm?: number
-  /** 设备上报的纸张列表（系统打印机来自驱动 winspool/CUPS）；网络直连无驱动查询通道，数据为空 */
+  /** 设备上报的纸张列表（驱动 winspool/CUPS 上报） */
   paperList?: PrinterPaper[]
   /** 驱动默认值（打印首选项）；平台读取失败时缺省 */
   defaults?: PrinterDefaults
@@ -185,10 +161,10 @@ export interface PrinterCaps {
 }
 
 export interface UnifiedPrinter {
-  /** 统一 ID：系统打印机 = deviceName；网络直连 = "raw:<host>:<port>" */
+  /** 统一 ID：系统打印机 = deviceName */
   id: string
   displayName: string
-  source: 'system' | 'network' | 'ipp'
+  source: 'system' | 'ipp'
   isDefault: boolean
   status: 'ready' | 'offline' | 'unknown'
   capabilities: PrinterCaps
@@ -206,16 +182,4 @@ export interface JobStatus {
   result?: PrintResult
   /** 失败原因（state = failed 时存在） */
   error?: PrintError
-}
-
-/** 网络直连打印机档案（宿主注入的现场数据：IP/端口/协议/mock） */
-export interface RawPrinterConfig {
-  id: string
-  displayName: string
-  protocol: 'escpos' | 'star'
-  transport: { type: 'tcp', host: string, port: number }
-  mock?: boolean
-  mockOutputDir?: string
-  isDefault?: boolean
-  capabilities?: PrinterCaps
 }

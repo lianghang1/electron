@@ -37,29 +37,17 @@ export class SystemChannel implements PrintChannel {
     if (printer.source !== 'system') {
       throw printError('VALIDATION_FAILED', 'system 通道仅支持系统已安装驱动的打印机', { printerId: printer.id })
     }
-    // 硬件控制是指令直写设备的能力，系统队列（含 A4 打印机）不支持 → 显式报错而非静默忽略
-    const hw = job.options.hardware ?? {}
-    if ((hw.cut && hw.cut !== 'none') || hw.openCashbox) {
-      throw printError('OPTION_UNSUPPORTED', '系统打印队列不支持切纸/开钱箱等硬件控制，请使用指令直写打印机', {
-        printerId: printer.id,
-        requested: hw,
-      })
-    }
 
     switch (job.content.type) {
       case 'html':
         return this.printHtml(job, printer, job.content.html)
       case 'pdf':
         return this.printPdfFile(job, printer, job.content.path)
-      case 'raw':
-        throw printError('OPTION_UNSUPPORTED', '系统打印队列不支持原始指令负载')
     }
   }
 
   private printHtml(job: PreparedJob, printer: UnifiedPrinter, html: string): Promise<ChannelOutcome> {
-    // HTML 内容必有纸张（validate 已强制）；显式守卫而非类型断言（局部常量保证闭包内类型收窄）
-    if (!job.paper)
-      throw printError('VALIDATION_FAILED', 'HTML 内容需要 options.paper 指定版式')
+    // paper 可缺省（undefined = 交驱动默认纸张）；局部常量保证闭包内类型收窄
     const paper = job.paper
     // 渲染+存档+打印必须在同一个窗口锁内完成，否则并发 submit 会互相打断渲染
     return this.windows.runExclusive('utility', async (win) => {

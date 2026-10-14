@@ -1,4 +1,4 @@
-import type { DesktopConfig, RawPrinterConfig } from '@desktop/shared'
+import type { DesktopConfig } from '@desktop/shared'
 import type { BrowserWindowConstructorOptions, WebPreferences } from 'electron'
 
 /**
@@ -45,8 +45,6 @@ export interface WindowOverrides {
     capture?: { saveDir?: string }
     /** 打印（print 域） */
     print?: {
-      /** 静态打印机档案清单；mock: true 档案为指令落盘模拟（无真机联调用），按需显式声明 */
-      printers?: RawPrinterConfig[]
       /** SumatraPDF 可执行文件位置（PDF 打印后端）：相对 resourcesRoot（缺省 devices/print/SumatraPDF.exe）或绝对路径 */
       sumatraPath?: string
     }

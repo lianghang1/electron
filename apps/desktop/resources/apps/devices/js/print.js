@@ -1,9 +1,9 @@
 'use strict'
-/* 打印域：统一信封提交（8 种内容类型）+ 版式 + 小票硬件控制 + 渲染预览 + 打印机/任务管理 */
+/* 打印域：统一信封提交（8 种内容类型）+ 版式 + 渲染预览 + 打印机/任务管理 */
 
 const KINDS = {
-  receipt80: { templateId: 'receipt-default', sampleKey: 'receipt', paper: '80', paperWidth: 80, receipt: true },
-  receipt58: { templateId: 'receipt-default', sampleKey: 'receipt', paper: '58', paperWidth: 58, receipt: true },
+  receipt80: { templateId: 'receipt-default', sampleKey: 'receipt', paper: '80', paperWidth: 80 },
+  receipt58: { templateId: 'receipt-default', sampleKey: 'receipt', paper: '58', paperWidth: 58 },
   document: { templateId: 'document-default', sampleKey: 'document', paper: 'a4', paperWidth: 210, docLike: true },
   label: { templateId: 'label-default', sampleKey: 'label', paper: '40x30', paperWidth: 40 },
   image: { payload: 'file', paper: 'a4', paperWidth: 210, docLike: true },
@@ -43,7 +43,7 @@ let printers = []
 let jobs = []
 let currentKind = 'receipt80'
 
-// ── 内容类型切换：联动数据区 / 版式 / 硬件控制 / 预览按钮 / 默认纸型 ──
+// ── 内容类型切换：联动数据区 / 版式 / 预览按钮 / 默认纸型 ──
 function switchKind(k) {
   currentKind = k
   const kind = KINDS[k]
@@ -54,7 +54,6 @@ function switchKind(k) {
   $('#data-url').hidden = kind.payload !== 'url'
   $('#layout-grid').hidden = !kind.docLike
   $('#pdf-extra-grid').hidden = currentKind !== 'pdf' && currentKind !== 'pdfurl'
-  $('#hardware-grid').hidden = !kind.receipt
   $('#btn-preview').hidden = !kind.templateId
   // 尽量选中宽度匹配的驱动表单（如 80mm 小票切到 80 宽纸型），匹配不上保持当前选择
   if (kind.paperWidth != null) {
@@ -133,17 +132,6 @@ function buildOptions() {
     options.scale = $('#opt-scale').value || undefined
     options.bin = $('#opt-bin').value.trim() || undefined
   }
-  if (kind.receipt) {
-    const cut = $('#hw-cut').value
-    const feed = Number($('#hw-feed').value) || 0
-    if (cut || feed > 0 || $('#hw-cashbox').checked) {
-      options.hardware = {
-        ...(cut ? { cut } : {}),
-        ...(feed > 0 ? { feedLines: feed } : {}),
-        ...($('#hw-cashbox').checked ? { openCashbox: true } : {}),
-      }
-    }
-  }
   return options
 }
 
@@ -221,7 +209,7 @@ function renderPrinters() {
   $('#printer-count').textContent = printers.length ? `共 ${printers.length} 台` : ''
   const box = $('#printer-list')
   if (!printers.length) {
-    box.innerHTML = '<div class="empty">未检测到打印机（网络直连打印机由宿主 bootstrap.devices 配置注入）</div>'
+    box.innerHTML = '<div class="empty">未检测到打印机</div>'
     return
   }
   box.innerHTML = printers.map((p) => {
@@ -229,8 +217,6 @@ function renderPrinters() {
       : p.status === 'offline' ? '<span class="badge err"><span class="dot"></span>离线</span>'
         : '<span class="badge"><span class="dot"></span>状态未知</span>'
     const caps = [
-      p.capabilities?.cut ? '切刀' : '',
-      p.capabilities?.openCashbox ? '钱箱' : '',
       p.capabilities?.paperList?.length ? `纸型 ${p.capabilities.paperList.length}` : '',
       defaultsText(p.capabilities?.defaults),
       p.capabilities?.duplexSupported ? '支持双面' : '',
@@ -428,95 +414,3 @@ void (async () => {
   await refreshJobs()
 })()
 
-// ── 网络直连打印机档案：运行时添加/编辑（upsert 持久化 + 即时生效）；新档案 id 按 raw:host:port 统一约定 ──
-
-const NETP_PROTOCOL_LABEL = { escpos: 'ESC/POS', star: 'Star' }
-
-let netPrinters = []
-let editingNetPrinter = null
-
-function renderNetPrinters() {
-  const box = $('#netp-list')
-  if (!netPrinters.length) {
-    box.innerHTML = '<div class="empty">暂无网络直连打印机档案，点右上「添加」创建</div>'
-    return
-  }
-  box.innerHTML = netPrinters.map((p) => {
-    const addr = p.mock ? '落盘模拟' : `${p.transport.host}:${p.transport.port}`
-    return `<div class="row">
-      <div class="grow">
-        <div class="name">${esc(p.displayName || p.id)}${p.isDefault ? ' <span class="chip brand">默认</span>' : ''}</div>
-        <div class="sub">${esc(NETP_PROTOCOL_LABEL[p.protocol] ?? p.protocol)} · ${esc(addr)} · ${esc(p.id)}</div>
-      </div>
-      ${p.mock ? '<span class="chip">模拟</span>' : ''}
-      <button class="btn ghost" data-netp-edit="${esc(p.id)}">编辑</button>
-    </div>`
-  }).join('')
-}
-
-async function refreshNetPrinters() {
-  try {
-    netPrinters = await window.desktop.print.getNetworkPrinters()
-  }
-  catch (e) {
-    toast(`读取打印机档案失败：${e.message}`, false)
-    netPrinters = []
-  }
-  renderNetPrinters()
-}
-
-function openNetPrinterForm(p) {
-  editingNetPrinter = p ?? null
-  $('#netp-name').value = p?.displayName ?? ''
-  $('#netp-host').value = p?.transport?.host ?? ''
-  $('#netp-port').value = p?.transport?.port ?? 9100
-  $('#netp-protocol').value = p?.protocol ?? 'escpos'
-  $('#netp-mock').checked = !!p?.mock
-  $('#netp-default').checked = !!p?.isDefault
-  $('#netp-form-note').textContent = p ? `正在编辑「${p.displayName || p.id}」，id 保持不变` : '新档案，id 按地址生成'
-  $('#netp-form').hidden = false
-}
-
-function closeNetPrinterForm() {
-  editingNetPrinter = null
-  $('#netp-form').hidden = true
-}
-
-$('#btn-netp-add').addEventListener('click', () => openNetPrinterForm(null))
-$('#btn-netp-cancel').addEventListener('click', closeNetPrinterForm)
-
-$('#netp-list').addEventListener('click', (e) => {
-  const id = e.target.dataset?.netpEdit
-  if (!id) return
-  const p = netPrinters.find(x => x.id === id)
-  if (p) openNetPrinterForm(p)
-})
-
-$('#btn-netp-save').addEventListener('click', async () => {
-  const name = $('#netp-name').value.trim()
-  const host = $('#netp-host').value.trim()
-  const port = Number($('#netp-port').value)
-  if (!name) { toast('请填写打印机名称', false); return }
-  if (!host) { toast('请填写主机地址', false); return }
-  if (!Number.isInteger(port) || port < 1 || port > 65535) { toast('端口应为 1-65535 的整数', false); return }
-  const printer = {
-    ...(editingNetPrinter ?? {}),
-    id: editingNetPrinter?.id ?? `raw:${host}:${port}`,
-    displayName: name,
-    protocol: $('#netp-protocol').value,
-    transport: { type: 'tcp', host, port },
-    mock: $('#netp-mock').checked,
-    isDefault: $('#netp-default').checked || undefined,
-  }
-  try {
-    netPrinters = await window.desktop.print.upsertNetworkPrinter(printer)
-    renderNetPrinters()
-    closeNetPrinterForm()
-    toast('打印机档案已保存')
-    await refreshPrinters()
-  }
-  catch (e) { toast(e.message, false) }
-})
-
-registerRefresher(refreshNetPrinters)
-void refreshNetPrinters()

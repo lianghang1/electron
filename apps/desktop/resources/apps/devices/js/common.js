@@ -4,7 +4,7 @@
 const $ = sel => document.querySelector(sel)
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
-const SOURCE_LABEL = { system: '系统打印机', network: '网络直连', ipp: 'IPP' }
+const SOURCE_LABEL = { system: '系统打印机', ipp: 'IPP' }
 const STATE_LABEL = { accepted: '已受理', printing: '打印中', done: '已完成', failed: '失败' }
 const TRANSPORT_LABEL = { ws: '本地服务', dll: 'SDK 直连', service: '本地服务', wia: 'WIA', stub: '模拟', uvc: 'UVC' }
 
