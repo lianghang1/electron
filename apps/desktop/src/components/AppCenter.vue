@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { AppPermissionState, DesktopTab, RegisteredApp } from '@desktop/shared'
-import { AccordionContent, AccordionHeader, AccordionItem, AccordionRoot, AccordionTrigger, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogOverlay, AlertDialogRoot, AlertDialogTitle } from 'reka-ui'
+import { AccordionContent, AccordionHeader, AccordionItem, AccordionRoot, AccordionTrigger, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogOverlay, AlertDialogRoot, AlertDialogTitle } from 'reka-ui'
 import { computed, ref, watch } from 'vue'
 import { permissionLabel } from '../composables/use-permission-labels'
 
@@ -73,20 +73,40 @@ async function resetPerms(appId: string): Promise<void> {
 // ---- 敏感操作确认（reka AlertDialog）：清除站点数据 = 登出、重置授权 = 撤销决策 ----
 // 面板宽度有限，弹窗不 Portal，控制在面板区域内模态（aside 为定位基准）
 const confirmTarget = ref<{ appId: string, name: string, kind: 'site' | 'perm' } | null>(null)
+// AlertDialog 的内部关闭时序与确认按钮的 click 不保证先后，操作负载在询问时固化，
+// 确认时读取快照而不是可能已被关闭流程清空的 confirmTarget
+const pendingAction = ref<{ appId: string, kind: 'site' | 'perm' } | null>(null)
 
 function askConfirm(appId: string, kind: 'site' | 'perm'): void {
   const app = props.apps.find(item => item.manifest.id === appId)
   confirmTarget.value = { appId, name: app?.manifest.name ?? appId, kind }
+  pendingAction.value = { appId, kind }
+}
+
+function closeConfirm(): void {
+  confirmTarget.value = null
+  pendingAction.value = null
+}
+
+function onOpenChange(value: boolean): void {
+  if (value)
+    return
+  closeConfirm()
 }
 
 async function onConfirm(): Promise<void> {
-  const target = confirmTarget.value
-  confirmTarget.value = null
-  if (!target)
+  const action = pendingAction.value
+  if (!action)
     return
-  if (target.kind === 'site')
-    await clearApp(target.appId, 'site')
-  else await resetPerms(target.appId)
+  closeConfirm()
+  try {
+    if (action.kind === 'site')
+      await clearApp(action.appId, 'site')
+    else await resetPerms(action.appId)
+  }
+  catch (error) {
+    console.error('[AppCenter] 确认操作执行失败', error)
+  }
 }
 
 /** 权限状态文案：声明 = 平台直接放行；未声明看运行时用户决策 */
@@ -218,7 +238,7 @@ function isRunning(appId: string): boolean {
          面板区域有限，不 Portal，控制在 360px 面板内模态（aside 为定位基准） -->
     <AlertDialogRoot
       :open="confirmTarget !== null"
-      @update:open="(value) => !value && (confirmTarget = null)"
+      @update:open="onOpenChange"
     >
       <AlertDialogContent class="ac-confirm">
         <AlertDialogOverlay class="ac-confirm__scrim" />
@@ -235,9 +255,14 @@ function isRunning(appId: string): boolean {
             <AlertDialogCancel class="ac-confirm__btn">
               取消
             </AlertDialogCancel>
-            <AlertDialogAction class="ac-confirm__btn ac-confirm__btn--danger" @click="onConfirm">
+            <!-- 确认按钮不用 AlertDialogAction：其内部关闭会先清空 confirmTarget，导致 click 回调读到空值 -->
+            <button
+              type="button"
+              class="ac-confirm__btn ac-confirm__btn--danger"
+              @click="onConfirm"
+            >
               {{ confirmTarget?.kind === 'site' ? '确认清除' : '确认重置' }}
-            </AlertDialogAction>
+            </button>
           </div>
         </div>
       </AlertDialogContent>

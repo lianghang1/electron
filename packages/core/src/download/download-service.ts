@@ -23,6 +23,8 @@ export class DownloadService {
   private readonly tasks = new Map<string, DownloadTask>()
   /** 已挂 will-download 的 Session（App Session 全局唯一，WeakSet 防重复） */
   private readonly attached = new WeakSet<Electron.Session>()
+  /** item → 任务映射：拒绝决策需回写已抢先完成的任务状态（WeakMap 不阻止 item 回收） */
+  private readonly itemTasks = new WeakMap<Electron.DownloadItem, DownloadTask>()
   private readonly throttles = new Map<string, NodeJS.Timeout>()
   private seq = 0
 
@@ -67,6 +69,13 @@ export class DownloadService {
           }
           catch (error) {
             this.logger.warn('download item gone before deny applied', { appId, error: String(error) })
+          }
+          // 下载若在用户决策前已抢先完成，cancel 已无效：同步把任务改写为已取消，
+          // 避免横幅残留「已完成」误导用户（对应文件已被下方清理删除）
+          const task = this.itemTasks.get(item)
+          if (task && task.status === 'completed') {
+            task.status = 'cancelled'
+            this.push()
           }
           if (savePath) {
             void rm(savePath, { force: true }).catch((error) => {
@@ -114,6 +123,7 @@ export class DownloadService {
       startedAt: Date.now(),
     }
     this.tasks.set(id, task)
+    this.itemTasks.set(item, task)
     this.push()
 
     item.on('updated', (_e, state) => {
