@@ -377,6 +377,40 @@
         </div>
       </div>
     </div>
+
+    <div id="sec-ic-texts" hidden>
+      <div class="toolbar">
+        <span class="section-label">IC 卡字符串组（扇区）</span>
+        <span class="hint">每行一个字符串按序占用扇区数据块（UTF-8、00 结尾补齐 16 字节），未占用块清零；最多 3 行、每行 ≤ 16 字节</span>
+      </div>
+      <div class="panel padded">
+        <div class="form-grid" style="align-items: flex-start;">
+          <label class="field"><span>扇区（1-15）</span>
+            <input class="input" id="ic-t-sector" type="number" min="1" max="15" value="1" style="width: 70px;">
+          </label>
+          <label class="field"><span>字符串组（每行一条）</span>
+            <textarea class="input mono" id="ic-t-texts" rows="3" style="width: 220px;" spellcheck="false" placeholder="1&#10;2&#10;1051851"></textarea>
+          </label>
+          <label class="field"><span>扇区密钥（留空 = 白键）</span>
+            <input class="input mono" id="ic-t-key" placeholder="FFFFFFFFFFFF" style="width: 130px;" spellcheck="false" maxlength="12">
+          </label>
+          <label class="field"><span>密钥类型</span>
+            <select class="input" id="ic-t-keytype" style="width: 80px;">
+              <option value="A">A 键</option>
+              <option value="B">B 键</option>
+            </select>
+          </label>
+          <button class="btn" id="btn-ic-t-read" style="align-self: flex-end; margin-bottom: 1px;">读取字符串组</button>
+          <button class="btn danger-ghost" id="btn-ic-t-write" style="align-self: flex-end; margin-bottom: 1px;">写入字符串组</button>
+        </div>
+      </div>
+      <div class="panel" id="ic-t-result" style="margin-top: 12px;" hidden>
+        <div class="row" style="display: block;">
+          <span class="hint">字符串组</span>
+          <div id="ic-t-items" class="mono selectable" style="margin-top: 6px; line-height: 1.9;"></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <!-- ══════════ 采集 ══════════ -->

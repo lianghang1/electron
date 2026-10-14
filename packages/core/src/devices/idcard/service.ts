@@ -1,9 +1,47 @@
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
-import type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IdCardAdapter, IdCardData, IdReaderDevice } from './types'
+import type { IcCardData, IcCardReadRequest, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardAdapter, IdCardData, IdReaderDevice } from './types'
+import { Buffer } from 'node:buffer'
 
 import { DllIdAdapter } from './adapters/dll-adapter'
 import { idCardError, toIdCardError } from './errors'
+
+/** M1 每扇区块数（数据块地址 = 扇区号 × 4 + 块内序号） */
+const SECTOR_BLOCKS = 4
+/** M1 每扇区数据块数（末块为密钥控制块，不参与字符串组） */
+const SECTOR_DATA_BLOCKS = 3
+/** M1 数据块字节数 */
+const BLOCK_BYTES = 16
+
+/**
+ * 文本 → 16 字节数据块 hex：UTF-8 编码、0x00 结尾并补齐整块。
+ * 超长或含 0x00 的输入在进入原生调用前拒绝（0x00 会在读取截断时丢数据）。
+ */
+function encodeBlockText(text: string): string {
+  const bytes = Buffer.from(text, 'utf8')
+  if (bytes.length > BLOCK_BYTES) {
+    throw idCardError('VALIDATION_FAILED', `字符串超出单块容量（UTF-8 ${bytes.length}/16 字节）`)
+  }
+  if (bytes.includes(0)) {
+    throw idCardError('VALIDATION_FAILED', '字符串不得包含 0x00 字符')
+  }
+  const block = Buffer.alloc(BLOCK_BYTES)
+  bytes.copy(block)
+  return block.toString('hex').toUpperCase()
+}
+
+/** 16 字节块 hex → 文本：截至第一个 0x00 的字节按 UTF-8 解码（与 encodeBlockText 互逆） */
+function decodeBlockText(hex: string): string {
+  const bytes: number[] = []
+  for (let i = 0; i + 1 < hex.length; i += 2) {
+    const byte = Number.parseInt(hex.slice(i, i + 2), 16)
+    if (Number.isNaN(byte) || byte === 0) {
+      break
+    }
+    bytes.push(byte)
+  }
+  return new TextDecoder('utf-8').decode(new Uint8Array(bytes))
+}
 
 /**
  * IdCardService = 证卡读取域统一 API（与 print/capture 同构）。
@@ -56,6 +94,63 @@ export class IdCardService {
         throw idCardError('ADAPTER_UNAVAILABLE', `读卡器 ${located.device.displayName} 不支持 IC 卡写入`)
       }
       await this.enqueue(this.lockKeyOf(located.device), () => located.adapter.writeIc(located.device, req))
+    }
+    catch (err) {
+      throw this.logFailure(req?.deviceId, err)
+    }
+  }
+
+  /** 读扇区字符串组：一次读卡取整扇区数据块，按 0x00 截断解码；尾部空块不返回（与 writeIcTexts 对称） */
+  async readIcTexts(req: IcCardReadRequest & { deviceId: string }): Promise<string[]> {
+    try {
+      const data = await this.readIc(req)
+      const sector = req?.sector ?? 1
+      const texts = Array.from({ length: SECTOR_DATA_BLOCKS }, (_, i) =>
+        decodeBlockText(data.blocks[sector * SECTOR_BLOCKS + i] ?? ''))
+      while (texts.length > 0 && texts[texts.length - 1] === '') {
+        texts.pop()
+      }
+      return texts
+    }
+    catch (err) {
+      throw this.logFailure(req?.deviceId, err)
+    }
+  }
+
+  /**
+   * 写扇区字符串组：texts 按序占用数据块，未占用的数据块清零（保证读取结果与本次写入一致）。
+   * 整扇区写入在同一设备锁内完成；中途失败（如密钥认证不过）可能留下部分写入，重试即整扇区覆盖修复。
+   */
+  async writeIcTexts(req: IcCardTextsWriteRequest & { deviceId: string }): Promise<void> {
+    try {
+      const { sector, texts } = req ?? {}
+      if (!Number.isInteger(sector) || sector < 0 || sector > 15) {
+        throw idCardError('VALIDATION_FAILED', '扇区号不合法（应为 0-15）')
+      }
+      if (!Array.isArray(texts) || texts.some(text => typeof text !== 'string')) {
+        throw idCardError('VALIDATION_FAILED', 'texts 应为字符串数组')
+      }
+      if (texts.length > SECTOR_DATA_BLOCKS) {
+        throw idCardError('VALIDATION_FAILED', `字符串数量超出扇区数据块数（最多 ${SECTOR_DATA_BLOCKS} 个）`)
+      }
+      const located = await this.locate(req.deviceId)
+      if (!located.device.capabilities.includes('iccard-write')) {
+        throw idCardError('ADAPTER_UNAVAILABLE', `读卡器 ${located.device.displayName} 不支持 IC 卡写入`)
+      }
+      const blocks = [
+        ...texts.map(encodeBlockText),
+        ...Array.from({ length: SECTOR_DATA_BLOCKS - texts.length }, () => '00'.repeat(BLOCK_BYTES)),
+      ]
+      await this.enqueue(this.lockKeyOf(located.device), async () => {
+        for (let i = 0; i < SECTOR_DATA_BLOCKS; i++) {
+          await located.adapter.writeIc(located.device, {
+            block: sector * SECTOR_BLOCKS + i,
+            data: blocks[i],
+            key: req.key,
+            keyType: req.keyType,
+          })
+        }
+      })
     }
     catch (err) {
       throw this.logFailure(req?.deviceId, err)

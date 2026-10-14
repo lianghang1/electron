@@ -89,3 +89,19 @@ export interface IcCardWriteRequest {
   /** 密钥类型，缺省 A */
   keyType?: 'A' | 'B'
 }
+
+/**
+ * M1 IC 卡扇区级字符串组写入参数（writeIcCardTexts）：
+ * texts 按序占用扇区数据块（UTF-8 编码、0x00 结尾补齐 16 字节），未占用的数据块清零。
+ * 与 readIcCardTexts 互逆：写入 ["1","2","1051851"] 后读取返回原数组。
+ */
+export interface IcCardTextsWriteRequest {
+  /** 扇区号 0-15（0 扇区首块为厂商块，写入会被驱动拒绝，业务数据用 1-15） */
+  sector: number
+  /** 字符串组：每项 UTF-8 编码 ≤ 16 字节且不含 0x00；最多 3 项（M1 每扇区数据块数） */
+  texts: string[]
+  /** 扇区密钥（12 位 hex），缺省出厂白键 */
+  key?: string
+  /** 密钥类型，缺省 A */
+  keyType?: 'A' | 'B'
+}

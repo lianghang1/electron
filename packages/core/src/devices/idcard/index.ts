@@ -1,6 +1,6 @@
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
-import type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IdCardData, IdReaderDevice } from './types'
+import type { IcCardData, IcCardReadRequest, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData, IdReaderDevice } from './types'
 import { IdCardService } from './service'
 
 export interface IdCardSystemOptions {
@@ -19,6 +19,10 @@ export interface IdCardSystem {
   readIc: (req: IcCardReadRequest & { deviceId: string }) => Promise<IcCardData>
   /** 写 M1 IC 卡单块（覆盖写，驱动强制拒绝密钥控制块/厂商块；与读同设备串行化） */
   writeIc: (req: IcCardWriteRequest & { deviceId: string }) => Promise<void>
+  /** 读 M1 IC 卡扇区字符串组（数据块按 0x00 截断解码，与 writeIcTexts 互逆；与读同设备串行化） */
+  readIcTexts: (req: IcCardReadRequest & { deviceId: string }) => Promise<string[]>
+  /** 写 M1 IC 卡扇区字符串组（未占用数据块清零，整扇区同锁写入；与读同设备串行化） */
+  writeIcTexts: (req: IcCardTextsWriteRequest & { deviceId: string }) => Promise<void>
   destroy: () => void
 }
 
@@ -30,6 +34,8 @@ export function createIdCardSystem(options: IdCardSystemOptions): IdCardSystem {
     read: req => service.read(req),
     readIc: req => service.readIc(req),
     writeIc: req => service.writeIc(req),
+    readIcTexts: req => service.readIcTexts(req),
+    writeIcTexts: req => service.writeIcTexts(req),
     destroy: () => service.destroy(),
   }
 }

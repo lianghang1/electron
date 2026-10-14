@@ -13,15 +13,44 @@ const ID_FIELDS = [
 
 const ID_TRANSPORT_LABEL = { dll: 'SDK 直连' }
 
+/** 块数据 hex → 可打印 ASCII 预览：不可打印字节显示为 ·（块内容是任意二进制，hex 为准，预览仅供肉眼核对） */
+function toPrintableAscii(hex) {
+  let out = ''
+  for (let i = 0; i < hex.length; i += 2) {
+    const code = Number.parseInt(hex.slice(i, i + 2), 16)
+    out += code >= 0x20 && code <= 0x7e ? String.fromCharCode(code) : '·'
+  }
+  return out
+}
+
+/** 块数据 hex → 文本（截至第一个 0x00，UTF-8 解码；全空或含乱码返回 null 不展示） */
+function toCString(hex) {
+  const bytes = []
+  for (let i = 0; i < hex.length; i += 2) {
+    const byte = Number.parseInt(hex.slice(i, i + 2), 16)
+    if (byte === 0) {
+      break
+    }
+    bytes.push(byte)
+  }
+  if (bytes.length === 0) {
+    return null
+  }
+  const text = new TextDecoder('utf-8').decode(new Uint8Array(bytes))
+  return text.includes('\uFFFD') ? null : text
+}
+
 /** 最近一次枚举的读卡器列表（能力联动与回读选中态使用） */
 let readers = []
 
-/** 区块显隐跟随所选读卡器的能力：身份证 / IC 读 / IC 写三块互不越界 */
+/** 区块显隐跟随所选读卡器的能力：身份证 / IC 读 / IC 写 / 字符串组四块互不越界 */
 function syncIdSections() {
   const caps = readers.find(d => d.id === $('#id-reader').value)?.capabilities ?? []
   $('#sec-id-read').hidden = !caps.includes('idcard')
   $('#sec-ic-read').hidden = !caps.includes('iccard')
   $('#sec-ic-write').hidden = !caps.includes('iccard-write')
+  $('#sec-ic-texts').hidden = !caps.includes('iccard')
+  $('#btn-ic-t-write').hidden = !caps.includes('iccard-write')
 }
 
 async function refreshReaders() {
@@ -117,11 +146,16 @@ async function readIcCard() {
       key: key || undefined,
       keyType: $('#ic-keytype').value,
     })
+    console.log(r)
     $('#ic-uid').textContent = r.uid
     $('#ic-number').textContent = r.cardNumber ?? '—'
     $('#ic-type').textContent = r.cardType ?? '—'
     $('#ic-blocks').innerHTML = Object.entries(r.blocks)
-      .map(([addr, hex]) => `<div>块 ${esc(addr)}：${esc(hex)}</div>`).join('')
+      .map(([addr, hex]) => {
+        const text = toCString(hex)
+        const textLabel = text === null ? '' : ` · 文本 "${esc(text)}"`
+        return `<div>块 ${esc(addr)}：${esc(hex)}<br><span class="hint">ASCII ${esc(toPrintableAscii(hex))}${textLabel}</span></div>`
+      }).join('')
     $('#ic-result').hidden = false
     status.textContent = '读取成功'
     toast('IC 卡读取成功')
@@ -198,6 +232,101 @@ async function writeIcBlock() {
 
 $('#btn-ic-write').addEventListener('click', () => void writeIcBlock())
 
+// ── IC 卡字符串组（扇区级业务语义：每行一个字符串，与 writeIcCardTexts/readIcCardTexts 契约同构） ──
+
+/** 文本域 → 字符串组：按行拆分并丢弃行尾空白行（尾部空串写入即清零块，读取时不保留，无法往返） */
+function parseTexts() {
+  const texts = $('#ic-t-texts').value.replace(/\r/g, '').split('\n')
+  while (texts.length > 0 && texts[texts.length - 1] === '') {
+    texts.pop()
+  }
+  return texts
+}
+
+async function readIcTexts() {
+  const btn = $('#btn-ic-t-read')
+  const deviceId = $('#id-reader').value
+  if (!deviceId) {
+    toast('未检测到可用读卡器', false)
+    return
+  }
+  const key = $('#ic-t-key').value.trim()
+  btn.disabled = true
+  try {
+    const texts = await window.desktop.device.readIcCardTexts({
+      deviceId,
+      sector: Number($('#ic-t-sector').value),
+      key: key || undefined,
+      keyType: $('#ic-t-keytype').value,
+    })
+
+    console.log({texts})
+
+    $('#ic-t-items').innerHTML = texts.length
+      ? texts.map((text, i) => `<div>${i}: "${esc(text)}"</div>`).join('')
+      : '<span class="hint">（空）</span>'
+    $('#ic-t-result').hidden = false
+    toast('字符串组读取成功')
+  }
+  catch (e) {
+    $('#ic-t-result').hidden = true
+    toast(`读取失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`, false)
+  }
+  finally {
+    btn.disabled = false
+  }
+}
+
+async function writeIcTexts() {
+  const btn = $('#btn-ic-t-write')
+  const deviceId = $('#id-reader').value
+  const texts = parseTexts()
+  const sector = Number($('#ic-t-sector').value)
+  if (!deviceId) {
+    toast('未检测到可用读卡器', false)
+    return
+  }
+  if (!Number.isInteger(sector) || sector < 1 || sector > 15) {
+    toast('扇区应为 1-15（0 扇区首块为厂商块，不可写）', false)
+    return
+  }
+  if (texts.length > 3) {
+    toast('最多 3 行（每扇区 3 个数据块）', false)
+    return
+  }
+  const tooLong = texts.find(text => new TextEncoder().encode(text).length > 16)
+  if (tooLong !== undefined) {
+    toast(`"${tooLong}" 超出单块容量（UTF-8 16 字节）`, false)
+    return
+  }
+  if (!window.confirm(`确认写入扇区 ${sector}？整扇区覆盖（未占用块清零）、不可恢复。`)) {
+    return
+  }
+  btn.disabled = true
+  try {
+    console.log({deviceId, sector, texts})
+    await window.desktop.device.writeIcCardTexts({
+      deviceId,
+      sector,
+      texts,
+      key: $('#ic-t-key').value.trim() || undefined,
+      keyType: $('#ic-t-keytype').value,
+    })
+    toast(`扇区 ${sector} 写入成功`)
+    // 写后回读验证（同一扇区密钥），结果展示在字符串组区
+    await readIcTexts()
+  }
+  catch (e) {
+    toast(`写入失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`, false)
+  }
+  finally {
+    btn.disabled = false
+  }
+}
+
+$('#btn-ic-t-read').addEventListener('click', () => void readIcTexts())
+$('#btn-ic-t-write').addEventListener('click', () => void writeIcTexts())
+
 // ── 清空：读卡结果（证件/IC）一次清掉，回到未读状态 ──
 
 $('#btn-id-clear').addEventListener('click', () => {
@@ -209,6 +338,8 @@ $('#btn-id-clear').addEventListener('click', () => {
   $('#ic-number').textContent = ''
   $('#ic-type').textContent = ''
   $('#ic-blocks').innerHTML = ''
+  $('#ic-t-result').hidden = true
+  $('#ic-t-items').innerHTML = ''
   $('#id-status').textContent = '选择读卡器后点击读取'
   $('#ic-status').textContent = '选择读卡器后点击读取'
   toast('已清空读卡结果')

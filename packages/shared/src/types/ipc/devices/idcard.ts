@@ -1,4 +1,4 @@
-import type { IcCardData, IcCardReadRequest, IcCardWriteRequest, IdCardData, IdReaderDevice } from '../../devices/idcard'
+import type { IcCardData, IcCardReadRequest, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData, IdReaderDevice } from '../../devices/idcard'
 import { invoke } from '../../../domain'
 
 /**
@@ -30,4 +30,15 @@ export const idCardDomainDefs = {
    * 危险操作：驱动强制拒绝密钥控制块与厂商块，业务数据块照写不校验内容。
    */
   writeIcCard: invoke<(req: IcCardWriteRequest & { deviceId?: string }) => Promise<void>>(),
+  /**
+   * 读一个扇区的字符串组：扇区数据块按 0x00 截断解码为 UTF-8 文本，尾部空块不返回。
+   * 与 writeIcCardTexts 互逆：写入 ["1","2","1051851"] 后读取返回原数组；
+   * deviceId 缺省时自动选用第一个支持 IC 卡且就绪的读卡器。
+   */
+  readIcCardTexts: invoke<(req?: IcCardReadRequest & { deviceId?: string }) => Promise<string[]>>(),
+  /**
+   * 写一个扇区的字符串组：texts 按序占用扇区数据块（UTF-8、0x00 结尾补齐 16 字节），未占用数据块清零。
+   * 约束见 IcCardTextsWriteRequest；deviceId 缺省时自动选用第一个支持写卡且就绪的读卡器。
+   */
+  writeIcCardTexts: invoke<(req: IcCardTextsWriteRequest & { deviceId?: string }) => Promise<void>>(),
 }
