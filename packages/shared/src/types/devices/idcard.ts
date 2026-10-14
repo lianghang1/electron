@@ -70,6 +70,8 @@ export interface IcCardReadRequest {
 export interface IcCardData {
   /** 卡序列号 UID（大写 hex） */
   uid: string
+  /** 十进制卡号：UID 4 字节按小端整数转十进制（门禁/一卡通系统常见卡号形态，与 hex UID 为同一序列号的两种展示） */
+  cardNumber?: string
   /** 卡类型代码（ATQA，4 位 hex） */
   cardType?: string
   /** 读出的数据块：键 = 绝对块地址（扇区号×4 起），值 = 32 位 hex（16 字节）；密钥控制块（每扇区末块）不回读 */

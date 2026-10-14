@@ -9,10 +9,11 @@ import { requireKoffi } from './koffi'
 /**
  * 德卡 IC 卡读卡器驱动（dcrf32.dll，Mifare Classic 全系列通用 API，返回码 0 = 成功）。
  *
- * DLL（resources/devices/decard/dcrf32.dll，x64）。调用流程：
- *   dc_init(port, baud)          打开设备 → 句柄（1001-1016 = USB，1-16 = 串口）
+ * DLL（resources/devices/decard/dcrf32.dll，x64；USB 通讯依赖须与 DLL 同目录放置 libusb-1.0.dll）。
+ * 端口约定（dcrf32.h）：0-99 = 串口，100-199 = USB（100 = 第一个 USB 设备），<0 = 打开失败。
+ *   dc_init(port, baud)          打开设备 → 句柄
  *        ↓
- *   dc_request(1)                寻卡（1 = ISO14443A）
+ *   dc_request(1)                寻卡（0x01 = 对所有卡操作，0x00 = 仅空闲卡；返回 1 = 无卡）
  *        ↓
  *   dc_anticoll(0)               防碰撞 → 卡 UID（4 字节）
  *        ↓
@@ -61,8 +62,8 @@ export class DecardDriver implements BrandDriver {
   readonly displayName = '德卡 IC 卡读卡器（USB）'
   /** DLL 相对宿主资源根的出厂位置 */
   readonly dllFile = 'devices/decard/dcrf32.dll'
-  /** 1001-1016 = USB；1-16 = 串口（USB 路线波特率被忽略） */
-  readonly port = 1001
+  /** 端口号：100-199 = USB（100 = 第一个 USB 设备），0-99 = 串口（USB 路线波特率被忽略） */
+  readonly port = 100
   readonly baud = 115200
 
   private readonly dllPath: string
@@ -88,27 +89,30 @@ export class DecardDriver implements BrandDriver {
     }
     this.lib = requireKoffi({ dllPath: this.dllPath }).load(this.dllPath)
     const f = this.lib.func.bind(this.lib)
-    // 指针入参统一传 Node Buffer（与 huashi-driver 同风格），出参手工读字节
+    // 签名对齐 dcrf32.h：功能函数返回 short（0 = 成功，<0 = 失败，dc_request 另有 1 = 无卡）
     this.fns = {
-      dc_init: f('void *dc_init(uint port, uint baud)'),
-      dc_exit: f('int dc_exit(void *icdev)'),
-      dc_request: f('int dc_request(void *icdev, uchar mode, uint *tagType)'),
-      dc_anticoll: f('int dc_anticoll(void *icdev, uchar bantisel, uchar *snr)'),
-      dc_select: f('int dc_select(void *icdev, uchar *snr, uchar *size)'),
-      dc_authentication_pass: f('int dc_authentication_pass(void *icdev, uchar mode, uchar sector, uchar *key)'),
-      dc_read: f('int dc_read(void *icdev, uchar addr, uchar *data)'),
-      dc_write: f('int dc_write(void *icdev, uchar addr, uchar *data)'),
-      dc_beep: f('int dc_beep(void *icdev, uint msec)'),
+      dc_init: f('void *dc_init(short port, int baud)'),
+      dc_exit: f('short dc_exit(void *icdev)'),
+      dc_request: f('short dc_request(void *icdev, uchar mode, ushort *tagType)'),
+      dc_anticoll: f('short dc_anticoll(void *icdev, uchar bcnt, uint *snr)'),
+      dc_select: f('short dc_select(void *icdev, uint snr, uchar *size)'),
+      dc_authentication_pass: f('short dc_authentication_pass(void *icdev, uchar mode, uchar sector, uchar *key)'),
+      dc_read: f('short dc_read(void *icdev, uchar addr, uchar *data)'),
+      dc_write: f('short dc_write(void *icdev, uchar addr, uchar *data)'),
+      dc_beep: f('short dc_beep(void *icdev, ushort msec)'),
     }
   }
 
-  /** 打开连接（USB 端口 1001）。dcrf32 无 cwd 依赖（无 license/资源文件），无需 chdir */
+  /** 打开连接（USB 端口 100）。koffi 经 LOAD_WITH_ALTERED_SEARCH_PATH 加载，libusb 等依赖按 DLL 同目录解析，无需 chdir */
   open(): void {
     this.ensureLoaded()
-    this.handle = this.fns.dc_init(this.port, this.baud)
-    if (!this.handle) {
+    const handle = this.fns.dc_init(this.port, this.baud)
+    // SDK 约定 <0 = 失败：负句柄非空指针（koffi 指针返回值为无符号 BigInt，负值回绕成高位 1），须一并拒绝
+    const valid = typeof handle === 'bigint' && handle > 0n && handle < 0x8000000000000000n
+    if (!valid) {
       throw idCardError('DEVICE_OFFLINE', `打开德卡读卡器失败（端口 ${this.port}）`, { port: this.port })
     }
+    this.handle = handle
   }
 
   /** 完整读卡：寻卡 → 防碰撞 → 选卡 → 认证 → 读数据块 */
@@ -122,8 +126,8 @@ export class DecardDriver implements BrandDriver {
     const mode = req?.keyType === 'B' ? 4 : 0
     const h = this.handle
 
-    // 寻卡（1 = ISO14443A；若真机寻卡失败可试 0 = 全部卡型）
-    const tagType = Buffer.alloc(4)
+    // 寻卡（0x01 = 对所有卡操作；返回 1 = 无卡，提示语与之一致）
+    const tagType = Buffer.alloc(2)
     let ret = this.fns.dc_request(h, 1, tagType)
     if (ret !== 0) {
       throw idCardError('READ_FAILED', '寻卡失败：请将 IC 卡放置在读卡区', { stage: 'request', ret })
@@ -134,8 +138,8 @@ export class DecardDriver implements BrandDriver {
     if (ret !== 0) {
       throw idCardError('READ_FAILED', '防碰撞失败', { stage: 'anticoll', ret })
     }
-    // 选卡（size 出参为容量代码，本流程不消费）
-    ret = this.fns.dc_select(h, snr, Buffer.alloc(1))
+    // 选卡（_Snr 按值传 uint；size 出参为 SAK，本流程不消费）
+    ret = this.fns.dc_select(h, snr.readUInt32LE(0), Buffer.alloc(1))
     if (ret !== 0) {
       throw idCardError('READ_FAILED', '选卡失败', { stage: 'select', ret })
     }
@@ -161,6 +165,8 @@ export class DecardDriver implements BrandDriver {
     this.fns.dc_beep(h, 30)
     return {
       uid: snr.toString('hex').toUpperCase(),
+      // 十进制卡号：UID 4 字节按小端整数解读（门禁系统常见展示形态，如 769FBDD1 → 3518865270）
+      cardNumber: snr.readUInt32LE(0).toString(),
       // dc_request 的 ATQA 出参低字节在前（LE）：M1 = 04 00 → 0x0004
       cardType: tagType.readUInt16LE(0).toString(16).padStart(4, '0').toUpperCase(),
       blocks,
@@ -197,7 +203,7 @@ export class DecardDriver implements BrandDriver {
     const { block, data, sector, key, mode } = this.normalizeWrite(req)
     const h = this.handle
 
-    const tagType = Buffer.alloc(4)
+    const tagType = Buffer.alloc(2)
     let ret = this.fns.dc_request(h, 1, tagType)
     if (ret !== 0) {
       throw idCardError('READ_FAILED', '寻卡失败：请将 IC 卡放置在读卡区', { stage: 'request', ret })
@@ -207,7 +213,7 @@ export class DecardDriver implements BrandDriver {
     if (ret !== 0) {
       throw idCardError('READ_FAILED', '防碰撞失败', { stage: 'anticoll', ret })
     }
-    ret = this.fns.dc_select(h, snr, Buffer.alloc(1))
+    ret = this.fns.dc_select(h, snr.readUInt32LE(0), Buffer.alloc(1))
     if (ret !== 0) {
       throw idCardError('READ_FAILED', '选卡失败', { stage: 'select', ret })
     }

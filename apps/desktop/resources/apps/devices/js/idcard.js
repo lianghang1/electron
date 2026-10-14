@@ -118,6 +118,7 @@ async function readIcCard() {
       keyType: $('#ic-keytype').value,
     })
     $('#ic-uid').textContent = r.uid
+    $('#ic-number').textContent = r.cardNumber ?? '—'
     $('#ic-type').textContent = r.cardType ?? '—'
     $('#ic-blocks').innerHTML = Object.entries(r.blocks)
       .map(([addr, hex]) => `<div>块 ${esc(addr)}：${esc(hex)}</div>`).join('')
@@ -205,6 +206,7 @@ $('#btn-id-clear').addEventListener('click', () => {
   $('#id-fields').innerHTML = ''
   $('#ic-result').hidden = true
   $('#ic-uid').textContent = ''
+  $('#ic-number').textContent = ''
   $('#ic-type').textContent = ''
   $('#ic-blocks').innerHTML = ''
   $('#id-status').textContent = '选择读卡器后点击读取'
