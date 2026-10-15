@@ -1,6 +1,6 @@
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
-import type { IcCardData, IcCardReadRequest, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardAdapter, IdCardData, IdReaderDevice } from './types'
+import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardAdapter, IdCardData, IdReaderDevice } from './types'
 import { Buffer } from 'node:buffer'
 
 import { DllIdAdapter } from './adapters/dll-adapter'
@@ -76,10 +76,21 @@ export class IdCardService {
     }
   }
 
-  async readIc(req: IcCardReadRequest & { deviceId: string }): Promise<IcCardData> {
+  /**
+   * 读 IC 卡一个扇区：读块后派生字符串组 texts（数据块按 0x00 截断解码为 UTF-8、尾部空块不返回，
+   * 与 writeIcTexts 的 texts 互逆），与原始块数据同一次会话返回。
+   */
+  async readIc(req: IcCardReadRequest & { deviceId: string }): Promise<IcCardReadResult> {
     try {
       const located = await this.locate(req?.deviceId)
-      return await this.enqueue(this.lockKeyOf(located.device), () => located.adapter.readIc(located.device, req))
+      const data = await this.enqueue(this.lockKeyOf(located.device), () => located.adapter.readIc(located.device, req))
+      const sector = req?.sector ?? 1
+      const texts = Array.from({ length: SECTOR_DATA_BLOCKS }, (_, i) =>
+        decodeBlockText(data.blocks[sector * SECTOR_BLOCKS + i] ?? ''))
+      while (texts.length > 0 && texts[texts.length - 1] === '') {
+        texts.pop()
+      }
+      return { ...data, texts }
     }
     catch (err) {
       throw this.logFailure(req?.deviceId, err)
@@ -94,23 +105,6 @@ export class IdCardService {
         throw idCardError('ADAPTER_UNAVAILABLE', `读卡器 ${located.device.displayName} 不支持 IC 卡写入`)
       }
       await this.enqueue(this.lockKeyOf(located.device), () => located.adapter.writeIc(located.device, req))
-    }
-    catch (err) {
-      throw this.logFailure(req?.deviceId, err)
-    }
-  }
-
-  /** 读扇区字符串组：一次读卡取整扇区数据块，按 0x00 截断解码；尾部空块不返回（与 writeIcTexts 对称） */
-  async readIcTexts(req: IcCardReadRequest & { deviceId: string }): Promise<string[]> {
-    try {
-      const data = await this.readIc(req)
-      const sector = req?.sector ?? 1
-      const texts = Array.from({ length: SECTOR_DATA_BLOCKS }, (_, i) =>
-        decodeBlockText(data.blocks[sector * SECTOR_BLOCKS + i] ?? ''))
-      while (texts.length > 0 && texts[texts.length - 1] === '') {
-        texts.pop()
-      }
-      return texts
     }
     catch (err) {
       throw this.logFailure(req?.deviceId, err)

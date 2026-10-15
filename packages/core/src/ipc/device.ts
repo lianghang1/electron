@@ -1,4 +1,4 @@
-import type { IcCardData, IcCardReadRequest, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData } from '@desktop/shared'
+import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData } from '@desktop/shared'
 import type { IdCardSystem } from '../devices/idcard'
 import { idCardError } from '../devices/idcard/errors'
 import { handle } from './handle'
@@ -18,7 +18,6 @@ export function registerDeviceIpc(deps: DeviceIpcDeps): void {
   handle('device:readIdCard', (_e, req) => readIdCard(deps.idCard, req))
   handle('device:readIcCard', (_e, req) => readIcCard(deps.idCard, req))
   handle('device:writeIcCard', (_e, req) => writeIcCard(deps.idCard, req))
-  handle('device:readIcCardTexts', (_e, req) => readIcCardTexts(deps.idCard, req))
   handle('device:writeIcCardTexts', (_e, req) => writeIcCardTexts(deps.idCard, req))
 }
 
@@ -49,8 +48,8 @@ async function readIdCard(system: IdCardSystem | undefined, req?: { deviceId?: s
   return idCard.read({ deviceId })
 }
 
-/** 读 IC 卡：deviceId 缺省时自动选用第一个支持 IC 卡且就绪的读卡器 */
-async function readIcCard(system: IdCardSystem | undefined, req?: IcCardReadRequest & { deviceId?: string }): Promise<IcCardData> {
+/** 读 IC 卡一个扇区（返回原始块数据 + 字符串组 texts）：deviceId 缺省时自动选用第一个支持 IC 卡且就绪的读卡器 */
+async function readIcCard(system: IdCardSystem | undefined, req?: IcCardReadRequest & { deviceId?: string }): Promise<IcCardReadResult> {
   const idCard = requireSystem(system)
   const deviceId = await pickReader(idCard, req, 'iccard', '无可用 IC 卡读卡器')
   return idCard.readIc({ deviceId, key: req?.key, keyType: req?.keyType, sector: req?.sector })
@@ -64,13 +63,6 @@ async function writeIcCard(system: IdCardSystem | undefined, req?: IcCardWriteRe
     throw idCardError('VALIDATION_FAILED', '缺少写入参数')
   }
   await idCard.writeIc({ deviceId, block: req.block, data: req.data, key: req.key, keyType: req.keyType })
-}
-
-/** 读 IC 卡扇区字符串组：deviceId 缺省时自动选用第一个支持 IC 卡且就绪的读卡器 */
-async function readIcCardTexts(system: IdCardSystem | undefined, req?: IcCardReadRequest & { deviceId?: string }): Promise<string[]> {
-  const idCard = requireSystem(system)
-  const deviceId = await pickReader(idCard, req, 'iccard', '无可用 IC 卡读卡器')
-  return idCard.readIcTexts({ deviceId, key: req?.key, keyType: req?.keyType, sector: req?.sector })
 }
 
 /** 写 IC 卡扇区字符串组：deviceId 缺省时自动选用第一个支持写卡且就绪的读卡器；约束校验在系统层 */

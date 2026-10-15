@@ -146,7 +146,7 @@ async function readIcCard() {
       key: key || undefined,
       keyType: $('#ic-keytype').value,
     })
-    console.log(r)
+    console.log({read: r})
     $('#ic-uid').textContent = r.uid
     $('#ic-number').textContent = r.cardNumber ?? '—'
     $('#ic-type').textContent = r.cardType ?? '—'
@@ -232,7 +232,7 @@ async function writeIcBlock() {
 
 $('#btn-ic-write').addEventListener('click', () => void writeIcBlock())
 
-// ── IC 卡字符串组（扇区级业务语义：每行一个字符串，与 writeIcCardTexts/readIcCardTexts 契约同构） ──
+// ── IC 卡字符串组（扇区级业务语义：每行一个字符串，与 writeIcCardTexts / readIcCard 的 texts 契约同构） ──
 
 /** 文本域 → 字符串组：按行拆分并丢弃行尾空白行（尾部空串写入即清零块，读取时不保留，无法往返） */
 function parseTexts() {
@@ -253,12 +253,13 @@ async function readIcTexts() {
   const key = $('#ic-t-key').value.trim()
   btn.disabled = true
   try {
-    const texts = await window.desktop.device.readIcCardTexts({
+    const r = await window.desktop.device.readIcCard({
       deviceId,
       sector: Number($('#ic-t-sector').value),
       key: key || undefined,
       keyType: $('#ic-t-keytype').value,
     })
+    const texts = r.texts
 
     console.log({texts})
 

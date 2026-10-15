@@ -1,6 +1,6 @@
-import type { IcCardData, IcCardReadRequest, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from '@desktop/shared'
+import type { IcCardData, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from '@desktop/shared'
 
-export type { IcCardData, IcCardReadRequest, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport }
+export type { IcCardData, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport }
 
 /** 读卡适配器统一接口 —— 新接入方式 = 实现本接口。失败抛 IdCardError（code 见 IdReaderErrorCode） */
 export interface IdCardAdapter {

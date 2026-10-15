@@ -78,6 +78,9 @@ export interface IcCardData {
   blocks: Record<number, string>
 }
 
+/** 扇区数据块按 0x00 截断解码为 UTF-8 文本、尾部空块不返回（与 writeIcCardTexts 的 texts 互逆） */
+export type IcCardReadResult = IcCardData & { texts: string[] }
+
 /** M1 IC 卡写入参数：按绝对块地址写 16 字节数据 */
 export interface IcCardWriteRequest {
   /** 绝对块地址 0-63（Mifare Classic 1K）；驱动强制拒绝密钥控制块（每扇区末块）与 0 扇区 0 块（厂商块） */
@@ -93,7 +96,7 @@ export interface IcCardWriteRequest {
 /**
  * M1 IC 卡扇区级字符串组写入参数（writeIcCardTexts）：
  * texts 按序占用扇区数据块（UTF-8 编码、0x00 结尾补齐 16 字节），未占用的数据块清零。
- * 与 readIcCardTexts 互逆：写入 ["1","2","1051851"] 后读取返回原数组。
+ * 与 readIcCard 返回的 texts 互逆：写入 ["1","2","1051851"] 后读取返回原数组。
  */
 export interface IcCardTextsWriteRequest {
   /** 扇区号 0-15（0 扇区首块为厂商块，写入会被驱动拒绝，业务数据用 1-15） */
