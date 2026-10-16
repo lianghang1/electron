@@ -20,7 +20,7 @@ pnpm hotfix <app> --version <新版本> --sync-version
 pnpm exec tsx scripts/e2e-packaged.ts <app> --hot
 
 # 3. 上传（顺序不可颠倒）
-#    先 dist/hotfix/core-<版本>.asar，后 dist/hotfix/asar-manifest.json
+#    先 dist/hotfix/core-<版本>.zip，后 dist/hotfix/asar-manifest.json
 ```
 
 决策点：

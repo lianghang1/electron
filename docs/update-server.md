@@ -9,7 +9,7 @@
 ```
 <feed基地址>/
 ├── asar-manifest.json                     ← 通道一清单
-├── core-<版本>.asar                       ← 通道一热更代码包
+├── core-<版本>.zip                        ← 通道一热更包（自描述 zip：update.json + core-<版本>.asar）
 ├── latest.yml                             ← 通道二清单（electron-updater generic）
 ├── <应用名>-Setup-<版本>.exe              ← 通道二完整安装器
 └── <应用名>-Setup-<版本>.exe.blockmap     ← 通道二差量索引（可选，建议上传）
@@ -17,27 +17,40 @@
 
 ## 通道一：asar 热更
 
-**GET /asar-manifest.json** → 200 + JSON：
+**GET /asar-manifest.json** → 200 + JSON（仅承载"取包"信息）：
 
 ```json
 {
   "version": "1.0.1",
-  "url": "./core-1.0.1.asar",
-  "sha256": "856cfb3bc9858a76ad01de6332f6e8436cbc7286b04e3f15a5adde4b36f50c88",
-  "minResourcesVersion": "1.1.0"
+  "url": "./core-1.0.1.zip"
 }
 ```
 
 | 字段 | 必须 | 说明 |
 |---|---|---|
 | `version` | 是 | 热更版本，数字段比较；**必须严格大于**线上所有已发布版本 |
-| `url` | 是 | 热更包下载地址，相对清单 URL 解析（也支持绝对地址，可托管到 CDN） |
-| `sha256` | 是 | 热更包文件 SHA-256，64 位小写 hex；客户端下载后强校验，不一致即丢弃 |
-| `minResourcesVersion` | 否 | 资源配对要求：热更代码依赖新版 resources（厂商 DLL/内置页面/SumatraPDF）能力时必填。客户端发现本机 resources（安装期整包版本）旧于该值则跳过热更，等待整包更新先行。**缺省 = 不设限，旧清单天然兼容** |
+| `url` | 是 | 热更包 zip 下载地址，相对清单 URL 解析（也支持绝对地址，可托管到 CDN），扩展名必须 `.zip` |
 
-**GET <url>** → 200 + asar 文件原始字节（`Content-Length` 建议返回，进度条依赖）。
+**GET <url>** → 200 + 热更包 zip 原始字节（`Content-Length` 建议返回，进度条依赖）。
 
-**发布顺序**：先上传 `core-<版本>.asar`，最后覆盖 `asar-manifest.json`（顺序颠倒会导致一个更新周期的 404，客户端下次启动自动重试）。
+热更包为**自描述 zip**（校验元数据随包下发，服务器零维护）：
+
+```
+core-<版本>.zip
+├── update.json                ← { "version", "file", "sha256", "minResourcesVersion"? }
+└── core-<版本>.asar           ← 条目名由 update.json.file 声明
+```
+
+`update.json` 字段：
+
+| 字段 | 必须 | 说明 |
+|---|---|---|
+| `version` | 是 | 包内热更版本，须与外部清单 `version` 一致，不一致视为服务器配置错误 |
+| `file` | 是 | zip 内 asar 条目文件名 |
+| `sha256` | 是 | zip 内 asar 条目的 SHA-256，64 位小写 hex；客户端解包后强校验，不一致即丢弃 |
+| `minResourcesVersion` | 否 | 资源配对要求：热更代码依赖新版 resources（厂商 DLL/内置页面/SumatraPDF）能力时必填。客户端发现本机 resources（安装期整包版本）旧于该值则跳过热更，等待整包更新先行。**缺省 = 不设限，旧包天然兼容** |
+
+**发布顺序**：先上传 `core-<版本>.zip`，最后覆盖 `asar-manifest.json`（顺序颠倒会导致一个更新周期的 404，客户端下次启动自动重试）。
 
 ## 通道二：整包更新（electron-updater generic）
 
@@ -78,7 +91,7 @@ releaseDate: '2026-10-11T03:00:00.000Z'
 ## 本地联调
 
 ```bash
-pnpm hotfix <app> --version 1.0.1          # 产出 dist/hotfix/{core-*.asar, asar-manifest.json}
+pnpm hotfix <app> --version 1.0.1          # 产出 dist/hotfix/{core-*.zip, asar-manifest.json}
 pnpm exec tsx scripts/e2e-update-server.ts <app>   # 本地供流服务器（asar + latest.yml）
 pnpm exec tsx scripts/e2e-packaged.ts <app> --hot  # 树外打包冒烟（含热更闭环）
 ```
