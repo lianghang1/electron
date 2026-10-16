@@ -1,6 +1,7 @@
 import type { JobStatus, PrinterCaps, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
 import type { BrowserWindow } from 'electron'
 import type { Logger } from '../../logger/logger'
+import type { DeviceHost } from '../host/device-host'
 import { join } from 'node:path'
 import { HiddenWindowPool } from './hidden-window'
 import { PrinterRegistry } from './printer-registry'
@@ -36,6 +37,8 @@ export interface PrintSystemOptions {
   sumatraPath?: string
   /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁（无主隐藏窗会让 window-all-closed 永不触发，进程常驻） */
   getParent?: () => BrowserWindow | undefined
+  /** 设备守护进程：winspool 同步探测经此进 utility 进程，避免阻塞主进程事件循环 */
+  host?: DeviceHost
   /** 结构化日志（模块内不直接 console） */
   logger?: Logger
 }
@@ -46,7 +49,7 @@ export interface PrintSystemOptions {
 export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
   const windows = new HiddenWindowPool(options.getParent)
   const archiveDir = join(options.stateDir, 'print-archive')
-  const registry = new PrinterRegistry(windows)
+  const registry = new PrinterRegistry(windows, options.host)
   const log: PrintLogFn = (level, message, meta) => options.logger?.[level](message, meta)
   const service = new PrintService(windows, registry, {
     archiveDir,

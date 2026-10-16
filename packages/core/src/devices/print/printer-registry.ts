@@ -1,11 +1,16 @@
 import type { PrinterCaps, UnifiedPrinter } from '@desktop/shared'
 import type { HiddenWindowPool } from './hidden-window'
+import type { WinspoolHost } from './system-default'
 import { printError } from './errors'
 import { detectPrinterHardware, detectPrinterPapers, detectSystemDefaultPrinter } from './system-default'
 
 /** 打印机注册表：枚举系统打印机（getPrintersAsync），业务层只见 UnifiedPrinter。 */
 export class PrinterRegistry {
-  constructor(private readonly windows: HiddenWindowPool) {}
+  constructor(
+    private readonly windows: HiddenWindowPool,
+    /** 设备守护进程窄接口：winspool 同步探测经此进 utility 进程，主进程零阻塞（缺省回退主进程直调） */
+    private readonly winspool?: WinspoolHost,
+  ) {}
 
   async list(): Promise<UnifiedPrinter[]> {
     const system = await this.listSystem()
@@ -36,8 +41,8 @@ export class PrinterRegistry {
       }))
       // 设备驱动上报的纸张（Win: winspool；Unix: lpoptions）与打印首选项默认值/能力位，纸型联动与默认值展示以此为准
       await Promise.all(mapped.map(async (p) => {
-        p.capabilities.paperList = await detectPrinterPapers(p.id)
-        const hw = await detectPrinterHardware(p.id)
+        p.capabilities.paperList = await detectPrinterPapers(p.id, this.winspool)
+        const hw = await detectPrinterHardware(p.id, this.winspool)
         if (hw) {
           p.capabilities.defaults = hw.defaults
           p.capabilities.duplexSupported = hw.duplexSupported

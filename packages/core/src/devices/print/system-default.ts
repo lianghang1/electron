@@ -5,6 +5,29 @@ import process from 'node:process'
 import { gunzipSync } from 'node:zlib'
 import { queryWinspoolForms, queryWinspoolHardware } from './winspool-forms'
 
+/** 设备守护进程窄接口（结构性类型，避免模块耦合）：winspool 同步 koffi 调用经此进 utility 进程 */
+export interface WinspoolHost {
+  request: <T>(method: string, payload?: unknown) => Promise<T>
+}
+
+/**
+ * winspool 探测经守护进程（utilityProcess）执行：GetFormW 逐表单循环 / GetPrinterW 都是同步 koffi
+ * 调用，留在主进程会阻塞事件循环（整窗冻结数秒）。host 未接线时回退主进程直调（旧行为）；
+ * 已接线但守护进程失败（崩溃退避/超时）返回 null，调用方走既有的 WMI 子进程 / 无默认值降级，
+ * 绝不回退主进程直调——探测失败宁可降级，也不能冻结窗口。
+ */
+async function winspoolViaHost<T>(host: WinspoolHost | undefined, method: string, printerName: string, direct: () => T): Promise<T | null> {
+  if (!host) {
+    return direct()
+  }
+  try {
+    return await host.request<T>(method, { printerName })
+  }
+  catch {
+    return null
+  }
+}
+
 /**
  * 系统默认打印机探测。
  * Electron 37 起 PrinterInfo 不再携带 isDefault/status 字段，改由 OS 查询：
@@ -130,7 +153,7 @@ const hardwareCache = new Map<string, { at: number, hw: PrinterHardwareInfo | nu
  *   - macOS/Linux（CUPS）: `lpoptions -l` 中带 * 的选项即默认值，Duplex / ColorModel 选项同时给出能力位
  * 结果缓存 5 分钟，与纸型查询同源（lpoptions -l 一次拿全）。
  */
-export async function detectPrinterHardware(printerName: string): Promise<PrinterHardwareInfo | null> {
+export async function detectPrinterHardware(printerName: string, host?: WinspoolHost): Promise<PrinterHardwareInfo | null> {
   const cached = hardwareCache.get(printerName)
   if (cached && Date.now() - cached.at < PAPERS_TTL)
     return cached.hw
@@ -141,7 +164,7 @@ export async function detectPrinterHardware(printerName: string): Promise<Printe
   }
 
   if (process.platform === 'win32') {
-    const hw = queryWinspoolHardware(printerName)
+    const hw = await winspoolViaHost(host, 'print.winspoolHardware', printerName, () => queryWinspoolHardware(printerName))
     return finish(hw)
   }
 
@@ -192,17 +215,17 @@ export async function detectPrinterHardware(printerName: string): Promise<Printe
   }))
 }
 
-export function detectPrinterPapers(printerName: string): Promise<PrinterPaper[]> {
+export async function detectPrinterPapers(printerName: string, host?: WinspoolHost): Promise<PrinterPaper[]> {
   const cached = papersCache.get(printerName)
   if (cached && Date.now() - cached.at < PAPERS_TTL)
     return Promise.resolve(cached.papers)
 
   if (process.platform === 'win32') {
     // winspool 直调返回 null 才回落 WMI；空数组 = 驱动真实上报无表单，信任之
-    const direct = queryWinspoolForms(printerName)
+    const direct = await winspoolViaHost(host, 'print.winspoolForms', printerName, () => queryWinspoolForms(printerName))
     if (direct) {
       papersCache.set(printerName, { at: Date.now(), papers: direct })
-      return Promise.resolve(direct)
+      return direct
     }
     return loadWindowsForms().then((map) => {
       const papers = toPapers(map.get(printerName) ?? [])

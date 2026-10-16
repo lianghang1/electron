@@ -57,6 +57,7 @@ async function refreshReaders() {
   const sel = $('#id-reader')
   try {
     readers = await window.desktop.device.listReaders()
+    console.log(readers)
   }
   catch (e) {
     sel.innerHTML = `<option value="">读卡器不可用（${esc(e.message)}）</option>`

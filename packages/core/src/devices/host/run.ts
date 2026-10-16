@@ -6,6 +6,7 @@ import { HuashiDriver } from '../idcard/drivers/huashi-driver'
 import { KemiDriver } from '../idcard/drivers/kemi-driver'
 import { koffiAvailable } from '../idcard/drivers/koffi'
 import { idCardError } from '../idcard/errors'
+import { queryWinspoolForms, queryWinspoolHardware } from '../print/winspool-forms'
 
 /**
  * 设备守护进程入口运行器（utilityProcess 子进程内执行）：
@@ -137,6 +138,16 @@ function dispatch(method: string, payload: unknown): unknown {
         return true
       })
       return undefined
+    }
+    // 打印 winspool 探测（koffi 同步调用）：收敛进守护进程，主进程事件循环零阻塞。
+    // 两个查询内部自带平台 + koffi 可用性守卫（非 win32 / 缺依赖返回 null），无需重复判断。
+    case 'print.winspoolForms': {
+      const { printerName } = payload as { printerName: string }
+      return queryWinspoolForms(printerName)
+    }
+    case 'print.winspoolHardware': {
+      const { printerName } = payload as { printerName: string }
+      return queryWinspoolHardware(printerName)
     }
     default:
       throw idCardError('ADAPTER_UNAVAILABLE', `守护进程未实现方法: ${method}`)

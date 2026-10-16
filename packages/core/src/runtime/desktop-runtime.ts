@@ -226,6 +226,8 @@ export class DesktopRuntime {
 
     // 设备守护进程：入口 bundle 与主进程同目录（out/main/device-host.js，electron-vite 多入口）
     this.deviceHost = new DeviceHost(this.logger.scope('device:host'), resolveHostEntryPath())
+    // 预热：后台提前拉起守护进程（fork + koffi 加载），证卡/打印首次操作免等秒级冷启动
+    void this.deviceHost.warmup()
 
     this.idCardSystem = createIdCardSystem({
       resourcesRoot,
@@ -264,6 +266,8 @@ export class DesktopRuntime {
       sumatraPath: isAbsolute(sumatraRel) ? sumatraRel : join(resourcesRoot, sumatraRel),
       // 打印隐藏窗挂主窗口为 parent：主窗关闭级联销毁池窗，退出链路才能走完
       getParent: () => this.windowService.getMainWindow(),
+      // winspool 同步探测经设备守护进程执行，主进程事件循环零阻塞
+      host: this.deviceHost,
       logger: this.logger.scope('device:print'),
     })
   }

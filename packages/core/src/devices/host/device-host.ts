@@ -60,6 +60,16 @@ export class DeviceHost {
     return this.ensureProcess().then(() => this.send<T>(method, payload))
   }
 
+  /** 预热：后台提前拉起守护进程（含 koffi 加载），把冷启动成本移出用户首次设备操作；失败静默（懒启动兜底） */
+  warmup(): Promise<void> {
+    if (this.disposed) {
+      return Promise.resolve()
+    }
+    return this.ensureProcess().catch((err) => {
+      this.logger.warn('device host warmup failed', { err })
+    })
+  }
+
   /** 释放：pending 全拒 + 杀进程（runtime 退出时调用） */
   dispose(): void {
     this.disposed = true
