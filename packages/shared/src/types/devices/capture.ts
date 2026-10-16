@@ -31,11 +31,17 @@ export interface CaptureCaps {
 
 export interface CaptureRequest {
   deviceId: string
-  /** 图片保存目录，默认 userData/capture */
-  saveDir?: string
   format?: 'jpg' | 'png' | 'bmp'
   /** 分辨率序号（设备枚举 resolutionList 的索引；ws/camsdk 路线生效，缺省 0 = 设备默认） */
   resolutionNum?: number
+}
+
+/**
+ * 适配器内部采集请求 = 对外契约 + 平台注入的保存目录。
+ * 保存目录是平台内部事务（userData/capture），渲染层不可指定——否则等于开放任意路径写文件
+ */
+export interface AdapterCaptureRequest extends CaptureRequest {
+  saveDir: string
 }
 
 /** 摄像头枚举条目（ws/camsdk GetCameraInfo）：name 供下拉展示、id 即 devNum */
@@ -57,6 +63,7 @@ export type CaptureLogFn = (
 export type CaptureErrorCode
   = | 'DEVICE_NOT_FOUND'
     | 'DEVICE_OFFLINE'
+    | 'DEVICE_BUSY'
     | 'CAPTURE_FAILED'
     | 'ADAPTER_UNAVAILABLE'
     | 'SAVE_FAILED'
@@ -70,6 +77,43 @@ export interface CaptureResult {
   /** 缩略图 dataURL（UI 预览用，免 file:// 权限问题） */
   thumbDataUrl?: string
   meta?: Record<string, unknown>
+}
+
+/** 内置 UI 浮层拍摄请求：页面经桥发起，Main 打开拍摄浮层窗（会话全局互斥） */
+export interface CaptureDialogRequest {
+  /** 预选采集设备 id（缺省 = 浮层内自选；uvc: 开头为本机摄像头，浮层自拿流） */
+  deviceId?: string
+  /**
+   * 预选设备名兜底：UVC 摄像头的 deviceId 按 session 随机化，浮层窗独立 partition
+   * 枚举出的 id 与发起页不一致——跨窗口传设备必须带 label 供二次匹配
+   */
+  deviceLabel?: string
+  /** ws/camsdk 分辨率序号（设备枚举 resolutionList 的索引） */
+  resolutionNum?: number
+  /** 浮层标题（缺省「拍摄」） */
+  title?: string
+  format?: 'jpg' | 'png' | 'bmp'
+  /** 可拍摄张数（缺省 1）：1 = 每拍一张替换前一张；>1 = 可拍多张，拍满后禁拍，确认后一次回传 */
+  maxCount?: number
+}
+
+/** 拍摄浮层关闭原因：confirmed=确认回传后关闭，cancelled=用户取消，tabClosed=发起 tab 已销毁，error=会话异常 */
+export type CaptureDialogClosedReason = 'confirmed' | 'cancelled' | 'tabClosed' | 'error'
+
+/** 拍摄浮层会话描述（浮层窗渲染数据源；sessionId 防过期卡片渲染） */
+export interface CaptureDialogSession {
+  sessionId: string
+  title: string
+  /** 发起方 App（展示与结果回传路由） */
+  appId: string
+  appName: string
+  deviceId?: string
+  /** 发起页传的设备名（UVC deviceId 跨窗口不可靠，浮层按 label 二次匹配） */
+  deviceLabel?: string
+  resolutionNum?: number
+  format?: 'jpg' | 'png' | 'bmp'
+  /** 可拍摄张数（缺省 1），浮层按此限制拍摄与展示计数 */
+  maxCount?: number
 }
 
 /** 品牌设备档案 —— 出厂值见 core BUILT_IN_CAPTURE_PROFILES，运行时编辑持久化 userData */
@@ -103,7 +147,7 @@ export interface CaptureDeviceProfile {
 export interface CaptureAdapter {
   readonly transport: CaptureTransport
   listDevices: () => Promise<CaptureDevice[]>
-  capture: (req: CaptureRequest, device: CaptureDevice) => Promise<CaptureResult>
+  capture: (req: AdapterCaptureRequest, device: CaptureDevice) => Promise<CaptureResult>
   destroy?: () => void
   /**
    * 实时预览（可选能力）：开启后预览帧经 onFrame 持续回调（JPEG base64），

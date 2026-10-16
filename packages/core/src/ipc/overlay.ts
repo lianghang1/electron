@@ -1,6 +1,7 @@
 import type { TabMenuAction } from '@desktop/shared'
 import type { AppRegistry } from '../app/app-registry'
 import type { CacheService } from '../cache/cache-service'
+import type { CaptureDialogSessionService } from '../devices/capture/dialog-session'
 import type { TabService } from '../tab/tab-service'
 import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
@@ -10,6 +11,8 @@ import { handle } from './handle'
 
 export interface OverlayIpcDeps {
   overlayService: OverlayWindowService
+  /** 拍摄浮层关闭回传：执行会话收尾（回收预览 / 隐藏拍摄窗 / 通知发起 tab） */
+  captureDialog: CaptureDialogSessionService
   /** 菜单打开时按 manifest.chrome 计算 closable（套壳模式 Tab 不给关闭入口） */
   registry: AppRegistry
   /** 菜单动作执行：选中项由 Main 直接调 service，Shell 无需中转 */
@@ -41,12 +44,10 @@ export function registerOverlayIpc(deps: OverlayIpcDeps): void {
   // Shell 发起：打开 Tab 右键菜单浮层窗（原生窗承载，页面内容保持可见）
   handle('overlay:menu', (e, menu) => {
     assertShell(deps.resolver.resolve(e.sender))
-    if (!menu || typeof menu.tabId !== 'string' || typeof menu.appId !== 'string')
-      throw new DesktopError('IPC_ERROR', 'invalid tab context menu')
+    if (!menu || typeof menu.tabId !== 'string' || typeof menu.appId !== 'string') { throw new DesktopError('IPC_ERROR', 'invalid tab context menu') }
     const x = Number(menu.x)
     const y = Number(menu.y)
-    if (!Number.isFinite(x) || !Number.isFinite(y))
-      throw new DesktopError('IPC_ERROR', 'invalid menu anchor')
+    if (!Number.isFinite(x) || !Number.isFinite(y)) { throw new DesktopError('IPC_ERROR', 'invalid menu anchor') }
     // 套壳模式（chrome: 'single'）Tab 固定不可关：菜单不给「关闭标签页」入口
     const closable = deps.registry.get(menu.appId)?.chrome !== 'single'
     deps.overlayService.pushMenu({ tabId: menu.tabId, appId: menu.appId, x, y, closable })
@@ -57,8 +58,7 @@ export function registerOverlayIpc(deps: OverlayIpcDeps): void {
       throw new DesktopError('PERMISSION_DENIED', 'This channel is overlay-only')
     }
     const menu = deps.overlayService.getMenu()
-    if (!menu)
-      return
+    if (!menu) { return }
     deps.overlayService.dismissMenu()
     // 关窗先行，动作异步执行（清缓存可能耗时，不阻塞菜单关闭）
     void execMenuAction(action as TabMenuAction, menu.tabId, menu.appId, deps)
@@ -69,6 +69,13 @@ export function registerOverlayIpc(deps: OverlayIpcDeps): void {
       throw new DesktopError('PERMISSION_DENIED', 'This channel is overlay-only')
     }
     deps.overlayService.dismissMenu()
+  })
+  // 仅供拍摄窗页面回传：取消拍摄浮层（× / ESC）→ 会话收尾（隐藏拍摄窗 + 通知发起 tab）
+  handle('overlay:captureDismiss', (e) => {
+    if (!deps.overlayService.isOverlay(e.sender)) {
+      throw new DesktopError('PERMISSION_DENIED', 'This channel is overlay-only')
+    }
+    deps.captureDialog.cancelByOverlay()
   })
 }
 

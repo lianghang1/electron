@@ -38,8 +38,7 @@ export function listCamSdkCameras(cfg: CamSdkConfig): Promise<CamSdkCameraInfo[]
     const ws: MiniWS = newSession(cfg)
 
     const done = (err: unknown, cameras?: CamSdkCameraInfo[]): void => {
-      if (settled)
-        return
+      if (settled) { return }
       settled = true
       clearTimeout(timer)
       try {
@@ -48,9 +47,8 @@ export function listCamSdkCameras(cfg: CamSdkConfig): Promise<CamSdkCameraInfo[]
       catch {
         /* 忽略 */
       }
-      if (err)
-        reject(err)
-      else resolve(cameras!)
+      if (err) { reject(err) }
+      else { resolve(cameras!) }
     }
 
     timer = setTimeout(() => done(captureError('DEVICE_OFFLINE', `华视 CamSDKServer 枚举超时（${cfg.url}）`)), 6000)
@@ -59,8 +57,7 @@ export function listCamSdkCameras(cfg: CamSdkConfig): Promise<CamSdkCameraInfo[]
       ws.send(JSON.stringify({ func: 'GetCameraInfo', reqId: String(Date.now()) }))
     }
     ws.onmessage = (ev) => {
-      if (typeof ev.data !== 'string')
-        return
+      if (typeof ev.data !== 'string') { return }
       let msg: CamSdkFrame
       try {
         msg = JSON.parse(ev.data) as CamSdkFrame
@@ -68,8 +65,7 @@ export function listCamSdkCameras(cfg: CamSdkConfig): Promise<CamSdkCameraInfo[]
       catch {
         return
       }
-      if (msg.func !== 'GetCameraInfo')
-        return
+      if (msg.func !== 'GetCameraInfo') { return }
       if (msg.result !== 0) {
         done(captureError('CAPTURE_FAILED', `华视高拍仪枚举失败（result=${String(msg.result)}）：${String(msg.errorMsg ?? '未知错误')}`))
         return
@@ -114,8 +110,7 @@ export class CamSdkPreviewSession {
       this.ws = ws
 
       const settle = (err?: unknown): void => {
-        if (settled)
-          return
+        if (settled) { return }
         settled = true
         clearTimeout(timer)
         if (err) {
@@ -158,8 +153,7 @@ export class CamSdkPreviewSession {
         send({ func: 'GetCameraVideoBuff', enable: true })
       }
       ws.onmessage = (ev) => {
-        if (typeof ev.data !== 'string')
-          return
+        if (typeof ev.data !== 'string') { return }
         let msg: CamSdkFrame
         try {
           msg = JSON.parse(ev.data) as CamSdkFrame
@@ -184,8 +178,7 @@ export class CamSdkPreviewSession {
             check(msg)
             break
           case 'CameraCapture': {
-            if (!this.capturing)
-              break
+            if (!this.capturing) { break }
             clearTimeout(this.captureTimer)
             this.capturing = false
             const settleFn = this.captureSettle
@@ -195,10 +188,8 @@ export class CamSdkPreviewSession {
               break
             }
             const base64 = frameImage(msg)
-            if (base64)
-              settleFn?.(undefined, base64)
-            else
-              settleFn?.(captureError('CAPTURE_FAILED', '华视高拍仪拍照成功但未返回图片数据'))
+            if (base64) { settleFn?.(undefined, base64) }
+            else { settleFn?.(captureError('CAPTURE_FAILED', '华视高拍仪拍照成功但未返回图片数据')) }
             break
           }
           default:
@@ -264,8 +255,7 @@ export class CamSdkPreviewSession {
     this.closed = true
     const ws = this.ws
     this.ws = null
-    if (!ws)
-      return
+    if (!ws) { return }
     try {
       ws.send(JSON.stringify({ reqId: String(Date.now()), devNum: this.cfg.camId ?? 0, func: 'GetCameraVideoBuff', enable: false }))
       ws.send(JSON.stringify({ reqId: String(Date.now()), devNum: this.cfg.camId ?? 0, func: 'CloseCamera' }))

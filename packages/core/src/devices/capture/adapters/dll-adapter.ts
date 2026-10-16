@@ -1,4 +1,4 @@
-import type { CaptureAdapter, CaptureDevice, CaptureDeviceProfile, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { AdapterCaptureRequest, CaptureAdapter, CaptureDevice, CaptureDeviceProfile, CaptureResult } from '@desktop/shared'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { koffiAvailable } from '../../idcard/drivers/koffi'
@@ -56,7 +56,7 @@ export class DllAdapter implements CaptureAdapter {
       })
   }
 
-  async capture(req: CaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
+  async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
     throw captureError(
       'ADAPTER_UNAVAILABLE',
       'DLL 路线为骨架：拿到厂商 SDK 文档（.h 函数签名 + DLL 位数）后，按本文件头部的 koffi 范式实现 capture；'

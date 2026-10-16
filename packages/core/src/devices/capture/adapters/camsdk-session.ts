@@ -69,8 +69,7 @@ export function captureCamSdkBase64(cfg: CamSdkConfig, resolutionNum = 0): Promi
     const ws = newSession(cfg)
 
     const done = (err: unknown, base64?: string): void => {
-      if (settled)
-        return
+      if (settled) { return }
       settled = true
       clearTimeout(timer)
       try {
@@ -79,9 +78,8 @@ export function captureCamSdkBase64(cfg: CamSdkConfig, resolutionNum = 0): Promi
       catch {
         /* 忽略 */
       }
-      if (err)
-        reject(err)
-      else resolve(base64!)
+      if (err) { reject(err) }
+      else { resolve(base64!) }
     }
 
     const send = (obj: Record<string, unknown>): void => {
@@ -109,8 +107,7 @@ export function captureCamSdkBase64(cfg: CamSdkConfig, resolutionNum = 0): Promi
       send({ func: 'GetCameraVideoBuff', enable: true })
     }
     ws.onmessage = (ev) => {
-      if (typeof ev.data !== 'string')
-        return
+      if (typeof ev.data !== 'string') { return }
       let msg: CamSdkFrame
       try {
         msg = JSON.parse(ev.data) as CamSdkFrame
@@ -142,8 +139,7 @@ export function captureCamSdkBase64(cfg: CamSdkConfig, resolutionNum = 0): Promi
           break
         }
         case 'CameraCapture': {
-          if (!check(msg))
-            return
+          if (!check(msg)) { return }
           const base64 = frameImage(msg)
           if (!base64) {
             fail('CAPTURE_FAILED', '华视高拍仪拍照成功但未返回图片数据')

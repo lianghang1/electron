@@ -1,3 +1,4 @@
+import type { CaptureDialogSession } from '../devices/capture'
 import type { DownloadTask } from '../download'
 import type { PlatformNotification } from '../notification'
 import type { PermissionRequest } from '../permission'
@@ -26,6 +27,8 @@ export interface OverlaySyncState {
   dialogs: PermissionRequest[]
   /** 挂起中的 Tab 右键菜单（菜单窗数据源） */
   menu: TabContextMenu | null
+  /** 挂起中的拍摄浮层会话（拍摄窗数据源，null = 无会话） */
+  captureSession: CaptureDialogSession | null
 }
 
 /**
@@ -54,8 +57,12 @@ export const overlayDomain = defineDomain('overlay', {
   menuSelect: invoke<(action: TabMenuAction) => void>(),
   /** 仅供菜单窗页面回传：关闭菜单（ESC / 点击菜单外） */
   menuDismiss: invoke<() => void>(),
+  /** 仅供拍摄窗页面回传：关闭拍摄浮层（用户点击浮层关闭 / ESC） */
+  captureDismiss: invoke<() => void>(),
 
   // ---- Main → Renderer 推送 ----
   /** Tab 右键菜单变化推送（菜单窗数据源，null = 已关闭） */
   menuPending: push<[TabContextMenu | null]>(),
+  /** 拍摄浮层会话变化推送（拍摄窗数据源，null = 已关闭） */
+  capturePending: push<[CaptureDialogSession | null]>(),
 })

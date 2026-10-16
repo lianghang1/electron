@@ -28,7 +28,7 @@ export interface CaptureSystemOptions {
   persist?: (profiles: CaptureDeviceProfile[]) => void
   /** 结构化日志（采集日志不含图片内容） */
   logger?: Logger
-  /** 采集图片默认保存目录（绝对路径）；未传 req.saveDir 时使用 */
+  /** 采集图片保存目录（绝对路径，平台自管 userData/capture，渲染层不可指定） */
   defaultSaveDir: string
 }
 

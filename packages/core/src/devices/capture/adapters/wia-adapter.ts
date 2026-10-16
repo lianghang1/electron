@@ -1,4 +1,4 @@
-import type { CaptureAdapter, CaptureDevice, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { AdapterCaptureRequest, CaptureAdapter, CaptureDevice, CaptureResult } from '@desktop/shared'
 import { execFile } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
@@ -20,9 +20,8 @@ export class WiaAdapter implements CaptureAdapter {
         ['-NoProfile', '-NonInteractive', '-Command', script],
         { windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
         (err, stdout, stderr) => {
-          if (err && !stdout)
-            reject(new Error(stderr || err.message))
-          else resolve(stdout)
+          if (err && !stdout) { reject(new Error(stderr || err.message)) }
+          else { resolve(stdout) }
         },
       )
       child.on('error', () => reject(new Error('PowerShell 不可用')))
@@ -30,8 +29,7 @@ export class WiaAdapter implements CaptureAdapter {
   }
 
   async listDevices(): Promise<CaptureDevice[]> {
-    if (process.platform !== 'win32')
-      return []
+    if (process.platform !== 'win32') { return [] }
     const script = `
       $ErrorActionPreference = 'Stop'
       try {
@@ -65,12 +63,11 @@ export class WiaAdapter implements CaptureAdapter {
     }
   }
 
-  async capture(req: CaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
+  async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
     const wiaId = String(device.meta.wiaDeviceId ?? '')
-    if (!wiaId)
-      throw captureError('VALIDATION_FAILED', '缺少 WIA DeviceID')
+    if (!wiaId) { throw captureError('VALIDATION_FAILED', '缺少 WIA DeviceID') }
 
-    const dir = req.saveDir ?? path.join('out', 'capture')
+    const dir = req.saveDir
     await mkdir(dir, { recursive: true })
     const file = path.join(dir, `wia-${Date.now()}.jpg`)
 
@@ -86,8 +83,7 @@ export class WiaAdapter implements CaptureAdapter {
     `
     try {
       const out = await this.run(script)
-      if (!out.includes('OK'))
-        throw new Error('WIA 转存未完成')
+      if (!out.includes('OK')) { throw new Error('WIA 转存未完成') }
     }
     catch (err) {
       throw captureError('CAPTURE_FAILED', `WIA 采集失败: ${String(err)}`, { wiaId })

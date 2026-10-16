@@ -3,9 +3,16 @@ import { readFile } from 'node:fs/promises'
 import { extname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { bootstrap, resolveResourcePath } from '@desktop/core'
-import { protocol } from 'electron'
+import { app, protocol } from 'electron'
 import icon from '../../resources/icon.png?asset'
 import { appId, productName } from '../identity.cjs'
+
+// 仅 Windows：全屏浮层（拍摄/授权弹窗/右键菜单）盖住主窗时，Chromium 原生遮挡计算
+// 会把主窗判为完全遮挡而暂停渲染合成——浮层下页面逻辑照跑但画面不更新，结果/提示
+// 拖到浮层关闭后才上屏。禁用该特性保持主窗持续合成（mac/Linux 无此遮挡机制，不动）
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+}
 
 // 内部 App 页面协议：app://<appId>/index.html。
 // standard + secure 使其成为标准安全源——cookie / origin 语义等同 https（file:// 源禁止写 cookie），
@@ -91,11 +98,9 @@ async function handleDirAppRequest(host: string, pathname: string): Promise<Resp
   const dir = appDirs[host]
   const relative = decodeURIComponent(pathname).replace(/^\/+/, '') || 'index.html'
   const file = resolve(dir, relative)
-  if (!file.startsWith(dir + sep))
-    return new Response(`forbidden path: ${host}/${relative}`, { status: 403 })
+  if (!file.startsWith(dir + sep)) { return new Response(`forbidden path: ${host}/${relative}`, { status: 403 }) }
   const mime = assetMimeTypes[extname(file).toLowerCase()]
-  if (!mime)
-    return new Response(`unsupported asset: ${host}/${relative}`, { status: 404 })
+  if (!mime) { return new Response(`unsupported asset: ${host}/${relative}`, { status: 404 }) }
   try {
     const data = await readFile(file)
     return new Response(data, { headers: { 'content-type': mime } })

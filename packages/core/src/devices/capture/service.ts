@@ -1,4 +1,4 @@
-import type { CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -50,7 +50,7 @@ export class CaptureService {
 
   private buildAdapters(): Map<string, CaptureAdapter> {
     // 热重建前销毁旧适配器持有的资源（ws 预览会话等），防连接泄漏；构造首调时 adapters 尚未初始化
-    for (const a of this.adapters?.values() ?? []) a.destroy?.()
+    for (const a of this.adapters?.values() ?? []) { a.destroy?.() }
     const adapters: [string, CaptureAdapter][] = [
       ['service', new ServiceAdapter(this.profiles)],
       ['wia', new WiaAdapter()],
@@ -67,9 +67,8 @@ export class CaptureService {
     }
     const list = this.profiles.slice()
     const i = list.findIndex(p => p.id === profile.id)
-    if (i >= 0)
-      list[i] = profile
-    else list.push(profile)
+    if (i >= 0) { list[i] = profile }
+    else { list.push(profile) }
     this.profiles = list
     this.persist?.(list)
     this.adapters = this.buildAdapters()
@@ -145,8 +144,8 @@ export class CaptureService {
         throw captureError('ADAPTER_UNAVAILABLE', `设备适配器不可用: ${String(device.meta.note ?? transport)}`)
       }
       const prev = this.locks.get(req.deviceId) ?? Promise.resolve()
-      // 调用方未指定保存目录时注入模块默认目录（绝对路径）
-      const reqWithDir: CaptureRequest = { ...req, saveDir: req.saveDir ?? this.defaultSaveDir }
+      // 保存目录是平台内部事务：恒注入 userData/capture，渲染层不可指定（防任意路径写文件）
+      const reqWithDir: AdapterCaptureRequest = { ...req, saveDir: this.defaultSaveDir }
       // 链上已 catch（登记锁不吞结果），单分支即可
       const task = prev.then(() => adapter.capture(reqWithDir, device))
       this.locks.set(req.deviceId, task.catch(() => undefined))
@@ -163,7 +162,7 @@ export class CaptureService {
   }
 
   destroy(): void {
-    for (const a of this.adapters.values()) a.destroy?.()
+    for (const a of this.adapters.values()) { a.destroy?.() }
   }
 
   private log(level: 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>): void {

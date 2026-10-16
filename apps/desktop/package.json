@@ -19,6 +19,7 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
+    "@desktop/ui": "workspace:*",
     "@electron-toolkit/utils": "catalog:",
     "reka-ui": "^2.10.5"
   },

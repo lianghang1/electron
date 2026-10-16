@@ -3,6 +3,7 @@ import type { AppRegistry } from '../app/app-registry'
 import type { AppService } from '../app/app-service'
 import type { CacheService } from '../cache/cache-service'
 import type { CaptureSystem } from '../devices/capture'
+import type { CaptureDialogSessionService } from '../devices/capture/dialog-session'
 import type { IdCardSystem } from '../devices/idcard'
 import type { PrintSystem } from '../devices/print'
 import type { ScannerSystem } from '../devices/scanner'
@@ -59,6 +60,8 @@ export interface PlatformIpcDeps {
   scanner: ScannerSystem
   /** 图像采集系统（bootstrap 装配，恒创建） */
   capture: CaptureSystem
+  /** 拍摄浮层会话服务（bootstrap 装配，恒创建） */
+  captureDialog: CaptureDialogSessionService
   /** 统一打印系统（bootstrap 装配，恒创建） */
   print: PrintSystem
   /** 平台事件总线：通知等域经它把 Main 侧事件转推 Shell */
@@ -88,6 +91,7 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService })
   registerOverlayIpc({
     overlayService: deps.overlayService,
+    captureDialog: deps.captureDialog,
     registry: deps.registry,
     tabService: deps.tabService,
     cacheService: deps.cacheService,
@@ -97,7 +101,13 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   registerDeviceIpc({ idCard: deps.idCard })
   registerSignatureIpc({ signature: deps.signature })
   registerScannerIpc({ scanner: deps.scanner })
-  registerCaptureIpc({ capture: deps.capture })
+  registerCaptureIpc({
+    capture: deps.capture,
+    captureDialog: deps.captureDialog,
+    overlayService: deps.overlayService,
+    registry: deps.registry,
+    resolver: deps.resolver,
+  })
   registerPrintIpc({ print: deps.print })
   registerNotificationIpc({
     registry: deps.registry,

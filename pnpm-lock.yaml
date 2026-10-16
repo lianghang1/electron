@@ -110,6 +110,9 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@desktop/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@electron-toolkit/utils':
         specifier: 'catalog:'
         version: 4.0.0(electron@39.2.6)
@@ -366,6 +369,25 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.8.3
+
+  packages/ui:
+    dependencies:
+      '@desktop/shared':
+        specifier: workspace:*
+        version: link:../shared
+      reka-ui:
+        specifier: ^2.10.5
+        version: 2.11.0(vue@3.5.25(typescript@5.8.3))
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.25(typescript@5.8.3)
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.8.3
+      vue-tsc:
+        specifier: 'catalog:'
+        version: 3.3.12(typescript@5.8.3)
 
   packages/utils:
     dependencies:

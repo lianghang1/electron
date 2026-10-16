@@ -37,11 +37,15 @@ export type { AppContext, AppInstance, AppLifecycleState, CallerContext } from '
 /* ---------------- 配置与调用方上下文 ---------------- */
 
 export type {
+  AdapterCaptureRequest,
   CaptureAdapter,
   CaptureCameraInfo,
   CaptureCaps,
   CaptureDevice,
   CaptureDeviceProfile,
+  CaptureDialogClosedReason,
+  CaptureDialogRequest,
+  CaptureDialogSession,
   CaptureErrorCode,
   CaptureLogFn,
   CaptureRequest,
@@ -113,4 +117,4 @@ export type { DesktopTab, OpenTabOptions, WorkAreaRect } from './types/tab'
 
 /* ---------------- 更新（整包 + asar 热更） ---------------- */
 
-export type { AsarUpdateState, UpdateAsarSource, UpdateManifest, UpdateState } from './types/update'
+export type { AsarBundleManifest, AsarUpdateState, UpdateAsarSource, UpdateManifest, UpdateState } from './types/update'

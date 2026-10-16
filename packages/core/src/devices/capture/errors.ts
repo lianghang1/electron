@@ -17,8 +17,7 @@ export function captureError(code: CaptureErrorCode, message: string, detail?: u
 }
 
 export function toCaptureError(err: unknown): CaptureErrorImpl {
-  if (err instanceof CaptureErrorImpl)
-    return err
+  if (err instanceof CaptureErrorImpl) { return err }
   const message = err instanceof Error ? err.message : String(err)
   return new CaptureErrorImpl('UNKNOWN', message)
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { DownloadTask, PermissionRequest, PlatformNotification, TabContextMenu, TabMenuAction } from '@desktop/shared'
+import type { CaptureDialogSession, DownloadTask, PermissionRequest, PlatformNotification, TabContextMenu, TabMenuAction } from '@desktop/shared'
+import { CaptureDialog } from '@desktop/ui'
 import {
   DialogContent,
   DialogDescription,
@@ -20,10 +21,11 @@ import { permissionLabel } from '../composables/use-permission-labels'
 /**
  * 浮层页（OverlayWindow 的 renderer，经 #/overlay 路由挂载）：
  * 原生层级压过 WebContentsView。承载必须盖住 Web 容器区域的浮层。
- * 同一份页面服务三类浮层窗（每窗同时只收一种消息，互斥渲染）：
+ * 同一份页面服务四类浮层窗（每窗同时只收一种消息，互斥渲染）：
  * - 消息窗：download:updated 下载通知卡 + notification:received 通知 toast（右上角）
  * - 弹窗窗：permission:pending 运行时授权决策卡（全屏遮罩模态，居中）
  * - 菜单窗：overlay:menuPending Tab 右键菜单（全屏透明模态，锚点定位——页面内容保持可见）
+ * - 拍摄窗：overlay:capturePending 拍摄浮层（全屏遮罩模态，CaptureDialog 由 @desktop/ui 提供）
  *
  * 交互语义交给 reka-ui 原语（Toast 滑动关闭/悬停暂停/无障碍、Dialog 焦点圈养/ESC），
  * 外观用 UnoCSS 工具类自绘；卡片样式固定高对比配色（不随 Shell 主题），保证任意背景下清晰可读。
@@ -32,6 +34,7 @@ const toasts = ref<PlatformNotification[]>([])
 const downloads = ref<DownloadTask[]>([])
 const dialogs = ref<PermissionRequest[]>([])
 const menu = ref<TabContextMenu | null>(null)
+const captureSession = ref<CaptureDialogSession | null>(null)
 
 const STATUS_TEXT: Record<DownloadTask['status'], string> = {
   progressing: '下载中',
@@ -54,18 +57,15 @@ let countdownTimer: ReturnType<typeof setInterval> | null = null
 /** 弹窗列表变化 → 为新请求起 30s 倒计时，移除已决策请求的计时（用户要求超时倒数可见） */
 function syncCountdowns(): void {
   for (const r of dialogs.value) {
-    if (countdowns[r.requestId] == null)
-      countdowns[r.requestId] = REQUEST_TIMEOUT_S
+    if (countdowns[r.requestId] == null) { countdowns[r.requestId] = REQUEST_TIMEOUT_S }
   }
   for (const id of Object.keys(countdowns)) {
-    if (!dialogs.value.some(r => r.requestId === id))
-      delete countdowns[id]
+    if (!dialogs.value.some(r => r.requestId === id)) { delete countdowns[id] }
   }
   if (dialogs.value.length && !countdownTimer) {
     countdownTimer = setInterval(() => {
       for (const r of dialogs.value) {
-        if ((countdowns[r.requestId] ?? 0) > 0)
-          countdowns[r.requestId] = (countdowns[r.requestId] ?? 0) - 1
+        if ((countdowns[r.requestId] ?? 0) > 0) { countdowns[r.requestId] = (countdowns[r.requestId] ?? 0) - 1 }
       }
       if (!dialogs.value.length && countdownTimer) {
         clearInterval(countdownTimer)
@@ -102,8 +102,7 @@ watch(dialogs, () => {
 let lastIgnore: boolean | null = null
 function onMouseMove(e: MouseEvent): void {
   const transparent = e.target === document.body || e.target === document.documentElement
-  if (transparent === lastIgnore)
-    return
+  if (transparent === lastIgnore) { return }
   lastIgnore = transparent
   void window.desktop.overlay.ignoreMouse(transparent)
 }
@@ -166,10 +165,20 @@ function dismissMenu(): void {
   void window.desktop.overlay.menuDismiss()
 }
 
-/** 菜单窗键盘：ESC 关闭 / 上下移动高亮 / Enter 选中（菜单窗 show 时持有焦点） */
+/** 拍摄浮层关闭（× / ESC）：本地立即清卡，Main 收尾后推 capturePending null 对账 */
+function dismissCapture(): void {
+  captureSession.value = null
+  void window.desktop.overlay.captureDismiss()
+}
+
+/** 浮层窗键盘：ESC 关闭（菜单卡高亮导航 / 拍摄浮层关闭），菜单窗 show 时持有焦点 */
 function onMenuKeydown(e: KeyboardEvent): void {
-  if (!menu.value)
+  if (captureSession.value && e.key === 'Escape') {
+    e.preventDefault()
+    dismissCapture()
     return
+  }
+  if (!menu.value) { return }
   if (e.key === 'Escape') {
     e.preventDefault()
     dismissMenu()
@@ -192,8 +201,7 @@ function onMenuKeydown(e: KeyboardEvent): void {
 const MENU_CARD_W = 190
 const MENU_CARD_H = 140
 const menuPos = computed(() => {
-  if (!menu.value)
-    return { left: '0px', top: '0px' }
+  if (!menu.value) { return { left: '0px', top: '0px' } }
   const left = Math.max(4, Math.min(menu.value.x, window.innerWidth - MENU_CARD_W - 8))
   const top = Math.max(4, Math.min(menu.value.y, window.innerHeight - MENU_CARD_H - 8))
   return { left: `${Math.round(left)}px`, top: `${Math.round(top)}px` }
@@ -201,8 +209,7 @@ const menuPos = computed(() => {
 
 /** reka Toast 的关闭事件统一走 Main（控制态由 Main 数据推导，页面不私存） */
 function onToastOpenChange(toastId: string, value: boolean): void {
-  if (!value)
-    dismissToast(toastId)
+  if (!value) { dismissToast(toastId) }
 }
 
 /** 遮罩/卡片外点击不关闭（模态语义：必须显式决策或等待超时） */
@@ -213,8 +220,7 @@ function keepDialogOpen(event: Event): void {
 /** ESC = 本次拒绝（贴近浏览器权限弹窗习惯，超时不持久化的语义一致） */
 function onDialogEscape(event: KeyboardEvent): void {
   event.preventDefault()
-  if (currentRequest.value)
-    void respond(currentRequest.value.requestId, false)
+  if (currentRequest.value) { void respond(currentRequest.value.requestId, false) }
 }
 
 /**
@@ -226,16 +232,14 @@ const panelRef = ref<HTMLElement | null>(null)
 
 function reportHeight(): void {
   const panel = panelRef.value
-  if (!panel)
-    return
+  if (!panel) { return }
   void window.desktop.overlay.resize(panel.scrollHeight + PANEL_MARGIN * 2)
 }
 
 /** 面板超高内部滚动时新 toast 在底部：追加后自动滚到底，保证最新通知可见 */
 function scrollPanelToBottom(): void {
   const panel = panelRef.value
-  if (panel)
-    panel.scrollTop = panel.scrollHeight
+  if (panel) { panel.scrollTop = panel.scrollHeight }
 }
 
 const unsubs: Array<() => void> = []
@@ -254,6 +258,9 @@ onMounted(async () => {
     window.desktop.events.on('overlay:menuPending', (m) => {
       menu.value = m
     }),
+    window.desktop.events.on('overlay:capturePending', (s) => {
+      captureSession.value = s
+    }),
   )
   window.addEventListener('mousemove', onMouseMove)
   window.addEventListener('keydown', onMenuKeydown)
@@ -264,15 +271,15 @@ onMounted(async () => {
   downloads.value = state.downloads
   dialogs.value = state.dialogs
   menu.value = state.menu
+  captureSession.value = state.captureSession
 })
 
 onBeforeUnmount(() => {
-  for (const off of unsubs) off()
+  for (const off of unsubs) { off() }
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('keydown', onMenuKeydown)
   document.removeEventListener('visibilitychange', syncOverlayVisible)
-  if (countdownTimer)
-    clearInterval(countdownTimer)
+  if (countdownTimer) { clearInterval(countdownTimer) }
 })
 
 // 消息窗内容变化 → 量高回报 + 滚到底（弹窗窗全屏铺开，不参与）
@@ -374,6 +381,22 @@ function dialogBtnClass(primary: boolean): string {
             {{ item.label }}
           </button>
         </template>
+      </div>
+    </div>
+
+    <!-- 拍摄浮层：全屏遮罩模态（拍摄窗独立页面实例承载），预览/拍摄在浮层窗内闭环，
+         确认后结果由 Main 推回发起 tab；sessionId 作 key，新会话重建组件（会话状态归零）。
+         遮罩不做动画：大面积半透明淡入与窗口首帧绘制同帧争抢会跳帧，卡片保留 pop 入场。
+         卡片用 flex 居中定位：ov-pop 动画的 transform 会覆盖 translateX(-50%)，
+         混用会先从偏移位弹出再跳回居中（观感「从右侧飘入」） -->
+    <div
+      v-if="captureSession && overlayVisible"
+      :key="captureSession.sessionId"
+      class="fixed inset-0 z-[10] flex justify-center"
+    >
+      <div class="absolute inset-0 bg-[rgba(15,23,42,0.55)]" />
+      <div class="ov-capture__card ov-anim-pop relative mt-[4vh] w-[820px] max-w-[94vw] self-start rounded-[16px] bg-white p-[20px] shadow-[0_24px_64px_rgba(2,8,20,0.32)]">
+        <CaptureDialog :session="captureSession" @close="dismissCapture" />
       </div>
     </div>
 

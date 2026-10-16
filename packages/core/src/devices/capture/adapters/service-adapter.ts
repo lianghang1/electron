@@ -1,4 +1,4 @@
-import type { CaptureAdapter, CaptureDevice, CaptureDeviceProfile, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { AdapterCaptureRequest, CaptureAdapter, CaptureDevice, CaptureDeviceProfile, CaptureResult } from '@desktop/shared'
 import { Buffer } from 'node:buffer'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -51,7 +51,7 @@ export class ServiceAdapter implements CaptureAdapter {
     }
   }
 
-  async capture(req: CaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
+  async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
     const profile = this.byId(device.id)
     const svc = profile.service!
     const url = `${svc.baseUrl.replace(/\/$/, '')}${svc.capturePath}`
@@ -70,7 +70,7 @@ export class ServiceAdapter implements CaptureAdapter {
       throw captureError('CAPTURE_FAILED', `厂商服务返回 ${res.status}`, { url })
     }
 
-    const dir = req.saveDir ?? path.join('out', 'capture')
+    const dir = req.saveDir
     await mkdir(dir, { recursive: true })
     const file = path.join(dir, `service-${profile.id}-${Date.now()}.${req.format ?? 'jpg'}`)
 

@@ -1,4 +1,4 @@
-import type { CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureResult } from '@desktop/shared'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -65,8 +65,7 @@ function tcpProbe(host: string, port: number, timeoutMs = 1500): Promise<boolean
 
 function parseWsUrl(url: string): { host: string, port: number } {
   const m = /^ws:\/\/([^:/]+):(\d+)/.exec(url)
-  if (!m)
-    throw captureError('VALIDATION_FAILED', `无法解析 WebSocket 地址: ${url}`)
+  if (!m) { throw captureError('VALIDATION_FAILED', `无法解析 WebSocket 地址: ${url}`) }
   return { host: m[1], port: Number(m[2]) }
 }
 
@@ -107,7 +106,7 @@ export class WsAdapter implements CaptureAdapter {
     )
   }
 
-  async capture(req: CaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
+  async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
     const { profile, ws } = this.findProfile(device.id)
     // 协议未经验证（verified: false）：服务探活在 listDevices 可见，但绝不套用其他厂商协议采集
     if (ws.verified === false) {
@@ -126,7 +125,7 @@ export class WsAdapter implements CaptureAdapter {
   }
 
   /** 一次性采集（无预览会话时）：探活后按协议开摄像头拍照并关闭 */
-  private async captureOnce(req: CaptureRequest, profile: CaptureDeviceProfile, ws: NonNullable<CaptureDeviceProfile['ws']>): Promise<string> {
+  private async captureOnce(req: AdapterCaptureRequest, profile: CaptureDeviceProfile, ws: NonNullable<CaptureDeviceProfile['ws']>): Promise<string> {
     const { host, port } = parseWsUrl(ws.url)
     const alive = await tcpProbe(host, port)
     if (!alive) {
@@ -139,8 +138,8 @@ export class WsAdapter implements CaptureAdapter {
       : this.captureBase64(ws)
   }
 
-  private async saveCaptureBase64(req: CaptureRequest, profileId: string, base64: string): Promise<string> {
-    const dir = req.saveDir ?? path.join('out', 'capture')
+  private async saveCaptureBase64(req: AdapterCaptureRequest, profileId: string, base64: string): Promise<string> {
+    const dir = req.saveDir
     await mkdir(dir, { recursive: true })
     const file = path.join(dir, `ws-${profileId}-${Date.now()}.jpg`)
     await writeFile(file, Buffer.from(base64, 'base64'))
@@ -183,7 +182,7 @@ export class WsAdapter implements CaptureAdapter {
 
   /** 销毁：关闭全部预览会话（档案热重建/系统停机时防 ws 泄漏） */
   destroy(): void {
-    for (const session of this.previews.values()) session.close()
+    for (const session of this.previews.values()) { session.close() }
     this.previews.clear()
   }
 
@@ -212,8 +211,7 @@ export class WsAdapter implements CaptureAdapter {
       ws.binaryType = 'arraybuffer'
 
       const done = (err: unknown, base64?: string): void => {
-        if (settled)
-          return
+        if (settled) { return }
         settled = true
         clearTimeout(timer)
         clearTimeout(captureTimer)
@@ -223,9 +221,8 @@ export class WsAdapter implements CaptureAdapter {
         catch {
           /* 忽略 */
         }
-        if (err)
-          reject(err)
-        else resolve(base64!)
+        if (err) { reject(err) }
+        else { resolve(base64!) }
       }
 
       const frame = (cmd: number, payload: number[]): ArrayBuffer => {

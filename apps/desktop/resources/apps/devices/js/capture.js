@@ -140,8 +140,12 @@ function pushRecord(result, source) {
   records.unshift({ result, time: fmtTime(Date.now()), source })
   if (records.length > 12) records.pop()
   $('#btn-cap-print').disabled = !current?.imagePath
-  $('#cap-records').innerHTML = records.map((r, i) =>
-    `<img src="${r.result.thumbDataUrl}" title="${esc(r.source)} ${r.time}" data-rec="${i}">`).join('')
+  $('#cap-records').innerHTML = records.map((r, i) => {
+    const m = r.result.meta || {}
+    const size = m.width && m.height ? `，成片 ${m.width}×${m.height}` : ''
+    const path = r.result.imagePath ? `&#10;已保存：${esc(r.result.imagePath)}` : ''
+    return `<img src="${r.result.thumbDataUrl}" title="${esc(r.source)} ${r.time}${size}${path}" data-rec="${i}">`
+  }).join('')
 }
 
 async function captureUvcFrame() {
@@ -295,6 +299,24 @@ $('#cap-resolution').addEventListener('change', async () => {
     catch { /* 忽略 */ }
     await startWsPreview()
   }
+})
+
+// ── 内置 UI 拍摄浮层：发起后预览/拍摄在浮层窗闭环，结果随 openCaptureDialog 的 Promise 回传本页 ──
+
+$('#btn-cap-dialog').addEventListener('click', async () => {
+  const sel = $('#cap-device')
+  const deviceId = sel.value || undefined
+  console.log('deviceId', deviceId)
+  // UVC 摄像头的 deviceId 跨窗口随机化，必须带设备名供浮层二次匹配
+  const deviceLabel = sel.selectedOptions[0]?.label || undefined
+  try {
+    // maxCount=3 便于连拍多张看效果；缺省 maxCount=1 每拍一张替换前一张
+    const results = await window.desktop.capture.openCaptureDialog({ deviceId, deviceLabel, title: '拍摄浮层', maxCount: 3 })
+    console.log(results)
+    for (const r of results) { pushRecord(r, '拍摄浮层') }
+    if (results.length) { toast(`拍摄完成（${results.length} 张）`) }
+  }
+  catch (e) { toast(`拍摄浮层失败：${e.message ?? '未知错误'}`, false) }
 })
 
 registerRefresher(refreshCaptureDevices)
