@@ -18,8 +18,7 @@ async function menuState() {
     })`)
     p.ws.close()
     const v = JSON.parse(r.value)
-    if (v.card)
-      return v
+    if (v.card) { return v }
   }
   return null
 }
@@ -38,8 +37,7 @@ async function menuWindow() {
   const { overlays } = await pages()
   for (const t of overlays) {
     const p = await connect(t.webSocketDebuggerUrl)
-    if ((await evalx(p, `Boolean(document.querySelector('.ov-menu__card'))`)).value)
-      return p
+    if ((await evalx(p, `Boolean(document.querySelector('.ov-menu__card'))`)).value) { return p }
     p.ws.close()
   }
   return null

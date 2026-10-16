@@ -102,49 +102,41 @@ function isValidDate(year: number, month: number, day: number): boolean {
  * @param allowMasked 是否允许带掩码的身份证 (如: 110***1234)，默认 true
  */
 export function isValidIdCard(cardNo: string, allowMasked = true): boolean {
-  if (!cardNo)
-    return false
-  if (allowMasked && cardNo.includes('***'))
-    return true
+  if (!cardNo) { return false }
+  if (allowMasked && cardNo.includes('***')) { return true }
 
   const upperCardNo = cardNo.toUpperCase()
 
   // 1. 格式校验
-  if (!ID_CARD_REGEX.test(upperCardNo))
-    return false
+  if (!ID_CARD_REGEX.test(upperCardNo)) { return false }
 
   // 2. 省份校验
   const provinceCode = upperCardNo.slice(0, 2)
-  if (!PROVINCE_MAP[provinceCode])
-    return false
+  if (!PROVINCE_MAP[provinceCode]) { return false }
 
   // 3. 生日校验
   let year: number, month: number, day: number
   if (upperCardNo.length === 15) {
     const match = upperCardNo.match(REGEX_15)
-    if (!match)
-      return false
+    if (!match) { return false }
     year = 1900 + Number(match[1])
     month = Number(match[2])
     day = Number(match[3])
   }
   else {
     const match = upperCardNo.match(REGEX_18)
-    if (!match)
-      return false
+    if (!match) { return false }
     year = Number(match[1])
     month = Number(match[2])
     day = Number(match[3])
   }
 
-  if (!isValidDate(year, month, day))
-    return false
+  if (!isValidDate(year, month, day)) { return false }
 
   // 年龄范围校验 (3岁 - 120岁)
   const currentYear = new Date().getFullYear()
   const age = currentYear - year
-  if (age < 3 || age > 120)
-    return false
+  if (age < 3 || age > 120) { return false }
 
   // 4. 校验位检测 (15位需先转18位进行校验)
   const id18 = convert15To18(upperCardNo)
@@ -155,8 +147,7 @@ export function isValidIdCard(cardNo: string, allowMasked = true): boolean {
  * 15位身份证号转18位
  */
 export function convert15To18(cardNo: string): string {
-  if (cardNo.length !== 15)
-    return cardNo
+  if (cardNo.length !== 15) { return cardNo }
 
   const core17 = `${cardNo.slice(0, 6)}19${cardNo.slice(6)}`
   const checkCode = calculateCheckCode(core17)

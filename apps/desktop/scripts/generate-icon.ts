@@ -18,12 +18,12 @@ function crc32(buf) {
     table = crc32.table = new Int32Array(256)
     for (let n = 0; n < 256; n++) {
       let c = n
-      for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1
+      for (let k = 0; k < 8; k++) { c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1 }
       table[n] = c
     }
   }
   let crc = -1
-  for (const byte of buf) crc = table[(crc ^ byte) & 0xFF] ^ (crc >>> 8)
+  for (const byte of buf) { crc = table[(crc ^ byte) & 0xFF] ^ (crc >>> 8) }
   return (crc ^ -1) >>> 0
 }
 
@@ -60,8 +60,7 @@ function encodePNG(size, rgba) {
 function inRoundRect(x, y, x0, y0, size, radius) {
   const x1 = x0 + size
   const y1 = y0 + size
-  if (x < x0 || x > x1 || y < y0 || y > y1)
-    return false
+  if (x < x0 || x > x1 || y < y0 || y > y1) { return false }
   const cx = Math.max(x0 + radius, Math.min(x, x1 - radius))
   const cy = Math.max(y0 + radius, Math.min(y, y1 - radius))
   return (x - cx) ** 2 + (y - cy) ** 2 <= radius ** 2
@@ -90,15 +89,13 @@ function render(size) {
         for (let sx = 0; sx < S; sx++) {
           const x = (px + (sx + 0.5) / S) / size
           const y = (py + (sy + 0.5) / S) / size
-          if (!inRoundRect(x, y, 0, 0, 1, CORNER))
-            continue
+          if (!inRoundRect(x, y, 0, 0, 1, CORNER)) { continue }
           inside++
           const col = Math.floor((x - start) / (cell + gap))
           const row = Math.floor((y - start) / (cell + gap))
           const lx = x - (start + col * (cell + gap))
           const ly = y - (start + row * (cell + gap))
-          if (col >= 0 && col < 2 && row >= 0 && row < 2 && inRoundRect(lx, ly, 0, 0, cell, cell * 0.3))
-            glyph++
+          if (col >= 0 && col < 2 && row >= 0 && row < 2 && inRoundRect(lx, ly, 0, 0, cell, cell * 0.3)) { glyph++ }
         }
       }
       const t = py / size
