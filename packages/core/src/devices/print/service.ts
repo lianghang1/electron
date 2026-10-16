@@ -60,8 +60,7 @@ export class PrintService {
       this.validate(req)
       // 纸张归一：字符串便捷写法（'a4'/'80x60'…）→ 物理尺寸，识别不了 → undefined 交驱动默认；PDF 直通豁免纸型
       const paper = req.options.paper ? resolvePaper(req.options.paper) : undefined
-      if (paper)
-        assertPaperSupported(paper, printer.capabilities.maxWidthMm, printer.id)
+      if (paper) { assertPaperSupported(paper, printer.capabilities.maxWidthMm, printer.id) }
       const channel = this.pickChannel(req, printer)
       this.jobs.markPrinting(jobId)
       const startedAt = Date.now()
@@ -120,8 +119,7 @@ export class PrintService {
   /** 启动清扫：删除超过保留期且无在册任务引用的归档 PDF，返回删除数；retentionDays=0 关闭 */
   async cleanupArchive(retentionDays = 30): Promise<number> {
     const removed = await cleanupArchiveDir(this.archiveDir, this.jobs.referencedArchiveFiles(), retentionDays)
-    if (removed.length > 0)
-      this.log('info', `归档清扫：删除 ${removed.length} 个过期孤儿 PDF`, { files: removed })
+    if (removed.length > 0) { this.log('info', `归档清扫：删除 ${removed.length} 个过期孤儿 PDF`, { files: removed }) }
     return removed.length
   }
 
@@ -175,8 +173,7 @@ export class PrintService {
     const pref = req.options.channel ?? 'auto'
     if (pref !== 'auto') {
       const ch = this.channels.get(pref)
-      if (!ch)
-        throw printError('VALIDATION_FAILED', `未知通道: ${pref}`)
+      if (!ch) { throw printError('VALIDATION_FAILED', `未知通道: ${pref}`) }
       this.assertChannelCompatible(pref, printer)
       return ch
     }

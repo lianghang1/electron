@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -14,23 +15,23 @@ import AdmZip from 'adm-zip'
  *   pnpm hotfix funeral        ← 直通模式（非交互，CI/熟手用），参数兼容 @app/funeral
  *   --version 1.0.1            ← 覆盖发布版本（默认取 package.json version）
  *   --sync-version             ← 把发布版本写回 app package.json（下次整包构建的内置基准与热更对齐）
- *   --min-resources-version 1.2.0 ← 清单携带资源配对要求：热更代码依赖新版 resources（DLL/内置页面）时，
+ *   --min-resources-version 1.2.0 ← 包内清单携带资源配对要求：热更代码依赖新版 resources（DLL/内置页面）时，
  *                                  旧 resources 设备自动跳过该热更，等待整包更新先行
  *   --no-build                 ← 跳过打包，直接用现有产物（仅调试用）
- * 输出 apps/<app>/dist/hotfix/：core-<version>.asar + asar-manifest.json，
+ * 输出 apps/<app>/dist/hotfix/：core-<version>.zip + asar-manifest.json，
  * 二者一起上传到更新服务器（updates.asar 指向清单所在目录）即完成发布。
+ * 热更包为自描述 zip：内含 update.json（version/file/sha256/minResourcesVersion）与版本化 asar，
+ * 校验元数据随包下发——服务器只需提供返回 { version, url } 的判断接口与静态托管 zip。
  */
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const APPS_DIR = join(ROOT, 'apps')
 
 interface HotfixOptions {
-  /** 清单携带的资源配对要求（可选，缺省不设限） */
+  /** 包内清单携带的资源配对要求（可选，缺省不设限） */
   minResourcesVersion?: string
   /** 把发布版本写回 app package.json */
   syncVersion?: boolean
-  /** 载荷打成 zip 容器（对接以 zip 为载体的后端发布体系；客户端自动解包） */
-  zip?: boolean
 }
 
 interface AppMeta {
@@ -42,15 +43,13 @@ interface AppMeta {
 /** 读取 app 元信息（无 package.json 或无 build:win 打包能力的目录不算 app） */
 function readAppMeta(dir: string): AppMeta | null {
   const pkgPath = join(APPS_DIR, dir, 'package.json')
-  if (!existsSync(pkgPath))
-    return null
+  if (!existsSync(pkgPath)) { return null }
   const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as {
     productName?: string
     version?: string
     scripts?: Record<string, string>
   }
-  if (!pkg.scripts?.['build:win'])
-    return null
+  if (!pkg.scripts?.['build:win']) { return null }
   // productName 真源在 electron/identity.cjs（package.json 不维护该字段），identity 缺失时回退目录名
   const identityPath = join(APPS_DIR, dir, 'electron', 'identity.cjs')
   const productName = existsSync(identityPath)
@@ -99,27 +98,24 @@ function packHotfix(app: AppMeta, version: string, options: HotfixOptions = {}):
   const asarName = `core-${version.replace(/[^\w.-]/g, '_')}.asar`
   copyFileSync(coreAsar, join(outDir, asarName))
 
-  // 载荷形态：缺省裸 asar；--zip 打成 zip 容器（单条目 app.core.asar，客户端自动解包）。
-  // manifest.sha256 恒为 url 指向文件的哈希（客户端对下载文件整体强校验）
-  let payloadName = asarName
-  if (options.zip) {
-    // 条目名固定 app.core.asar（与客户端解包逻辑精确对齐；用 addLocalFile 会带绝对路径被 adm-zip 拒绝）
-    const zip = new AdmZip()
-    zip.addFile('app.core.asar', readFileSync(join(outDir, asarName)))
-    payloadName = asarName.replace(/\.asar$/, '.zip')
-    zip.writeZip(join(outDir, payloadName))
-  }
-
-  // sha256 强校验（与 AsarUpdateService 的 UpdateManifest.sha256 协议对齐）；
-  // 清单文件名与客户端约定一致（bootstrap updates.asar → /updates/asar-manifest.json）
-  const sha256 = createHash('sha256').update(readFileSync(join(outDir, payloadName))).digest('hex')
-  // minResourcesVersion 缺省不写入（字段缺失 = 不设限，旧清单天然兼容）
-  const manifest = {
+  // 热更包 = 自描述 zip：update.json（version/file/sha256/minResourcesVersion）+ 版本化 asar。
+  // sha256 为包内 asar 的哈希（客户端解包后对 asar 强校验），服务器侧零元数据维护
+  const sha256 = createHash('sha256').update(readFileSync(join(outDir, asarName))).digest('hex')
+  const bundle = new AdmZip()
+  // 条目内容用 addFile 带缓冲写入（addLocalFile 会带绝对路径被 adm-zip 拒绝）
+  bundle.addFile(asarName, readFileSync(join(outDir, asarName)))
+  bundle.addFile('update.json', Buffer.from(JSON.stringify({
     version,
-    url: `./${payloadName}`,
+    file: asarName,
     sha256,
     ...(options.minResourcesVersion ? { minResourcesVersion: options.minResourcesVersion } : {}),
-  }
+  }, null, 2), 'utf-8'))
+  const payloadName = asarName.replace(/\.asar$/, '.zip')
+  bundle.writeZip(join(outDir, payloadName))
+
+  // 外部清单仅 { version, url }：校验元数据全部随包下发；
+  // 清单文件名与客户端约定一致（bootstrap updates.asar → /updates/asar-manifest.json）
+  const manifest = { version, url: `./${payloadName}` }
   writeFileSync(join(outDir, 'asar-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf-8')
 
   if (options.syncVersion) {
@@ -131,12 +127,10 @@ function packHotfix(app: AppMeta, version: string, options: HotfixOptions = {}):
   }
 
   console.log(`\n热更发布物已生成: apps/${app.dir}/dist/hotfix/`)
-  console.log(`  ${payloadName}`)
-  console.log(`  asar-manifest.json  (version=${version}, sha256=${sha256.slice(0, 12)}...)`)
-  if (options.minResourcesVersion)
-    console.log(`  资源配对要求: resources >= ${options.minResourcesVersion}（旧 resources 设备跳过该热更）`)
-  if (options.syncVersion)
-    console.log(`  已同步 package.json version → ${version}`)
+  console.log(`  ${payloadName}  (内含 ${asarName}, sha256=${sha256.slice(0, 12)}...)`)
+  console.log(`  asar-manifest.json  (version=${version}, url=./${payloadName})`)
+  if (options.minResourcesVersion) { console.log(`  资源配对要求: resources >= ${options.minResourcesVersion}（旧 resources 设备跳过该热更）`) }
+  if (options.syncVersion) { console.log(`  已同步 package.json version → ${version}`) }
   console.log('部署：把这两个文件一起上传到 updates.asar 指向的服务器目录，发布完成')
 }
 
@@ -148,8 +142,7 @@ async function selectApp(rl: readline.Interface): Promise<AppMeta> {
   for (;;) {
     const raw = (await rl.question('\n选择要发布的 App（编号或名称）: ')).trim()
     const picked = apps[Number(raw) - 1] ?? findApp(raw)
-    if (picked)
-      return picked
+    if (picked) { return picked }
     console.log(`无效选择「${raw}」，请输入列表中的编号或名称`)
   }
 }
@@ -160,10 +153,8 @@ async function confirmVersion(rl: readline.Interface, app: AppMeta, fallback: st
   console.log('提示：热更版本必须高于客户端已安装版本（如 1.0.0 → 1.0.1）')
   for (;;) {
     const raw = (await rl.question(`发布版本（回车 = ${fallback}）: `)).trim()
-    if (!raw)
-      return fallback
-    if (/^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(raw))
-      return raw
+    if (!raw) { return fallback }
+    if (/^\d+\.\d+\.\d+(?:-[\w.]+)?$/.test(raw)) { return raw }
     console.log(`「${raw}」不是合法版本号（如 1.0.1）`)
   }
 }
@@ -193,10 +184,8 @@ async function main(): Promise<void> {
     const options: HotfixOptions = {
       minResourcesVersion: minResourcesFlagIndex >= 0 ? args[minResourcesFlagIndex + 1] : undefined,
       syncVersion: args.includes('--sync-version'),
-      zip: args.includes('--zip'),
     }
-    if (!args.includes('--no-build'))
-      buildApp(app)
+    if (!args.includes('--no-build')) { buildApp(app) }
     packHotfix(app, version, options)
     return
   }

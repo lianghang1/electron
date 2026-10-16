@@ -1,3 +1,4 @@
+import { Buffer } from 'node:buffer'
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -6,6 +7,7 @@ import { createRequire } from 'node:module'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import AdmZip from 'adm-zip'
 import WebSocket from 'ws'
 
 /**
@@ -54,23 +56,18 @@ function fail(message: string): never {
 function assertArtifacts(): void {
   const resources = path.join(packedDir, 'resources')
   for (const file of ['app.asar', 'app.core.asar', 'app-update.yml']) {
-    if (!existsSync(path.join(resources, file)))
-      fail(`缺少产物 ${file}`)
+    if (!existsSync(path.join(resources, file))) { fail(`缺少产物 ${file}`) }
   }
   const triplet = `${process.platform}_${process.arch}`
   const koffiNode = path.join(resources, 'node_modules', 'koffi', 'build', triplet, 'koffi.node')
-  if (!existsSync(koffiNode))
-    fail(`缺少 koffi 平台二进制 ${koffiNode}`)
+  if (!existsSync(koffiNode)) { fail(`缺少 koffi 平台二进制 ${koffiNode}`) }
   // 设备资源经 postinstall junction 从仓库级单一来源 resources/devices 打包（缺失 = 同步链路断裂）
   const huashiDll = path.join(resources, 'resources', 'devices', 'huashi', 'Termb.dll')
-  if (!existsSync(huashiDll))
-    fail(`缺少设备资源 ${huashiDll}（检查 resources/devices junction 与打包解引用）`)
+  if (!existsSync(huashiDll)) { fail(`缺少设备资源 ${huashiDll}（检查 resources/devices junction 与打包解引用）`) }
   // asar 头部含 out 与 CJS 入口标记（字节级检查，无需 asar 依赖）
   const header = readFileSync(path.join(resources, 'app.core.asar')).subarray(0, 4_000_000).toString('latin1')
-  if (!header.includes('"out":{"files"'))
-    fail('app.core.asar 内不含 out/ 构建产物（疑似空包：先跑 vite build 再打包）')
-  if (!header.includes('"index.cjs"'))
-    fail('app.core.asar 内不含 out/main/index.cjs（bundle 必须为 CJS 入口）')
+  if (!header.includes('"out":{"files"')) { fail('app.core.asar 内不含 out/ 构建产物（疑似空包：先跑 vite build 再打包）') }
+  if (!header.includes('"index.cjs"')) { fail('app.core.asar 内不含 out/main/index.cjs（bundle 必须为 CJS 入口）') }
   console.log(`  [PASS] 产物文件齐备（asar=${statSync(path.join(resources, 'app.core.asar')).size}B）`)
 }
 
@@ -117,8 +114,7 @@ function cdpEvaluate(wsUrl: string, expression: string, timeoutMs = 30_000): Pro
 async function withMainPage(port: number, fn: (wsUrl: string) => Promise<void>): Promise<void> {
   const targets = await cdpTargets(port)
   const main = targets.find(t => t.type === 'page' && !t.url.includes('#/overlay'))
-  if (!main)
-    fail('CDP 未发现主窗口 page target')
+  if (!main) { fail('CDP 未发现主窗口 page target') }
   await fn(main.webSocketDebuggerUrl)
 }
 
@@ -166,15 +162,13 @@ function startHotfixServer(hotfixDir: string): Promise<{ port: number, close: ()
 
 async function main(): Promise<void> {
   console.log(`e2e-packaged: ${APP}（树外冒烟${HOT ? ' + 热更闭环' : ''}）`)
-  if (!existsSync(packedDir))
-    fail(`打包产物不存在：${packedDir}（先跑 build:win）`)
+  if (!existsSync(packedDir)) { fail(`打包产物不存在：${packedDir}（先跑 build:win）`) }
   assertArtifacts()
 
   // 1. 树外副本 + 干净热更状态
   rmSync(tempDir, { recursive: true, force: true })
   mkdirSync(tempDir, { recursive: true })
-  for (const entry of readdirSync(packedDir))
-    cpTree(path.join(packedDir, entry), path.join(tempDir, entry))
+  for (const entry of readdirSync(packedDir)) { cpTree(path.join(packedDir, entry), path.join(tempDir, entry)) }
   rmSync(path.join(userDataDir, 'desktop-updater'), { recursive: true, force: true })
   console.log('  [PASS] 树外副本就绪（杜绝目录树 node_modules 侥幸）')
 
@@ -183,13 +177,12 @@ async function main(): Promise<void> {
   if (HOT) {
     const hotfixDir = path.join(APPS_DIR, APP, 'dist', 'hotfix')
     const manifestPath = path.join(hotfixDir, 'asar-manifest.json')
-    if (!existsSync(manifestPath))
-      fail(`缺少热更发布物 ${manifestPath}（先跑 pnpm hotfix ${APP}）`)
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as { version: string, url: string, sha256: string }
-    const asarFile = path.join(hotfixDir, path.basename(manifest.url))
-    const actual = createHash('sha256').update(readFileSync(asarFile)).digest('hex')
-    if (actual !== manifest.sha256.toLowerCase())
-      fail('热更包 sha256 与清单不符')
+    if (!existsSync(manifestPath)) { fail(`缺少热更发布物 ${manifestPath}（先跑 pnpm hotfix ${APP}）`) }
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8')) as { version: string, url: string }
+    const zip = new AdmZip(readFileSync(path.join(hotfixDir, path.basename(manifest.url))))
+    const bundle = JSON.parse(zip.getEntry('update.json')?.getData().toString('utf-8') ?? '{}') as { sha256?: string }
+    const actual = createHash('sha256').update(zip.getEntry(bundle.file ?? '')?.getData() ?? Buffer.alloc(0)).digest('hex')
+    if (!bundle.sha256 || actual !== bundle.sha256.toLowerCase()) { fail('热更 zip 包内 update.json 缺失或 asar sha256 不符') }
     hotServer = await startHotfixServer(hotfixDir)
     console.log(`  [PASS] 热更供流服务器 :${hotServer.port}（版本 ${manifest.version}）`)
   }
@@ -214,8 +207,7 @@ async function main(): Promise<void> {
       try {
         await withMainPage(CDP_PORT, async (wsUrl) => {
           const keys = await cdpEvaluate(wsUrl, 'Object.keys(window.desktop || {}).join(",")') as string
-          if (!keys.includes('device') || !keys.includes('update'))
-            throw new Error(`window.desktop 命名空间缺失: ${keys}`)
+          if (!keys.includes('device') || !keys.includes('update')) { throw new Error(`window.desktop 命名空间缺失: ${keys}`) }
           const profiles = await cdpEvaluate(wsUrl, 'window.desktop.capture.getProfiles().then(p => p.length).catch(e => Promise.reject(String(e).slice(0, 80)))', 20_000)
           console.log(`  [PASS] 渲染桥与设备档案 API（profiles=${profiles}）`)
         })
@@ -223,8 +215,7 @@ async function main(): Promise<void> {
       }
       catch { /* 应用未就绪，重试 */ }
     }
-    if (!cdpReady)
-      fail('CDP 阶段未通过（窗口/渲染桥/设备 API）')
+    if (!cdpReady) { fail('CDP 阶段未通过（窗口/渲染桥/设备 API）') }
 
     // 6. --hot：下载校验 → 触发安装 → 重启加载热更包
     if (HOT && hotServer) {
@@ -255,8 +246,7 @@ async function main(): Promise<void> {
   spawnSync('taskkill', ['/IM', exeName, '/F'], { stdio: 'ignore' })
   await new Promise(resolve => setTimeout(resolve, 1500))
   const orphansGone = await pollProcessCount(exeName, 5_000)
-  if (!orphansGone)
-    fail('强制结束后仍存在孤儿子进程（utility/renderer 未随主进程消亡）')
+  if (!orphansGone) { fail('强制结束后仍存在孤儿子进程（utility/renderer 未随主进程消亡）') }
   console.log('  [PASS] 无孤儿子进程')
 
   if (!KEEP) {
@@ -326,8 +316,7 @@ function pollProcessCount(exeName: string, timeoutMs: number): Promise<boolean> 
 function cpTree(from: string, to: string): void {
   if (statSync(from).isDirectory()) {
     mkdirSync(to, { recursive: true })
-    for (const entry of readdirSync(from))
-      cpTree(path.join(from, entry), path.join(to, entry))
+    for (const entry of readdirSync(from)) { cpTree(path.join(from, entry), path.join(to, entry)) }
   }
   else {
     copyFileSync(from, to)

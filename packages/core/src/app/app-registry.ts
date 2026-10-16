@@ -8,8 +8,7 @@ export class AppRegistry {
   private entries = new Map<string, RegisteredApp>()
 
   register(app: DesktopAppManifest, source: AppSource = 'code'): void {
-    if (this.entries.has(app.id))
-      throw new Error(`[app-registry] App already registered: ${app.id}`)
+    if (this.entries.has(app.id)) { throw new Error(`[app-registry] App already registered: ${app.id}`) }
     this.entries.set(app.id, { manifest: app, source })
   }
 

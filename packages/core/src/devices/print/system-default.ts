@@ -38,14 +38,12 @@ async function winspoolViaHost<T>(host: WinspoolHost | undefined, method: string
 let cached: { name: string | undefined, at: number } = { name: undefined, at: 0 }
 
 export function detectSystemDefaultPrinter(): Promise<string | undefined> {
-  if (Date.now() - cached.at < 60_000)
-    return Promise.resolve(cached.name)
+  if (Date.now() - cached.at < 60_000) { return Promise.resolve(cached.name) }
 
   return new Promise((resolve) => {
     let done = false
     const finish = (name: string | undefined) => {
-      if (done)
-        return
+      if (done) { return }
       done = true
       cached = { name, at: Date.now() }
       resolve(name)
@@ -70,8 +68,7 @@ export function detectSystemDefaultPrinter(): Promise<string | undefined> {
       })
       child.on('error', () => finish(undefined))
       child.on('close', (code) => {
-        if (code !== 0)
-          return finish(undefined)
+        if (code !== 0) { return finish(undefined) }
         if (process.platform === 'win32') {
           finish(out.trim().split(/\r?\n/)[0]?.trim() || undefined)
         }
@@ -155,8 +152,7 @@ const hardwareCache = new Map<string, { at: number, hw: PrinterHardwareInfo | nu
  */
 export async function detectPrinterHardware(printerName: string, host?: WinspoolHost): Promise<PrinterHardwareInfo | null> {
   const cached = hardwareCache.get(printerName)
-  if (cached && Date.now() - cached.at < PAPERS_TTL)
-    return cached.hw
+  if (cached && Date.now() - cached.at < PAPERS_TTL) { return cached.hw }
 
   const finish = (hw: PrinterHardwareInfo | null): PrinterHardwareInfo | null => {
     hardwareCache.set(printerName, { at: Date.now(), hw })
@@ -171,8 +167,7 @@ export async function detectPrinterHardware(printerName: string, host?: Winspool
   return finish(await new Promise<PrinterHardwareInfo | null>((resolve) => {
     let done = false
     const complete = (hw: PrinterHardwareInfo | null): void => {
-      if (done)
-        return
+      if (done) { return }
       done = true
       resolve(hw)
     }
@@ -188,8 +183,7 @@ export async function detectPrinterHardware(printerName: string, host?: Winspool
         for (const line of out.split(/\r?\n/)) {
           // 行格式：OptionName/翻译: opt1 *default opt3 …（带 * 为当前默认值）
           const m = line.match(/^([^:]+):\s*(\S.*)$/)
-          if (!m)
-            continue
+          if (!m) { continue }
           const key = m[1].split('/')[0].trim()
           const opts = m[2].trim().split(/\s+/).filter(Boolean)
           const starred = opts.find(o => o.startsWith('*'))?.slice(1)
@@ -217,8 +211,7 @@ export async function detectPrinterHardware(printerName: string, host?: Winspool
 
 export async function detectPrinterPapers(printerName: string, host?: WinspoolHost): Promise<PrinterPaper[]> {
   const cached = papersCache.get(printerName)
-  if (cached && Date.now() - cached.at < PAPERS_TTL)
-    return Promise.resolve(cached.papers)
+  if (cached && Date.now() - cached.at < PAPERS_TTL) { return Promise.resolve(cached.papers) }
 
   if (process.platform === 'win32') {
     // winspool 直调返回 null 才回落 WMI；空数组 = 驱动真实上报无表单，信任之
@@ -237,8 +230,7 @@ export async function detectPrinterPapers(printerName: string, host?: WinspoolHo
   return new Promise((resolve) => {
     let done = false
     const finish = (names: string[], sizes?: Map<string, { widthMm: number, heightMm: number }>): void => {
-      if (done)
-        return
+      if (done) { return }
       done = true
       const papers = toPapers(names, names.map(n => sizes?.get(n)))
       papersCache.set(printerName, { at: Date.now(), papers })
@@ -254,11 +246,9 @@ export async function detectPrinterPapers(printerName: string, host?: WinspoolHo
       child.on('close', () => {
         // PageSize/Media size: *A4 Letter Legal …
         const line = out.split(/\r?\n/).find(l => l.startsWith('PageSize'))
-        if (!line)
-          return finish([])
+        if (!line) { return finish([]) }
         const values = line.split(':')[1]?.trim().split(/\s+/) ?? []
-        if (!values.length)
-          return finish([])
+        if (!values.length) { return finish([]) }
         loadCupsPaperSizes(printerName).then(sizes => finish(values.map(v => v.replace(/^\*/, '')), sizes))
       })
     }
@@ -271,8 +261,7 @@ export async function detectPrinterPapers(printerName: string, host?: WinspoolHo
 let winFormsPromise: Promise<Map<string, string[]>> | null = null
 
 function loadWindowsForms(): Promise<Map<string, string[]>> {
-  if (winFormsPromise)
-    return winFormsPromise
+  if (winFormsPromise) { return winFormsPromise }
   winFormsPromise = new Promise((resolve) => {
     try {
       const child = spawn(
@@ -293,8 +282,7 @@ function loadWindowsForms(): Promise<Map<string, string[]>> {
             | Array<{ Name: string, PrinterPaperNames?: string[] }>
           const list = Array.isArray(parsed) ? parsed : [parsed]
           for (const item of list) {
-            if (item?.Name)
-              map.set(item.Name, Array.isArray(item.PrinterPaperNames) ? item.PrinterPaperNames : [])
+            if (item?.Name) { map.set(item.Name, Array.isArray(item.PrinterPaperNames) ? item.PrinterPaperNames : []) }
           }
         }
         catch {

@@ -72,8 +72,7 @@ export async function waitForShell(timeoutMs = 30_000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     const { shell } = await pages()
-    if (shell)
-      return shell
+    if (shell) { return shell }
     await sleep(500)
   }
   throw new Error('shell page not found（dev 未启动或 CDP 未开）')
@@ -82,16 +81,14 @@ export async function waitForShell(timeoutMs = 30_000) {
 /** 前置：确保 lab tab 已打开（lab 页是探针的触发/断言载体），返回 lab 页连接 */
 export async function ensureLabTab() {
   const { lab } = await pages()
-  if (lab)
-    return connect(lab.webSocketDebuggerUrl)
+  if (lab) { return connect(lab.webSocketDebuggerUrl) }
   const shell = await waitForShell()
   const p = await connect(shell.webSocketDebuggerUrl)
   await evalx(p, 'window.desktop.tabs.open({ appId: \'lab\' })')
   p.ws.close()
   await sleep(2500)
   const { lab: labPage } = await pages()
-  if (!labPage)
-    throw new Error('lab page not found（lab tab 打开失败）')
+  if (!labPage) { throw new Error('lab page not found（lab tab 打开失败）') }
   return connect(labPage.webSocketDebuggerUrl)
 }
 

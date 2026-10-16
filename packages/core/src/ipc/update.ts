@@ -14,8 +14,7 @@ export interface UpdateIpcDeps {
  */
 export function registerUpdateIpc(deps: UpdateIpcDeps): void {
   const { updateService, asarService } = deps
-  if (!updateService && !asarService)
-    return
+  if (!updateService && !asarService) { return }
 
   handle('update:check', () => {
     void asarService?.check()

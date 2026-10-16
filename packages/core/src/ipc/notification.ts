@@ -29,8 +29,7 @@ export function registerNotificationIpc(deps: NotificationIpcDeps): void {
     deps.permissionService.assert(context, 'notification')
 
     const title = typeof notification?.title === 'string' ? notification.title.trim() : ''
-    if (!title)
-      throw new Error('[notification] title is required')
+    if (!title) { throw new Error('[notification] title is required') }
     const body = typeof notification?.body === 'string' ? notification.body.trim() : ''
 
     deps.events.emit('notification:received', {
@@ -45,8 +44,7 @@ export function registerNotificationIpc(deps: NotificationIpcDeps): void {
 
   // 浮层面板内关闭单条通知（reka Toast 滑动 / 关闭按钮回传）：仅浮层窗身份有效
   handle('notification:dismiss', (e, toastId) => {
-    if (!deps.overlayService.isOverlay(e.sender))
-      return
+    if (!deps.overlayService.isOverlay(e.sender)) { return }
     deps.overlayService.dismissToast(String(toastId))
   })
 }

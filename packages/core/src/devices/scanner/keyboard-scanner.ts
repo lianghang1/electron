@@ -17,11 +17,9 @@ export class KeyboardScanner {
 
   /** 喂入一个按键（只接 keyDown 的 key；不消费事件，键盘输入不受影响） */
   addKey(key: string): void {
-    if (key.length > 1 && key !== this.options.endKey)
-      return // 忽略修饰键等
+    if (key.length > 1 && key !== this.options.endKey) { return } // 忽略修饰键等
 
-    if (this.timer)
-      clearTimeout(this.timer)
+    if (this.timer) { clearTimeout(this.timer) }
 
     if (key === this.options.endKey) {
       this.flush()
@@ -36,16 +34,14 @@ export class KeyboardScanner {
 
   /** 直接处理一条完整条码（模拟/外部接入用） */
   processComplete(code: string): void {
-    if (!code || code.length < this.options.minLength)
-      return
+    if (!code || code.length < this.options.minLength) { return }
     this.emit(code)
   }
 
   reset(): void {
     this.buffer = ''
     this.active = false
-    if (this.timer)
-      clearTimeout(this.timer)
+    if (this.timer) { clearTimeout(this.timer) }
     this.timer = null
   }
 
@@ -54,8 +50,7 @@ export class KeyboardScanner {
       clearTimeout(this.timer)
       this.timer = null
     }
-    if (!this.active)
-      return
+    if (!this.active) { return }
     if (this.buffer.length < this.options.minLength) {
       this.reset()
       return

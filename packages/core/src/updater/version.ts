@@ -14,8 +14,7 @@ export function compareVersions(a: string, b: string): number {
     const an = Number.parseInt(av, 10)
     const bn = Number.parseInt(bv, 10)
     if (!Number.isNaN(an) && !Number.isNaN(bn)) {
-      if (an !== bn)
-        return an - bn
+      if (an !== bn) { return an - bn }
     }
     else if (av !== bv) {
       return av < bv ? -1 : 1

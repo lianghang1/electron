@@ -16,8 +16,7 @@ export interface TabsIpcDeps {
  */
 export function registerTabsIpc(deps: TabsIpcDeps): void {
   const { tabService, webService } = deps
-  if (!tabService || !webService)
-    return
+  if (!tabService || !webService) { return }
 
   handle('tabs:list', () => tabService.list())
   handle('tabs:open', (_e, options) => tabService.open(options))

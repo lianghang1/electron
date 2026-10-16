@@ -17,6 +17,7 @@ import { loadLocalAppManifests, loadRemoteAppManifests } from '../app/app-source
 import { AuditService } from '../audit/audit-service'
 import { CacheService } from '../cache/cache-service'
 import { createCaptureSystem } from '../devices/capture'
+import { CaptureDialogSessionService } from '../devices/capture/dialog-session'
 import { DeviceHost } from '../devices/host/device-host'
 import { createIdCardSystem } from '../devices/idcard'
 import { createPrintSystem } from '../devices/print'
@@ -76,6 +77,8 @@ export class DesktopRuntime {
   private scannerSystem!: ScannerSystem
   /** 设备系统：图像采集（UVC/DLL 双路线，恒创建） */
   private captureSystem!: CaptureSystem
+  /** 拍摄浮层会话（内置 UI 浮层拍摄，恒创建） */
+  private captureDialogService!: CaptureDialogSessionService
   /** 设备系统：统一打印（系统队列，恒创建） */
   private printSystem!: PrintSystem
   /** 设备系统：手写签名（dll 真实驱动） */
@@ -108,8 +111,7 @@ export class DesktopRuntime {
         {
           hasPendingAsar: () => this.asarUpdateService.hasPending(),
           installPendingPackage: () => {
-            if (!this.updateService.isDownloaded())
-              return false
+            if (!this.updateService.isDownloaded()) { return false }
             this.updateService.install()
             return true
           },
@@ -118,15 +120,13 @@ export class DesktopRuntime {
 
       app.on('activate', () => {
         // macOS：点 Dock 图标时若无存活窗口则重建（其他平台窗口常驻，不触发）
-        if (BrowserWindow.getAllWindows().length === 0)
-          this.windowService.createMainWindow(this.options)
+        if (BrowserWindow.getAllWindows().length === 0) { this.windowService.createMainWindow(this.options) }
       })
     })
 
     // 全部窗口关闭即退出（macOS 惯例除外：关窗留驻 Dock，走 activate 重建）
     app.on('window-all-closed', () => {
-      if (process.platform !== 'darwin')
-        app.quit()
+      if (process.platform !== 'darwin') { app.quit() }
     })
 
     app.on('will-quit', () => {
@@ -258,6 +258,11 @@ export class DesktopRuntime {
       defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(app.getPath('userData'), 'capture'),
       logger: this.logger.scope('device:capture'),
     })
+    // 拍摄浮层会话：overlayService 已在前置装配步骤创建
+    this.captureDialogService = new CaptureDialogSessionService({
+      capture: this.captureSystem,
+      overlay: this.overlayService,
+    })
 
     // 打印：SumatraPDF 相对资源根解析（缺省 devices/print/SumatraPDF.exe），绝对路径原样
     const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'devices/print/SumatraPDF.exe'
@@ -357,6 +362,7 @@ export class DesktopRuntime {
       signature: this.signatureSystem,
       scanner: this.scannerSystem,
       capture: this.captureSystem,
+      captureDialog: this.captureDialogService,
       print: this.printSystem,
       events: this.events,
       resolver: this.resolver,
@@ -412,25 +418,21 @@ export class DesktopRuntime {
    */
   private launchStartupApp(): void {
     const appId = process.argv.find(arg => arg.startsWith('--app='))?.slice('--app='.length)
-    if (!appId)
-      return
+    if (!appId) { return }
     if (!this.tabService) {
       this.logger.warn('--app launch skipped: tab services disabled')
       return
     }
     const open = (): boolean => {
-      if (!this.registry.has(appId))
-        return false
+      if (!this.registry.has(appId)) { return false }
       void this.tabService?.open({ appId }).catch((error) => {
         this.logger.warn(`startup app open failed: ${appId}`, { error: String(error) })
       })
       return true
     }
-    if (open())
-      return
+    if (open()) { return }
     const offRegistered = this.events.on('app:registered', (manifest) => {
-      if (manifest.id === appId && open())
-        offRegistered()
+      if (manifest.id === appId && open()) { offRegistered() }
     })
     this.logger.info('startup app pending registration', { appId })
   }
@@ -442,17 +444,14 @@ export class DesktopRuntime {
    * 生产环境不注册，不给调试入口。
    */
   private setupDevToolsHotkey(): void {
-    if (!is.dev)
-      return
+    if (!is.dev) { return }
     app.on('web-contents-created', (_, webContents) => {
       webContents.on('before-input-event', (event, input) => {
-        if (input.type !== 'keyDown')
-          return
+        if (input.type !== 'keyDown') { return }
         const key = input.key.toLowerCase()
         const isF12 = key === 'f12'
         const isInspect = (input.control || input.meta) && input.shift && key === 'i'
-        if (!isF12 && !isInspect)
-          return
+        if (!isF12 && !isInspect) { return }
         event.preventDefault()
         if (webContents.isDevToolsOpened()) {
           webContents.closeDevTools()
@@ -483,11 +482,9 @@ export class DesktopRuntime {
   /** bootstrap 注入的自定义协议处理器 → App Session（分区懒创建，幂等注册） */
   private readonly protocolHandled = new WeakSet<Electron.Session>()
   private attachProtocolHandlers(appSession: Electron.Session): void {
-    if (this.protocolHandled.has(appSession))
-      return
+    if (this.protocolHandled.has(appSession)) { return }
     this.protocolHandled.add(appSession)
-    for (const [scheme, handler] of Object.entries(this.options.protocols ?? {}))
-      appSession.protocol.handle(scheme, handler)
+    for (const [scheme, handler] of Object.entries(this.options.protocols ?? {})) { appSession.protocol.handle(scheme, handler) }
   }
 }
 

@@ -34,6 +34,9 @@ export function createEslintConfig(...blocks: EslintBlock[]) {
         'unused-imports/no-unused-vars': 'off',
         'unused-imports/no-unused-imports': 'error',
         'eslint-comments/no-unlimited-disable': 'error',
+        // curly all 补齐的单行大括号体天然占 2 条语句位，本行上限随之放宽避免互斥
+        'curly': ['error', 'all'],
+        'style/max-statements-per-line': ['error', { max: 2 }],
       },
     },
     ...blocks,

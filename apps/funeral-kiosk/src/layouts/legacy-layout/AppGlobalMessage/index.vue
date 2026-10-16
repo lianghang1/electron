@@ -85,8 +85,7 @@ function startCloseTimer() {
 
 // 更新进度条
 function updateProgress() {
-  if (!closeTimer.value)
-    return
+  if (!closeTimer.value) { return }
 
   const elapsed = Date.now() - startTime.value
   progress.value = Math.max(0, 100 - (elapsed / props.autoClose) * 100)
@@ -98,8 +97,7 @@ function updateProgress() {
 
 // 监听显示状态变化
 watch(() => props.isVisible, (newVal, oldVal) => {
-  if (newVal === oldVal)
-    return
+  if (newVal === oldVal) { return }
 
   if (newVal) {
     // 显示时重置进度并开始计时

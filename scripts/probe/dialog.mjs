@@ -17,8 +17,7 @@ async function overlayDialogState() {
     })`)
     p.ws.close()
     const v = JSON.parse(st.value)
-    if (v.card)
-      return v
+    if (v.card) { return v }
   }
   return null
 }

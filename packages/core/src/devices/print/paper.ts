@@ -41,14 +41,11 @@ export function isContinuousPaper(paper: PaperSpec | undefined): boolean {
 export function resolvePaper(paper: string): PaperSpec | undefined {
   const key = paper.trim().toLowerCase()
   const std = STANDARD_PAPERS[key]
-  if (std)
-    return { ...std }
+  if (std) { return { ...std } }
   const iso = /^([ab])(\d{1,2})$/.exec(key)
-  if (iso && Number(iso[2]) <= 10)
-    return isoPaperSize(iso[1] as 'a' | 'b', Number(iso[2]))
+  if (iso && Number(iso[2]) <= 10) { return isoPaperSize(iso[1] as 'a' | 'b', Number(iso[2])) }
   const m = /^(\d+(?:\.\d+)?)(?:\s*[x×*]\s*(\d+(?:\.\d+)?))?$/.exec(key)
-  if (m && Number(m[1]) > 0)
-    return { widthMm: Number(m[1]), heightMm: m[2] ? Number(m[2]) : 0 }
+  if (m && Number(m[1]) > 0) { return { widthMm: Number(m[1]), heightMm: m[2] ? Number(m[2]) : 0 } }
   return undefined
 }
 
@@ -59,22 +56,19 @@ export function resolvePaper(paper: string): PaperSpec | undefined {
  * pageSize，纸宽与纸长交给驱动纸卷设置决定。
  */
 export function paperToPrintPageSize(paper: PaperSpec | undefined): Electron.WebContentsPrintOptions['pageSize'] {
-  if (paper == null || isContinuousPaper(paper))
-    return undefined
+  if (paper == null || isContinuousPaper(paper)) { return undefined }
   return { width: paper.widthMm * 1000, height: paper.heightMm * 1000 }
 }
 
 /** printToPDF 的 pageSize（对象单位：英寸）。未指定纸型/连续纸高度退固定占位，实际分页由 preferCSSPageSize 走模板 @page */
 export function paperToPdfPageSize(paper: PaperSpec | undefined): Electron.PrintToPDFOptions['pageSize'] {
-  if (paper == null)
-    return undefined
+  if (paper == null) { return undefined }
   return { width: paper.widthMm / 25.4, height: (paper.heightMm || 297) / 25.4 }
 }
 
 /** 业务纸张与打印机能力核对：纸宽超出打印机能力 → PAPER_MISMATCH；未指定纸型跳过核对 */
 export function assertPaperSupported(paper: PaperSpec | undefined, maxWidthMm: number | undefined, printerId: string): void {
-  if (paper == null || maxWidthMm == null)
-    return
+  if (paper == null || maxWidthMm == null) { return }
   if (paper.widthMm > maxWidthMm + 0.5) {
     throw printError(
       'PAPER_MISMATCH',

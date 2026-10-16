@@ -18,11 +18,9 @@
 
 ```ts
 // ❌ 禁止
-if (!entity)
-  return
+if (!entity) { return }
 
-if (valid)
-  doSomething()
+if (valid) { doSomething() }
 
 // ✅ 正确
 if (!entity) {

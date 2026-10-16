@@ -16,7 +16,7 @@ const activeAppId = computed(() => props.tabs.find(tab => tab.active)?.appId)
 const AVATAR_COLORS = ['#0f9d8f', '#7c5cff', '#e0663c', '#c2379e', '#2f8af5', '#d9a514']
 function avatarColor(appId: string): string {
   let hash = 0
-  for (const ch of appId) hash = (hash * 31 + ch.charCodeAt(0)) | 0
+  for (const ch of appId) { hash = (hash * 31 + ch.charCodeAt(0)) | 0 }
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 </script>

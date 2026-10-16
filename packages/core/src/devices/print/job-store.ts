@@ -31,14 +31,11 @@ export class JobStore {
 
   private load(): void {
     try {
-      if (!existsSync(this.filePath))
-        return
+      if (!existsSync(this.filePath)) { return }
       const parsed = JSON.parse(readFileSync(this.filePath, 'utf8')) as JobRecord[]
-      if (!Array.isArray(parsed))
-        return
+      if (!Array.isArray(parsed)) { return }
       for (const rec of parsed.slice(0, MAX_RECORDS)) {
-        if (!rec?.jobId)
-          continue
+        if (!rec?.jobId) { continue }
         this.jobs.set(rec.jobId, rec)
       }
     }
@@ -48,8 +45,7 @@ export class JobStore {
   }
 
   private scheduleSave(): void {
-    if (this.saveTimer)
-      return
+    if (this.saveTimer) { return }
     this.saveTimer = setTimeout(() => {
       this.saveTimer = null
       try {
@@ -72,8 +68,7 @@ export class JobStore {
     this.jobs.set(record.jobId, record)
     if (this.jobs.size > MAX_RECORDS) {
       const oldest = this.jobs.keys().next().value
-      if (oldest)
-        this.jobs.delete(oldest)
+      if (oldest) { this.jobs.delete(oldest) }
     }
     this.scheduleSave()
     return record
@@ -81,14 +76,12 @@ export class JobStore {
 
   markPrinting(jobId: string): void {
     const rec = this.jobs.get(jobId)
-    if (rec)
-      rec.state = 'printing'
+    if (rec) { rec.state = 'printing' }
   }
 
   finish(jobId: string, result: PrintResult): void {
     const rec = this.jobs.get(jobId)
-    if (!rec)
-      return
+    if (!rec) { return }
     rec.result = result
     rec.state = 'done'
     rec.finishedAt = new Date().toISOString()
@@ -98,8 +91,7 @@ export class JobStore {
   /** 失败落簿：记录统一错误（失败原因查询与任务中心展示用） */
   fail(jobId: string, error: PrintError): void {
     const rec = this.jobs.get(jobId)
-    if (!rec)
-      return
+    if (!rec) { return }
     rec.error = error
     rec.state = 'failed'
     rec.finishedAt = new Date().toISOString()
@@ -126,8 +118,7 @@ export class JobStore {
     const set = new Set<string>()
     for (const rec of this.jobs.values()) {
       const p = rec.result?.archivedPdfPath
-      if (p)
-        set.add(path.basename(p))
+      if (p) { set.add(path.basename(p)) }
     }
     return set
   }
@@ -135,11 +126,9 @@ export class JobStore {
   /** 删除单条任务记录；连带删除其归档 PDF（默认行为），返回是否删除了记录 */
   remove(jobId: string, opts: { deletePdf?: boolean } = {}): boolean {
     const rec = this.jobs.get(jobId)
-    if (!rec)
-      return false
+    if (!rec) { return false }
     this.jobs.delete(jobId)
-    if (opts.deletePdf !== false)
-      this.deleteArchivedPdf(rec.result?.archivedPdfPath)
+    if (opts.deletePdf !== false) { this.deleteArchivedPdf(rec.result?.archivedPdfPath) }
     this.scheduleSave()
     return true
   }
@@ -148,7 +137,7 @@ export class JobStore {
   clear(opts: { deletePdf?: boolean } = {}): number {
     const n = this.jobs.size
     if (opts.deletePdf !== false) {
-      for (const rec of this.jobs.values()) this.deleteArchivedPdf(rec.result?.archivedPdfPath)
+      for (const rec of this.jobs.values()) { this.deleteArchivedPdf(rec.result?.archivedPdfPath) }
     }
     this.jobs.clear()
     this.scheduleSave()
@@ -156,8 +145,7 @@ export class JobStore {
   }
 
   private deleteArchivedPdf(pdfPath?: string): void {
-    if (!pdfPath || !existsSync(pdfPath))
-      return
+    if (!pdfPath || !existsSync(pdfPath)) { return }
     try {
       rmSync(pdfPath, { force: true })
     }

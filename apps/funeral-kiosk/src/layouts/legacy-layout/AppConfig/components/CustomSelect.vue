@@ -30,16 +30,14 @@ const displayValue = computed(() => {
 
 // 切换下拉框
 function toggleDropdown() {
-  if (props.disabled)
-    return
+  if (props.disabled) { return }
   isOpen.value = !isOpen.value
   hoverIndex.value = -1
 }
 
 // 选择选项
 function selectOption(value: any) {
-  if (props.disabled)
-    return
+  if (props.disabled) { return }
 
   const option = props.options.find(opt => opt.value === value)
   if (option && !option.disabled) {
@@ -57,8 +55,7 @@ function navigateOptions(direction: any) {
   }
 
   const enabledOptions = props.options.filter(option => !option.disabled)
-  if (enabledOptions.length === 0)
-    return
+  if (enabledOptions.length === 0) { return }
 
   let newIndex = hoverIndex.value + direction
   if (newIndex < 0) {

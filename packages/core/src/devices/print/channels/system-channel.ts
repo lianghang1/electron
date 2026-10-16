@@ -87,17 +87,14 @@ export class SystemChannel implements PrintChannel {
         landscape: job.options.landscape === true,
         copies: Math.max(1, job.options.copies ?? 1),
       }
-      if (job.options.duplex)
-        printOpts.duplexMode = duplexMode(job.options.duplex)
+      if (job.options.duplex) { printOpts.duplexMode = duplexMode(job.options.duplex) }
       const ranges = parsePageRanges(job.options.pages)
-      if (ranges)
-        printOpts.pageRanges = ranges
+      if (ranges) { printOpts.pageRanges = ranges }
       if (job.options.silent !== false) {
         // 静默：必须显式指定设备名（未指定则走系统默认打印机）
         printOpts.deviceName = printer.id
         printOpts.margins = wcMarginType(effectiveMargin)
-        if (pageSize)
-          printOpts.pageSize = pageSize
+        if (pageSize) { printOpts.pageSize = pageSize }
       }
       await withTimeout(webContentsPrint(wc, printOpts), 60000, 'JOB_FAILED', '打印提交超时（60s）')
 
@@ -116,23 +113,15 @@ export class SystemChannel implements PrintChannel {
       if (sumatra) {
         // SumatraPDF -print-settings：份数、页码范围、奇偶页、黑白、双面、纸张、纸盒、缩放
         const settings: string[] = []
-        if (copies > 1)
-          settings.push(`${copies}x`)
-        if (job.options.pages)
-          settings.push(job.options.pages)
-        if (job.options.subset)
-          settings.push(job.options.subset)
-        if (job.options.grayscale)
-          settings.push('monochrome')
-        if (job.options.duplex && job.options.duplex !== 'simplex')
-          settings.push(job.options.duplex)
-        if (job.options.landscape)
-          settings.push('landscape')
+        if (copies > 1) { settings.push(`${copies}x`) }
+        if (job.options.pages) { settings.push(job.options.pages) }
+        if (job.options.subset) { settings.push(job.options.subset) }
+        if (job.options.grayscale) { settings.push('monochrome') }
+        if (job.options.duplex && job.options.duplex !== 'simplex') { settings.push(job.options.duplex) }
+        if (job.options.landscape) { settings.push('landscape') }
         const paperName = sumatraPaperName(job.paper)
-        if (paperName)
-          settings.push(`paper=${paperName}`)
-        if (job.options.bin)
-          settings.push(`bin=${job.options.bin}`)
+        if (paperName) { settings.push(`paper=${paperName}`) }
+        if (job.options.bin) { settings.push(`bin=${job.options.bin}`) }
         settings.push(job.options.scale ?? 'fit')
         const args = ['-print-to', printer.id, '-silent', '-print-settings', settings.join(','), pdfPath]
         await withTimeout(runProcess(sumatra, args), 90000, 'SPOOL_FAILED', `SumatraPDF 送打超时（90s）`)
@@ -150,11 +139,9 @@ export class SystemChannel implements PrintChannel {
           copies,
           printBackground: true,
         }
-        if (job.options.duplex)
-          opts.duplexMode = duplexMode(job.options.duplex)
+        if (job.options.duplex) { opts.duplexMode = duplexMode(job.options.duplex) }
         const ranges = parsePageRanges(job.options.pages)
-        if (ranges)
-          opts.pageRanges = ranges
+        if (ranges) { opts.pageRanges = ranges }
         await webContentsPrint(win.webContents, opts as never)
       })
       return { archivedPdfPath: pdfPath, detail: { via: 'chromium-pdf-plugin' } }
@@ -162,22 +149,15 @@ export class SystemChannel implements PrintChannel {
 
     // macOS / Linux（含国产化 OS）：CUPS lp（纸盒 InputSlot 为 CUPS 通用约定，具体名依驱动）
     const args = ['-d', printer.id, '-n', String(copies), '-t', sanitizeJobName(job.jobName), pdfPath]
-    if (job.options.pages)
-      args.unshift('-P', job.options.pages)
-    if (job.options.subset)
-      args.unshift('-o', `page-set=${job.options.subset}`)
-    if (job.options.grayscale)
-      args.unshift('-o', 'ColorModel=Gray')
-    if (job.options.landscape)
-      args.unshift('-o', 'landscape')
+    if (job.options.pages) { args.unshift('-P', job.options.pages) }
+    if (job.options.subset) { args.unshift('-o', `page-set=${job.options.subset}`) }
+    if (job.options.grayscale) { args.unshift('-o', 'ColorModel=Gray') }
+    if (job.options.landscape) { args.unshift('-o', 'landscape') }
     const sides = lpSides(job.options.duplex)
-    if (sides)
-      args.unshift('-o', `sides=${sides}`)
-    if (job.options.bin)
-      args.unshift('-o', `InputSlot=${job.options.bin}`)
-    if (job.options.scale === 'fit')
-      args.unshift('-o', 'fit-to-page')
-    for (const [k, v] of lpMarginOptions(job.options.margin)) args.unshift('-o', `${k}=${v}`)
+    if (sides) { args.unshift('-o', `sides=${sides}`) }
+    if (job.options.bin) { args.unshift('-o', `InputSlot=${job.options.bin}`) }
+    if (job.options.scale === 'fit') { args.unshift('-o', 'fit-to-page') }
+    for (const [k, v] of lpMarginOptions(job.options.margin)) { args.unshift('-o', `${k}=${v}`) }
     await withTimeout(runProcess('lp', args), 90000, 'SPOOL_FAILED', 'lp 送打超时（90s）')
     return { archivedPdfPath: pdfPath, detail: { via: 'cups-lp' } }
   }
@@ -200,10 +180,8 @@ const mmToPt = (mm: number): number => Math.max(0, mm) * 2.83465
 
 /** webContents.print 的 margins（静默路径）：默认跟随/零边距/自定义英寸 */
 function wcMarginType(margin: PrintOptions['margin']): Record<string, unknown> {
-  if (margin === 'default')
-    return { marginType: 'default' }
-  if (margin == null || margin === 'none')
-    return { marginType: 'none' }
+  if (margin === 'default') { return { marginType: 'default' } }
+  if (margin == null || margin === 'none') { return { marginType: 'none' } }
   return {
     marginType: 'custom',
     top: mmToInch(margin.topMm),
@@ -215,10 +193,8 @@ function wcMarginType(margin: PrintOptions['margin']): Record<string, unknown> {
 
 /** printToPDF 存档 margins（英寸）：default 省略由 Chromium 决定 */
 function pdfMarginsInches(margin: PrintOptions['margin']): Record<string, number> {
-  if (margin === 'default' || margin == null)
-    return { top: 9.6 / 25.4, bottom: 9.6 / 25.4, left: 9.6 / 25.4, right: 9.6 / 25.4 }
-  if (margin === 'none')
-    return { top: 0, bottom: 0, left: 0, right: 0 }
+  if (margin === 'default' || margin == null) { return { top: 9.6 / 25.4, bottom: 9.6 / 25.4, left: 9.6 / 25.4, right: 9.6 / 25.4 } }
+  if (margin === 'none') { return { top: 0, bottom: 0, left: 0, right: 0 } }
   return {
     top: mmToInch(margin.topMm),
     bottom: mmToInch(margin.bottomMm),
@@ -229,8 +205,7 @@ function pdfMarginsInches(margin: PrintOptions['margin']): Record<string, number
 
 /** CUPS lp 页边距（点）：仅 none/自定义生效，default 不传由系统决定 */
 function lpMarginOptions(margin: PrintOptions['margin']): Array<[string, string]> {
-  if (margin === 'default' || margin == null)
-    return []
+  if (margin === 'default' || margin == null) { return [] }
   if (margin === 'none') {
     return [['page-top', '0'], ['page-bottom', '0'], ['page-left', '0'], ['page-right', '0']]
   }
@@ -244,13 +219,11 @@ function lpMarginOptions(margin: PrintOptions['margin']): Array<[string, string]
 
 /** "1-3,5" → Electron pageRanges；非法输入返回 null（由调用方决定跳过） */
 function parsePageRanges(pages: string | undefined): Array<{ from: number, to: number }> | null {
-  if (!pages?.trim())
-    return null
+  if (!pages?.trim()) { return null }
   const ranges: Array<{ from: number, to: number }> = []
   for (const part of pages.split(',')) {
     const m = part.trim().match(/^(\d+)(?:\s*-\s*(\d+))?$/)
-    if (!m)
-      return null
+    if (!m) { return null }
     const from = Number(m[1])
     ranges.push(m[2] ? { from, to: Number(m[2]) } : { from, to: from })
   }
@@ -259,8 +232,7 @@ function parsePageRanges(pages: string | undefined): Array<{ from: number, to: n
 
 /** 物理尺寸 → SumatraPDF paper= 标准名（仅 SumatraPDF 认识的标准系列；其他尺寸不传 paper=，交给 fit 缩放） */
 function sumatraPaperName(paper?: PaperSpec): string | null {
-  if (!paper || paper.heightMm <= 0)
-    return null
+  if (!paper || paper.heightMm <= 0) { return null }
   switch (`${paper.widthMm}x${paper.heightMm}`) {
     case '210x297':
       return 'A4'
@@ -312,8 +284,7 @@ function runProcess(cmd: string, args: string[], timeoutMs = 90000): Promise<voi
       reject(printError('SPOOL_FAILED', `打印命令超时（${timeoutMs}ms）`, { cmd }))
     }, timeoutMs)
     const finish = (fn: () => void): void => {
-      if (settled)
-        return
+      if (settled) { return }
       settled = true
       clearTimeout(timer)
       fn()
@@ -333,9 +304,8 @@ function runProcess(cmd: string, args: string[], timeoutMs = 90000): Promise<voi
     })
     child.on('close', (code) => {
       finish(() => {
-        if (code === 0)
-          resolve()
-        else reject(printError('SPOOL_FAILED', `打印命令退出码 ${code}`, { cmd, stderr: stderr.trim() }))
+        if (code === 0) { resolve() }
+        else { reject(printError('SPOOL_FAILED', `打印命令退出码 ${code}`, { cmd, stderr: stderr.trim() })) }
       })
     })
   })

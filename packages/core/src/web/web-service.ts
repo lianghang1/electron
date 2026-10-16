@@ -63,8 +63,7 @@ export class WebService {
     onLoadingChange?: (isLoading: boolean) => void,
   ): WebAppRuntime {
     const tabId = context.tabId
-    if (!tabId)
-      throw new Error('[web-service] tabId is required to create a web runtime')
+    if (!tabId) { throw new Error('[web-service] tabId is required to create a web runtime') }
 
     const view = new WebContentsView({
       webPreferences: {
@@ -84,8 +83,7 @@ export class WebService {
     this.runtimes.set(runtime.runtimeId, runtime)
 
     const win = this.windowService.getMainWindow()
-    if (!win)
-      throw new Error('[web-service] main window is not ready')
+    if (!win) { throw new Error('[web-service] main window is not ready') }
     win.contentView.addChildView(view)
     view.setBounds({ x: 0, y: 0, width: 0, height: 0 })
 
@@ -124,33 +122,29 @@ export class WebService {
 
   destroy(runtimeId: string): void {
     const runtime = this.runtimes.get(runtimeId)
-    if (!runtime)
-      return
+    if (!runtime) { return }
     this.resolver.unregister(runtime.view.webContents.id)
     this.windowService.getMainWindow()?.contentView.removeChildView(runtime.view)
     runtime.view.webContents.close()
     this.runtimes.delete(runtimeId)
-    if (this.focusedId === runtimeId)
-      this.focusedId = null
+    if (this.focusedId === runtimeId) { this.focusedId = null }
   }
 
   /** 释放全部 Web 运行时（Application 退出时调用） */
   dispose(): void {
-    for (const id of [...this.runtimes.keys()]) this.destroy(id)
+    for (const id of [...this.runtimes.keys()]) { this.destroy(id) }
   }
 
   private get(runtimeId: string): WebAppRuntime {
     const runtime = this.runtimes.get(runtimeId)
-    if (!runtime)
-      throw new Error(`[web-service] runtime not found: ${runtimeId}`)
+    if (!runtime) { throw new Error(`[web-service] runtime not found: ${runtimeId}`) }
     return runtime
   }
 
   /** 激活视图占满容器区域，其余归零隐藏；HTML5 全屏时铺满整窗 */
   private applyBounds(): void {
     const win = this.windowService.getMainWindow()
-    if (!win)
-      return
+    if (!win) { return }
     for (const [id, runtime] of this.runtimes) {
       if (id === this.focusedId && this.htmlFullscreen) {
         const content = win.getContentBounds()
@@ -187,16 +181,14 @@ export class WebService {
       webContents.on('did-stop-loading', () => onLoadingChange(false))
     }
     const markReady = (): void => {
-      if (runtime.ready)
-        return
+      if (runtime.ready) { return }
       runtime.ready = true
       this.applyBounds()
     }
     webContents.on('dom-ready', markReady)
     // 主框架加载失败也要展开：Electron 错误页需可见可交互，否则骨架屏永久悬挂
     webContents.on('did-fail-load', (_event, _code, _desc, _url, isMainFrame) => {
-      if (isMainFrame)
-        markReady()
+      if (isMainFrame) { markReady() }
     })
   }
 
@@ -210,21 +202,18 @@ export class WebService {
     view.webContents.on('enter-html-full-screen', () => {
       this.htmlFullscreen = true
       const win = this.windowService.getMainWindow()
-      if (!win)
-        return
+      if (!win) { return }
       win.setFullScreen(true)
       // setFullScreen 是异步布局：窗口真正进入全屏后再铺 view（getContentBounds 此时 = 屏幕尺寸）
       win.once('enter-full-screen', () => {
-        if (!this.htmlFullscreen)
-          return
+        if (!this.htmlFullscreen) { return }
         this.applyBounds()
       })
     })
     view.webContents.on('leave-html-full-screen', () => {
       this.htmlFullscreen = false
       const win = this.windowService.getMainWindow()
-      if (!win)
-        return
+      if (!win) { return }
       win.setFullScreen(false)
       // 退出全屏完成后再恢复容器区域，避免与全屏布局收尾竞态
       win.once('leave-full-screen', () => this.applyBounds())
@@ -241,16 +230,14 @@ export class WebService {
     )
 
     const appSession = view.webContents.session
-    if (this.guardedSessions.has(appSession))
-      return
+    if (this.guardedSessions.has(appSession)) { return }
     this.guardedSessions.add(appSession)
     // session 按 App 隔离（persist:app-<appId>）：声明权限直接放行，
     // 未声明权限走运行时授权（推送 Shell 请用户决策）
     applySessionPermissionGuards(appSession, toSessionPermissions(manifest.permissions ?? []), (wc, sessionPermission) => {
       this.logger.debug('runtime permission approval requested', { appId, sessionPermission, wcId: wc.id })
       const permission = sessionToPlatformPermission(sessionPermission)
-      if (!permission)
-        return Promise.resolve(false)
+      if (!permission) { return Promise.resolve(false) }
       return this.permissionService.requestRuntime(this.resolver.resolve(wc), permission)
     })
     this.logger.debug('session permission guards applied', { appId })
@@ -320,10 +307,8 @@ function parseWindowFeatures(features?: string): { width: number, height: number
   for (const part of features?.split(',') ?? []) {
     const [key, raw] = part.split('=')
     const value = Number.parseInt(raw ?? '', 10)
-    if (key === 'width' && Number.isFinite(value))
-      result.width = value
-    if (key === 'height' && Number.isFinite(value))
-      result.height = value
+    if (key === 'width' && Number.isFinite(value)) { result.width = value }
+    if (key === 'height' && Number.isFinite(value)) { result.height = value }
   }
   return result
 }

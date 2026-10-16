@@ -58,16 +58,11 @@ export class ResilienceService {
     restartDeps?: RestartDeps,
   ): void {
     const resilience = options.resilience
-    if (!resilience)
-      return
-    if (resilience.crashReload)
-      this.attachCrashReload(getWindow)
-    if (resilience.autoLaunch !== undefined)
-      this.attachAutoLaunch(resilience.autoLaunch)
-    if (resilience.exitGuard)
-      this.attachExitGuard(getWindow)
-    if (resilience.scheduledRestart)
-      this.attachScheduledRestart(resilience.scheduledRestart, restartDeps)
+    if (!resilience) { return }
+    if (resilience.crashReload) { this.attachCrashReload(getWindow) }
+    if (resilience.autoLaunch !== undefined) { this.attachAutoLaunch(resilience.autoLaunch) }
+    if (resilience.exitGuard) { this.attachExitGuard(getWindow) }
+    if (resilience.scheduledRestart) { this.attachScheduledRestart(resilience.scheduledRestart, restartDeps) }
   }
 
   dispose(): void {
@@ -86,11 +81,9 @@ export class ResilienceService {
   /** 崩溃重载：指数退避（1s / 2s / 4s...上限 30s），60s 内超过 5 次熔断并告警 */
   private attachCrashReload(getWindow: () => BrowserWindow | undefined): void {
     const win = getWindow()
-    if (!win)
-      return
+    if (!win) { return }
     win.webContents.on('render-process-gone', (_event, details) => {
-      if (details.reason === 'clean-exit')
-        return
+      if (details.reason === 'clean-exit') { return }
       const now = Date.now()
       this.crashTimes = this.crashTimes.filter(time => now - time < CRASH_WINDOW_MS)
       this.crashTimes.push(now)
@@ -103,8 +96,7 @@ export class ResilienceService {
       this.logger.warn(`renderer crashed (${details.reason}), reloading in ${delay}ms`)
       this.reloadTimer = setTimeout(() => {
         this.reloadTimer = null
-        if (!win.isDestroyed())
-          win.webContents.reload()
+        if (!win.isDestroyed()) { win.webContents.reload() }
       }, delay)
     })
   }
@@ -134,14 +126,12 @@ export class ResilienceService {
   /** 防退出：用户发起的 close 全部拦截，app.quit() 的退出流程放行 */
   private attachExitGuard(getWindow: () => BrowserWindow | undefined): void {
     const win = getWindow()
-    if (!win)
-      return
+    if (!win) { return }
     const markQuitting = (): void => {
       this.quitting = true
     }
     const onClose = (event: Event): void => {
-      if (this.quitting)
-        return
+      if (this.quitting) { return }
       event.preventDefault()
       this.logger.warn('user-initiated close blocked by exitGuard')
     }
@@ -149,8 +139,7 @@ export class ResilienceService {
     win.on('close', onClose)
     this.unsubscribers.push(() => {
       app.removeListener('before-quit', markQuitting)
-      if (!win.isDestroyed())
-        win.removeListener('close', onClose)
+      if (!win.isDestroyed()) { win.removeListener('close', onClose) }
     })
   }
 
@@ -166,11 +155,9 @@ export class ResilienceService {
     const minute = schedule.minute ?? 0
     this.restartTimer = setInterval(() => {
       const now = new Date()
-      if (now.getHours() !== hour || now.getMinutes() !== minute)
-        return
+      if (now.getHours() !== hour || now.getMinutes() !== minute) { return }
       const day = now.toDateString()
-      if (day === this.lastRestartDay)
-        return
+      if (day === this.lastRestartDay) { return }
       this.lastRestartDay = day
       if (restartDeps?.hasPendingAsar()) {
         this.logger.info('scheduled restart: relaunching to apply pending asar update')
@@ -178,8 +165,7 @@ export class ResilienceService {
         app.exit(0)
         return
       }
-      if (restartDeps?.installPendingPackage())
-        return // quitAndInstall 已接管退出流程
+      if (restartDeps?.installPendingPackage()) { return } // quitAndInstall 已接管退出流程
       this.logger.info(`scheduled daily restart at ${hour}:${String(minute).padStart(2, '0')}`)
       app.relaunch()
       app.exit(0)

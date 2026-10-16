@@ -23,8 +23,7 @@ const activeTab = computed(() => tabs.value.find(tab => tab.active))
 /** 套壳模式：激活 App 声明 chrome: 'single' 时隐藏左侧导航与应用中心（顶栏保留固定 Tab 条），Web 铺满窗口 */
 const chromeHidden = computed(() => {
   const tab = activeTab.value
-  if (!tab)
-    return false
+  if (!tab) { return false }
   return apps.value.some(app => app.manifest.id === tab.appId && app.manifest.chrome === 'single')
 })
 
@@ -34,9 +33,8 @@ async function minimize(): Promise<void> {
 }
 
 async function toggleMaximize(): Promise<void> {
-  if (maximized.value)
-    await window.desktop.window.restore()
-  else await window.desktop.window.maximize()
+  if (maximized.value) { await window.desktop.window.restore() }
+  else { await window.desktop.window.maximize() }
 }
 
 async function closeWindow(): Promise<void> {
@@ -51,8 +49,7 @@ function openTabContextMenu(tab: DesktopTab, x: number, y: number): void {
 // ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----
 function syncWorkArea(): void {
   const el = viewport.value
-  if (!el)
-    return
+  if (!el) { return }
   const rect = el.getBoundingClientRect()
   const area: WorkAreaRect = {
     x: Math.round(rect.left),
@@ -68,8 +65,7 @@ let unsubMaximized: (() => void) | null = null
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(syncWorkArea)
-  if (viewport.value)
-    resizeObserver.observe(viewport.value)
+  if (viewport.value) { resizeObserver.observe(viewport.value) }
 
   unsubMaximized = window.desktop.events.on('window:maximizedChanged', (value) => {
     maximized.value = value

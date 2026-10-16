@@ -23,16 +23,13 @@ export class AppService {
   /** 打开 App：校验定义与接入策略，返回打开中的实例（对同一 App 重复 open 复用实例） */
   async open(appId: string): Promise<AppInstance> {
     const manifest = this.registry.get(appId)
-    if (!manifest)
-      throw new DesktopError('APP_NOT_FOUND', `App not registered: ${appId}`)
-    if (manifest.type === 'third-party' && !this.config.apps.allowThirdParty)
-      throw new DesktopError('APP_NOT_ALLOWED', `Third-party app is not allowed: ${appId}`)
+    if (!manifest) { throw new DesktopError('APP_NOT_FOUND', `App not registered: ${appId}`) }
+    if (manifest.type === 'third-party' && !this.config.apps.allowThirdParty) { throw new DesktopError('APP_NOT_ALLOWED', `Third-party app is not allowed: ${appId}`) }
 
     const existingId = this.activeByApp.get(appId)
     if (existingId) {
       const existing = this.instances.get(existingId)
-      if (existing && existing.state !== 'closed')
-        return existing
+      if (existing && existing.state !== 'closed') { return existing }
     }
 
     const instance: AppInstance = {
@@ -49,8 +46,7 @@ export class AppService {
   /** Web 运行时就绪后由编排方（TabService）调用：opening → opened */
   markOpened(instanceId: string): void {
     const instance = this.instances.get(instanceId)
-    if (!instance || instance.state === 'opened')
-      return
+    if (!instance || instance.state === 'opened') { return }
     instance.state = 'opened'
     this.events.emit('app:opened', instance)
   }
@@ -58,8 +54,7 @@ export class AppService {
   /** 关闭实例：第一阶段 Web 运行时由 TabService 同步销毁后再调到这里（closing 态留给未来异步关闭） */
   async close(instanceId: string): Promise<void> {
     const instance = this.instances.get(instanceId)
-    if (!instance || instance.state === 'closing' || instance.state === 'closed')
-      return
+    if (!instance || instance.state === 'closing' || instance.state === 'closed') { return }
     instance.state = 'closed'
     this.activeByApp.delete(instance.appId)
     this.events.emit('app:closed', instance)

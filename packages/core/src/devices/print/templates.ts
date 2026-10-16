@@ -39,10 +39,8 @@ export function printableWidthMm(paper: PaperSpec | undefined): number {
   }
   const w = paper.widthMm
   if (paper.heightMm <= 0) {
-    if (w <= 60)
-      return w - 10
-    if (w <= 84)
-      return w - 8
+    if (w <= 60) { return w - 10 }
+    if (w <= 84) { return w - 8 }
     return w - 2
   }
   return w <= 84 ? w - 2 : w - 32

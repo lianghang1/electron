@@ -47,8 +47,7 @@ const isLoading = ref(false)
 // ================= 2. 全局单次安全洗涤 Hook =================
 let hookInstalled = false
 function installDompurifyHooks() {
-  if (hookInstalled)
-    return
+  if (hookInstalled) { return }
   hookInstalled = true
 
   DOMPurify.addHook('afterSanitizeAttributes', (node) => {
@@ -59,10 +58,8 @@ function installDompurifyHooks() {
     }
     // 图片懒加载与无障碍
     if (node.tagName === 'IMG') {
-      if (!node.getAttribute('loading'))
-        node.setAttribute('loading', 'lazy')
-      if (!node.getAttribute('alt'))
-        node.setAttribute('alt', '图片')
+      if (!node.getAttribute('loading')) { node.setAttribute('loading', 'lazy') }
+      if (!node.getAttribute('alt')) { node.setAttribute('alt', '图片') }
     }
     // iframe 强制沙箱防劫持
     if (node.tagName === 'IFRAME') {
@@ -75,8 +72,7 @@ function installDompurifyHooks() {
 onMounted(() => installDompurifyHooks())
 
 const safeHtml = computed(() => {
-  if (!props.html)
-    return ''
+  if (!props.html) { return '' }
   return DOMPurify.sanitize(props.html, {
     ALLOWED_TAGS: [
       'h1',
@@ -174,8 +170,7 @@ function handleGlobalClick(e: MouseEvent) {
   if (target.tagName === 'IMG' && !target.closest('a')) {
     const img = target as HTMLImageElement
     // 修复：使用 clientWidth 避免 loading="lazy" 还未加载时 naturalWidth 为 0 的 BUG
-    if (img.clientWidth < 50)
-      return
+    if (img.clientWidth < 50) { return }
 
     const allImages = Array.from(contentRef.value?.querySelectorAll('img') || [])
       .filter(i => (i as HTMLImageElement).clientWidth >= 50)
@@ -188,32 +183,27 @@ function handleGlobalClick(e: MouseEvent) {
 
 // ================= 4. 渲染引擎（高亮+注入UI） =================
 function injectUI() {
-  if (!contentRef.value)
-    return
+  if (!contentRef.value) { return }
 
   const id = ++currentTaskId
   isLoading.value = true // 开启防闪烁
 
   requestAnimationFrame(() => {
     // 防竞态：如果期间内容又变了，直接抛弃当前过期的渲染任务
-    if (id !== currentTaskId)
-      return
+    if (id !== currentTaskId) { return }
 
     const preBlocks = contentRef.value!.querySelectorAll('pre')
 
     preBlocks.forEach((pre) => {
       const code = pre.querySelector('code')
-      if (!code)
-        return
+      if (!code) { return }
 
       // 跳过已经被其他编辑器原生高亮过的代码块，防止内部 span 被转义成乱码
-      if (code.querySelector('span') && code.classList.contains('hljs'))
-        return
+      if (code.querySelector('span') && code.classList.contains('hljs')) { return }
 
       // 1. 执行代码高亮
       try {
-        if (!code.classList.contains('hljs'))
-          hljs.highlightElement(code)
+        if (!code.classList.contains('hljs')) { hljs.highlightElement(code) }
       }
       catch (e) {
         /* 忽略不支持的语法报错 */

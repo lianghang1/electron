@@ -39,8 +39,7 @@ export class DownloadService {
 
   /** 挂载到 App Session（App 首次取得 Session 时由 Application 接线触发） */
   attach(appId: string, appSession: Electron.Session = this.sessionService.getSession(appId)): void {
-    if (this.attached.has(appSession))
-      return
+    if (this.attached.has(appSession)) { return }
     this.attached.add(appSession)
 
     appSession.on('will-download', (_event, item, webContents) => {
@@ -106,10 +105,8 @@ export class DownloadService {
     // 运行时授权恢复的下载已在挂起前预设路径（抑制默认对话框），沿用不再二次指定
     if (!item.getSavePath()) {
       const defaultPath = join(app.getPath('downloads'), filename)
-      if (this.config.download?.saveAs)
-        item.setSaveDialogOptions({ title: '保存下载', defaultPath })
-      else
-        item.setSavePath(defaultPath)
+      if (this.config.download?.saveAs) { item.setSaveDialogOptions({ title: '保存下载', defaultPath }) }
+      else { item.setSavePath(defaultPath) }
     }
     const task: DownloadTask = {
       id,
@@ -152,26 +149,22 @@ export class DownloadService {
   /** App 关闭时取消其进行中的下载（Tab 关闭联动，防孤儿下载） */
   cancelForApp(appId: string): void {
     for (const task of this.tasks.values()) {
-      if (task.appId === appId && task.status === 'progressing')
-        task.status = 'cancelled'
+      if (task.appId === appId && task.status === 'progressing') { task.status = 'cancelled' }
     }
   }
 
   /** 用系统默认程序打开已完成的下载文件（taskId 寻址，路径不可伪造） */
   async openFile(taskId: string): Promise<void> {
     const task = this.tasks.get(taskId)
-    if (!task || task.status !== 'completed' || !task.path)
-      throw new Error('download task not available')
+    if (!task || task.status !== 'completed' || !task.path) { throw new Error('download task not available') }
     const error = await shell.openPath(task.path)
-    if (error)
-      this.logger.warn('open download failed', { taskId, error })
+    if (error) { this.logger.warn('open download failed', { taskId, error }) }
   }
 
   /** 在资源管理器中定位已完成的下载文件 */
   revealFile(taskId: string): void {
     const task = this.tasks.get(taskId)
-    if (!task || task.status !== 'completed' || !task.path)
-      throw new Error('download task not available')
+    if (!task || task.status !== 'completed' || !task.path) { throw new Error('download task not available') }
     shell.showItemInFolder(task.path)
   }
 
@@ -180,8 +173,7 @@ export class DownloadService {
   }
 
   private throttlePush(id: string): void {
-    if (this.throttles.has(id))
-      return
+    if (this.throttles.has(id)) { return }
     this.throttles.set(id, setTimeout(() => {
       this.throttles.delete(id)
       this.push()

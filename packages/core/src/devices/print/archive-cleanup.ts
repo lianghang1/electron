@@ -20,8 +20,7 @@ export function planArchiveCleanup(
   retentionDays: number,
   now = Date.now(),
 ): string[] {
-  if (retentionDays <= 0)
-    return []
+  if (retentionDays <= 0) { return [] }
   const cutoff = now - retentionDays * 86400000
   return files
     .filter(f => f.mtimeMs < cutoff && !referenced.has(f.name))

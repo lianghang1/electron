@@ -44,8 +44,7 @@ export class SessionService {
 
   getSession(appId: string): Electron.Session {
     const appSession = session.fromPartition(`persist:app-${appId}`)
-    for (const listener of this.createdListeners)
-      listener(appId, appSession)
+    for (const listener of this.createdListeners) { listener(appId, appSession) }
     void this.restoreCookies(appId, appSession)
     return appSession
   }
@@ -66,13 +65,11 @@ export class SessionService {
 
   private async restoreCookies(appId: string, appSession: Electron.Session): Promise<void> {
     const key = `persist:app-${appId}`
-    if (this.restoredPartitions.has(key))
-      return
+    if (this.restoredPartitions.has(key)) { return }
     this.restoredPartitions.add(key)
     try {
       const file = this.cookiesFileFor(appId)
-      if (!existsSync(file))
-        return
+      if (!existsSync(file)) { return }
       const stored = JSON.parse(readFileSync(file, 'utf-8')) as StoredCookie[]
       for (const cookie of stored) {
         // 单条失败不阻断整批（站点侧域属性变化等个别异常可容忍）

@@ -16,8 +16,7 @@ async function findPanelPage() {
       panel: Boolean(document.querySelector('.ov-panel')),
     })`)
     const v = JSON.parse(has.value)
-    if (v.panel)
-      return { p, v }
+    if (v.panel) { return { p, v } }
     p.ws.close()
   }
   return null
@@ -54,8 +53,7 @@ await sleep(400)
 
 const panel1 = await findPanelPage()
 report('panel 浮层页出现', Boolean(panel1))
-if (!panel1)
-  process.exit(1)
+if (!panel1) { process.exit(1) }
 const snap1 = await dlSnapshot(panel1.p)
 report('逐条独立卡片渲染（无聚合块）', snap1.length >= 2, `cards=${JSON.stringify(snap1.map(s => s.name))}`)
 report('卡片有状态图标块（.ov-dl__icon）', snap1.every(s => s.iconBg), snap1.map(s => s.iconBg).join(','))
@@ -72,8 +70,7 @@ let snapEnd = null
 for (let i = 0; i < 30; i++) {
   await sleep(500)
   snapEnd = await dlSnapshot(panel1.p)
-  if (snapEnd.length && snapEnd.every(s => !/下载中/.test(s.desc ?? '')))
-    break
+  if (snapEnd.length && snapEnd.every(s => !/下载中/.test(s.desc ?? ''))) { break }
 }
 report('下载到达终态（进度条消失）', snapEnd.length > 0 && snapEnd.every(s => !s.hasTrack), JSON.stringify(snapEnd.map(s => s.desc)))
 report('completed 图标为绿色', snapEnd.every(s => s.iconBg === 'bg-[#16a34a]'), snapEnd.map(s => `${s.name}:${s.iconBg}`).join(' | '))

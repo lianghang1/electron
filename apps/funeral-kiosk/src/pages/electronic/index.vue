@@ -36,12 +36,9 @@ const tipText = ref('请将业务单二维码朝下，置于屏幕下方的扫�
 // 格式化证件号显示（添加空格）- 仅身份证格式化
 const formattedIdCard = computed(() => {
   const val = idCard.value
-  if (certType.value !== 'idcard')
-    return val
-  if (val.length <= 6)
-    return val
-  if (val.length <= 14)
-    return `${val.slice(0, 6)} ${val.slice(6)}`
+  if (certType.value !== 'idcard') { return val }
+  if (val.length <= 6) { return val }
+  if (val.length <= 14) { return `${val.slice(0, 6)} ${val.slice(6)}` }
   return `${val.slice(0, 6)} ${val.slice(6, 14)} ${val.slice(14)}`
 })
 
@@ -55,15 +52,13 @@ const inputProgress = computed(() => {
   // 其他证件：最少3位
   const minLength = 3
   const currentLength = idCard.value.length
-  if (currentLength < minLength)
-    return (currentLength / minLength) * 100
+  if (currentLength < minLength) { return (currentLength / minLength) * 100 }
   return 100
 })
 
 // 输入提示文本
 const inputPlaceholder = computed(() => {
-  if (certType.value === 'idcard')
-    return '请输入逝者身份证号码'
+  if (certType.value === 'idcard') { return '请输入逝者身份证号码' }
   return '请输入逝者证件号码'
 })
 

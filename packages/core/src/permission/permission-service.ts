@@ -47,21 +47,18 @@ export class PermissionService {
   ) {
     // 仅装载允许决策；过滤历史版本持久化的拒绝记录（拒绝不再记忆，下次仍询问）
     for (const [key, granted] of Object.entries(store?.get('decisions') ?? {})) {
-      if (granted)
-        this.runtimeDecisions.set(key, granted)
+      if (granted) { this.runtimeDecisions.set(key, granted) }
     }
   }
 
   check(context: CallerContext, permission: Permission): boolean {
-    if (context.appId === SHELL_APP_ID)
-      return true
+    if (context.appId === SHELL_APP_ID) { return true }
     return this.registry.get(context.appId)?.permissions?.includes(permission) ?? false
   }
 
   /** 校验失败即抛出：Main 内部服务调用系统操作前的强制关卡 */
   assert(context: CallerContext, permission: Permission): void {
-    if (this.check(context, permission))
-      return
+    if (this.check(context, permission)) { return }
     this.events.emit('permission:denied', { context, permission })
     this.logger.warn(`permission denied: ${permission}`, { appId: context.appId })
     throw new DesktopError('PERMISSION_DENIED', `Permission denied: ${permission}`, {
@@ -71,8 +68,7 @@ export class PermissionService {
   }
 
   getPermissions(appId: string): Permission[] {
-    if (appId === SHELL_APP_ID)
-      return [...PERMISSIONS]
+    if (appId === SHELL_APP_ID) { return [...PERMISSIONS] }
     return [...(this.registry.get(appId)?.permissions ?? [])]
   }
 
@@ -86,19 +82,16 @@ export class PermissionService {
   async requestRuntime(context: CallerContext, permission: Permission): Promise<boolean> {
     const cacheKey = `${context.appId}:${permission}`
     const cached = this.runtimeDecisions.get(cacheKey)
-    if (cached !== undefined)
-      return cached
+    if (cached !== undefined) { return cached }
     const inflight = this.runtimeInflight.get(cacheKey)
-    if (inflight)
-      return inflight
+    if (inflight) { return inflight }
 
     const appName = this.registry.get(context.appId)?.name ?? context.appId
     const requestId = randomUUID()
     const request = new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => {
         const pending = this.pendingRuntime.get(requestId)
-        if (pending)
-          this.finishRuntimeRequest(pending, false, false)
+        if (pending) { this.finishRuntimeRequest(pending, false, false) }
         this.logger.warn(`runtime permission request timed out: ${permission}`, { appId: context.appId })
       }, RUNTIME_REQUEST_TIMEOUT_MS)
       this.pendingRuntime.set(requestId, {
@@ -143,8 +136,7 @@ export class PermissionService {
   /** Shell 用户决策回传：允许持久化记忆（下次免询问），拒绝只影响本次（下次仍询问） */
   respond(requestId: string, granted: boolean): void {
     const pending = this.pendingRuntime.get(requestId)
-    if (!pending)
-      return
+    if (!pending) { return }
     this.finishRuntimeRequest(pending, granted, granted)
   }
 
@@ -152,15 +144,12 @@ export class PermissionService {
   resetRuntime(appId: string): void {
     const prefix = `${appId}:`
     for (const key of [...this.runtimeDecisions.keys()]) {
-      if (key.startsWith(prefix))
-        this.runtimeDecisions.delete(key)
+      if (key.startsWith(prefix)) { this.runtimeDecisions.delete(key) }
     }
-    if (!this.store)
-      return
+    if (!this.store) { return }
     const decisions = { ...this.store.get('decisions') }
     for (const key of Object.keys(decisions)) {
-      if (key.startsWith(prefix))
-        delete decisions[key]
+      if (key.startsWith(prefix)) { delete decisions[key] }
     }
     this.store.set('decisions', decisions)
   }
@@ -168,8 +157,7 @@ export class PermissionService {
   /** App 退出（Tab 关闭）时取消其全部挂起请求：页面已不存在，按拒绝处理本次且不持久化 */
   cancelForApp(appId: string): void {
     for (const pending of [...this.pendingRuntime.values()]) {
-      if (pending.appId !== appId)
-        continue
+      if (pending.appId !== appId) { continue }
       this.finishRuntimeRequest(pending, false, false)
     }
   }
@@ -177,15 +165,13 @@ export class PermissionService {
   /** 结束运行时请求：按给定决策 resolve；persist 表示用户明确决策，写透持久化存储（审计订阅照常广播） */
   private finishRuntimeRequest(pending: RuntimeRequest, granted: boolean, persist: boolean): void {
     for (const [key, entry] of this.pendingRuntime) {
-      if (entry !== pending)
-        continue
+      if (entry !== pending) { continue }
       this.pendingRuntime.delete(key)
       break
     }
     clearTimeout(pending.timer)
     pending.resolve(granted)
-    if (persist)
-      this.setRuntimeDecision(`${pending.appId}:${pending.permission}`, granted)
+    if (persist) { this.setRuntimeDecision(`${pending.appId}:${pending.permission}`, granted) }
     this.events.emit('permission:decided', {
       requestId: pending.requestId,
       appId: pending.appId,
@@ -197,8 +183,7 @@ export class PermissionService {
   /** 决策写内存 + 写透持久化存储（无存储实例时仅内存，如单测环境） */
   private setRuntimeDecision(key: string, granted: boolean): void {
     this.runtimeDecisions.set(key, granted)
-    if (!this.store)
-      return
+    if (!this.store) { return }
     this.store.set('decisions', { ...this.store.get('decisions'), [key]: granted })
   }
 }

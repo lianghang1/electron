@@ -22,8 +22,7 @@ export class CallerResolver {
 
   resolve(sender: WebContents): CallerContext {
     const context = this.contexts.get(sender.id)
-    if (!context)
-      throw new DesktopError('IPC_ERROR', `Unidentified IPC caller: webContents ${sender.id}`)
+    if (!context) { throw new DesktopError('IPC_ERROR', `Unidentified IPC caller: webContents ${sender.id}`) }
     return context
   }
 

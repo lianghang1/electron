@@ -65,8 +65,7 @@ function render(content: string): string {
 function fail(message: string): never {
   console.error(`[gen:app] ${message}`)
   // 自检失败回滚：删除半成品应用目录，避免未替换的 catalog 依赖污染后续 pnpm install
-  if (existsSync(appDir))
-    rmSync(appDir, { recursive: true, force: true })
+  if (existsSync(appDir)) { rmSync(appDir, { recursive: true, force: true }) }
   process.exit(1)
 }
 
@@ -75,21 +74,17 @@ function verifyGenerated(files: string[]): void {
   for (const rel of files) {
     const content = readFileSync(join(appDir, rel), 'utf-8')
     const leftover = content.match(/@@[A-Z][A-Z_]*@@/g)
-    if (leftover)
-      fail(`${rel} 存在未替换令牌 ${[...new Set(leftover)].join(', ')}——检查模板与 TOKENS 是否同步`)
+    if (leftover) { fail(`${rel} 存在未替换令牌 ${[...new Set(leftover)].join(', ')}——检查模板与 TOKENS 是否同步`) }
   }
 
   const pkg = JSON.parse(readFileSync(join(appDir, 'package.json'), 'utf-8')) as { name: string, main: string }
-  if (pkg.name !== `@app/${slug}`)
-    fail(`package.json name 异常: ${pkg.name}`)
+  if (pkg.name !== `@app/${slug}`) { fail(`package.json name 异常: ${pkg.name}`) }
   // main 指向构建产物（生成时尚未构建），校验契约值而非文件存在性
-  if (pkg.main !== './out/main/index.cjs')
-    fail(`package.json main 异常: ${pkg.main}（CJS 入口契约）`)
+  if (pkg.main !== './out/main/index.cjs') { fail(`package.json main 异常: ${pkg.main}（CJS 入口契约）`) }
 
   for (const rel of files.filter(file => file.endsWith('.cjs'))) {
     const check = spawnSync(process.execPath, ['--check', join(appDir, rel)], { encoding: 'utf-8' })
-    if (check.status !== 0)
-      fail(`${rel} 语法错误:\n${check.stderr}`)
+    if (check.status !== 0) { fail(`${rel} 语法错误:\n${check.stderr}`) }
   }
 
   // identity 是身份唯一真源：值与命令行参数一致才算生成成功
@@ -98,8 +93,7 @@ function verifyGenerated(files: string[]): void {
     productName: string
     displayName: string
   }
-  if (identity.appId !== appId || identity.productName !== productName || identity.displayName !== displayName)
-    fail(`identity.cjs 导出与参数不一致: ${JSON.stringify(identity)}`)
+  if (identity.appId !== appId || identity.productName !== productName || identity.displayName !== displayName) { fail(`identity.cjs 导出与参数不一致: ${JSON.stringify(identity)}`) }
 }
 
 const templateFiles = listTemplateFiles(TEMPLATE_DIR)

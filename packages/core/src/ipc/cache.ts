@@ -21,8 +21,7 @@ export interface CacheIpcDeps {
 export function registerCacheIpc(deps: CacheIpcDeps): void {
   const shellOnly = (sender: WebContents, appId: string): void => {
     assertShell(deps.resolver.resolve(sender))
-    if (!deps.registry.has(appId))
-      throw new Error(`unknown app: ${appId}`)
+    if (!deps.registry.has(appId)) { throw new Error(`unknown app: ${appId}`) }
   }
 
   handle('cache:clear', (e, appId) => {
@@ -35,8 +34,7 @@ export function registerCacheIpc(deps: CacheIpcDeps): void {
     await deps.cacheService.clearSiteData(appId)
     // 站点数据清掉后登录态已失效：重载该容器全部 Tab，让内存中的 JS 状态一并复位
     for (const tab of deps.tabService?.list() ?? []) {
-      if (tab.appId === appId)
-        deps.tabService?.reload(tab.id)
+      if (tab.appId === appId) { deps.tabService?.reload(tab.id) }
     }
   })
 }

@@ -16,15 +16,13 @@ const searchType = ref('1')
 const scheduleData = ref([])
 
 function desensitizeName(name) {
-  if (!name || name.length === 0)
-    return '可预定'
+  if (!name || name.length === 0) { return '可预定' }
   // 脱敏规则：保留第一个字，其余用 * 代替（单个字符时直接返回）
   return name.length === 1 ? name : name[0] + '*'.repeat(name.length - 1)
 }
 
 function desensitizeBusinessNo(str = '') {
-  if (str.length <= 6)
-    return str // 如果字符串长度不足6，直接返回
+  if (str.length <= 6) { return str } // 如果字符串长度不足6，直接返回
 
   const first4 = str.substring(0, 4)
   const last2 = str.substring(str.length - 2)

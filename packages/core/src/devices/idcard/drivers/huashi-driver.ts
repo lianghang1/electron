@@ -101,8 +101,7 @@ export class HuashiDriver implements BrandDriver {
 
   /** 懒加载：首次真正用设备时才 require koffi + LoadLibrary（缺依赖不影响服务启动） */
   private ensureLoaded(): void {
-    if (this.lib)
-      return
+    if (this.lib) { return }
     if (!existsSync(this.dllPath)) {
       throw idCardError('DEVICE_OFFLINE', `华视 DLL 未就位: ${this.dllPath}`, { dllPath: this.dllPath })
     }
@@ -183,8 +182,7 @@ export class HuashiDriver implements BrandDriver {
 
   /** 恢复读卡会话前的进程 cwd（close 必达，open 失败路径也走这里） */
   private restoreCwd(): void {
-    if (!this.prevCwd)
-      return
+    if (!this.prevCwd) { return }
     try {
       process.chdir(this.prevCwd)
     }
@@ -202,12 +200,10 @@ export class HuashiDriver implements BrandDriver {
   private readPhotoB64(): string | undefined {
     const buf = Buffer.alloc(38862 * 2)
     const r = this.fns.Getbase64JpgData(buf, Buffer.alloc(4))
-    if (r !== 1)
-      return undefined
+    if (r !== 1) { return undefined }
     const end = buf.indexOf(0)
     const b64 = buf.toString('latin1', 0, end < 0 ? buf.length : end).trim()
-    if (!/^[a-z0-9+/=\r\n]+$/i.test(b64))
-      return undefined
+    if (!/^[a-z0-9+/=\r\n]+$/i.test(b64)) { return undefined }
     return `data:image/jpeg;base64,${b64}`
   }
 
@@ -216,8 +212,7 @@ export class HuashiDriver implements BrandDriver {
     const buffer = Buffer.alloc(512)
     const length = Buffer.alloc(4)
     const r = fn(buffer, length)
-    if (r !== 1)
-      return ''
+    if (r !== 1) { return '' }
     return buffer.toString('utf16le').replace(/\0/g, '').trim()
   }
 }

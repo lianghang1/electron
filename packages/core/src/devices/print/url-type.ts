@@ -7,12 +7,9 @@ export type UrlFileType = 'pdf' | 'image'
 /** Content-Type → 内容类型（application/pdf / IMAGE_MIME 认可的图片类型） */
 export function typeFromContentType(contentType: string | null | undefined): UrlFileType | null {
   const mime = contentType?.split(';')[0]?.trim().toLowerCase()
-  if (!mime)
-    return null
-  if (mime === 'application/pdf')
-    return 'pdf'
-  if (Object.values(IMAGE_MIME).includes(mime))
-    return 'image'
+  if (!mime) { return null }
+  if (mime === 'application/pdf') { return 'pdf' }
+  if (Object.values(IMAGE_MIME).includes(mime)) { return 'image' }
   return null
 }
 
@@ -20,10 +17,8 @@ export function typeFromContentType(contentType: string | null | undefined): Url
 export function typeFromUrlPath(url: string): UrlFileType | null {
   try {
     const ext = path.extname(new URL(url).pathname).toLowerCase()
-    if (ext === '.pdf')
-      return 'pdf'
-    if (IMAGE_MIME[ext])
-      return 'image'
+    if (ext === '.pdf') { return 'pdf' }
+    if (IMAGE_MIME[ext]) { return 'image' }
   }
   catch {
     /* 非法 URL 交由下载阶段报错 */
@@ -35,12 +30,10 @@ export function typeFromUrlPath(url: string): UrlFileType | null {
 export function imageExt(contentType: string | null | undefined, url: string): string | null {
   const mime = contentType?.split(';')[0]?.trim().toLowerCase()
   const byMime = mime ? Object.entries(IMAGE_MIME).find(([, m]) => m === mime)?.[0] : undefined
-  if (byMime)
-    return byMime
+  if (byMime) { return byMime }
   try {
     const ext = path.extname(new URL(url).pathname).toLowerCase()
-    if (IMAGE_MIME[ext])
-      return ext
+    if (IMAGE_MIME[ext]) { return ext }
   }
   catch {
     /* 非法 URL 交由下载阶段报错 */

@@ -36,8 +36,7 @@ function countFiles(dir: string): number {
 }
 
 export function syncDevResources(apps: string[] = listApps()): void {
-  if (!existsSync(SHARED_DEVICES))
-    throw new Error(`共享设备资源不存在: ${SHARED_DEVICES}`)
+  if (!existsSync(SHARED_DEVICES)) { throw new Error(`共享设备资源不存在: ${SHARED_DEVICES}`) }
 
   for (const app of apps) {
     const target = path.join(APPS_DIR, app, 'resources', 'devices')
@@ -45,15 +44,13 @@ export function syncDevResources(apps: string[] = listApps()): void {
 
     // 旧机制（junction）残留：链接只删自身，绝不递归穿透删除共享源
     const st = lstatSync(target, { throwIfNoEntry: false })
-    if (st?.isSymbolicLink())
-      rmSync(target)
+    if (st?.isSymbolicLink()) { rmSync(target) }
 
     // 单向复制语义：应用侧整体重建。手工放进去的额外文件（共享源没有的）会丢失，提前大声警告
     if (st?.isDirectory() && !st.isSymbolicLink()) {
       const shared = new Set(listFiles(SHARED_DEVICES))
       const extras = listFiles(target).filter(rel => !shared.has(rel))
-      if (extras.length > 0)
-        console.warn(`  ! ${app}: 应用侧存在共享源没有的文件，本次同步将被清除：${extras.join('、')}`)
+      if (extras.length > 0) { console.warn(`  ! ${app}: 应用侧存在共享源没有的文件，本次同步将被清除：${extras.join('、')}`) }
     }
 
     rmSync(target, { recursive: true, force: true })

@@ -31,8 +31,7 @@ watch(() => props.visible, (newVal) => {
     isClosing.value = false
     // 如果有设置自动关闭时间
     if (props.duration > 0) {
-      if (timer.value)
-        clearTimeout(timer.value)
+      if (timer.value) { clearTimeout(timer.value) }
       timer.value = setTimeout(() => {
         handleClose()
       }, props.duration)
@@ -48,8 +47,7 @@ onUnmounted(() => {
 })
 
 function handleClose() {
-  if (isClosing.value)
-    return
+  if (isClosing.value) { return }
   isClosing.value = true
 
   if (timer.value) {

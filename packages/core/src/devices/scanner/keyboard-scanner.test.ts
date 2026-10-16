@@ -17,7 +17,7 @@ function create(opts: Partial<{ timeout: number, minLength: number, endKey: stri
 }
 
 function type(scanner: KeyboardScanner, text: string): void {
-  for (const ch of text) scanner.addKey(ch)
+  for (const ch of text) { scanner.addKey(ch) }
 }
 
 describe('keyboardScanner —— 结束键出码', () => {

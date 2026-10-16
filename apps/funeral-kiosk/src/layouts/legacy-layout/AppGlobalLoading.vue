@@ -26,8 +26,7 @@ function clearTimer() {
 }
 
 watch(() => props.isVisible, (newVal, oldVal) => {
-  if (newVal === oldVal)
-    return
+  if (newVal === oldVal) { return }
 
   if (newVal) {
     clearTimer()

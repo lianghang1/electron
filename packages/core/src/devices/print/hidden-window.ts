@@ -44,8 +44,7 @@ export class HiddenWindowPool {
   }
 
   private async getUtility(): Promise<BrowserWindow> {
-    if (this.utility && !this.utility.isDestroyed())
-      return this.utility
+    if (this.utility && !this.utility.isDestroyed()) { return this.utility }
     this.utility = new BrowserWindow({
       show: false,
       skipTaskbar: true,
@@ -64,8 +63,7 @@ export class HiddenWindowPool {
   }
 
   private async getPdfViewer(): Promise<BrowserWindow> {
-    if (this.pdfViewer && !this.pdfViewer.isDestroyed())
-      return this.pdfViewer
+    if (this.pdfViewer && !this.pdfViewer.isDestroyed()) { return this.pdfViewer }
     this.pdfViewer = new BrowserWindow({
       show: false,
       skipTaskbar: true,
@@ -95,8 +93,7 @@ export class HiddenWindowPool {
 
   destroyAll(): void {
     for (const win of [this.utility, this.pdfViewer]) {
-      if (win && !win.isDestroyed())
-        win.destroy()
+      if (win && !win.isDestroyed()) { win.destroy() }
     }
     this.utility = null
     this.pdfViewer = null
@@ -125,11 +122,9 @@ export async function loadHtmlInto(win: BrowserWindow, html: string): Promise<Br
 export function webContentsPrint(wc: Electron.WebContents, options: Electron.WebContentsPrintOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     wc.print(options, (success, failureReason) => {
-      if (success)
-        resolve()
-      else if (failureReason === 'Print job canceled')
-        reject(printError('JOB_CANCELED', failureReason))
-      else reject(printError('JOB_FAILED', failureReason || '打印任务失败'))
+      if (success) { resolve() }
+      else if (failureReason === 'Print job canceled') { reject(printError('JOB_CANCELED', failureReason)) }
+      else { reject(printError('JOB_FAILED', failureReason || '打印任务失败')) }
     })
   })
 }

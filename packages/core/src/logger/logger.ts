@@ -59,15 +59,12 @@ export class Logger {
 
   private write(level: 'debug' | 'info' | 'warn' | 'error', message: string, metadata?: Record<string, unknown>): void {
     // debug 受开关控制：生产环境默认不产生，避免刷屏与性能损耗
-    if (level === 'debug' && !this.options.debug)
-      return
+    if (level === 'debug' && !this.options.debug) { return }
 
     const data = { ...this.fields, ...metadata }
     const entries = Object.entries(data).filter(([, value]) => value !== undefined)
-    if (entries.length === 0)
-      this.elog[level](message)
-    else
-      this.elog[level](message, Object.fromEntries(entries))
+    if (entries.length === 0) { this.elog[level](message) }
+    else { this.elog[level](message, Object.fromEntries(entries)) }
   }
 }
 

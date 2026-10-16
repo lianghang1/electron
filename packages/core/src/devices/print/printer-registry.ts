@@ -15,8 +15,7 @@ export class PrinterRegistry {
   async list(): Promise<UnifiedPrinter[]> {
     const system = await this.listSystem()
     const hasDefault = system.some(p => p.isDefault)
-    if (!hasDefault && system.length > 0)
-      system[0].isDefault = true
+    if (!hasDefault && system.length > 0) { system[0].isDefault = true }
     return system
   }
 

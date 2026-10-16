@@ -18,8 +18,7 @@ export function idCardError(code: IdReaderErrorCode, message: string, detail?: u
 }
 
 export function toIdCardError(err: unknown): IdCardError {
-  if (err instanceof IdCardError)
-    return err
+  if (err instanceof IdCardError) { return err }
   const message = err instanceof Error ? err.message : String(err)
   return new IdCardError('UNKNOWN', message)
 }

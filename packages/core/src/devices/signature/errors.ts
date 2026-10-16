@@ -18,8 +18,7 @@ export function signatureError(code: SignErrorCode, message: string, detail?: un
 }
 
 export function toSignatureError(err: unknown): SignatureError {
-  if (err instanceof SignatureError)
-    return err
+  if (err instanceof SignatureError) { return err }
   const message = err instanceof Error ? err.message : String(err)
   return new SignatureError('UNKNOWN', message)
 }

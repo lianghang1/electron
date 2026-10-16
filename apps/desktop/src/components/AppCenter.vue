@@ -49,8 +49,7 @@ async function clearApp(appId: string, kind: 'cache' | 'site'): Promise<void> {
   await window.desktop.cache[kind === 'cache' ? 'clear' : 'clearSite'](appId)
   doneKey.value = clearKey(appId, kind)
   setTimeout(() => {
-    if (doneKey.value === clearKey(appId, kind))
-      doneKey.value = null
+    if (doneKey.value === clearKey(appId, kind)) { doneKey.value = null }
   }, 2000)
 }
 
@@ -65,8 +64,7 @@ async function resetPerms(appId: string): Promise<void> {
   const key = clearKey(appId, 'perm')
   doneKey.value = key
   setTimeout(() => {
-    if (doneKey.value === key)
-      doneKey.value = null
+    if (doneKey.value === key) { doneKey.value = null }
   }, 2000)
 }
 
@@ -89,20 +87,17 @@ function closeConfirm(): void {
 }
 
 function onOpenChange(value: boolean): void {
-  if (value)
-    return
+  if (value) { return }
   closeConfirm()
 }
 
 async function onConfirm(): Promise<void> {
   const action = pendingAction.value
-  if (!action)
-    return
+  if (!action) { return }
   closeConfirm()
   try {
-    if (action.kind === 'site')
-      await clearApp(action.appId, 'site')
-    else await resetPerms(action.appId)
+    if (action.kind === 'site') { await clearApp(action.appId, 'site') }
+    else { await resetPerms(action.appId) }
   }
   catch (error) {
     console.error('[AppCenter] 确认操作执行失败', error)
@@ -111,20 +106,15 @@ async function onConfirm(): Promise<void> {
 
 /** 权限状态文案：声明 = 平台直接放行；未声明看运行时用户决策 */
 function stateText(state: AppPermissionState): string {
-  if (state.declared)
-    return '已声明'
-  if (state.granted === true)
-    return '已授权'
-  if (state.granted === false)
-    return '已拒绝'
+  if (state.declared) { return '已声明' }
+  if (state.granted === true) { return '已授权' }
+  if (state.granted === false) { return '已拒绝' }
   return '按需询问'
 }
 
 function stateClass(state: AppPermissionState): string {
-  if (state.declared || state.granted === true)
-    return 'ac-perm__state--ok'
-  if (state.granted === false)
-    return 'ac-perm__state--deny'
+  if (state.declared || state.granted === true) { return 'ac-perm__state--ok' }
+  if (state.granted === false) { return 'ac-perm__state--deny' }
   return 'ac-perm__state--pending'
 }
 

@@ -69,13 +69,11 @@ export class AuditService {
   /** 清理超过保留期的按天文件（audit-YYYY-MM-DD.jsonl） */
   private cleanExpired(): void {
     try {
-      if (!existsSync(this.dir))
-        return
+      if (!existsSync(this.dir)) { return }
       const now = Date.now()
       for (const name of readdirSync(this.dir)) {
         const match = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/.exec(name)
-        if (!match)
-          continue
+        if (!match) { continue }
         if ((now - Date.parse(match[1])) / 86_400_000 > RETENTION_DAYS) {
           rmSync(join(this.dir, name))
           this.logger.info(`expired audit file removed: ${name}`)

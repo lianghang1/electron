@@ -70,8 +70,7 @@ export class UpdateService {
 
   /** 手动触发检查（Shell 调用） */
   check(): void {
-    if (!this.installed)
-      return
+    if (!this.installed) { return }
     void this.autoUpdater.checkForUpdates().catch((error) => {
       this.logger.error('update check failed', { error: String(error) })
     })
@@ -84,7 +83,6 @@ export class UpdateService {
 
   /** 下载完成后重启安装 */
   install(): void {
-    if (this.installed)
-      this.autoUpdater.quitAndInstall()
+    if (this.installed) { this.autoUpdater.quitAndInstall() }
   }
 }

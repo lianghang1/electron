@@ -52,10 +52,8 @@ export class ScanService {
 
   attachWindow(win: BrowserWindow): void {
     win.webContents.on('before-input-event', (_event, input) => {
-      if (!this.config.enabled)
-        return
-      if (input.type !== 'keyDown')
-        return
+      if (!this.config.enabled) { return }
+      if (input.type !== 'keyDown') { return }
       this.scanner.addKey(input.key)
     })
   }
@@ -66,8 +64,7 @@ export class ScanService {
     // 全量 webContents（BrowserWindow + shell Tab 的 WebContentsView 都在内），
     // 只遍历 BrowserWindow 会漏掉 Tab 装载的页面
     for (const wc of webContents.getAllWebContents()) {
-      if (!wc.isDestroyed())
-        wc.send(scannerDomain.channels.onScan, result)
+      if (!wc.isDestroyed()) { wc.send(scannerDomain.channels.onScan, result) }
     }
   }
 

@@ -102,7 +102,7 @@ export class SignatureService {
   }
 
   destroy(): void {
-    for (const a of this.adapters.values()) a.destroy?.()
+    for (const a of this.adapters.values()) { a.destroy?.() }
     this.active = null
   }
 

@@ -19,14 +19,11 @@ function isObj(v: unknown): v is Record<string, unknown> {
 
 function lookup(scope: Scope, path: string): unknown {
   const trimmed = path.trim()
-  if (trimmed === '@index')
-    return scope.index
-  if (trimmed === '@value')
-    return scope.vars.value
+  if (trimmed === '@index') { return scope.index }
+  if (trimmed === '@value') { return scope.vars.value }
   let cur: unknown = scope.vars
   for (const part of trimmed.split('.')) {
-    if (!isObj(cur))
-      return undefined
+    if (!isObj(cur)) { return undefined }
     cur = cur[part]
   }
   return cur

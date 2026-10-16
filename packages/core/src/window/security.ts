@@ -50,18 +50,15 @@ export function applyWebContentsGuards(
 
   // 页面"跳走"之前会先到这里：自己人放行，外人拦下
   webContents.on('will-navigate', (event, url) => {
-    if (isAppUrl(url, appOrigin))
-      return
+    if (isAppUrl(url, appOrigin)) { return }
     event.preventDefault()
     // 普通网页链接转交系统浏览器，用户点外链的预期不受影响
-    if (/^https?:\/\//.test(url))
-      shell.openExternal(url)
+    if (/^https?:\/\//.test(url)) { shell.openExternal(url) }
   })
 
   // 想开新窗口（window.open、target="_blank"）→ 一律不批
   webContents.setWindowOpenHandler((details) => {
-    if (/^https?:\/\//.test(details.url))
-      shell.openExternal(details.url)
+    if (/^https?:\/\//.test(details.url)) { shell.openExternal(details.url) }
     return { action: 'deny' }
   })
 
@@ -80,11 +77,9 @@ export function applyWebAppGuards(
   openPopup?: (url: string, features?: string) => void,
 ): void {
   webContents.on('will-navigate', (event, url) => {
-    if (isAllowedOrigin(url, allowedOrigins))
-      return
+    if (isAllowedOrigin(url, allowedOrigins)) { return }
     event.preventDefault()
-    if (/^https?:\/\//.test(url))
-      shell.openExternal(url)
+    if (/^https?:\/\//.test(url)) { shell.openExternal(url) }
   })
 
   webContents.setWindowOpenHandler((details) => {
@@ -92,8 +87,7 @@ export function applyWebAppGuards(
       openPopup?.(details.url, details.features)
       return { action: 'deny' }
     }
-    if (/^https?:\/\//.test(details.url))
-      shell.openExternal(details.url)
+    if (/^https?:\/\//.test(details.url)) { shell.openExternal(details.url) }
     return { action: 'deny' }
   })
 }
@@ -143,15 +137,13 @@ export function applySessionPermissionGuards(
     allowedPermissions === 'all'
     || (Array.isArray(allowedPermissions) && allowedPermissions.includes(permission))
   session.setPermissionRequestHandler((wc, permission, callback) => {
-    if (permission === 'clipboard-sanitized-write' || isDeclared(permission) || SYNC_GRANT.has(permission))
-      return callback(true)
+    if (permission === 'clipboard-sanitized-write' || isDeclared(permission) || SYNC_GRANT.has(permission)) { return callback(true) }
     if (requestApproval) {
       // callback 必达保证：审批链路任何异常（同步抛 / Promise 拒绝）都按拒绝落定，
       // 否则页面请求永久挂起（media 等Promise 永不 settle）且无任何日志
       let answered = false
       const answer = (granted: boolean) => {
-        if (answered)
-          return
+        if (answered) { return }
         answered = true
         callback(granted)
       }
@@ -197,8 +189,7 @@ function isAppUrl(url: string, appOrigin: string | null): boolean {
   try {
     const { protocol, origin } = new URL(url)
     // file:// 没有 origin（URL 解析结果就是 "null"），只能按协议判断
-    if (protocol === 'file:')
-      return appOrigin === null
+    if (protocol === 'file:') { return appOrigin === null }
     return appOrigin !== null && origin === appOrigin
   }
   catch {

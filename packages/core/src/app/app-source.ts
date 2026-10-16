@@ -5,8 +5,7 @@ import { join } from 'node:path'
 
 /** 最小结构校验：外部 JSON 不受 TS 约束，入口必须把好关 */
 export function isAppManifest(value: unknown): value is DesktopAppManifest {
-  if (typeof value !== 'object' || value === null)
-    return false
+  if (typeof value !== 'object' || value === null) { return false }
   const v = value as Record<string, unknown>
   return typeof v.id === 'string'
     && typeof v.name === 'string'
@@ -22,8 +21,7 @@ export function isAppManifest(value: unknown): value is DesktopAppManifest {
  */
 export function loadLocalAppManifests(userDataPath: string, logger: Logger): DesktopAppManifest[] {
   const file = join(userDataPath, 'apps.json')
-  if (!existsSync(file))
-    return []
+  if (!existsSync(file)) { return [] }
 
   try {
     const parsed: unknown = JSON.parse(readFileSync(file, 'utf-8'))
@@ -33,8 +31,7 @@ export function loadLocalAppManifests(userDataPath: string, logger: Logger): Des
     }
     const manifests = parsed.filter(isAppManifest)
     const invalid = parsed.length - manifests.length
-    if (invalid > 0)
-      logger.warn(`apps.json contains ${invalid} invalid manifest(s), skipped`)
+    if (invalid > 0) { logger.warn(`apps.json contains ${invalid} invalid manifest(s), skipped`) }
     return manifests
   }
   catch (error) {
@@ -70,8 +67,7 @@ export async function loadRemoteAppManifests(
     }
     const manifests = parsed.filter(isAppManifest)
     const invalid = parsed.length - manifests.length
-    if (invalid > 0)
-      logger.warn(`remote app source contains ${invalid} invalid manifest(s), skipped`, { url })
+    if (invalid > 0) { logger.warn(`remote app source contains ${invalid} invalid manifest(s), skipped`, { url }) }
     return manifests
   }
   catch (error) {
@@ -82,8 +78,7 @@ export async function loadRemoteAppManifests(
 
 /** origin 白名单比对：url 解析失败（非法 URL）一律不允许；origin 精确匹配含协议与端口 */
 export function isOriginAllowed(url: string, allowedOrigins: string[]): boolean {
-  if (allowedOrigins.length === 0)
-    return false
+  if (allowedOrigins.length === 0) { return false }
   try {
     return allowedOrigins.includes(new URL(url).origin)
   }

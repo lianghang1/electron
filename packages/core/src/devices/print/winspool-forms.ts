@@ -62,36 +62,29 @@ function declareFns(koffi: KoffiModule): { open: BoolFn, close: BoolFn, getInfo:
 
 /** 从缓冲区 base 偏移手工读 DEVMODEW 默认值（按 dmFields 有效位取值，越界或全零返回 null） */
 function readDevmodeDefaults(buf: Buffer, base: number): PrinterDefaults | null {
-  if (base < 0 || base + DEVMODE_MIN_SIZE > buf.length)
-    return null
+  if (base < 0 || base + DEVMODE_MIN_SIZE > buf.length) { return null }
   const fields = buf.readUInt32LE(base + DM_OFFSET_FIELDS)
-  if (!fields)
-    return null
+  if (!fields) { return null }
   const defaults: PrinterDefaults = {}
   if (fields & DM_FORMNAME) {
     // dmFormName 为 wchar 串（尾部 NUL 填充），逐字符读到空字符
     let name = ''
     for (let i = 0; i < DEVMODE_FORMNAME_CHARS; i++) {
       const ch = buf.readUInt16LE(base + DM_OFFSET_FORMNAME + i * 2)
-      if (!ch)
-        break
+      if (!ch) { break }
       name += String.fromCharCode(ch)
     }
-    if (name)
-      defaults.formName = name
+    if (name) { defaults.formName = name }
   }
-  if (fields & DM_ORIENTATION)
-    defaults.orientation = buf.readInt16LE(base + DM_OFFSET_ORIENTATION) === 2 ? 'landscape' : 'portrait'
+  if (fields & DM_ORIENTATION) { defaults.orientation = buf.readInt16LE(base + DM_OFFSET_ORIENTATION) === 2 ? 'landscape' : 'portrait' }
   if (fields & DM_DUPLEX) {
     // DMDUP_SIMPLEX=1、DMDUP_VERTICAL=2（长边装订）、DMDUP_HORIZONTAL=3（短边装订）
     const duplex = buf.readInt16LE(base + DM_OFFSET_DUPLEX)
     defaults.duplex = duplex === 3 ? 'duplexshort' : duplex === 2 ? 'duplexlong' : 'simplex'
   }
-  if (fields & DM_COLOR)
-    defaults.color = buf.readInt16LE(base + DM_OFFSET_COLOR) === 2
+  if (fields & DM_COLOR) { defaults.color = buf.readInt16LE(base + DM_OFFSET_COLOR) === 2 }
   const copies = buf.readInt16LE(base + DM_OFFSET_COPIES)
-  if (fields & DM_COPIES && copies > 1)
-    defaults.copies = copies
+  if (fields & DM_COPIES && copies > 1) { defaults.copies = copies }
   return defaults
 }
 
@@ -117,19 +110,16 @@ function getFormSize(koffi: KoffiModule, getForm: BoolFn, handle: number | bigin
   const neededBuf = koffi.alloc('uint32_t', 1)
   getForm(handle, name, 1, null, 0, neededBuf)
   const needed = koffi.decode(neededBuf, 0, 'uint32_t') as number
-  if (!needed)
-    return undefined
+  if (!needed) { return undefined }
   const buf = Buffer.alloc(needed)
-  if (!getForm(handle, name, 1, buf, needed, neededBuf))
-    return undefined
+  if (!getForm(handle, name, 1, buf, needed, neededBuf)) { return undefined }
   const widthUm = buf.readInt32LE(16)
   const heightUm = buf.readInt32LE(20)
   return widthUm > 0 && heightUm > 0 ? { widthMm: widthUm / 1000, heightMm: heightUm / 1000 } : undefined
 }
 
 export function queryWinspoolForms(printerName: string): PrinterPaper[] | null {
-  if (process.platform !== 'win32' || !koffiAvailable())
-    return null
+  if (process.platform !== 'win32' || !koffiAvailable()) { return null }
 
   let close: (() => void) | undefined
   try {
@@ -137,8 +127,7 @@ export function queryWinspoolForms(printerName: string): PrinterPaper[] | null {
     const { open, close: closePrinter, getInfo, caps, getForm } = declareFns(koffi)
 
     const handleBuf = koffi.alloc('uint64_t', 1)
-    if (!open(printerName, handleBuf, null))
-      return null
+    if (!open(printerName, handleBuf, null)) { return null }
     const handle = koffi.decode(handleBuf, 0, 'uint64_t') as number | bigint
     close = () => {
       closePrinter(handle)
@@ -147,38 +136,30 @@ export function queryWinspoolForms(printerName: string): PrinterPaper[] | null {
     const neededBuf = koffi.alloc('uint32_t', 1)
     getInfo(handle, 2, null, 0, neededBuf)
     const needed = koffi.decode(neededBuf, 0, 'uint32_t') as number
-    if (!needed)
-      return null
+    if (!needed) { return null }
     const infoBuf = Buffer.alloc(needed)
-    if (!getInfo(handle, 2, infoBuf, needed, neededBuf))
-      return null
+    if (!getInfo(handle, 2, infoBuf, needed, neededBuf)) { return null }
     const port = (koffi.decode(infoBuf, 24, 'wchar_t *') as string | undefined)?.split(',')[0] ?? ''
-    if (!port)
-      return null
+    if (!port) { return null }
 
     const count = caps(printerName, port, DC_PAPERNAMES, null, null)
-    if (count < 0)
-      return null
-    if (count === 0)
-      return []
+    if (count < 0) { return null }
+    if (count === 0) { return [] }
 
     const namesBuf = Buffer.alloc(count * FORM_NAME_CHARS * 2)
-    if (caps(printerName, port, DC_PAPERNAMES, namesBuf, null) !== count)
-      return null
+    if (caps(printerName, port, DC_PAPERNAMES, namesBuf, null) !== count) { return null }
 
     // DC_PAPERSIZE 与 DC_PAPERNAMES 平行；部分驱动不支持（返回值对不上），此时退化用表单名解析尺寸
     let sizeBuf: Buffer | undefined
     if (caps(printerName, port, DC_PAPERSIZE, null, null) === count) {
       const buf = Buffer.alloc(count * 8)
-      if (caps(printerName, port, DC_PAPERSIZE, buf, null) === count)
-        sizeBuf = buf
+      if (caps(printerName, port, DC_PAPERSIZE, buf, null) === count) { sizeBuf = buf }
     }
 
     const papers: PrinterPaper[] = []
     for (let i = 0; i < count; i++) {
       const name = koffi.decode(namesBuf, i * FORM_NAME_CHARS * 2, `wchar_t[${FORM_NAME_CHARS}]`) as string | undefined
-      if (!name)
-        continue
+      if (!name) { continue }
       // 尺寸优先级：DC_PAPERSIZE（0.1mm POINT）→ GetFormW 表单库（0.001mm）→ 表单名解析
       const widthMm = sizeBuf ? sizeBuf.readInt32LE(i * 8) / 10 : 0
       const heightMm = sizeBuf ? sizeBuf.readInt32LE(i * 8 + 4) / 10 : 0
@@ -212,8 +193,7 @@ export interface WinspoolHardware {
  * DEVMODE 解析失败仅缺 defaults，能力位仍有效；整体失败返回 null。
  */
 export function queryWinspoolHardware(printerName: string): WinspoolHardware | null {
-  if (process.platform !== 'win32' || !koffiAvailable())
-    return null
+  if (process.platform !== 'win32' || !koffiAvailable()) { return null }
 
   let close: (() => void) | undefined
   try {
@@ -221,8 +201,7 @@ export function queryWinspoolHardware(printerName: string): WinspoolHardware | n
     const { open, close: closePrinter, getInfo, caps } = declareFns(koffi)
 
     const handleBuf = koffi.alloc('uint64_t', 1)
-    if (!open(printerName, handleBuf, null))
-      return null
+    if (!open(printerName, handleBuf, null)) { return null }
     const handle = koffi.decode(handleBuf, 0, 'uint64_t') as number | bigint
     close = () => {
       closePrinter(handle)
@@ -231,11 +210,9 @@ export function queryWinspoolHardware(printerName: string): WinspoolHardware | n
     const neededBuf = koffi.alloc('uint32_t', 1)
     getInfo(handle, 2, null, 0, neededBuf)
     const needed = koffi.decode(neededBuf, 0, 'uint32_t') as number
-    if (!needed)
-      return null
+    if (!needed) { return null }
     const infoBuf = Buffer.alloc(needed)
-    if (!getInfo(handle, 2, infoBuf, needed, neededBuf))
-      return null
+    if (!getInfo(handle, 2, infoBuf, needed, neededBuf)) { return null }
 
     const hardware: WinspoolHardware = {
       defaults: {},
@@ -249,8 +226,7 @@ export function queryWinspoolHardware(printerName: string): WinspoolHardware | n
       const infoAddr = koffi.address(infoBuf)
       const base = Number(BigInt(devmodePtr) - BigInt(infoAddr))
       const defaults = readDevmodeDefaults(infoBuf, base)
-      if (defaults)
-        hardware.defaults = defaults
+      if (defaults) { hardware.defaults = defaults }
     }
     catch {
       // DEVMODE 解析失败：仅默认值缺省，能力位保留

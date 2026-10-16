@@ -82,8 +82,7 @@ export class DecardDriver implements BrandDriver {
 
   /** 懒加载：首次真正用设备时才 require koffi + LoadLibrary（缺依赖不影响服务启动） */
   private ensureLoaded(): void {
-    if (this.lib)
-      return
+    if (this.lib) { return }
     if (!existsSync(this.dllPath)) {
       throw idCardError('DEVICE_OFFLINE', `德卡 DLL 未就位: ${this.dllPath}`, { dllPath: this.dllPath })
     }

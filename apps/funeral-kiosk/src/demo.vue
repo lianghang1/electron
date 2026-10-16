@@ -21,8 +21,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (quitArmTimer)
-    clearTimeout(quitArmTimer)
+  if (quitArmTimer) { clearTimeout(quitArmTimer) }
 })
 
 function onQuitClick(): void {
@@ -32,8 +31,7 @@ function onQuitClick(): void {
     return
   }
   quitArmed.value = true
-  if (quitArmTimer)
-    clearTimeout(quitArmTimer)
+  if (quitArmTimer) { clearTimeout(quitArmTimer) }
   quitArmTimer = setTimeout(() => {
     quitArmed.value = false
   }, 3000)
