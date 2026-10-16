@@ -1,5 +1,10 @@
 import type { LogFunctions } from 'electron-log'
+import fs from 'node:fs'
+import path from 'node:path'
 import log from 'electron-log/main'
+
+/** 历史日志保留天数，超期文件在启动时清理 */
+const LOG_RETENTION_DAYS = 14
 
 export type LogFields = Record<string, string | number | boolean | undefined>
 
@@ -67,13 +72,86 @@ export class Logger {
 }
 
 /**
- * 根 Logger：一次性配置 electron-log 传输分级。
- * 文件路径用 electron-log 默认值（userData/logs/main.log，超 1MB 自动轮转 .old）。
+ * 根 Logger：一次性配置 electron-log 传输分级与文件轮转。
+ * 文件目录沿用 electron-log 默认值（userData/logs），按天拆分为 main-YYYY-MM-DD.log，
+ * 单日超 1MB 追加序号轮转，历史日志保留 LOG_RETENTION_DAYS 天。
  * - 文件：dev 全量（含 debug），生产从 info 起
  * - 控制台：dev 全量，生产仅 error（避免污染终端）
  */
 export function createRootLogger(options: LoggerOptions = {}): Logger {
   log.transports.file.level = options.debug ? 'debug' : 'info'
   log.transports.console.level = options.debug ? 'debug' : 'error'
+  configureFileRotation()
   return new Logger(options.scope ?? 'desktop', options)
+}
+
+/** 当天日期文本（本地时区），用于日志文件命名 */
+function toDateText(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day}`
+}
+
+/**
+ * 按天拆分日志文件并清理历史日志：
+ * - resolvePathFn 在每条消息写入时都会重新解析，文件名携带当天日期，跨天自动切换新文件
+ * - 同一天超过 maxSize 时追加序号轮转（main-2026-10-16.1.log），
+ *   替代默认的 .old 重命名（同名覆盖会丢失当日轮转块）
+ * - 启动时按文件修改时间清理超过保留期的历史日志（含旧版 main.log / main.old.log）
+ */
+function configureFileRotation(): void {
+  log.transports.file.resolvePathFn = (variables) => {
+    const logDir = path.dirname(variables.libraryDefaultDir)
+    return path.join(logDir, `main-${toDateText(new Date())}.log`)
+  }
+
+  log.transports.file.archiveLogFn = (file) => {
+    const info = path.parse(file.path)
+    let index = 1
+    let target = path.join(info.dir, `${info.name}.${index}${info.ext}`)
+    while (fs.existsSync(target)) {
+      index += 1
+      target = path.join(info.dir, `${info.name}.${index}${info.ext}`)
+    }
+    try {
+      fs.renameSync(file.path, target)
+    }
+    catch (error) {
+      // 重命名失败（如文件被占用）时清空当前文件兜底，避免单文件无限增长
+      file.clear()
+      console.warn('rotate log file failed:', error)
+    }
+  }
+
+  const currentFile = log.transports.file.getFile()
+  cleanExpiredLogs(path.dirname(currentFile.path))
+}
+
+/** 清理超过保留期的历史日志文件（按文件修改时间判断） */
+function cleanExpiredLogs(logDir: string): void {
+  let fileNames: string[]
+  try {
+    fileNames = fs.readdirSync(logDir)
+  }
+  catch {
+    // 目录不存在（首次运行）等场景直接跳过：日志系统自身不能成为故障点
+    return
+  }
+
+  const deadline = Date.now() - LOG_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  for (const fileName of fileNames) {
+    if (!fileName.startsWith('main')) {
+      continue
+    }
+    const filePath = path.join(logDir, fileName)
+    try {
+      const stat = fs.statSync(filePath)
+      if (stat.isFile() && stat.mtimeMs < deadline) {
+        fs.rmSync(filePath, { force: true })
+      }
+    }
+    catch {
+      // 单个文件清理失败不阻断其余文件
+    }
+  }
 }
