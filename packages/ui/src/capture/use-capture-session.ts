@@ -86,7 +86,7 @@ export function useCaptureSession(
 
   async function refreshDevices(): Promise<void> {
     try {
-      devices.value = await window.desktop.captureDialog.listDevices()
+      devices.value = await window.desktop.capture.listDevices()
     }
     catch {
       devices.value = []
@@ -138,7 +138,7 @@ export function useCaptureSession(
     }
     // ws：枚举摄像头档位，优先文档摄像头（funcType=1），无档位 = 仅设备默认
     try {
-      const cams: CaptureCameraInfo[] = await window.desktop.captureDialog.listCameras(deviceId.value)
+      const cams: CaptureCameraInfo[] = await window.desktop.capture.listCameras(deviceId.value)
       const cam = cams.find(c => c.funcType === 1) ?? cams[0]
       resolutions.value = cam?.resolutions?.length
         ? [{ value: '', label: '默认' }, ...cam.resolutions.map((r, i) => ({ value: String(i), label: r }))]
@@ -172,21 +172,21 @@ export function useCaptureSession(
 
   async function startWsPreview(id: string): Promise<void> {
     if (!frameUnsub) {
-      frameUnsub = window.desktop.events.on('capture:onPreviewFrame', (frame) => {
+      frameUnsub = window.desktop.events.on('capture:frameReceived', (frame) => {
         if (frame.deviceId !== deviceId.value) { return }
         // 新帧到达即回实时画面（覆盖可能展示的拍摄记录）
         frameSrc.value = `data:image/jpeg;base64,${frame.base64}`
       })
     }
     const opts = resolution.value === '' ? undefined : { resolutionNum: Number(resolution.value) }
-    await window.desktop.captureDialog.startPreview(id, opts)
+    await window.desktop.capture.dialogStartPreview({ deviceId: id, resolutionNum: opts?.resolutionNum })
   }
 
   async function stopLive(): Promise<void> {
     stopUvcStream()
     if (deviceKind(deviceId.value) === 'ws' && deviceId.value) {
       try {
-        await window.desktop.captureDialog.stopPreview()
+        await window.desktop.capture.dialogStopPreview()
       }
       catch {
         // 会话可能已被 Main 回收（设备掉线等），停止失败不阻断 UI
@@ -232,7 +232,7 @@ export function useCaptureSession(
         }
         // 落盘走全尺寸 dataURL；展示/回传换本地小缩略图，避免大 payload 两跳 IPC 造成卡顿
         const thumb = grabUvcThumb()
-        result = await window.desktop.captureDialog.capture({
+        result = await window.desktop.capture.dialogCapture({
           dataUrl: frame.dataUrl,
           // 成片像素随 meta 回传（测试/业务方可在结果里核对分辨率档位是否生效）
           meta: { width: frame.width, height: frame.height, transport: 'uvc' },
@@ -240,7 +240,7 @@ export function useCaptureSession(
         if (thumb) { result = { ...result, thumbDataUrl: thumb } }
       }
       else {
-        result = await window.desktop.captureDialog.capture()
+        result = await window.desktop.capture.dialogCapture()
       }
       // maxCount=1：每次拍摄替换前一张；>1：最新在前追加，拍满由 full 拦截
       results.value = maxCount.value === 1 ? [result] : [result, ...results.value]
@@ -271,7 +271,7 @@ export function useCaptureSession(
         thumbDataUrl: r.thumbDataUrl,
         meta: r.meta ? { ...r.meta } : undefined,
       }))
-      await window.desktop.captureDialog.confirm(snapshot)
+      await window.desktop.capture.dialogConfirm(snapshot)
       // 确认成功：保持「回传中」锁定直到组件随浮层收场卸载，宽限窗口内不可再操作
     }
     catch (err) {
@@ -369,7 +369,7 @@ export function useCaptureSession(
     }
     if (live.value && deviceKind(deviceId.value) === 'ws') {
       // 卸载收尾：Main 侧会话可能已随会话关闭回收，失败不阻断卸载
-      void window.desktop.captureDialog.stopPreview().catch(() => {})
+      void window.desktop.capture.dialogStopPreview().catch(() => {})
     }
     live.value = false
   }

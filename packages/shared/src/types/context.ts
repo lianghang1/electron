@@ -1,4 +1,3 @@
-import type { DesktopDomains } from './ipc'
 import type { DesktopAppManifest } from './manifest'
 import type { Permission } from './permission'
 
@@ -10,8 +9,6 @@ export interface CallerContext {
   appId: string
   instanceId: string
   tabId?: string
-  /** 挂载的域清单：Main 创建窗口 / Web 容器时登记，与 preload 的 --desktop-domains 启动参数同源 */
-  domains: DesktopDomains
 }
 
 /** 平台提供给 App 的运行上下文快照（可通过 IPC 返回给 Renderer） */

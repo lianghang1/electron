@@ -5,7 +5,7 @@ import { defineDomain, invoke } from '../../domain'
  */
 export const storageDomain = defineDomain('storage', {
   get: invoke<(key: string) => unknown>(),
-  set: invoke<(key: string, value: unknown) => void>(),
+  set: invoke<(input: { key: string, value: unknown }) => void>(),
   remove: invoke<(key: string) => void>(),
   clear: invoke<() => void>(),
 })

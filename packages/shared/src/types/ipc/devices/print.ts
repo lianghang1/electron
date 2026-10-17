@@ -11,8 +11,8 @@ export const printDomainDefs = {
   submit: invoke<(request: PrintRequest) => Promise<PrintResult>>(),
   /** 统一打印机列表（系统队列，含 capabilities 硬件能力位） */
   listPrinters: invoke<() => Promise<UnifiedPrinter[]>>(),
-  /** 查询任务状态；任务不存在返回 null */
-  status: invoke<(jobId: string) => Promise<JobStatus | null>>(),
+  /** 单条任务状态查询（找不到返回 null） */
+  getJob: invoke<(jobId: string) => Promise<JobStatus | null>>(),
   /** 最近任务列表（创建时间倒序），任务中心数据源 */
   listJobs: invoke<(limit?: number) => Promise<JobStatus[]>>(),
   /** 删除单条任务记录（连带删除其归档 PDF） */
@@ -20,7 +20,7 @@ export const printDomainDefs = {
   /** 清空全部任务记录（连带删除归档 PDF），返回清除条数 */
   clearJobs: invoke<() => Promise<number>>(),
   /** 渲染预览：模板 + 数据 + 纸张写法 → 完整 HTML（iframe 实时预览用，不送打） */
-  renderPreview: invoke<(templateId: string, data: Record<string, unknown>, paper: string) => Promise<string>>(),
+  renderPreview: invoke<(input: { templateId: string, data: Record<string, unknown>, paper: string }) => Promise<string>>(),
   /** 重打：优先用 PDF 存档（版式一致），文件负载任务原样重提交 */
   reprint: invoke<(jobId: string) => Promise<PrintResult>>(),
 }

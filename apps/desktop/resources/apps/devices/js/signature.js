@@ -1,5 +1,5 @@
 'use strict'
-/* 签名域：signature 会话（start/stop/clear/cancel）+ onStroke 笔迹点 canvas 实时自绘。
+/* 签名域：signature 会话（start/stop/clear/cancel）+ strokeReceived 笔迹点 canvas 实时自绘。
    设备只产采样点，签名图完全由本页绘制（板面坐标系 → 画布等比映射）。
    调用失败统一 reject（IpcRemoteError：e.code / e.message），catch 分支展示。 */
 
@@ -67,7 +67,7 @@ async function refreshSignDevices() {
 }
 
 // ── 笔迹点实时绘制：down 起新笔画（画起点圆点），move 连线，up 收笔 ──
-window.desktop.events.on('signature:onStroke', (p) => {
+window.desktop.events.on('signature:strokeReceived', (p) => {
   if (!sctx) return
   if (p.phase === 'down') {
     sctx.beginPath()

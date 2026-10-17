@@ -2,15 +2,15 @@ import type { WebContents } from 'electron'
 import { DesktopError } from '@desktop/shared'
 import { describe, expect, it } from 'vitest'
 import { SHELL_APP_ID } from '../src/constants'
-import { assertDomain, assertShell, CallerResolver } from '../src/ipc/caller-context'
+import { assertShell, CallerResolver } from '../src/ipc/caller-context'
 
 /** CallerResolver 只消费 webContents.id，测试用最小桩替代真实 WebContents */
 function fakeWebContents(id: number): WebContents {
   return { id } as WebContents
 }
 
-const shellContext = { appId: SHELL_APP_ID, instanceId: 'shell', domains: '*' as const }
-const appContext = { appId: 'crm', instanceId: 'crm-1', domains: ['storage'] as const }
+const shellContext = { appId: SHELL_APP_ID, instanceId: 'shell' }
+const appContext = { appId: 'crm', instanceId: 'crm-1' }
 
 describe('callerResolver', () => {
   it('登记后按 webContents.id 反查身份', () => {
@@ -49,19 +49,5 @@ describe('assertShell', () => {
 
   it('普通 App 被拒绝并携带 appId 详情', () => {
     expect(() => assertShell(appContext)).toThrowError(DesktopError)
-  })
-})
-
-describe('assertDomain', () => {
-  it('全量挂载（Shell）恒放行', () => {
-    expect(() => assertDomain(shellContext, 'cache')).not.toThrow()
-  })
-
-  it('清单内域放行', () => {
-    expect(() => assertDomain(appContext, 'storage')).not.toThrow()
-  })
-
-  it('清单外域抛 PERMISSION_DENIED', () => {
-    expect(() => assertDomain(appContext, 'cache')).toThrowError(DesktopError)
   })
 })

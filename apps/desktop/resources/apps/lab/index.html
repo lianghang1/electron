@@ -592,7 +592,7 @@
     },
     'deny-respond': async () => {
       try {
-        await window.desktop.permission.respond('00000000-0000-4000-8000-000000000000', true)
+        await window.desktop.permission.respond({ requestId: '00000000-0000-4000-8000-000000000000', granted: true })
         log('permission.respond 伪造决策意外成功——越权漏洞！', 'fail')
       }
       catch (err) { log(`permission.respond 被拒 ✓（${err.message}）`, 'block') }

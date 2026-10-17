@@ -40,17 +40,3 @@ export function assertShell(context: CallerContext): void {
     })
   }
 }
-
-/**
- * 域归属关卡：调用者须挂载了该域（Shell 全量恒过）。
- * 与 preload 的 --desktop-domains 挂载清单同源，preload 收口之外的主进程兜底。
- */
-export function assertDomain(context: CallerContext, domain: string): void {
-  const allowed = context.domains
-  if (allowed === '*' || allowed.includes(domain)) { return }
-  throw new DesktopError('PERMISSION_DENIED', `Domain not mounted: ${domain}`, {
-    appId: context.appId,
-    // '*' 分支已在上方 return：此处 allowed 必为清单
-    domains: allowed.join(','),
-  })
-}

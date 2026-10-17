@@ -162,7 +162,7 @@ onMounted(async () => {
     immediate: true,
   })
 
-  window.desktop.events.on('scanner:onScan', onScan)
+  window.desktop.events.on('scanner:scanReceived', onScan)
 
   httpContext.set({
     showError: (msg?: string | null) => {

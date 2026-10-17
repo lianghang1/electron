@@ -1,5 +1,5 @@
 'use strict'
-/* 扫码域：键盘仿真扫码枪配置 + 模拟扫码 + scanner:onScan 广播订阅 */
+/* 扫码域：键盘仿真扫码枪配置 + 模拟扫码 + scanner:scanReceived 广播订阅 */
 
 let scanHistory = []
 /** 输入框为空时的模拟条码（带前缀，覆盖前缀命中链路） */
@@ -56,7 +56,7 @@ $('#scan-code').addEventListener('keyup', (e) => {
 })
 $('#btn-scan-clear').addEventListener('click', () => { scanHistory = []; renderScan() })
 
-window.desktop.events.on('scanner:onScan', pushScan)
+window.desktop.events.on('scanner:scanReceived', pushScan)
 
 void (async () => {
   try {

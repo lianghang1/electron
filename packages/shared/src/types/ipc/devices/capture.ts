@@ -3,7 +3,11 @@ import { invoke, push } from '../../../domain'
 
 /**
  * capture 域契约 —— 图像采集（高拍仪/扫描仪/摄像头，多品牌多接入方式）。
+ * dialog* 前缀通道是拍摄浮层窗内的会话上下文操作（仅拍摄窗调用，Main 按会话校验身份），
+ * 与发起方通道（openCaptureDialog / closeCaptureDialog）分离；设备发现（listDevices /
+ * listCameras）浮层窗直接复用。
  * 失败统一 reject（IpcRemoteError，code 见 CaptureErrorCode），渲染层 try/catch 按错误码分支。
+ * 文件与 core/src/ipc/capture.ts（注册实现）一一对应。
  */
 export const captureDomainDefs = {
   /** 设备列表：各适配器上报后合并（含连通性探测状态） */
@@ -15,17 +19,17 @@ export const captureDomainDefs = {
   /** 采集一张：deviceId 路由到对应适配器；同一设备串行化；预览开启时走会话内拍照 */
   capture: invoke<(req: CaptureRequest) => Promise<CaptureResult>>(),
   /** UVC 路线（渲染层 getUserMedia）拍到的 dataURL 落盘为图片文件，返回绝对路径 */
-  saveDataUrl: invoke<(dataUrl: string, ext?: 'jpg' | 'png') => Promise<string>>(),
-  /** 开启实时预览（ws/camsdk 高拍仪）：预览帧经 onPreviewFrame 推给发起窗口，会话保持供 capture 拍照 */
-  startPreview: invoke<(deviceId: string, opts?: { resolutionNum?: number }) => Promise<void>>(),
+  saveDataUrl: invoke<(input: { dataUrl: string, ext?: 'jpg' | 'png' }) => Promise<string>>(),
+  /** 开启实时预览（ws/camsdk 高拍仪）：预览帧经 frameReceived 推给发起窗口，会话保持供 capture 拍照 */
+  startPreview: invoke<(input: { deviceId: string, resolutionNum?: number }) => Promise<void>>(),
   /** 关闭实时预览 */
   stopPreview: invoke<(deviceId: string) => Promise<void>>(),
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo；不占用摄像头） */
   listCameras: invoke<(deviceId: string) => Promise<CaptureCameraInfo[]>>(),
   /** 实时预览帧推送（JPEG base64；仅推给发起预览的窗口） */
-  onPreviewFrame: push<[frame: { deviceId: string, base64: string }]>(),
+  frameReceived: push<[frame: { deviceId: string, base64: string }]>(),
 
-  // ---- 内置 UI 拍摄浮层（发起方通道；浮层窗内操作见 captureDialog 域） ----
+  // ---- 拍摄浮层（发起方通道；浮层窗内会话操作见下方 dialog* 通道） ----
   /**
    * 发起拍摄浮层：Main 打开第四类原生浮层窗（全局互斥，占用中 reject DEVICE_BUSY）。
    * Promise 在浮层结束时交付：确认回传 resolve 结果数组，用户取消/未拍 resolve 空数组，
@@ -34,4 +38,17 @@ export const captureDomainDefs = {
   openCaptureDialog: invoke<(req: CaptureDialogRequest) => Promise<CaptureResult[]>>(),
   /** 页面主动取消浮层（仅发起 tab 可调）：Promise 以空结果收尾 */
   closeCaptureDialog: invoke<() => Promise<void>>(),
+
+  // ---- 拍摄浮层窗内会话操作（仅拍摄窗调用；会话关闭/取消回传见 overlay.dismissCapture） ----
+  /** 浮层内开启预览（帧经 frameReceived 推回浮层窗自身） */
+  dialogStartPreview: invoke<(input: { deviceId: string, resolutionNum?: number }) => Promise<void>>(),
+  /** 浮层内关闭预览 */
+  dialogStopPreview: invoke<() => Promise<void>>(),
+  /**
+   * 浮层内拍一张。UVC 路线传 dataUrl（浮层抽帧，meta 可带成片像素）落盘；
+   * ws/SDK 路线不传，由 Main 按会话设备走 capture 会话内拍照。结果由浮层 UI 收集，确认时统一回传。
+   */
+  dialogCapture: invoke<(opts?: { dataUrl?: string, meta?: Record<string, unknown> }) => Promise<CaptureResult>>(),
+  /** 确认回传（非空结果数组，作为 openCaptureDialog 的 resolve 值，Main 随即关闭浮层） */
+  dialogConfirm: invoke<(results: CaptureResult[]) => Promise<void>>(),
 }

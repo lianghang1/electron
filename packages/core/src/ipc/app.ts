@@ -20,7 +20,7 @@ export interface AppIpcDeps {
  */
 export function registerAppIpc(deps: AppIpcDeps): void {
   handle('app:list', () => deps.registry.list())
-  handle('app:getManifest', (_e, appId) => deps.registry.get(appId))
+  handle('app:getManifest', (_e, appId) => deps.registry.get(appId) ?? null)
   handle('app:getCurrent', e => buildAppContext(deps.resolver.resolve(e.sender), deps))
 }
 

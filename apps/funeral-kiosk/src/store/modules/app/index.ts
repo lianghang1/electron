@@ -41,7 +41,7 @@ async function getAppConfigData(): Promise<AppConfig | undefined> {
 }
 
 async function setAppConfigData(data: AppConfig): Promise<void> {
-  await window.desktop.storage.set(APP_CONFIG_KEY, toPlainData(data))
+  await window.desktop.storage.set({ key: APP_CONFIG_KEY, value: toPlainData(data) })
 }
 
 async function setScannerConfigData(data: Partial<ScannerConfig>): Promise<ScannerConfig> {

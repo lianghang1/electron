@@ -27,7 +27,7 @@ import { DownloadService } from '../download/download-service'
 import { EventBus } from '../event/event-bus'
 import { registerPlatformIpc } from '../ipc'
 import { CallerResolver } from '../ipc/caller-context'
-import { attachHandleLogger, attachHandleResolver } from '../ipc/handle'
+import { attachHandleLogger } from '../ipc/handle'
 import { createRootLogger } from '../logger/logger'
 import { attachSystemLogging } from '../logger/system'
 import { PermissionService } from '../permission/permission-service'
@@ -161,8 +161,6 @@ export class DesktopRuntime {
     attachSystemLogging(this.logger, this.resolver, this.events)
     // 崩溃防护第 1 层：IPC handler 异常统一留痕（主进程排障盲区补齐）
     attachHandleLogger(this.logger.scope('ipc'))
-    // 平台 IPC 域归属兜底：按调用者挂载清单放行（preload 收口之外的第二道）
-    attachHandleResolver(this.resolver)
     this.logger.info('desktop application starting', {
       appId: this.options.app.id,
       // 崩溃防护第 0 层：crashDumps 本地落盘路径（bootstrap 已启动 CrashReporter，minidump 不上报）
@@ -366,6 +364,7 @@ export class DesktopRuntime {
       capture: this.captureSystem,
       captureDialog: this.captureDialogService,
       print: this.printSystem,
+      logger: this.logger,
       events: this.events,
       resolver: this.resolver,
     })
@@ -406,11 +405,11 @@ export class DesktopRuntime {
     })
     // 更新流程状态 → Shell 底部横幅
     this.events.on('update:state', (state) => {
-      this.windowService.getMainWindow()?.webContents.send('update:state', state)
+      this.windowService.getMainWindow()?.webContents.send('update:stateUpdated', state)
     })
     // asar 热更状态 → Shell 更新横幅（pending = 重启应用生效）
     this.events.on('update:asarState', (state) => {
-      this.windowService.getMainWindow()?.webContents.send('update:asarState', state)
+      this.windowService.getMainWindow()?.webContents.send('update:asarStateUpdated', state)
     })
   }
 

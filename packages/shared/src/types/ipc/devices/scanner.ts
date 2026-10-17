@@ -13,5 +13,5 @@ export const scannerDomainDefs = {
   /** 模拟一条扫码（诊断/演示：走与真枪完全相同的缓冲 → 广播链路；仅 dev 环境可用，生产返回 PERMISSION_DENIED） */
   simulate: invoke<(code: string) => ScanResult>(),
   /** 扫码推送：任何窗口检测到条码都广播（缓冲命中后触发） */
-  onScan: push<[result: ScanResult]>(),
+  scanReceived: push<[result: ScanResult]>(),
 }

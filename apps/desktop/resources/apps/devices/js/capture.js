@@ -103,7 +103,7 @@ async function startWsPreview() {
   if (!deviceId) { toast('请先选择采集设备', false); return }
   try {
     const opts = { resolutionNum: currentResolutionNum() }
-    await window.desktop.capture.startPreview(deviceId, opts)
+    await window.desktop.capture.startPreview({ deviceId, resolutionNum: opts?.resolutionNum })
     wsPreviewOn = true
     $('#cap-stage').innerHTML = '<img id="cap-live" alt="实时预览">'
     applyPreviewTransform()
@@ -113,7 +113,7 @@ async function startWsPreview() {
   finally { capToggleOpButtons() }
 }
 
-window.desktop?.events?.on('capture:onPreviewFrame', (frame) => {
+window.desktop?.events?.on('capture:frameReceived', (frame) => {
   if (!wsPreviewOn || frame.deviceId !== $('#cap-device').value) return
   // 新帧到达即回到实时画面（浏览拍摄记录时来新帧 = 自动回直播）
   const live = $('#cap-live')
@@ -164,7 +164,7 @@ async function captureUvcFrame() {
   ctx.drawImage(video, -vw / 2, -vh / 2, vw, vh)
   const dataUrl = canvas.toDataURL('image/jpeg', 0.92)
   try {
-    const imagePath = await window.desktop.capture.saveDataUrl(dataUrl, 'jpg')
+    const imagePath = await window.desktop.capture.saveDataUrl({ dataUrl, ext: 'jpg' })
     pushRecord({ imagePath, thumbDataUrl: dataUrl }, '本机摄像头')
     toast('拍摄完成')
   }

@@ -2,13 +2,11 @@ import type { DomainApi } from '../domain'
 import type { DesktopIpc } from './ipc'
 import type { appDomain } from './ipc/app'
 import type { cacheDomain } from './ipc/cache'
-import type { captureDialogDomain, captureDomain, deviceDomain, printDomain, scannerDomain, signatureDomain } from './ipc/devices'
+import type { captureDomain, deviceDomain, printDomain, scannerDomain, signatureDomain } from './ipc/devices'
 import type { downloadDomain } from './ipc/download'
-import type { menuDomain } from './ipc/menu'
 import type { notificationDomain } from './ipc/notification'
 import type { overlayDomain } from './ipc/overlay'
 import type { permissionDomain } from './ipc/permission'
-import type { permissionDialogDomain } from './ipc/permission-dialog'
 import type { storageDomain } from './ipc/storage'
 import type { tabsDomain } from './ipc/tabs'
 import type { updateDomain } from './ipc/update'
@@ -34,7 +32,6 @@ export type DesktopApi
     & DomainApi<typeof appDomain>
     & DomainApi<typeof tabsDomain>
     & DomainApi<typeof permissionDomain>
-    & DomainApi<typeof permissionDialogDomain>
     & DomainApi<typeof storageDomain>
     & DomainApi<typeof cacheDomain>
     & DomainApi<typeof updateDomain>
@@ -42,9 +39,7 @@ export type DesktopApi
     & DomainApi<typeof signatureDomain>
     & DomainApi<typeof scannerDomain>
     & DomainApi<typeof captureDomain>
-    & DomainApi<typeof captureDialogDomain>
     & DomainApi<typeof printDomain>
-    & DomainApi<typeof menuDomain>
     & DomainApi<typeof overlayDomain>
     & DomainApi<typeof downloadDomain>
     & DomainApi<typeof notificationDomain>

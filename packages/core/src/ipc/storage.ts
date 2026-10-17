@@ -22,8 +22,7 @@ export function registerStorageIpc(deps: StorageIpcDeps): void {
   }
 
   handle('storage:get', (e, key) => deps.storageService.get(authorized(e.sender), key))
-  handle('storage:set', (e, key, value) =>
-    deps.storageService.set(authorized(e.sender), key, value))
+  handle('storage:set', (e, input) => deps.storageService.set(authorized(e.sender), input.key, input.value))
   handle('storage:remove', (e, key) => deps.storageService.remove(authorized(e.sender), key))
   handle('storage:clear', e => deps.storageService.clear(authorized(e.sender)))
 }

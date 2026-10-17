@@ -5,7 +5,6 @@ import type { PermissionService } from '../permission/permission-service'
 import type { SessionService } from '../session/session-service'
 import type { WindowService } from '../window/window-service'
 import { join } from 'node:path'
-import { CAPABILITY_BUSINESS, desktopDomainsArg } from '@desktop/shared'
 import { BrowserWindow, WebContentsView } from 'electron'
 import {
   applySessionPermissionGuards,
@@ -286,11 +285,10 @@ export class WebService {
 
     // closed 时弹窗已销毁：webContents 须存活期捕获 id，销毁后访问会抛 Object has been destroyed
     const popupWcId = popup.webContents.id
-    // 弹窗与父容器同一套域挂载（同 App 能力一致）
+    // 弹窗与父容器同一调用者身份（同 App 能力一致）
     this.resolver.register(popup.webContents, {
       appId: parentContext.appId,
       instanceId: parentContext.instanceId,
-      domains: parentContext.domains,
     })
     popup.on('closed', () => {
       this.resolver.unregister(popupWcId)
@@ -316,13 +314,9 @@ function parseWindowFeatures(features?: string): { width: number, height: number
   return result
 }
 
-/** internal App 注入平台 preload（业务能力包桥）；第三方 App 保持无桥最小面 */
-function internalPreload(manifest: DesktopAppManifest): { preload?: string, additionalArguments?: string[] } {
+/** internal App 注入平台 preload（平台桥）；第三方 App 保持无桥最小面 */
+function internalPreload(manifest: DesktopAppManifest): { preload?: string } {
   return manifest.type === 'internal'
-    ? {
-        preload: join(__dirname, '../preload/index.cjs'),
-        // 业务 Tab 挂共用能力包：preload 按清单裁剪桥面（fail-closed）
-        additionalArguments: [desktopDomainsArg(CAPABILITY_BUSINESS)],
-      }
+    ? { preload: join(__dirname, '../preload/index.cjs') }
     : {}
 }

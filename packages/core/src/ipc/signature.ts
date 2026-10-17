@@ -33,7 +33,7 @@ export function registerSignatureIpc(deps: SignatureIpcDeps): void {
 async function startSign(system: SignatureSystem, sender: WebContents, req?: { deviceId?: string }): Promise<SignStartResult> {
   return system.start(req, (point: SignStrokePoint) => {
     if (!sender.isDestroyed()) {
-      sender.send('signature:onStroke', point)
+      sender.send('signature:strokeReceived', point)
     }
   })
 }

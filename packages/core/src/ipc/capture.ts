@@ -1,4 +1,4 @@
-import type { CaptureDialogRequest, CaptureRequest } from '@desktop/shared'
+import type { CaptureDialogRequest, CaptureRequest, CaptureResult } from '@desktop/shared'
 import type { WebContents } from 'electron'
 import type { AppRegistry } from '../app/app-registry'
 import type { CaptureSystem } from '../devices/capture'
@@ -12,6 +12,7 @@ export interface CaptureIpcDeps {
   capture: CaptureSystem
   /** 拍摄浮层会话服务（bootstrap 装配，恒创建） */
   captureDialog: CaptureDialogSessionService
+  /** 拍摄窗身份校验（会话操作仅拍摄窗可回传） */
   overlayService: OverlayWindowService
   /** 浮层标题展示用：按发起 appId 反查 App 显示名 */
   registry: AppRegistry
@@ -19,7 +20,8 @@ export interface CaptureIpcDeps {
 }
 
 /**
- * capture 域通道注册：图像采集（高拍仪/扫描仪/摄像头）+ 拍摄浮层发起方通道。
+ * capture 域通道注册：图像采集（高拍仪/扫描仪/摄像头）+ 拍摄浮层通道
+ * （发起方 openCaptureDialog / closeCaptureDialog + 浮层窗内 dialog* 会话操作）。
  * 失败统一 reject（CaptureError → IpcRemoteError，code 见 CaptureErrorCode，渲染层 try/catch 分支）；
  * 预览帧只推给发起预览的窗口（webContents 直发，不走全局事件广播）。
  */
@@ -28,10 +30,10 @@ export function registerCaptureIpc(deps: CaptureIpcDeps): void {
   handle('capture:getProfiles', () => deps.capture.getProfiles())
   handle('capture:upsertProfile', (_e, profile) => deps.capture.upsertProfile(profile))
   handle('capture:capture', (_e, req) => deps.capture.capture(sanitizeCaptureRequest(req)))
-  handle('capture:saveDataUrl', (_e, dataUrl, ext) => deps.capture.saveDataUrl(dataUrl, ext))
-  handle('capture:startPreview', (e, deviceId, opts) => deps.capture.startPreview(deviceId, (base64) => {
-    forwardFrame(e.sender, deviceId, base64)
-  }, opts))
+  handle('capture:saveDataUrl', (_e, input) => deps.capture.saveDataUrl(input.dataUrl, input.ext))
+  handle('capture:startPreview', (e, input) => deps.capture.startPreview(input.deviceId, (base64) => {
+    forwardFrame(e.sender, input.deviceId, base64)
+  }, input.resolutionNum === undefined ? undefined : { resolutionNum: input.resolutionNum }))
   handle('capture:stopPreview', (_e, deviceId) => deps.capture.stopPreview(deviceId))
   handle('capture:listCameras', (_e, deviceId) => deps.capture.listCameras(deviceId))
 
@@ -49,12 +51,18 @@ export function registerCaptureIpc(deps: CaptureIpcDeps): void {
     const ctx = deps.resolver.resolve(e.sender)
     deps.captureDialog.cancelByCaller({ appId: ctx.appId, tabId: ctx.tabId })
   })
+
+  // 浮层窗内会话操作：仅拍摄窗可调（会话服务按 webContents 校验归属）
+  handle('capture:dialogStartPreview', (e, input) => deps.captureDialog.startPreview(e.sender, input.deviceId, input.resolutionNum === undefined ? undefined : { resolutionNum: input.resolutionNum }))
+  handle('capture:dialogStopPreview', e => deps.captureDialog.stopPreview(e.sender))
+  handle('capture:dialogCapture', (e, opts) => deps.captureDialog.capture(e.sender, opts))
+  handle('capture:dialogConfirm', async (e, results) => deps.captureDialog.confirm(e.sender, sanitizeConfirmResults(results)))
 }
 
 /** 预览帧转发（发起窗口销毁后静默丢弃，由 stopPreview 正常回收会话） */
 function forwardFrame(sender: WebContents, deviceId: string, base64: string): void {
   if (!sender.isDestroyed()) {
-    sender.send('capture:onPreviewFrame', { deviceId, base64 })
+    sender.send('capture:frameReceived', { deviceId, base64 })
   }
 }
 
@@ -90,4 +98,10 @@ function sanitizeCaptureRequest(req: CaptureRequest | undefined): CaptureRequest
     resolutionNum: Number.isInteger(resolutionNum) && resolutionNum >= 0 ? resolutionNum : undefined,
     format: input.format === 'png' || input.format === 'bmp' ? input.format : input.format === 'jpg' ? 'jpg' : undefined,
   }
+}
+
+/** 确认回传入参收敛：丢弃缺 imagePath 的项（Main 侧 confirm 还会做非空校验） */
+function sanitizeConfirmResults(results: CaptureResult[] | undefined): CaptureResult[] {
+  if (!Array.isArray(results)) { return [] }
+  return results.filter(r => !!r && typeof r.imagePath === 'string' && r.imagePath.length > 0)
 }

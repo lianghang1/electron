@@ -28,7 +28,7 @@ export interface ScannerSystem {
  * ScanService = 扫码枪域统一 API。
  * 精华在 before-input-event：键盘事件在到达页面前被"观察"（不 preventDefault），
  * 扫码枪在任何输入焦点下都能被识别，且不会污染人工输入；缓冲器靠节奏+长度区分人与枪。
- * 结果广播到所有窗口（推送通道见 scannerDomain.channels.onScan）。
+ * 结果广播到所有窗口（推送通道见 scannerDomain.channels.scanReceived）。
  */
 export class ScanService {
   private config: ScannerConfig
@@ -64,7 +64,7 @@ export class ScanService {
     // 全量 webContents（BrowserWindow + shell Tab 的 WebContentsView 都在内），
     // 只遍历 BrowserWindow 会漏掉 Tab 装载的页面
     for (const wc of webContents.getAllWebContents()) {
-      if (!wc.isDestroyed()) { wc.send(scannerDomain.channels.onScan, result) }
+      if (!wc.isDestroyed()) { wc.send(scannerDomain.channels.scanReceived, result) }
     }
   }
 

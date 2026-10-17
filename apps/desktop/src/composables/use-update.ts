@@ -7,7 +7,7 @@ export function useUpdateState() {
   let unsubscribe: (() => void) | null = null
 
   onMounted(() => {
-    unsubscribe = window.desktop.events.on('update:state', (value) => {
+    unsubscribe = window.desktop.events.on('update:stateUpdated', (value) => {
       state.value = value
     })
   })
@@ -23,7 +23,7 @@ export function useAsarUpdateState() {
   let unsubscribe: (() => void) | null = null
 
   onMounted(() => {
-    unsubscribe = window.desktop.events.on('update:asarState', (value) => {
+    unsubscribe = window.desktop.events.on('update:asarStateUpdated', (value) => {
       state.value = value
     })
   })

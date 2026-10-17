@@ -10,6 +10,7 @@ import type { ScannerSystem } from '../devices/scanner'
 import type { SignatureSystem } from '../devices/signature'
 import type { DownloadService } from '../download/download-service'
 import type { EventBus } from '../event/event-bus'
+import type { Logger } from '../logger/logger'
 import type { PermissionService } from '../permission/permission-service'
 import type { StorageService } from '../storage/storage-service'
 import type { TabService } from '../tab/tab-service'
@@ -21,14 +22,11 @@ import type { CallerResolver } from './caller-context'
 import { registerAppIpc } from './app'
 import { registerCacheIpc } from './cache'
 import { registerCaptureIpc } from './capture'
-import { registerCaptureDialogIpc } from './capture-dialog'
 import { registerDeviceIpc } from './device'
 import { registerDownloadIpc } from './download'
-import { registerMenuIpc } from './menu'
 import { registerNotificationIpc } from './notification'
 import { registerOverlayIpc } from './overlay'
 import { registerPermissionIpc } from './permission'
-import { registerPermissionDialogIpc } from './permission-dialog'
 import { registerPrintIpc } from './print'
 import { registerScannerIpc } from './scanner'
 import { registerSignatureIpc } from './signature'
@@ -69,6 +67,8 @@ export interface PlatformIpcDeps {
   print: PrintSystem
   /** 平台事件总线：通知等域经它把 Main 侧事件转推 Shell */
   events: EventBus
+  /** 平台日志根：域实现内异步动作失败留痕（如菜单动作执行失败） */
+  logger: Logger
   resolver: CallerResolver
 }
 
@@ -88,19 +88,19 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
     resolver: deps.resolver,
   })
   registerTabsIpc({ tabService: deps.tabService, webService: deps.webService, resolver: deps.resolver })
-  registerPermissionIpc({ permissionService: deps.permissionService, resolver: deps.resolver })
-  registerStorageIpc({ storageService: deps.storageService, permissionService: deps.permissionService, resolver: deps.resolver })
-  registerCacheIpc({ cacheService: deps.cacheService, registry: deps.registry, tabService: deps.tabService, resolver: deps.resolver })
-  registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService, resolver: deps.resolver })
-  registerOverlayIpc({ overlayService: deps.overlayService })
-  registerMenuIpc({
+  registerOverlayIpc({
     overlayService: deps.overlayService,
+    captureDialog: deps.captureDialog,
     registry: deps.registry,
     tabService: deps.tabService,
     cacheService: deps.cacheService,
+    logger: deps.logger,
     resolver: deps.resolver,
   })
-  registerPermissionDialogIpc({ overlayService: deps.overlayService, permissionService: deps.permissionService })
+  registerPermissionIpc({ permissionService: deps.permissionService, overlayService: deps.overlayService, resolver: deps.resolver })
+  registerStorageIpc({ storageService: deps.storageService, permissionService: deps.permissionService, resolver: deps.resolver })
+  registerCacheIpc({ cacheService: deps.cacheService, registry: deps.registry, tabService: deps.tabService, resolver: deps.resolver })
+  registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService, resolver: deps.resolver })
   registerDownloadIpc({ downloadService: deps.downloadService, overlayService: deps.overlayService, resolver: deps.resolver })
   registerDeviceIpc({ idCard: deps.idCard })
   registerSignatureIpc({ signature: deps.signature })
@@ -112,7 +112,6 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
     registry: deps.registry,
     resolver: deps.resolver,
   })
-  registerCaptureDialogIpc({ captureDialog: deps.captureDialog, capture: deps.capture, overlayService: deps.overlayService })
   registerPrintIpc({ print: deps.print })
   registerNotificationIpc({
     registry: deps.registry,

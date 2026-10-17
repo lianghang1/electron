@@ -12,10 +12,10 @@ export interface PrintIpcDeps {
 export function registerPrintIpc(deps: PrintIpcDeps): void {
   handle('print:submit', (_e, request) => deps.print.submit(request))
   handle('print:listPrinters', () => deps.print.listPrinters())
-  handle('print:status', (_e, jobId) => deps.print.status(jobId))
+  handle('print:getJob', (_e, jobId) => deps.print.status(jobId))
   handle('print:listJobs', (_e, limit) => deps.print.listJobs(limit))
   handle('print:removeJob', (_e, jobId) => deps.print.removeJob(jobId))
   handle('print:clearJobs', () => deps.print.clearJobs())
-  handle('print:renderPreview', (_e, templateId, data, paper) => deps.print.renderPreview(templateId, data, paper))
+  handle('print:renderPreview', (_e, input) => deps.print.renderPreview(input.templateId, input.data, input.paper))
   handle('print:reprint', (_e, jobId) => deps.print.reprint(jobId))
 }

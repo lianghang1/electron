@@ -3,7 +3,7 @@ import { invoke, push } from '../../../domain'
 
 /**
  * 设备域 · 手写签名切片（手写板 / 签名屏）。
- * 会话式交互：startSign 建会话 → 笔迹点经 onStroke 实时推送（渲染层即时绘制）→
+ * 会话式交互：startSign 建会话 → 笔迹点经 strokeReceived 实时推送（渲染层即时绘制）→
  * stopSign 回收完整笔迹点集（签名图由渲染层自绘，设备侧不产位图）。
  * 失败统一 reject（IpcRemoteError，code 见 SignErrorCode），渲染层 try/catch 按错误码分支。
  */
@@ -19,5 +19,5 @@ export const signatureDomainDefs = {
   /** 取消会话（笔迹作废，等同未签名） */
   cancelSign: invoke<() => Promise<void>>(),
   /** 笔迹采样点实时推送（仅推给发起会话的窗口） */
-  onStroke: push<[point: SignStrokePoint]>(),
+  strokeReceived: push<[point: SignStrokePoint]>(),
 }

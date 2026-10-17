@@ -7,8 +7,8 @@ import { SHELL_APP_ID } from '../src/constants'
 import { EventBus } from '../src/event/event-bus'
 import { PermissionService } from '../src/permission/permission-service'
 
-const shell: CallerContext = { appId: SHELL_APP_ID, instanceId: 'shell', domains: '*' }
-const crm: CallerContext = { appId: 'crm', instanceId: 'crm-1', domains: ['storage'] }
+const shell: CallerContext = { appId: SHELL_APP_ID, instanceId: 'shell' }
+const crm: CallerContext = { appId: 'crm', instanceId: 'crm-1' }
 
 /** 单测环境无 electron-store：决策仅内存（PermissionService 预留的测试形态） */
 const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() } as unknown as Logger
@@ -41,7 +41,7 @@ describe('permissionService.check / assert', () => {
 
   it('未注册 App 一律拒绝', () => {
     const { service } = createService([PERMISSIONS[0]])
-    expect(service.check({ appId: 'ghost', instanceId: 'ghost', domains: '*' }, PERMISSIONS[0])).toBe(false)
+    expect(service.check({ appId: 'ghost', instanceId: 'ghost' }, PERMISSIONS[0])).toBe(false)
   })
 
   it('assert 拒绝时抛 PERMISSION_DENIED 并广播 permission:denied', () => {
@@ -167,7 +167,7 @@ describe('permissionService.resetRuntime（应用中心「重置授权」语义�
     events.on('permission:request', request => service.respond(request.requestId, true))
     await service.requestRuntime(crm, 'media')
 
-    const other: CallerContext = { appId: 'kiosk', instanceId: 'kiosk-1', domains: '*' }
+    const other: CallerContext = { appId: 'kiosk', instanceId: 'kiosk-1' }
     const registry = (service as unknown as { registry: AppRegistry }).registry
     registry.register({
       id: 'kiosk',

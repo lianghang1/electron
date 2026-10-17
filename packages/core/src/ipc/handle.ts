@@ -1,18 +1,11 @@
 import type { DesktopInvoke, IpcErrorPayload } from '@desktop/shared'
-import type { IpcMainInvokeEvent, WebContents } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
 import type { Logger } from '../logger/logger'
-import type { CallerResolver } from './caller-context'
-import { encodeIpcError, platformDomains } from '@desktop/shared'
+import { encodeIpcError } from '@desktop/shared'
 import { ipcMain } from 'electron'
-import { assertDomain } from './caller-context'
 
 /** handle 层日志（runtime 装配时注入；未注入时仅做异常编码，不留痕） */
 let handleLogger: Logger | undefined
-/** handle 层身份反查（runtime 装配时注入；未注入时跳过域兜底校验） */
-let handleResolver: CallerResolver | undefined
-
-/** 平台域名单集合：channel 前缀命中才做域归属校验（App 业务通道不受影响） */
-const PLATFORM_DOMAIN_NAMES = new Set<string>(platformDomains.map(domain => domain.domain))
 
 /**
  * 类型安全的 ipcMain.handle 包装工厂：
@@ -22,6 +15,8 @@ const PLATFORM_DOMAIN_NAMES = new Set<string>(platformDomains.map(domain => doma
  * 崩溃防护第 1 层（IPC 异常规范化）：handler 抛出的异常在此统一出口——
  * 主进程日志留痕（排障盲区补齐）后编码为可序列化 message 再抛出，
  * 渲染层经 preload 桥 decodeIpcError 还原 code/details，业务按错误码分支。
+ * 调用者身份与越权校验由各域 handler 首行自理（CallerResolver 反查 +
+ * assertShell / isOverlay / PermissionService 关卡）。
  */
 export function createHandle<Ipc extends Record<string, (...args: any[]) => any>>() {
   return function handle<K extends keyof Ipc & string>(
@@ -33,7 +28,6 @@ export function createHandle<Ipc extends Record<string, (...args: any[]) => any>
   ): void {
     ipcMain.handle(channel, async (event, ...args: unknown[]) => {
       try {
-        assertMountedDomain(channel, event.sender)
         return await (handler as (e: IpcMainInvokeEvent, ...a: unknown[]) => unknown)(event, ...args)
       }
       catch (error) {
@@ -50,22 +44,6 @@ export const handle = createHandle<DesktopInvoke>()
 /** runtime 日志根创建后挂接：IPC 异常统一进平台日志（scope: ipc） */
 export function attachHandleLogger(logger: Logger): void {
   handleLogger = logger
-}
-
-/** runtime 装配后挂接：平台通道统一做域归属兜底校验（见 assertMountedDomain） */
-export function attachHandleResolver(resolver: CallerResolver): void {
-  handleResolver = resolver
-}
-
-/**
- * 平台域通道的统一域兜底：channel 前缀是平台域名时，按调用者挂载清单放行。
- * App 业务通道（非平台域名）不在此校验，由 App 侧自行把关。
- */
-function assertMountedDomain(channel: string, sender: WebContents): void {
-  if (!handleResolver) { return }
-  const domain = channel.slice(0, channel.indexOf(':'))
-  if (!PLATFORM_DOMAIN_NAMES.has(domain)) { return }
-  assertDomain(handleResolver.resolve(sender), domain)
 }
 
 /** 日志元数据：错误类名 + 错误码 + 消息 + 可序列化 detail（不进日志的敏感内容由各域自行保证） */

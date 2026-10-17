@@ -7,6 +7,6 @@ import { defineDomain, invoke } from '../../domain'
  */
 export const appDomain = defineDomain('app', {
   list: invoke<() => RegisteredApp[]>(),
-  getManifest: invoke<(appId: string) => DesktopAppManifest | undefined>(),
+  getManifest: invoke<(appId: string) => DesktopAppManifest | null>(),
   getCurrent: invoke<() => AppContext>(),
 })

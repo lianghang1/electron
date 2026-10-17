@@ -12,6 +12,6 @@ export const notificationDomain = defineDomain('notification', {
   dismiss: invoke<(toastId: string) => void>(),
 
   // ---- Main → Renderer 推送 ----
-  /** 平台通知全量列表（Main → OverlayWindow 右下角 toast 渲染数据源） */
-  received: push<[PlatformNotification[]]>(),
+  /** 当前通知快照推送（全量列表，空数组 = 已清空） */
+  updated: push<[PlatformNotification[]]>(),
 })

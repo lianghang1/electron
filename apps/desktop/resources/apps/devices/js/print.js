@@ -182,7 +182,7 @@ async function renderPreview() {
     return
   }
   try {
-    const html = await window.desktop.print.renderPreview(kind.templateId, data, parsePaperValue($('#opt-paper').value) || kind.paper)
+    const html = await window.desktop.print.renderPreview({ templateId: kind.templateId, data, paper: parsePaperValue($('#opt-paper').value) || kind.paper })
     $('#preview-wrap').hidden = false
     $('#preview-frame').srcdoc = html
   }
