@@ -1,4 +1,5 @@
 import type { PrintSystem } from '../devices/print'
+import { DesktopError } from '@desktop/shared'
 import { handle } from './handle'
 
 export interface PrintIpcDeps {
@@ -16,6 +17,13 @@ export function registerPrintIpc(deps: PrintIpcDeps): void {
   handle('print:listJobs', (_e, limit) => deps.print.listJobs(limit))
   handle('print:removeJob', (_e, jobId) => deps.print.removeJob(jobId))
   handle('print:clearJobs', () => deps.print.clearJobs())
-  handle('print:renderPreview', (_e, input) => deps.print.renderPreview(input.templateId, input.data, input.paper))
+  handle('print:renderPreview', (_e, input) => {
+    if (!input || typeof input.templateId !== 'string') {
+      throw new DesktopError('IPC_ERROR', 'invalid render preview input')
+    }
+    // paper 契约为 string；非 string 视同缺省（空串无法识别 → 驱动默认纸张）
+    const paper = typeof input.paper === 'string' ? input.paper : ''
+    return deps.print.renderPreview(input.templateId, input.data, paper)
+  })
   handle('print:reprint', (_e, jobId) => deps.print.reprint(jobId))
 }

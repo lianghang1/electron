@@ -4,6 +4,7 @@ import type { PermissionService } from '../permission/permission-service'
 import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
 import { randomUUID } from 'node:crypto'
+import { DesktopError } from '@desktop/shared'
 import { handle } from './handle'
 
 export interface NotificationIpcDeps {
@@ -29,7 +30,7 @@ export function registerNotificationIpc(deps: NotificationIpcDeps): void {
     deps.permissionService.assert(context, 'notification')
 
     const title = typeof notification?.title === 'string' ? notification.title.trim() : ''
-    if (!title) { throw new Error('[notification] title is required') }
+    if (!title) { throw new DesktopError('IPC_ERROR', 'notification title is required') }
     const body = typeof notification?.body === 'string' ? notification.body.trim() : ''
 
     deps.events.emit('notification:received', {
@@ -44,7 +45,9 @@ export function registerNotificationIpc(deps: NotificationIpcDeps): void {
 
   // 浮层面板内关闭单条通知（reka Toast 滑动 / 关闭按钮回传）：仅浮层窗身份有效
   handle('notification:dismiss', (e, toastId) => {
-    if (!deps.overlayService.isOverlay(e.sender)) { return }
+    if (!deps.overlayService.isOverlay(e.sender)) {
+      throw new DesktopError('PERMISSION_DENIED', 'This channel is overlay-only')
+    }
     deps.overlayService.dismissToast(String(toastId))
   })
 }

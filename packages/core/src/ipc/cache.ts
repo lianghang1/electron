@@ -3,6 +3,7 @@ import type { AppRegistry } from '../app/app-registry'
 import type { CacheService } from '../cache/cache-service'
 import type { TabService } from '../tab/tab-service'
 import type { CallerResolver } from './caller-context'
+import { DesktopError } from '@desktop/shared'
 import { assertShell } from './caller-context'
 import { handle } from './handle'
 
@@ -21,7 +22,7 @@ export interface CacheIpcDeps {
 export function registerCacheIpc(deps: CacheIpcDeps): void {
   const shellOnly = (sender: WebContents, appId: string): void => {
     assertShell(deps.resolver.resolve(sender))
-    if (!deps.registry.has(appId)) { throw new Error(`unknown app: ${appId}`) }
+    if (!deps.registry.has(appId)) { throw new DesktopError('APP_NOT_FOUND', `App not registered: ${appId}`) }
   }
 
   handle('cache:clear', (e, appId) => {
