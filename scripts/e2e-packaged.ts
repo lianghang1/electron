@@ -200,7 +200,7 @@ async function main(): Promise<void> {
     await pollFile(launcherLog, c => c.includes('loaded builtin core'), 90_000, 'launcher 加载内置包')
     console.log('  [PASS] 引导器加载内置包（树外裸环境）')
 
-    // 5. CDP 等主窗口就绪 → 渲染桥 + 设备档案 API
+    // 5. CDP 等主窗口就绪 → 渲染桥 + 设备配置 API
     let cdpReady = false
     for (let i = 0; i < 30 && !cdpReady; i++) {
       await new Promise(r => setTimeout(r, 1000))
@@ -208,8 +208,8 @@ async function main(): Promise<void> {
         await withMainPage(CDP_PORT, async (wsUrl) => {
           const keys = await cdpEvaluate(wsUrl, 'Object.keys(window.desktop || {}).join(",")') as string
           if (!keys.includes('device') || !keys.includes('update')) { throw new Error(`window.desktop 命名空间缺失: ${keys}`) }
-          const profiles = await cdpEvaluate(wsUrl, 'window.desktop.capture.getProfiles().then(p => p.length).catch(e => Promise.reject(String(e).slice(0, 80)))', 20_000)
-          console.log(`  [PASS] 渲染桥与设备档案 API（profiles=${profiles}）`)
+          const configs = await cdpEvaluate(wsUrl, 'window.desktop.capture.getConfig().then(p => p.length).catch(e => Promise.reject(String(e).slice(0, 80)))', 20_000)
+          console.log(`  [PASS] 渲染桥与设备配置 API（configs=${configs}）`)
         })
         cdpReady = true
       }

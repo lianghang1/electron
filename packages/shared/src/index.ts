@@ -42,7 +42,7 @@ export type {
   CaptureCameraInfo,
   CaptureCaps,
   CaptureDevice,
-  CaptureDeviceProfile,
+  CaptureDeviceConfig,
   CaptureDialogClosedReason,
   CaptureDialogRequest,
   CaptureDialogSession,

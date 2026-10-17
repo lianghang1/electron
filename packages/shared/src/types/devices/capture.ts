@@ -116,8 +116,8 @@ export interface CaptureDialogSession {
   maxCount?: number
 }
 
-/** 品牌设备档案 —— 出厂值见 core BUILT_IN_CAPTURE_PROFILES，运行时编辑持久化 userData */
-export interface CaptureDeviceProfile {
+/** 设备接入配置（transport + 连接参数）—— 出厂值见 core BUILT_IN_CAPTURE_CONFIGS，运行时编辑持久化 userData */
+export interface CaptureDeviceConfig {
   id: string
   brand: string
   displayName: string

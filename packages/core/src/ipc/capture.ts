@@ -27,9 +27,9 @@ export interface CaptureIpcDeps {
  */
 export function registerCaptureIpc(deps: CaptureIpcDeps): void {
   handle('capture:listDevices', () => deps.capture.listDevices())
-  handle('capture:getProfiles', () => deps.capture.getProfiles())
-  handle('capture:upsertProfile', (_e, profile) => deps.capture.upsertProfile(profile))
-  handle('capture:capture', (_e, req) => deps.capture.capture(sanitizeCaptureRequest(req)))
+  handle('capture:getConfig', () => deps.capture.getConfigs())
+  handle('capture:setConfig', (_e, config) => deps.capture.setConfig(config))
+  handle('capture:snap', (_e, req) => deps.capture.capture(sanitizeCaptureRequest(req)))
   handle('capture:saveDataUrl', (_e, input) => deps.capture.saveDataUrl(input.dataUrl, input.ext))
   handle('capture:startPreview', (e, input) => deps.capture.startPreview(input.deviceId, (base64) => {
     forwardFrame(e.sender, input.deviceId, base64)

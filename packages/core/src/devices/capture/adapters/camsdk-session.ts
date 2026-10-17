@@ -1,4 +1,4 @@
-import type { CaptureDeviceProfile } from '@desktop/shared'
+import type { CaptureDeviceConfig } from '@desktop/shared'
 import { WebSocket } from 'ws'
 import { captureError } from '../errors'
 
@@ -10,8 +10,8 @@ import { captureError } from '../errors'
  * 数据红线：imgBase64 为拍摄内容，不写日志。
  */
 
-/** 采集所需的最小档案 ws 配置（protocol 由 WsAdapter 分发，本模块固定 camsdk） */
-export type CamSdkConfig = NonNullable<CaptureDeviceProfile['ws']>
+/** 采集所需的最小设备 ws 配置（protocol 由 WsAdapter 分发，本模块固定 camsdk） */
+export type CamSdkConfig = NonNullable<CaptureDeviceConfig['ws']>
 
 export interface CamSdkFrame {
   func: string

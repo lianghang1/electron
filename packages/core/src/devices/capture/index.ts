@@ -1,13 +1,13 @@
-import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import { CaptureService } from './service'
 
-export { BUILT_IN_CAPTURE_PROFILES } from './profiles'
+export { BUILT_IN_CAPTURE_CONFIGS } from './configs'
 
 export interface CaptureSystem {
   listDevices: () => Promise<CaptureDevice[]>
-  getProfiles: () => Promise<CaptureDeviceProfile[]>
-  upsertProfile: (profile: CaptureDeviceProfile) => void
+  getConfigs: () => Promise<CaptureDeviceConfig[]>
+  setConfig: (config: CaptureDeviceConfig) => void
   capture: (req: CaptureRequest) => Promise<CaptureResult>
   /** UVC 路线（渲染层 getUserMedia）拍到的 dataURL 落盘为图片文件 */
   saveDataUrl: (dataUrl: string, ext?: 'jpg' | 'png') => Promise<string>
@@ -22,10 +22,10 @@ export interface CaptureSystem {
 export interface CaptureSystemOptions {
   /** 设备资源根（DLL 相对路径基准，宿主解析开发/打包差异） */
   resourcesRoot: string
-  /** 初始设备档案（持久化回注；不传 = 出厂档案） */
-  initialProfiles?: CaptureDeviceProfile[]
+  /** 初始设备配置（持久化回注；不传 = 出厂配置） */
+  initialConfigs?: CaptureDeviceConfig[]
   /** 运行时编辑持久化（未注入则编辑仅内存生效） */
-  persist?: (profiles: CaptureDeviceProfile[]) => void
+  persist?: (configs: CaptureDeviceConfig[]) => void
   /** 结构化日志（采集日志不含图片内容） */
   logger?: Logger
   /** 采集图片保存目录（绝对路径，平台自管 userData/capture，渲染层不可指定） */
@@ -38,8 +38,8 @@ export function createCaptureSystem(options: CaptureSystemOptions): CaptureSyste
   const service = new CaptureService({ ...options, logger: log })
   return {
     listDevices: () => service.listDevices(),
-    getProfiles: async () => service.getProfiles(),
-    upsertProfile: p => service.upsertProfile(p),
+    getConfigs: async () => service.getConfigs(),
+    setConfig: config => service.setConfig(config),
     capture: req => service.capture(req),
     saveDataUrl: (dataUrl, ext) => service.saveDataUrl(dataUrl, ext),
     startPreview: (deviceId, onFrame, opts) => service.startPreview(deviceId, onFrame, opts),

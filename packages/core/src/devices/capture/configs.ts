@@ -1,11 +1,11 @@
-import type { CaptureDeviceProfile } from '@desktop/shared'
+import type { CaptureDeviceConfig } from '@desktop/shared'
 
 /**
- * 出厂设备档案（代码即档案，单一数据源）。
- * 运行时编辑（UI upsert）写入 userData 持久化（core 经 electron-store，启动时回注 initialProfiles）。
+ * 出厂设备配置（代码即配置，单一数据源）。
+ * 运行时编辑（UI setConfig）写入 userData 持久化（core 经 electron-store，启动时回注 initialConfigs）。
  * dll.file 相对宿主资源根（resourcesRoot）；运行时编辑可填绝对路径。
  */
-export const BUILT_IN_CAPTURE_PROFILES: CaptureDeviceProfile[] = [
+export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
   {
     id: 'dianyipai-x1800',
     brand: '点易拍',

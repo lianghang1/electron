@@ -18,7 +18,7 @@ function capIsUvc() { return $('#cap-device').value.startsWith(UVC_PREFIX) }
 /** 当前所选设备类型：uvc（本机摄像头）/ camsdk（华视 WS 高拍仪）/ other（SDK 直连或未加载档案） */
 function capKind() {
   if (capIsUvc()) return 'uvc'
-  const p = capSelectedProfile()
+  const p = capSelectedConfig()
   return p?.ws?.protocol === 'camsdk' ? 'camsdk' : 'other'
 }
 
@@ -175,7 +175,7 @@ async function captureByDevice() {
   const deviceId = $('#cap-device').value
   if (!deviceId) { toast('请先选择采集设备', false); return }
   try {
-    const r = await window.desktop.capture.capture({ deviceId, resolutionNum: currentResolutionNum() })
+    const r = await window.desktop.capture.snap({ deviceId, resolutionNum: currentResolutionNum() })
     pushRecord(r, captureDevices.find(d => d.id === deviceId)?.displayName ?? '设备')
     toast('拍摄完成')
   }
@@ -248,7 +248,7 @@ $('#btn-cap-print').addEventListener('click', async () => {
 function capResolutionKey() {
   const kind = capKind()
   if (kind === 'uvc') return 'cap-res:uvc'
-  const p = capSelectedProfile()
+  const p = capSelectedConfig()
   return p ? `cap-res:${p.id}` : null
 }
 
@@ -264,8 +264,8 @@ async function syncResolutionOptions() {
     sel.value = localStorage.getItem('cap-res:uvc') ?? ''
     return
   }
-  // camsdk：所选摄像头（档案 camId）的枚举分辨率；服务离线时退回默认档
-  const p = capSelectedProfile()
+  // camsdk：所选摄像头（配置 camId）的枚举分辨率；服务离线时退回默认档
+  const p = capSelectedConfig()
   const cams = p ? await fetchCamerasSafe(`ws:${p.id}`) : null
   const cam = cams?.find(c => c.id === (p.ws.camId ?? 0)) ?? cams?.[0]
   if (!cam?.resolutions?.length) {

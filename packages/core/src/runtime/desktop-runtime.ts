@@ -1,4 +1,4 @@
-import type { AppSource, CaptureDeviceProfile, DesktopAppManifest, ScannerConfig } from '@desktop/shared'
+import type { AppSource, CaptureDeviceConfig, DesktopAppManifest } from '@desktop/shared'
 import type { CaptureSystem } from '../devices/capture'
 import type { IdCardSystem } from '../devices/idcard'
 import type { PrintSystem } from '../devices/print'
@@ -33,6 +33,7 @@ import { attachSystemLogging } from '../logger/system'
 import { PermissionService } from '../permission/permission-service'
 import { ResilienceService } from '../resilience/resilience'
 import { SessionService } from '../session/session-service'
+import { createDeviceStore } from '../storage/device-store'
 import { StorageService } from '../storage/storage-service'
 import { createStore } from '../storage/store'
 import { TabService } from '../tab/tab-service'
@@ -241,20 +242,20 @@ export class DesktopRuntime {
     })
 
     // 扫码枪：配置持久化 + 键盘观察接入所有窗口（before-input-event，全局生效）
-    const scannerStore = createStore<ScannerConfig>({ name: 'device-scanner', defaults: SCANNER_DEFAULTS })
+    const scannerStore = createDeviceStore('scanner', SCANNER_DEFAULTS)
     this.scannerSystem = createScannerSystem({
-      initialConfig: scannerStore.store,
-      persist: config => scannerStore.set(config),
+      initialConfig: scannerStore.load(),
+      persist: config => scannerStore.save(config),
       logger: this.logger.scope('device:scanner'),
     })
     app.on('browser-window-created', (_, win) => this.scannerSystem?.attachWindow(win))
 
-    // 图像采集：设备档案持久化，图片默认落 userData/capture
-    const captureStore = createStore<{ devices?: CaptureDeviceProfile[] }>({ name: 'device-capture-profiles' })
+    // 图像采集：设备配置持久化，图片默认落 userData/capture
+    const captureStore = createDeviceStore<{ devices?: CaptureDeviceConfig[] }>('capture-configs')
     this.captureSystem = createCaptureSystem({
       resourcesRoot,
-      initialProfiles: captureStore.get('devices'),
-      persist: devices => captureStore.set('devices', devices),
+      initialConfigs: captureStore.load().devices,
+      persist: configs => captureStore.save({ devices: configs }),
       defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(app.getPath('userData'), 'capture'),
       logger: this.logger.scope('device:capture'),
     })

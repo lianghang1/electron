@@ -1,4 +1,4 @@
-import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceProfile, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -6,16 +6,16 @@ import { DllAdapter } from './adapters/dll-adapter'
 import { ServiceAdapter } from './adapters/service-adapter'
 import { WiaAdapter } from './adapters/wia-adapter'
 import { WsAdapter } from './adapters/ws-adapter'
+import { BUILT_IN_CAPTURE_CONFIGS } from './configs'
 import { captureError, toCaptureError } from './errors'
-import { BUILT_IN_CAPTURE_PROFILES } from './profiles'
 
 export interface CaptureServiceOptions {
   /** 设备资源根（DLL 相对路径基准，宿主解析开发/打包差异） */
   resourcesRoot: string
-  /** 初始设备档案（持久化回注；不传 = 出厂档案） */
-  initialProfiles?: CaptureDeviceProfile[]
+  /** 初始设备配置（持久化回注；不传 = 出厂配置） */
+  initialConfigs?: CaptureDeviceConfig[]
   /** 运行时编辑持久化（未注入则编辑仅内存生效） */
-  persist?: (profiles: CaptureDeviceProfile[]) => void
+  persist?: (configs: CaptureDeviceConfig[]) => void
   /** 结构化日志注入（采集日志不含图片内容） */
   logger?: CaptureLogFn
   /** 采集图片默认保存目录（绝对路径） */
@@ -24,19 +24,19 @@ export interface CaptureServiceOptions {
 
 /**
  * CaptureService = 统一采集 API 的实现体（与 PrintService 同构的归一化层）。
- * 多品牌 × 多接入方式：品牌差异在设备档案（数据），接入方式差异在适配器（代码）。
- * 设备档案支持运行时编辑（upsertProfile → persist → 热重建适配器），
+ * 多品牌 × 多接入方式：品牌差异在设备配置（数据），接入方式差异在适配器（代码）。
+ * 设备配置支持运行时编辑（setConfig → persist → 热重建适配器），
  * 适配"服务地址/IP/端口变更"场景。UVC 路线在渲染进程（getUserMedia），不经本服务。
  */
 export class CaptureService {
-  private profiles: CaptureDeviceProfile[]
+  private configs: CaptureDeviceConfig[]
   private adapters: Map<string, CaptureAdapter>
   /** 同一设备串行化采集（硬件一次一格） */
   private locks = new Map<string, Promise<unknown>>()
   private readonly logger: CaptureLogFn
   /** 采集图片默认保存目录（绝对路径） */
   private readonly defaultSaveDir: string
-  private readonly persist?: (profiles: CaptureDeviceProfile[]) => void
+  private readonly persist?: (configs: CaptureDeviceConfig[]) => void
   private readonly resourcesRoot: string
 
   constructor(options: CaptureServiceOptions) {
@@ -44,7 +44,7 @@ export class CaptureService {
     this.defaultSaveDir = path.resolve(options.defaultSaveDir)
     this.persist = options.persist
     this.resourcesRoot = options.resourcesRoot
-    this.profiles = options.initialProfiles ?? BUILT_IN_CAPTURE_PROFILES
+    this.configs = options.initialConfigs ?? BUILT_IN_CAPTURE_CONFIGS
     this.adapters = this.buildAdapters()
   }
 
@@ -52,30 +52,30 @@ export class CaptureService {
     // 热重建前销毁旧适配器持有的资源（ws 预览会话等），防连接泄漏；构造首调时 adapters 尚未初始化
     for (const a of this.adapters?.values() ?? []) { a.destroy?.() }
     const adapters: [string, CaptureAdapter][] = [
-      ['service', new ServiceAdapter(this.profiles)],
+      ['service', new ServiceAdapter(this.configs)],
       ['wia', new WiaAdapter()],
-      ['dll', new DllAdapter(this.profiles, this.resourcesRoot)],
-      ['ws', new WsAdapter(this.profiles)],
+      ['dll', new DllAdapter(this.configs, this.resourcesRoot)],
+      ['ws', new WsAdapter(this.configs)],
     ]
     return new Map<string, CaptureAdapter>(adapters)
   }
 
-  /** 运行时编辑设备档案：upsert 一条 → 持久化 → 热重建适配器（地址/端口变更即时生效） */
-  upsertProfile(profile: CaptureDeviceProfile): void {
-    if (!profile?.id || !profile.transport) {
-      throw toCaptureError(captureError('VALIDATION_FAILED', '设备档案缺少 id 或 transport'))
+  /** 运行时编辑设备配置：按 id 整条 upsert → 持久化 → 热重建适配器（地址/端口变更即时生效） */
+  setConfig(config: CaptureDeviceConfig): void {
+    if (!config?.id || !config.transport) {
+      throw toCaptureError(captureError('VALIDATION_FAILED', '设备配置缺少 id 或 transport'))
     }
-    const list = this.profiles.slice()
-    const i = list.findIndex(p => p.id === profile.id)
-    if (i >= 0) { list[i] = profile }
-    else { list.push(profile) }
-    this.profiles = list
+    const list = this.configs.slice()
+    const i = list.findIndex(p => p.id === config.id)
+    if (i >= 0) { list[i] = config }
+    else { list.push(config) }
+    this.configs = list
     this.persist?.(list)
     this.adapters = this.buildAdapters()
   }
 
-  getProfiles(): CaptureDeviceProfile[] {
-    return this.profiles.slice()
+  getConfigs(): CaptureDeviceConfig[] {
+    return this.configs.slice()
   }
 
   /** 设备列表：各适配器上报后按 transport 合并 */
