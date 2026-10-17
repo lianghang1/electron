@@ -1,4 +1,4 @@
-import type { UpdateState } from '@desktop/shared'
+import type { AsarUpdateState, UpdateState } from '@desktop/shared'
 import type { AsarUpdateService } from '../updater/asar-update-service'
 import type { UpdateService } from '../updater/update-service'
 import type { CallerResolver } from './caller-context'
@@ -6,6 +6,7 @@ import { assertShell } from './caller-context'
 import { handle } from './handle'
 
 const IDLE_UPDATE_STATE: UpdateState = { status: 'idle' }
+const IDLE_ASAR_STATE: AsarUpdateState = { status: 'idle' }
 
 export interface UpdateIpcDeps {
   /** updates.url 未配置时为空：整包更新不启用 */
@@ -36,4 +37,5 @@ export function registerUpdateIpc(deps: UpdateIpcDeps): void {
     updateService?.install()
   })
   handle('update:getState', () => updateService?.getState() ?? IDLE_UPDATE_STATE)
+  handle('update:getAsarState', () => asarService?.getState() ?? IDLE_ASAR_STATE)
 }

@@ -74,6 +74,8 @@ const PROGRESS_THROTTLE_MS = 500
 export class AsarUpdateService {
   private pendingVersion: string | null = null
   private checking = false
+  /** 最近一次推送的热更状态（先拉后推的快照源） */
+  private lastState: AsarUpdateState = { status: 'idle' }
   /** 清单实际地址（native=清单文件 / adapter=判断接口），下载相对 URL 的解析基准 */
   private manifestUrl: string | null = null
 
@@ -101,7 +103,10 @@ export class AsarUpdateService {
   async check(): Promise<void> {
     if (!this.source || this.checking) { return }
     this.checking = true
-    const push = (state: AsarUpdateState) => this.events.emit('update:asarState', state)
+    const push = (state: AsarUpdateState) => {
+      this.lastState = state
+      this.events.emit('update:asarState', state)
+    }
     try {
       push({ status: 'checking' })
       const manifest = await this.fetchManifest()
@@ -152,6 +157,11 @@ export class AsarUpdateService {
   /** 是否有待生效的热更（install 统一入口判定用） */
   hasPending(): boolean {
     return this.pendingVersion !== null || existsSync(getPendingMarkPath())
+  }
+
+  /** 当前热更状态快照（最近一次推送值；未跑过检查 = idle） */
+  getState(): AsarUpdateState {
+    return this.lastState
   }
 
   /** 重启应用：引导器在下次启动早期完成替换 */

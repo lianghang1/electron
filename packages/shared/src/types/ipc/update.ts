@@ -11,6 +11,8 @@ export const updateDomain = defineDomain('update', {
   install: invoke<() => void>(),
   /** 当前整包更新状态快照（先拉后推：页面先取快照再订阅 stateUpdated） */
   getState: invoke<() => UpdateState>(),
+  /** 当前 asar 热更状态快照（先拉后推：页面先取快照再订阅 asarStateUpdated） */
+  getAsarState: invoke<() => AsarUpdateState>(),
 
   // ---- Main → Renderer 推送 ----
   /** 整包更新状态变化推送（全量快照） */
