@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DesktopTab } from '@desktop/shared'
 import type { ShellTheme } from '../composables/use-theme'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import WindowControls from './WindowControls.vue'
 
 defineProps<{
@@ -22,8 +22,6 @@ const emit = defineEmits<{
   /** Tab 右键：转发锚点坐标（内容区 DIP），菜单经原生浮层窗渲染（页面内容保持可见） */
   contextMenu: [tab: DesktopTab, x: number, y: number]
   toggleCenter: []
-  /** 设备菜单选中：打开对应设备配置弹窗（Shell 内嵌模态） */
-  openDeviceConfig: [kind: 'scanner' | 'capture']
   toggleTheme: []
   minimize: []
   toggleMaximize: []
@@ -31,29 +29,6 @@ const emit = defineEmits<{
 }>()
 
 const tabsEl = ref<HTMLElement | null>(null)
-const deviceEl = ref<HTMLElement | null>(null)
-const deviceMenuOpen = ref(false)
-
-/** 设备菜单选中项（菜单收起 + 通知 App 打开对应配置弹窗） */
-function pickDevice(kind: 'scanner' | 'capture'): void {
-  deviceMenuOpen.value = false
-  emit('openDeviceConfig', kind)
-}
-
-/** 点击菜单外收起设备菜单 */
-function onDocClick(e: MouseEvent): void {
-  if (deviceMenuOpen.value && !deviceEl.value?.contains(e.target as Node)) {
-    deviceMenuOpen.value = false
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('click', onDocClick)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('click', onDocClick)
-})
 
 /** Tab 条不显示滚动条：竖向滚轮转横向滚动（Chrome 行为） */
 function onTabsWheel(e: WheelEvent): void {
@@ -77,27 +52,6 @@ function onTabsWheel(e: WheelEvent): void {
     >
       应用中心
     </button>
-    <div v-if="!single" ref="deviceEl" class="dt-topbar__device">
-      <button
-        class="dt-topbar__center"
-        :class="{ 'dt-topbar__center--open': deviceMenuOpen }"
-        title="设备"
-        @click="deviceMenuOpen = !deviceMenuOpen"
-      >
-        设备
-      </button>
-      <Transition name="dv-menu">
-        <div v-if="deviceMenuOpen" class="dt-topbar__device-menu">
-          <button class="dt-topbar__device-item" @click="pickDevice('scanner')">
-            扫码枪配置
-          </button>
-          <button class="dt-topbar__device-item" @click="pickDevice('capture')">
-            拍摄设备配置
-          </button>
-        </div>
-      </Transition>
-    </div>
-
     <div ref="tabsEl" class="dt-topbar__tabs" @wheel="onTabsWheel">
       <button
         v-for="tab in tabs"
@@ -191,55 +145,6 @@ function onTabsWheel(e: WheelEvent): void {
   color: var(--dt-brand-on);
 }
 
-/* 设备菜单：按钮 + 下拉项（配置弹窗为 Shell 内嵌模态） */
-.dt-topbar__device {
-  position: relative;
-  flex: none;
-}
-
-.dt-topbar__device-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 40;
-  display: flex;
-  flex-direction: column;
-  min-width: 140px;
-  padding: 4px;
-  background: var(--dt-surface);
-  border: 1px solid var(--dt-line);
-  border-radius: 10px;
-  box-shadow: 0 10px 28px rgba(2, 8, 20, 0.16);
-}
-
-.dt-topbar__device-item {
-  border: none;
-  background: transparent;
-  border-radius: 7px;
-  padding: 7px 10px;
-  font-size: 12px;
-  font-family: inherit;
-  color: var(--dt-text-2);
-  text-align: left;
-  cursor: pointer;
-  transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
-}
-
-.dt-topbar__device-item:hover {
-  background: var(--dt-hover);
-  color: var(--dt-text);
-}
-
-.dv-menu-enter-active,
-.dv-menu-leave-active {
-  transition: opacity 0.14s ease, transform 0.14s ease;
-}
-
-.dv-menu-enter-from,
-.dv-menu-leave-to {
-  opacity: 0;
-  transform: translateY(-4px);
-}
 .dt-topbar__tabs {
   display: flex;
   align-items: center;

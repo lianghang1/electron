@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { CaptureDialogSession, DownloadTask, PermissionRequest, PlatformNotification, TabContextMenu, TabMenuAction } from '@desktop/shared'
-import { CaptureDialog } from '@desktop/ui'
+import type { CaptureDialogSession, DeviceConfigKind, DownloadTask, PermissionRequest, PlatformNotification, TabContextMenu, TabMenuAction } from '@desktop/shared'
+import { CaptureConfigDialog, CaptureDialog, ScannerConfigDialog } from '@desktop/ui'
 import {
   DialogContent,
   DialogDescription,
@@ -37,6 +37,7 @@ const downloads = ref<DownloadTask[]>([])
 const dialogs = ref<PermissionRequest[]>([])
 const menu = ref<TabContextMenu | null>(null)
 const captureSession = ref<CaptureDialogSession | null>(null)
+const configKind = ref<DeviceConfigKind | null>(null)
 
 const STATUS_TEXT: Record<DownloadTask['status'], string> = {
   progressing: '下载中',
@@ -173,11 +174,22 @@ function dismissCapture(): void {
   void window.desktop.overlay.dismissCapture()
 }
 
-/** 浮层窗键盘：ESC 关闭（菜单卡高亮导航 / 拍摄浮层关闭），菜单窗 show 时持有焦点 */
+/** 设备配置浮层关闭（弹窗关闭按钮 / ESC）：本地立即清卡，Main 清场后推 null 对账 */
+function dismissConfig(): void {
+  configKind.value = null
+  void window.desktop.overlay.dismissConfig()
+}
+
+/** 浮层窗键盘：ESC 关闭（菜单卡高亮导航 / 拍摄浮层关闭 / 配置浮层关闭），菜单窗 show 时持有焦点 */
 function onMenuKeydown(e: KeyboardEvent): void {
   if (captureSession.value && e.key === 'Escape') {
     e.preventDefault()
     dismissCapture()
+    return
+  }
+  if (configKind.value && e.key === 'Escape') {
+    e.preventDefault()
+    dismissConfig()
     return
   }
   if (!menu.value) { return }
@@ -247,9 +259,9 @@ function scrollPanelToBottom(): void {
 const unsubs: Array<() => void> = []
 
 /** 浮层窗用途（Main 经 URL hash 透传）：仅决定渲染分支与页面级监听，不裁剪数据订阅 */
-const overlayKind = ((): 'panel' | 'dialog' | 'menu' | 'capture' => {
+const overlayKind = ((): 'panel' | 'dialog' | 'menu' | 'capture' | 'config' => {
   const kind = new URLSearchParams(location.hash.split('?')[1] ?? '').get('kind')
-  if (kind === 'dialog' || kind === 'menu' || kind === 'capture') { return kind }
+  if (kind === 'dialog' || kind === 'menu' || kind === 'capture' || kind === 'config') { return kind }
   return 'panel'
 })()
 
@@ -271,9 +283,12 @@ onMounted(async () => {
     window.desktop.events.on('overlay:captureUpdated', (s) => {
       captureSession.value = s
     }),
+    window.desktop.events.on('overlay:configUpdated', (kind) => {
+      configKind.value = kind
+    }),
   )
   if (overlayKind === 'panel') { window.addEventListener('mousemove', onMouseMove) }
-  if (overlayKind === 'menu' || overlayKind === 'capture') { window.addEventListener('keydown', onMenuKeydown) }
+  if (overlayKind === 'menu' || overlayKind === 'capture' || overlayKind === 'config') { window.addEventListener('keydown', onMenuKeydown) }
   document.addEventListener('visibilitychange', syncOverlayVisible)
   // 主动拉取当前状态：Main 推送可能早于本页事件订阅（did-finish-load ≠ Vue mounted），按窗身份分发
   const state = await window.desktop.overlay.sync()
@@ -282,6 +297,7 @@ onMounted(async () => {
   dialogs.value = state.dialogs
   menu.value = state.menu
   captureSession.value = state.captureSession
+  configKind.value = state.configKind
 })
 
 onBeforeUnmount(() => {
@@ -407,6 +423,21 @@ function dialogBtnClass(primary: boolean): string {
       <div class="absolute inset-0 bg-[rgba(15,23,42,0.55)]" />
       <div class="ov-capture__card ov-anim-pop relative mt-[4vh] w-[820px] max-w-[94vw] self-start rounded-[16px] bg-white p-[20px] shadow-[0_24px_64px_rgba(2,8,20,0.32)]">
         <CaptureDialog :session="captureSession" @close="dismissCapture" />
+      </div>
+    </div>
+
+    <!-- 设备配置浮层：全屏遮罩模态（配置窗独立页面实例承载），业务页（设备测试页）经桥发起。
+         遮罩不做动画（同拍摄浮层），卡片 pop 入场 + flex 居中定位；
+         配置弹窗组件由 @desktop/ui 提供，配置保存走设备域 IPC（全量桥），kind 作 key 原地换卡 -->
+    <div
+      v-if="configKind && overlayVisible"
+      :key="configKind"
+      class="fixed inset-0 z-[10] flex justify-center"
+    >
+      <div class="absolute inset-0 bg-[rgba(15,23,42,0.55)]" />
+      <div class="ov-config__card ov-anim-pop relative mt-[4vh] w-[680px] max-w-[94vw] self-start rounded-[16px] bg-white p-[4px] shadow-[0_24px_64px_rgba(2,8,20,0.32)]">
+        <ScannerConfigDialog v-if="configKind === 'scanner'" @close="dismissConfig" />
+        <CaptureConfigDialog v-else-if="configKind === 'capture'" @close="dismissConfig" />
       </div>
     </div>
 

@@ -1,4 +1,4 @@
-import type { TabMenuAction } from '@desktop/shared'
+import type { DeviceConfigKind, TabMenuAction } from '@desktop/shared'
 import type { AppRegistry } from '../app/app-registry'
 import type { CacheService } from '../cache/cache-service'
 import type { CaptureDialogSessionService } from '../devices/capture/dialog-session'
@@ -12,6 +12,9 @@ import { handle } from './handle'
 
 /** 菜单动作白名单：契约类型只在编译层生效，渲染层运行时传值须经校验 */
 const MENU_ACTIONS: readonly TabMenuAction[] = ['reload', 'clearCache', 'clearSite', 'close']
+
+/** 设备配置浮层类别白名单：契约类型只在编译层生效，渲染层运行时传值须经校验 */
+const CONFIG_KINDS: readonly DeviceConfigKind[] = ['scanner', 'capture']
 
 export interface OverlayIpcDeps {
   overlayService: OverlayWindowService
@@ -84,6 +87,20 @@ export function registerOverlayIpc(deps: OverlayIpcDeps): void {
       throw new DesktopError('PERMISSION_DENIED', 'This channel is capture-overlay-only')
     }
     deps.captureDialog.cancelByOverlay()
+  })
+  // 业务页（设备测试页）发起：打开设备配置浮层窗（原生窗承载，盖过 Web 容器区域）
+  handle('overlay:openConfig', (e, kind) => {
+    if (typeof kind !== 'string' || !CONFIG_KINDS.includes(kind as DeviceConfigKind)) {
+      throw new DesktopError('IPC_ERROR', `invalid device config kind: ${String(kind)}`)
+    }
+    deps.overlayService.pushConfigDialog(kind as DeviceConfigKind)
+  })
+  // 仅供配置窗页面回传：关闭设备配置浮层（弹窗关闭按钮 / ESC）
+  handle('overlay:dismissConfig', (e) => {
+    if (!deps.overlayService.isConfigWindow(e.sender)) {
+      throw new DesktopError('PERMISSION_DENIED', 'This channel is config-overlay-only')
+    }
+    deps.overlayService.dismissConfigDialog()
   })
 }
 

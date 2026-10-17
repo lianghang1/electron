@@ -7,6 +7,9 @@ import { defineDomain, invoke, push } from '../../domain'
 /** 菜单项动作：菜单窗回传后由 Main 直接执行对应 service（Shell 无需中转） */
 export type TabMenuAction = 'reload' | 'clearCache' | 'clearSite' | 'close'
 
+/** 设备配置浮层类别：设备测试页（业务 tab）经桥发起，浮层窗承载对应配置弹窗 */
+export type DeviceConfigKind = 'scanner' | 'capture'
+
 /** Tab 右键菜单：Shell 发起，浮层窗在 (x, y)（主窗内容区坐标）附近渲染菜单卡 */
 export interface TabContextMenu {
   /** 菜单实例 id：防止重复打开 / 页面 key 对账 */
@@ -29,6 +32,8 @@ export interface OverlaySyncState {
   menu: TabContextMenu | null
   /** 挂起中的拍摄浮层会话（拍摄窗数据源，null = 无会话） */
   captureSession: CaptureDialogSession | null
+  /** 挂起中的设备配置浮层类别（配置窗数据源，null = 无浮层） */
+  configKind: DeviceConfigKind | null
 }
 
 /**
@@ -60,10 +65,16 @@ export const overlayDomain = defineDomain('overlay', {
   dismissMenu: invoke<() => void>(),
   /** 仅供拍摄窗页面回传：关闭拍摄浮层（用户点击浮层关闭 / ESC） */
   dismissCapture: invoke<() => void>(),
+  /** 业务页发起：打开设备配置浮层窗（扫码枪 / 拍摄设备，全屏遮罩模态盖过 Web 容器区域） */
+  openConfig: invoke<(kind: DeviceConfigKind) => void>(),
+  /** 仅供配置浮层窗页面回传：关闭配置浮层（用户点击弹窗关闭 / ESC） */
+  dismissConfig: invoke<() => void>(),
 
   // ---- Main → Renderer 推送 ----
   /** Tab 右键菜单变化推送（菜单窗数据源，null = 已关闭） */
   menuUpdated: push<[TabContextMenu | null]>(),
   /** 拍摄浮层会话变化推送（拍摄窗数据源，null = 已关闭） */
   captureUpdated: push<[CaptureDialogSession | null]>(),
+  /** 设备配置浮层变化推送（配置窗数据源，null = 已关闭） */
+  configUpdated: push<[DeviceConfigKind | null]>(),
 })

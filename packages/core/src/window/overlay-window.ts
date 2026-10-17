@@ -1,4 +1,4 @@
-import type { CaptureDialogSession, DownloadTask, OverlaySyncState, PermissionRequest, PlatformNotification, TabContextMenu } from '@desktop/shared'
+import type { CaptureDialogSession, DeviceConfigKind, DownloadTask, OverlaySyncState, PermissionRequest, PlatformNotification, TabContextMenu } from '@desktop/shared'
 import type { WebContents } from 'electron'
 import type { CallerResolver } from '../ipc/caller-context'
 import type { Logger } from '../logger/logger'
@@ -26,7 +26,7 @@ const DOWNLOAD_TTL_MS = TOAST_TTL_MS
 const OVERLAY_CLEAR_DELAY_MS = 100
 
 /** 浮层窗用途：决定页面初始 sync 分发与渲染分支（URL hash 透传给 OverlayApp） */
-export type OverlayWindowKind = 'panel' | 'dialog' | 'menu' | 'capture'
+export type OverlayWindowKind = 'panel' | 'dialog' | 'menu' | 'capture' | 'config'
 
 /**
  * 浮层窗口服务：独立透明无边框 BrowserWindow 承载全局浮层。
@@ -42,6 +42,8 @@ export type OverlayWindowKind = 'panel' | 'dialog' | 'menu' | 'capture'
  *   选中 / ESC / 点击菜单外关闭，页面内容全程可见
  * - capture 拍摄浮层：全屏遮罩模态（会话数据源由 CaptureDialogSessionService 管理），
  *   预览/拍摄在浮层窗内闭环，结果回传发起 tab
+ * - config 设备配置浮层：全屏遮罩模态，业务页（设备测试页）经桥发起，
+ *   OverlayApp 挂载 @desktop/ui 配置弹窗，配置保存走设备域 IPC，无需会话管理
  *
  * panel 内容高度动态：页面渲染后经 overlay:resize 量高回报，Main 据此调整窗口；
  * dialog / menu 尺寸由 Main 直接确定（全屏铺开），无需回报。
@@ -51,6 +53,7 @@ export class OverlayWindowService {
   private dialogWin: BrowserWindow | null = null
   private menuWin: BrowserWindow | null = null
   private captureWin: BrowserWindow | null = null
+  private configWin: BrowserWindow | null = null
 
   /** 右下角消息区数据源（Main 持有，窗口复用时全量重推） */
   private toasts: PlatformNotification[] = []
@@ -66,12 +69,16 @@ export class OverlayWindowService {
   private menu: TabContextMenu | null = null
   /** 挂起中的拍摄浮层会话（capture 窗数据源，会话状态由 CaptureDialogSessionService 管理） */
   private captureSession: CaptureDialogSession | null = null
+  /** 挂起中的设备配置浮层类别（config 窗数据源） */
+  private configKind: DeviceConfigKind | null = null
   /** 清场隐藏延迟器：空帧绘制落地后再 hide；期间来了新请求则取消（窗口保持可见） */
   private dialogHideTimer: NodeJS.Timeout | null = null
   /** 菜单窗清场隐藏延迟器（与 dialogHideTimer 同策略，窗口独立互不影响） */
   private menuHideTimer: NodeJS.Timeout | null = null
   /** 拍摄窗清场隐藏延迟器（与 dialogHideTimer 同策略，窗口独立互不影响） */
   private captureHideTimer: NodeJS.Timeout | null = null
+  /** 配置窗清场隐藏延迟器（与 dialogHideTimer 同策略，窗口独立互不影响） */
+  private configHideTimer: NodeJS.Timeout | null = null
   /** 菜单实例序号：生成菜单 id */
   private menuSeq = 0
 
@@ -272,6 +279,52 @@ export class OverlayWindowService {
     return this.captureWin
   }
 
+  // ---- 设备配置浮层（业务页经桥发起，无会话语义） ----
+
+  /** 设备配置浮层弹出：全屏遮罩模态，类别切换时原地换卡（同 pushCaptureSession 策略） */
+  pushConfigDialog(kind: DeviceConfigKind): void {
+    // 清场隐藏还没落地就有新请求：取消延迟隐藏，窗口保持可见，卡片原地换新
+    if (this.configHideTimer) {
+      clearTimeout(this.configHideTimer)
+      this.configHideTimer = null
+    }
+    this.configKind = kind
+    const win = this.ensureConfig()
+    this.applyFullscreenBounds(win)
+    // 数据先行：页面在窗口隐藏状态下渲染就绪，show 瞬间即有内容（与 pushDialog 同策略）
+    win.webContents.send('overlay:configUpdated', kind)
+    if (!win.isVisible()) { win.show() }
+    win.focus()
+  }
+
+  /** 关闭设备配置浮层（弹窗关闭回传）：清场后隐藏配置窗 */
+  dismissConfigDialog(): void {
+    if (!this.configKind) { return }
+    this.configKind = null
+    if (!this.configWin) { return }
+    // 清场先行：推空让页面在可见状态下移除卡片并绘制透明帧，再隐藏（防残留帧，同 dismissMenu）
+    this.configWin.webContents.send('overlay:configUpdated', null)
+    this.configHideTimer = setTimeout(() => {
+      this.configHideTimer = null
+      this.configWin?.hide()
+    }, OVERLAY_CLEAR_DELAY_MS)
+  }
+
+  /** 当前挂起配置浮层类别（浮层页 sync 拉取用） */
+  getConfigKind(): DeviceConfigKind | null {
+    return this.configKind
+  }
+
+  private ensureConfig(): BrowserWindow {
+    if (this.configWin) { return this.configWin }
+    const parent = this.getParent()
+    if (!parent) { throw new Error('[overlay] main window is not ready') }
+    const win = this.createOverlayWindow(parent, 'config')
+    // 配置浮层不因失焦消失（全屏遮罩模态）：状态由 Main 统一管理（用户关闭）
+    this.configWin = win
+    return win
+  }
+
   private ensureCapture(): BrowserWindow {
     if (this.captureWin) { return this.captureWin }
     const parent = this.getParent()
@@ -310,6 +363,7 @@ export class OverlayWindowService {
       dialogs: this.dialogWin?.webContents === sender ? this.dialogs : [],
       menu: this.menuWin?.webContents === sender ? this.menu : null,
       captureSession: this.captureWin?.webContents === sender ? this.captureSession : null,
+      configKind: this.configWin?.webContents === sender ? this.configKind : null,
     }
   }
 
@@ -325,6 +379,7 @@ export class OverlayWindowService {
       this.ensureDialog()
       this.ensureMenu()
       this.ensureCapture()
+      this.ensureConfig()
     }
     catch (error) {
       this.logger.warn('overlay prewarm failed', { error: String(error) })
@@ -337,11 +392,17 @@ export class OverlayWindowService {
       || this.dialogWin?.webContents === sender
       || this.menuWin?.webContents === sender
       || this.captureWin?.webContents === sender
+      || this.configWin?.webContents === sender
   }
 
   /** 拍摄窗校验：overlay:dismissCapture 仅接受拍摄窗自身（取消会话语义） */
   isCaptureWindow(sender: WebContents): boolean {
     return this.captureWin?.webContents === sender
+  }
+
+  /** 配置窗校验：overlay:dismissConfig 仅接受配置窗自身（关闭浮层语义） */
+  isConfigWindow(sender: WebContents): boolean {
+    return this.configWin?.webContents === sender
   }
 
   // ---- 内部：消息区 ----
@@ -461,6 +522,7 @@ export class OverlayWindowService {
       if (this.dialogWin === win) { this.dialogWin = null }
       if (this.menuWin === win) { this.menuWin = null }
       if (this.captureWin === win) { this.captureWin = null }
+      if (this.configWin === win) { this.configWin = null }
       this.resolver.unregister(wcId)
     })
     // 浮层页以 Shell 身份登记：与 Shell 同级信任（全量桥），回传通道经 isOverlay 关卡校验
