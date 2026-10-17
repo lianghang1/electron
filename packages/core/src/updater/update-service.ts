@@ -14,12 +14,19 @@ export class UpdateService {
   private readonly autoUpdater = electronUpdater.autoUpdater
   private installed = false
   private downloaded = false
+  /** 最近一次状态（getState 快照用，先拉后推约定） */
+  private lastState: UpdateState = { status: 'idle' }
 
   constructor(
     private readonly feedUrl: string | undefined,
     private readonly events: EventBus,
     private readonly logger: Logger,
   ) {}
+
+  /** 当前整包更新状态快照 */
+  getState(): UpdateState {
+    return this.lastState
+  }
 
   /** 启动自动更新（配置了 updates.url 且非 dev 时生效） */
   start(): void {
@@ -35,7 +42,10 @@ export class UpdateService {
     this.autoUpdater.setFeedURL({ provider: 'generic', url: this.feedUrl })
     this.autoUpdater.autoInstallOnAppQuit = true
 
-    const push = (state: UpdateState) => this.events.emit('update:state', state)
+    const push = (state: UpdateState) => {
+      this.lastState = state
+      this.events.emit('update:state', state)
+    }
     // 下载 promise 显式接管：autoDownload 的内置 promise 是 fire-and-forget，
     // 缺 app-update.yml（win-unpacked 直跑）等场景会 unhandled rejection
     this.autoUpdater.autoDownload = false

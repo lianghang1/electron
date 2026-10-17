@@ -1,4 +1,6 @@
 import type { ScannerSystem } from '../devices/scanner'
+import { DesktopError } from '@desktop/shared'
+import { is } from '@electron-toolkit/utils'
 import { handle } from './handle'
 
 export interface ScannerIpcDeps {
@@ -13,5 +15,11 @@ export interface ScannerIpcDeps {
 export function registerScannerIpc(deps: ScannerIpcDeps): void {
   handle('scanner:getConfig', () => deps.scanner.getConfig())
   handle('scanner:setConfig', (_e, patch) => deps.scanner.setConfig(patch))
-  handle('scanner:simulate', (_e, code) => deps.scanner.simulate(code))
+  // simulate 是诊断工具，不进生产 API 面
+  handle('scanner:simulate', (_e, code) => {
+    if (!is.dev) {
+      throw new DesktopError('PERMISSION_DENIED', 'scanner simulate is dev-only')
+    }
+    return deps.scanner.simulate(code)
+  })
 }

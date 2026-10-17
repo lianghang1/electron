@@ -1,5 +1,6 @@
 import type { DesktopApi } from '@desktop/shared'
 import type { IpcRendererEvent } from 'electron'
+import process from 'node:process'
 import { decodeIpcError, IpcRemoteError, platformDomains } from '@desktop/shared'
 import { contextBridge, ipcRenderer } from 'electron'
 
@@ -12,20 +13,38 @@ export interface DesktopBridgeOptions {
   appChannels?: readonly string[]
 }
 
+/** 域挂载启动参数前缀：Main 创建窗口时经 additionalArguments 传入 */
+const DOMAINS_ARG_PREFIX = '--desktop-domains='
+
+/**
+ * 从 renderer argv 解析域挂载清单：'*' 全量，数组为白名单。
+ * fail-closed：未传参数 = 空清单（挂空桥），漏配窗口的能力静默不可用而非全量放行。
+ */
+function resolveMountedDomains(): '*' | Set<string> {
+  const arg = process.argv.find(item => item.startsWith(DOMAINS_ARG_PREFIX))
+  if (!arg) { return new Set() }
+  const value = arg.slice(DOMAINS_ARG_PREFIX.length)
+  if (value === '*') { return '*' }
+  return new Set(value.split(',').filter(Boolean))
+}
+
 /**
  * 暴露 window.desktop 平台桥：只暴露 DesktopApi 声明的方法，不暴露裸 ipcRenderer。
  * 平台方法由域运行时表（platformDomains）通用生成——invoke 通道 → Promise 方法，
- * 新增平台通道零改动；推送事件经 desktop.events.on 订阅（与 DesktopApi 类型一致，
- * 不进方法分组）。
+ * 新增平台通道零改动；按 --desktop-domains 挂载清单裁剪（Shell 传 '*' 全量），
+ * 未挂载的域不出现在桥上，$invoke 白名单同样拒绝；推送事件经 desktop.events.on
+ * 订阅（推送目标由 Main 决定，订阅不做裁剪）。
  * 身份不经过参数：Main 侧按 event.sender 反查 CallerContext。
  * 无业务通道的 App 直接 exposeDesktop()；有业务通道的 App 声明白名单。
  */
 export function exposeDesktop(options: DesktopBridgeOptions = {}): void {
   // $invoke 白名单：平台 invoke 通道 + App 业务通道（推送事件不走 $invoke，不进白名单）
   const allowedChannels = new Set<string>(options.appChannels ?? [])
+  const mountedDomains = resolveMountedDomains()
   const desktop: Record<string, unknown> = {}
 
   for (const domain of platformDomains) {
+    if (mountedDomains !== '*' && !mountedDomains.has(domain.domain)) { continue }
     const group: Record<string, unknown> = {}
     for (const [method, channel] of Object.entries(domain.channels)) {
       if (domain.eventChannels.has(channel)) {

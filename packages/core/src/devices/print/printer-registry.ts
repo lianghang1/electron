@@ -73,9 +73,4 @@ export class PrinterRegistry {
     }
     return fallback
   }
-
-  async capabilities(printerId: string): Promise<PrinterCaps> {
-    const printer = await this.resolve(printerId)
-    return printer.capabilities
-  }
 }

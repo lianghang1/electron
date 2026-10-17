@@ -1,4 +1,4 @@
-import type { JobStatus, PrinterCaps, PrintRequest, PrintResult, UnifiedPrinter } from '../../devices/print'
+import type { JobStatus, PrintRequest, PrintResult, UnifiedPrinter } from '../../devices/print'
 import { invoke } from '../../../domain'
 
 /**
@@ -9,12 +9,10 @@ import { invoke } from '../../../domain'
 export const printDomainDefs = {
   /** 提交打印任务（统一信封：业务类型 + 负载 + 选项） */
   submit: invoke<(request: PrintRequest) => Promise<PrintResult>>(),
-  /** 统一打印机列表（系统队列） */
+  /** 统一打印机列表（系统队列，含 capabilities 硬件能力位） */
   listPrinters: invoke<() => Promise<UnifiedPrinter[]>>(),
-  /** 打印机能力探测（决定硬件控制参数是否可用） */
-  capabilities: invoke<(printerId: string) => Promise<PrinterCaps>>(),
-  /** 查询任务状态 */
-  status: invoke<(jobId: string) => Promise<JobStatus | { jobId: string, state: 'unknown' }>>(),
+  /** 查询任务状态；任务不存在返回 null */
+  status: invoke<(jobId: string) => Promise<JobStatus | null>>(),
   /** 最近任务列表（创建时间倒序），任务中心数据源 */
   listJobs: invoke<(limit?: number) => Promise<JobStatus[]>>(),
   /** 删除单条任务记录（连带删除其归档 PDF） */

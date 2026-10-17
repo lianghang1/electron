@@ -7,8 +7,10 @@ import { defineDomain, invoke, push } from '../../domain'
 export const updateDomain = defineDomain('update', {
   /** 触发检查更新（dev 下为空操作） */
   check: invoke<() => void>(),
-  /** 重启应用以生效更新：有 asar 热更 pending → 重启替换；有整包已下载 → 安装器重启 */
+  /** 重启应用以生效更新：有 asar 热更 pending → 重启替换；有整包已下载 → 安装器重启（Shell 专属） */
   install: invoke<() => void>(),
+  /** 当前整包更新状态快照（先拉后推：页面先取快照再订阅 state） */
+  getState: invoke<() => UpdateState>(),
 
   // ---- Main → Renderer 推送 ----
   /** 更新流程状态变化 */

@@ -21,11 +21,14 @@ import type { CallerResolver } from './caller-context'
 import { registerAppIpc } from './app'
 import { registerCacheIpc } from './cache'
 import { registerCaptureIpc } from './capture'
+import { registerCaptureDialogIpc } from './capture-dialog'
 import { registerDeviceIpc } from './device'
 import { registerDownloadIpc } from './download'
+import { registerMenuIpc } from './menu'
 import { registerNotificationIpc } from './notification'
 import { registerOverlayIpc } from './overlay'
 import { registerPermissionIpc } from './permission'
+import { registerPermissionDialogIpc } from './permission-dialog'
 import { registerPrintIpc } from './print'
 import { registerScannerIpc } from './scanner'
 import { registerSignatureIpc } from './signature'
@@ -88,15 +91,16 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   registerPermissionIpc({ permissionService: deps.permissionService, resolver: deps.resolver })
   registerStorageIpc({ storageService: deps.storageService, permissionService: deps.permissionService, resolver: deps.resolver })
   registerCacheIpc({ cacheService: deps.cacheService, registry: deps.registry, tabService: deps.tabService, resolver: deps.resolver })
-  registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService })
-  registerOverlayIpc({
+  registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService, resolver: deps.resolver })
+  registerOverlayIpc({ overlayService: deps.overlayService })
+  registerMenuIpc({
     overlayService: deps.overlayService,
-    captureDialog: deps.captureDialog,
     registry: deps.registry,
     tabService: deps.tabService,
     cacheService: deps.cacheService,
     resolver: deps.resolver,
   })
+  registerPermissionDialogIpc({ overlayService: deps.overlayService, permissionService: deps.permissionService })
   registerDownloadIpc({ downloadService: deps.downloadService, overlayService: deps.overlayService, resolver: deps.resolver })
   registerDeviceIpc({ idCard: deps.idCard })
   registerSignatureIpc({ signature: deps.signature })
@@ -108,6 +112,7 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
     registry: deps.registry,
     resolver: deps.resolver,
   })
+  registerCaptureDialogIpc({ captureDialog: deps.captureDialog, capture: deps.capture, overlayService: deps.overlayService })
   registerPrintIpc({ print: deps.print })
   registerNotificationIpc({
     registry: deps.registry,

@@ -1,4 +1,4 @@
-import type { JobStatus, PrinterCaps, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
+import type { JobStatus, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
 import type { BrowserWindow } from 'electron'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
@@ -13,8 +13,7 @@ export * from './paper'
 export interface PrintSystem {
   submit: (request: PrintRequest) => Promise<PrintResult>
   listPrinters: () => Promise<UnifiedPrinter[]>
-  capabilities: (printerId: string) => Promise<PrinterCaps>
-  status: (jobId: string) => Promise<JobStatus | { jobId: string, state: 'unknown' }>
+  status: (jobId: string) => Promise<JobStatus | null>
   /** 最近任务列表（创建时间倒序），任务中心数据源 */
   listJobs: (limit?: number) => Promise<JobStatus[]>
   /** 删除单条任务记录（连带删除其归档 PDF） */
@@ -61,7 +60,6 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
   const system: PrintSystem = {
     submit: request => service.submit(request),
     listPrinters: () => registry.list(),
-    capabilities: printerId => registry.capabilities(printerId),
     status: jobId => service.status(jobId),
     listJobs: async limit => service.listJobs(limit),
     removeJob: jobId => service.removeJob(jobId),

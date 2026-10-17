@@ -5,7 +5,7 @@ import type { EventBus } from '../event/event-bus'
 import type { Logger } from '../logger/logger'
 import type { WebService } from '../web/web-service'
 import { randomUUID } from 'node:crypto'
-import { DesktopError } from '@desktop/shared'
+import { CAPABILITY_BUSINESS, DesktopError } from '@desktop/shared'
 
 /**
  * Tab 编排：open 一个 App = 确保 Instance → 建 Tab → 建 Web 运行时 → 激活。
@@ -55,7 +55,7 @@ export class TabService {
     this.events.emit('tab:created', tab)
 
     this.webService.create(
-      { appId: tab.appId, instanceId: instance.instanceId, tabId: tab.id },
+      { appId: tab.appId, instanceId: instance.instanceId, tabId: tab.id, domains: CAPABILITY_BUSINESS },
       manifest,
       isLoading => this.setLoading(tab.id, isLoading),
     )

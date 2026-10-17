@@ -23,9 +23,9 @@ import { permissionLabel } from '../composables/use-permission-labels'
  * 原生层级压过 WebContentsView。承载必须盖住 Web 容器区域的浮层。
  * 同一份页面服务四类浮层窗（每窗同时只收一种消息，互斥渲染）：
  * - 消息窗：download:updated 下载通知卡 + notification:received 通知 toast（右上角）
- * - 弹窗窗：permission:pending 运行时授权决策卡（全屏遮罩模态，居中）
- * - 菜单窗：overlay:menuPending Tab 右键菜单（全屏透明模态，锚点定位——页面内容保持可见）
- * - 拍摄窗：overlay:capturePending 拍摄浮层（全屏遮罩模态，CaptureDialog 由 @desktop/ui 提供）
+ * - 弹窗窗：permissionDialog:pending 运行时授权决策卡（全屏遮罩模态，居中）
+ * - 菜单窗：menu:menuUpdated Tab 右键菜单（全屏透明模态，锚点定位——页面内容保持可见）
+ * - 拍摄窗：captureDialog:captureUpdated 拍摄浮层（全屏遮罩模态，CaptureDialog 由 @desktop/ui 提供）
  *
  * 交互语义交给 reka-ui 原语（Toast 滑动关闭/悬停暂停/无障碍、Dialog 焦点圈养/ESC），
  * 外观用 UnoCSS 工具类自绘；卡片样式固定高对比配色（不随 Shell 主题），保证任意背景下清晰可读。
@@ -116,8 +116,8 @@ async function revealTask(taskId: string): Promise<void> {
 }
 
 async function respond(requestId: string, granted: boolean): Promise<void> {
-  await window.desktop.permission.respond(requestId, granted)
-  // 列表更新由 Main 统一推送（permission:pending），页面无需本地移除
+  await window.desktop.permissionDialog.respond(requestId, granted)
+  // 列表更新由 Main 统一推送（permissionDialog:pending），页面无需本地移除
 }
 
 /** 用户滑动/单条关闭 toast：回传 Main 移除（列表更新由 Main 推送） */
@@ -153,22 +153,22 @@ watch(menu, () => {
   highlightIndex.value = 0
 })
 
-/** 选中：本地立即清卡（清场先行），Main 执行动作后推 overlay:menuPending null 对账 */
+/** 选中：本地立即清卡（清场先行），Main 执行动作后推 menu:menuUpdated null 对账 */
 function selectMenu(action: TabMenuAction): void {
   menu.value = null
-  void window.desktop.overlay.menuSelect(action)
+  void window.desktop.menu.select(action)
 }
 
 /** ESC / 点击菜单外：回传 Main 关窗，本地立即清卡 */
 function dismissMenu(): void {
   menu.value = null
-  void window.desktop.overlay.menuDismiss()
+  void window.desktop.menu.dismiss()
 }
 
-/** 拍摄浮层关闭（× / ESC）：本地立即清卡，Main 收尾后推 capturePending null 对账 */
+/** 拍摄浮层关闭（× / ESC）：本地立即清卡，Main 收尾后推 captureUpdated null 对账 */
 function dismissCapture(): void {
   captureSession.value = null
-  void window.desktop.overlay.captureDismiss()
+  void window.desktop.captureDialog.dismiss()
 }
 
 /** 浮层窗键盘：ESC 关闭（菜单卡高亮导航 / 拍摄浮层关闭），菜单窗 show 时持有焦点 */
@@ -244,34 +244,58 @@ function scrollPanelToBottom(): void {
 
 const unsubs: Array<() => void> = []
 
+/** 浮层窗用途（Main 经 URL hash 透传）：决定初始 sync 分流与事件订阅范围 */
+const overlayKind = ((): 'panel' | 'dialog' | 'menu' | 'capture' => {
+  const kind = new URLSearchParams(location.hash.split('?')[1] ?? '').get('kind')
+  if (kind === 'dialog' || kind === 'menu' || kind === 'capture') { return kind }
+  return 'panel'
+})()
+
 onMounted(async () => {
-  unsubs.push(
-    window.desktop.events.on('notification:received', (list) => {
-      toasts.value = list
-    }),
-    window.desktop.events.on('download:updated', (list) => {
-      downloads.value = list
-    }),
-    window.desktop.events.on('permission:pending', (list) => {
+  // 订阅与监听按窗用途挂载：各窗只收自己域的推送，跨窗监听会调用未挂载域的通道
+  if (overlayKind === 'dialog') {
+    unsubs.push(window.desktop.events.on('permissionDialog:pending', (list) => {
       dialogs.value = list
-    }),
-    window.desktop.events.on('overlay:menuPending', (m) => {
+    }))
+  }
+  else if (overlayKind === 'menu') {
+    unsubs.push(window.desktop.events.on('menu:menuUpdated', (m) => {
       menu.value = m
-    }),
-    window.desktop.events.on('overlay:capturePending', (s) => {
+    }))
+  }
+  else if (overlayKind === 'capture') {
+    unsubs.push(window.desktop.events.on('captureDialog:captureUpdated', (s) => {
       captureSession.value = s
-    }),
-  )
-  window.addEventListener('mousemove', onMouseMove)
-  window.addEventListener('keydown', onMenuKeydown)
+    }))
+  }
+  else {
+    unsubs.push(
+      window.desktop.events.on('notification:received', (list) => {
+        toasts.value = list
+      }),
+      window.desktop.events.on('download:updated', (list) => {
+        downloads.value = list
+      }),
+    )
+  }
+  if (overlayKind === 'panel') { window.addEventListener('mousemove', onMouseMove) }
+  if (overlayKind === 'menu' || overlayKind === 'capture') { window.addEventListener('keydown', onMenuKeydown) }
   document.addEventListener('visibilitychange', syncOverlayVisible)
-  // 主动拉取当前状态：Main 推送可能早于本页事件订阅（did-finish-load ≠ Vue mounted）
-  const state = await window.desktop.overlay.sync()
-  toasts.value = state.toasts
-  downloads.value = state.downloads
-  dialogs.value = state.dialogs
-  menu.value = state.menu
-  captureSession.value = state.captureSession
+  // 主动拉取当前状态：Main 推送可能早于本页事件订阅（did-finish-load ≠ Vue mounted），按窗用途分域拉取
+  if (overlayKind === 'dialog') {
+    dialogs.value = await window.desktop.permissionDialog.sync()
+  }
+  else if (overlayKind === 'menu') {
+    menu.value = await window.desktop.menu.sync()
+  }
+  else if (overlayKind === 'capture') {
+    captureSession.value = await window.desktop.captureDialog.sync()
+  }
+  else {
+    const state = await window.desktop.overlay.sync()
+    toasts.value = state.toasts
+    downloads.value = state.downloads
+  }
 })
 
 onBeforeUnmount(() => {

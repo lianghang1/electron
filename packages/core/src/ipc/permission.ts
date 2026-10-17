@@ -9,18 +9,14 @@ export interface PermissionIpcDeps {
 }
 
 /**
- * 权限域通道注册：仅用于 UI 展示，实际授权以 Main 的 assert 为准。
+ * permission 域通道注册：权限状态查询，仅用于 UI 展示，实际授权以 Main 的 assert 为准。
+ * 运行时授权弹窗的决策回传与挂起推送见 permissionDialog 域（弹窗窗专属）。
  */
 export function registerPermissionIpc(deps: PermissionIpcDeps): void {
   handle('permission:check', (e, permission) =>
     deps.permissionService.check(deps.resolver.resolve(e.sender), permission))
   handle('permission:list', (_e, appId) => deps.permissionService.listPermissionStates(appId))
-  // 决策回传是 Shell 的职责：只有 Shell 用户能对运行时授权表态
-  handle('permission:respond', (e, requestId, granted) => {
-    assertShell(deps.resolver.resolve(e.sender))
-    deps.permissionService.respond(requestId, granted)
-  })
-  // 撤销决策同样是 Shell 用户的管理动作（应用中心「重置授权」）
+  // 撤销决策是 Shell 用户的管理动作（应用中心「重置授权」）
   handle('permission:reset', (e, appId) => {
     assertShell(deps.resolver.resolve(e.sender))
     deps.permissionService.resetRuntime(appId)

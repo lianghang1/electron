@@ -4,6 +4,7 @@ import type { Logger } from '../logger/logger'
 import type { BootstrapOptions } from '../types'
 import { join } from 'node:path'
 import process from 'node:process'
+import { desktopDomainsArg } from '@desktop/shared'
 import { is } from '@electron-toolkit/utils'
 import { BrowserWindow } from 'electron'
 import { SHELL_APP_ID } from '../constants'
@@ -49,6 +50,8 @@ export class WindowService {
         allowRunningInsecureContent: false,
         experimentalFeatures: false,
         ...options.webPreferences,
+        // Shell 挂全量域（'*'）：置于逃生口之后不可覆盖，preload 据此决定桥上暴露哪些平台域
+        additionalArguments: [desktopDomainsArg('*')],
       },
     })
 
@@ -58,8 +61,8 @@ export class WindowService {
     const appOrigin = is.dev && devUrl ? new URL(devUrl).origin : null
     applyWebContentsGuards(win, appOrigin, options.permissions)
 
-    // Shell 是平台自身：登记调用者身份，IPC 侧按 SHELL_APP_ID 全量放行
-    this.resolver.register(win.webContents, { appId: SHELL_APP_ID, instanceId: 'shell' })
+    // Shell 是平台自身：登记调用者身份与全量域挂载，IPC 侧按 SHELL_APP_ID 全量放行
+    this.resolver.register(win.webContents, { appId: SHELL_APP_ID, instanceId: 'shell', domains: '*' })
     win.on('closed', () => {
       this.mainWindow = null
     })

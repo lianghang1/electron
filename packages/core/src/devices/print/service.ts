@@ -1,4 +1,4 @@
-import type { JobStatus, PaperSpec, PrinterCaps, PrintLogFn, PrintOptions, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
+import type { JobStatus, PaperSpec, PrintLogFn, PrintOptions, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
 import type { PreparedContent, PreparedJob } from './channels/channel-types'
 import type { PrintChannel } from './channels/print-channel'
 import type { HiddenWindowPool } from './hidden-window'
@@ -107,8 +107,9 @@ export class PrintService {
     this.logger(level, `[print] ${message}`, meta)
   }
 
-  async status(jobId: string): Promise<JobStatus | { jobId: string, state: 'unknown' }> {
-    return this.jobs.status(jobId) ?? { jobId, state: 'unknown' }
+  /** 查询任务状态；任务不存在返回 null */
+  async status(jobId: string): Promise<JobStatus | null> {
+    return this.jobs.status(jobId) ?? null
   }
 
   /** 最近任务列表（任务中心数据源），创建时间倒序 */
@@ -141,11 +142,6 @@ export class PrintService {
   /** 统一打印机列表（系统 + 网络直连合并） */
   listPrinters(): Promise<UnifiedPrinter[]> {
     return this.registry.list()
-  }
-
-  /** 打印机能力探测（决定硬件控制参数是否可用） */
-  capabilities(printerId: string): Promise<PrinterCaps> {
-    return this.registry.capabilities(printerId)
   }
 
   /** 重打：优先用 PDF 存档（版式完全一致，保持原通道）；文件负载任务原样重提交 */

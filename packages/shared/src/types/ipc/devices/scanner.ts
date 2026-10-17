@@ -10,7 +10,7 @@ export const scannerDomainDefs = {
   getConfig: invoke<() => ScannerConfig>(),
   /** 运行时修改配置（patch 合并，返回合并后的全量配置） */
   setConfig: invoke<(patch: Partial<ScannerConfig>) => ScannerConfig>(),
-  /** 模拟一条扫码（诊断/演示：走与真枪完全相同的缓冲 → 广播链路） */
+  /** 模拟一条扫码（诊断/演示：走与真枪完全相同的缓冲 → 广播链路；仅 dev 环境可用，生产返回 PERMISSION_DENIED） */
   simulate: invoke<(code: string) => ScanResult>(),
   /** 扫码推送：任何窗口检测到条码都广播（缓冲命中后触发） */
   onScan: push<[result: ScanResult]>(),

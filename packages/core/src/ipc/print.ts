@@ -12,7 +12,6 @@ export interface PrintIpcDeps {
 export function registerPrintIpc(deps: PrintIpcDeps): void {
   handle('print:submit', (_e, request) => deps.print.submit(request))
   handle('print:listPrinters', () => deps.print.listPrinters())
-  handle('print:capabilities', (_e, printerId) => deps.print.capabilities(printerId))
   handle('print:status', (_e, jobId) => deps.print.status(jobId))
   handle('print:listJobs', (_e, limit) => deps.print.listJobs(limit))
   handle('print:removeJob', (_e, jobId) => deps.print.removeJob(jobId))

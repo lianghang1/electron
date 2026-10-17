@@ -1,11 +1,13 @@
-import type { CaptureDialogSession, DownloadTask, OverlaySyncState, PermissionRequest, PlatformNotification, TabContextMenu } from '@desktop/shared'
+import type { CaptureDialogSession, DesktopDomainName, DesktopDomains, DownloadTask, OverlayPanelState, PermissionRequest, PlatformNotification, TabContextMenu } from '@desktop/shared'
 import type { WebContents } from 'electron'
 import type { CallerResolver } from '../ipc/caller-context'
 import type { Logger } from '../logger/logger'
 import { join } from 'node:path'
 import process from 'node:process'
+import { desktopDomainsArg } from '@desktop/shared'
 import { is } from '@electron-toolkit/utils'
 import { BrowserWindow } from 'electron'
+
 import { SHELL_APP_ID } from '../constants'
 import { applySessionPermissionGuards } from './security'
 
@@ -23,6 +25,15 @@ const TOAST_TTL_MS = 8000
 const DOWNLOAD_TTL_MS = TOAST_TTL_MS
 /** 弹窗清场到隐藏的间隔（ms）：等浮层页绘制完透明空帧再 hide，2-3 帧足够，留余量 */
 const OVERLAY_CLEAR_DELAY_MS = 100
+
+/** 四类浮层窗的域挂载清单（preload 裁剪与 assertDomain 兜底同源） */
+const PANEL_DOMAINS = ['overlay', 'download', 'notification'] as const satisfies readonly DesktopDomainName[]
+const DIALOG_DOMAINS = ['permissionDialog'] as const satisfies readonly DesktopDomainName[]
+const MENU_DOMAINS = ['menu'] as const satisfies readonly DesktopDomainName[]
+const CAPTURE_DOMAINS = ['captureDialog'] as const satisfies readonly DesktopDomainName[]
+
+/** 浮层窗用途：决定域挂载、页面初始 sync 分发与渲染分支（URL hash 透传给 OverlayApp） */
+export type OverlayWindowKind = 'panel' | 'dialog' | 'menu' | 'capture'
 
 /**
  * 浮层窗口服务：独立透明无边框 BrowserWindow 承载全局浮层。
@@ -145,7 +156,7 @@ export class OverlayWindowService {
     this.applyDialogBounds()
     // 数据先行：页面在窗口隐藏状态下渲染就绪，show 瞬间即有内容——
     // 否则先显一帧空白窗再上遮罩，视觉「闪一下像显示了两次」
-    win.webContents.send('permission:pending', this.dialogs)
+    win.webContents.send('permissionDialog:pending', this.dialogs)
     if (!win.isVisible()) { win.show() }
     win.focus()
     this.logger.info('permission dialog shown', {
@@ -167,7 +178,7 @@ export class OverlayWindowService {
       // 直接 hide 的话窗口缓冲区最后一帧是旧卡片（隐藏文档不再渲染，清卡片的绘制不会发生），
       // 下次 show 瞬间会先合成残留帧——卡片「瞬间出现」后又闪回复播入场动画，
       // 即「第一次正常、之后只是显示隐藏」的观感。与 refreshPanel 隐藏前清空页面状态同一策略。
-      this.dialogWin.webContents.send('permission:pending', [])
+      this.dialogWin.webContents.send('permissionDialog:pending', [])
       this.dialogHideTimer = setTimeout(() => {
         this.dialogHideTimer = null
         this.dialogWin?.hide()
@@ -175,7 +186,7 @@ export class OverlayWindowService {
       return
     }
     this.applyDialogBounds()
-    this.dialogWin.webContents.send('permission:pending', this.dialogs)
+    this.dialogWin.webContents.send('permissionDialog:pending', this.dialogs)
   }
 
   /** 弹窗窗全屏遮罩：窗口铺满主窗口内容区，遮罩与居中卡片由页面绘制（模态语义，遮罩区拦截点击） */
@@ -204,7 +215,7 @@ export class OverlayWindowService {
     const win = this.ensureMenu()
     this.applyFullscreenBounds(win)
     // 数据先行：页面在窗口隐藏状态下渲染就绪，show 瞬间即有菜单（与 pushDialog 同策略）
-    win.webContents.send('overlay:menuPending', this.menu)
+    win.webContents.send('menu:menuUpdated', this.menu)
     if (!win.isVisible()) { win.show() }
     win.focus()
   }
@@ -215,7 +226,7 @@ export class OverlayWindowService {
     this.menu = null
     if (!this.menuWin) { return }
     // 清场先行：推空让页面在可见状态下移除菜单卡并绘制透明帧，再隐藏（防残留帧，同 resolveDialog）
-    this.menuWin.webContents.send('overlay:menuPending', null)
+    this.menuWin.webContents.send('menu:menuUpdated', null)
     this.menuHideTimer = setTimeout(() => {
       this.menuHideTimer = null
       this.menuWin?.hide()
@@ -240,7 +251,7 @@ export class OverlayWindowService {
     const win = this.ensureCapture()
     this.applyFullscreenBounds(win)
     // 数据先行：页面在窗口隐藏状态下渲染就绪，show 瞬间即有内容（与 pushDialog 同策略）
-    win.webContents.send('overlay:capturePending', session)
+    win.webContents.send('captureDialog:captureUpdated', session)
     if (!win.isVisible()) { win.show() }
     win.focus()
   }
@@ -251,7 +262,7 @@ export class OverlayWindowService {
     this.captureSession = null
     if (!this.captureWin) { return }
     // 清场先行：推空让页面在可见状态下移除卡片并绘制透明帧，再隐藏（防残留帧，同 dismissMenu）
-    this.captureWin.webContents.send('overlay:capturePending', null)
+    this.captureWin.webContents.send('captureDialog:captureUpdated', null)
     this.captureHideTimer = setTimeout(() => {
       this.captureHideTimer = null
       this.captureWin?.hide()
@@ -272,7 +283,7 @@ export class OverlayWindowService {
     if (this.captureWin) { return this.captureWin }
     const parent = this.getParent()
     if (!parent) { throw new Error('[overlay] main window is not ready') }
-    const win = this.createOverlayWindow(parent)
+    const win = this.createOverlayWindow(parent, CAPTURE_DOMAINS, 'capture')
     // 拍摄浮层不因失焦消失（全屏遮罩模态）：会话由 Main 统一管理（用户关闭 / tab 关闭）
     this.captureWin = win
     return win
@@ -295,25 +306,39 @@ export class OverlayWindowService {
   }
 
   /**
-   * 浮层页 mounted 后主动拉取当前状态（杜绝 Main 推送早于页面订阅的竞态）。
-   * 按窗口身份分发：每类浮层窗只拉取自己承载的数据——否则 panel 窗会把挂起的
-   * 权限请求也拉过来（在 320px 小窗里渲染全屏遮罩卡且无人清理，盖住 toast），
-   * dialog 窗也会拉到 toast，跨窗状态污染。
+   * 各浮层窗 mounted 后主动拉取自身状态（杜绝 Main 推送早于页面订阅的竞态）。
+   * 按域拆分：每类浮层窗只拉取自己承载的数据（原 syncFor 混装态已按域拆散），
+   * 跨窗调用返回空值——域挂载已隔离，此处是身份兜底。
    */
-  syncFor(sender: WebContents): OverlaySyncState {
-    if (this.panelWin?.webContents === sender) {
-      return { toasts: this.toasts, downloads: this.downloads, dialogs: [], menu: null, captureSession: null }
+  syncPanel(sender: WebContents): OverlayPanelState {
+    if (this.panelWin?.webContents !== sender) {
+      return { toasts: [], downloads: [] }
     }
-    if (this.dialogWin?.webContents === sender) {
-      return { toasts: [], downloads: [], dialogs: this.dialogs, menu: null, captureSession: null }
+    return { toasts: this.toasts, downloads: this.downloads }
+  }
+
+  /** 弹窗窗拉取挂起授权请求（permissionDialog:sync） */
+  syncDialogs(sender: WebContents): PermissionRequest[] {
+    if (this.dialogWin?.webContents !== sender) {
+      return []
     }
-    if (this.menuWin?.webContents === sender) {
-      return { toasts: [], downloads: [], dialogs: [], menu: this.menu, captureSession: null }
+    return this.dialogs
+  }
+
+  /** 菜单窗拉取挂起菜单（menu:sync） */
+  syncMenu(sender: WebContents): TabContextMenu | null {
+    if (this.menuWin?.webContents !== sender) {
+      return null
     }
-    if (this.captureWin?.webContents === sender) {
-      return { toasts: [], downloads: [], dialogs: [], menu: null, captureSession: this.captureSession }
+    return this.menu
+  }
+
+  /** 拍摄窗拉取挂起会话（captureDialog:sync） */
+  syncCapture(sender: WebContents): CaptureDialogSession | null {
+    if (this.captureWin?.webContents !== sender) {
+      return null
     }
-    return { toasts: [], downloads: [], dialogs: [], menu: null, captureSession: null }
+    return this.captureSession
   }
 
   /**
@@ -340,6 +365,11 @@ export class OverlayWindowService {
       || this.dialogWin?.webContents === sender
       || this.menuWin?.webContents === sender
       || this.captureWin?.webContents === sender
+  }
+
+  /** 拍摄窗校验：captureDialog:dismiss 仅接受拍摄窗自身（取消会话语义） */
+  isCaptureWindow(sender: WebContents): boolean {
+    return this.captureWin?.webContents === sender
   }
 
   // ---- 内部：消息区 ----
@@ -393,7 +423,7 @@ export class OverlayWindowService {
 
   private ensurePanel(parent: BrowserWindow): BrowserWindow {
     if (this.panelWin) { return this.panelWin }
-    const win = this.createOverlayWindow(parent)
+    const win = this.createOverlayWindow(parent, PANEL_DOMAINS, 'panel')
     // 消息窗不抢焦点（showInactive），常驻到内容清空后由 refreshPanel 隐藏
     this.panelWin = win
     return win
@@ -403,7 +433,7 @@ export class OverlayWindowService {
     if (this.dialogWin) { return this.dialogWin }
     const parent = this.getParent()
     if (!parent) { throw new Error('[overlay] main window is not ready') }
-    const win = this.createOverlayWindow(parent)
+    const win = this.createOverlayWindow(parent, DIALOG_DOMAINS, 'dialog')
     // 决策弹窗不因失焦消失（全屏遮罩模态）：挂起请求由 Main 统一管理（决策 / 30s 超时 / App 关闭）
     this.dialogWin = win
     return win
@@ -413,14 +443,14 @@ export class OverlayWindowService {
     if (this.menuWin) { return this.menuWin }
     const parent = this.getParent()
     if (!parent) { throw new Error('[overlay] main window is not ready') }
-    const win = this.createOverlayWindow(parent)
+    const win = this.createOverlayWindow(parent, MENU_DOMAINS, 'menu')
     // 菜单不因失焦消失（全屏透明模态）：挂起菜单由 Main 统一管理（选中 / ESC / 点击菜单外）
     this.menuWin = win
     return win
   }
 
-  /** 浮层窗公共底座：透明无边框、不进任务栏；注册 Shell 身份供决策回传通道校验 */
-  private createOverlayWindow(parent: BrowserWindow): BrowserWindow {
+  /** 浮层窗公共底座：透明无边框、不进任务栏；按窗口类型登记域挂载并经 URL hash 透传 kind */
+  private createOverlayWindow(parent: BrowserWindow, domains: DesktopDomains, kind: OverlayWindowKind): BrowserWindow {
     const win = new BrowserWindow({
       width: 100,
       height: 0,
@@ -437,6 +467,8 @@ export class OverlayWindowService {
       parent,
       webPreferences: {
         preload: join(__dirname, '../preload/index.cjs'),
+        // 域挂载参数不可被逃生口覆盖（浮层窗无逃生口配置，置于字面量末位防误改）
+        additionalArguments: [desktopDomainsArg(domains)],
         sandbox: true,
         contextIsolation: true,
         // 数据先行策略依赖隐藏窗口提前渲染：关闭合成节流，show 瞬间即有完整画面，
@@ -461,14 +493,15 @@ export class OverlayWindowService {
       if (this.captureWin === win) { this.captureWin = null }
       this.resolver.unregister(wcId)
     })
-    // 浮层页以 Shell 身份登记：permission:respond 等决策回传通道经 assertShell 放行
-    this.resolver.register(wc, { appId: SHELL_APP_ID, instanceId: `overlay-${win.id}` })
+    // 浮层页以 Shell 身份登记：域挂载按窗口类型收窄，回传通道经 handle 层域兜底 + isOverlay 双保险
+    this.resolver.register(wc, { appId: SHELL_APP_ID, instanceId: `overlay-${win.id}`, domains })
 
+    // kind 经 URL hash 透传：OverlayApp 按窗用途分流初始 sync 与渲染分支
     const devUrl = process.env.ELECTRON_RENDERER_URL
     const load
       = is.dev && devUrl
-        ? win.loadURL(`${devUrl}#/overlay`)
-        : win.loadFile(join(__dirname, '../renderer/index.html'), { hash: '/overlay' })
+        ? win.loadURL(`${devUrl}#/overlay?kind=${kind}`)
+        : win.loadFile(join(__dirname, '../renderer/index.html'), { hash: `/overlay?kind=${kind}` })
     void load.catch((error) => {
       this.logger.error('failed to load overlay renderer', { error: String(error) })
     })

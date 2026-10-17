@@ -20,6 +20,8 @@ export function registerDownloadIpc(deps: DownloadIpcDeps): void {
     assertShell(deps.resolver.resolve(sender))
   }
 
+  handle('download:list', () => deps.downloadService.list())
+
   handle('download:open', (e, taskId) => {
     shellOnly(e.sender)
     return deps.downloadService.openFile(taskId)

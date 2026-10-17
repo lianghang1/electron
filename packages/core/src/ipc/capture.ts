@@ -1,4 +1,4 @@
-import type { CaptureDialogRequest, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { CaptureDialogRequest, CaptureRequest } from '@desktop/shared'
 import type { WebContents } from 'electron'
 import type { AppRegistry } from '../app/app-registry'
 import type { CaptureSystem } from '../devices/capture'
@@ -19,7 +19,7 @@ export interface CaptureIpcDeps {
 }
 
 /**
- * capture 域通道注册：图像采集（高拍仪/扫描仪/摄像头）+ 内置 UI 拍摄浮层。
+ * capture 域通道注册：图像采集（高拍仪/扫描仪/摄像头）+ 拍摄浮层发起方通道。
  * 失败统一 reject（CaptureError → IpcRemoteError，code 见 CaptureErrorCode，渲染层 try/catch 分支）；
  * 预览帧只推给发起预览的窗口（webContents 直发，不走全局事件广播）。
  */
@@ -35,7 +35,7 @@ export function registerCaptureIpc(deps: CaptureIpcDeps): void {
   handle('capture:stopPreview', (_e, deviceId) => deps.capture.stopPreview(deviceId))
   handle('capture:listCameras', (_e, deviceId) => deps.capture.listCameras(deviceId))
 
-  // 拍摄浮层：发起/关闭按 CallerContext 定身份（结果随 open 的 Promise 交付）；浮层内操作仅接受拍摄窗
+  // 拍摄浮层发起方通道：按 CallerContext 定身份（结果随 open 的 Promise 交付）
   handle('capture:openCaptureDialog', async (e, req) => {
     const ctx = deps.resolver.resolve(e.sender)
     return deps.captureDialog.open(sanitizeDialogRequest(req), {
@@ -49,10 +49,6 @@ export function registerCaptureIpc(deps: CaptureIpcDeps): void {
     const ctx = deps.resolver.resolve(e.sender)
     deps.captureDialog.cancelByCaller({ appId: ctx.appId, tabId: ctx.tabId })
   })
-  handle('capture:dialogStartPreview', (e, deviceId, opts) => deps.captureDialog.startPreview(e.sender, String(deviceId), opts))
-  handle('capture:dialogStopPreview', e => deps.captureDialog.stopPreview(e.sender))
-  handle('capture:dialogCapture', (e, opts) => deps.captureDialog.capture(e.sender, opts))
-  handle('capture:dialogConfirm', async (e, results) => deps.captureDialog.confirm(e.sender, sanitizeConfirmResults(results)))
 }
 
 /** 预览帧转发（发起窗口销毁后静默丢弃，由 stopPreview 正常回收会话） */
@@ -94,10 +90,4 @@ function sanitizeCaptureRequest(req: CaptureRequest | undefined): CaptureRequest
     resolutionNum: Number.isInteger(resolutionNum) && resolutionNum >= 0 ? resolutionNum : undefined,
     format: input.format === 'png' || input.format === 'bmp' ? input.format : input.format === 'jpg' ? 'jpg' : undefined,
   }
-}
-
-/** 确认回传入参收敛：丢弃缺 imagePath 的项（Main 侧 confirm 还会做非空校验） */
-function sanitizeConfirmResults(results: CaptureResult[] | undefined): CaptureResult[] {
-  if (!Array.isArray(results)) { return [] }
-  return results.filter(r => !!r && typeof r.imagePath === 'string' && r.imagePath.length > 0)
 }

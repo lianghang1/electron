@@ -6,6 +6,9 @@ import { defineDomain, invoke, push } from '../../domain'
  * 文件操作仅 Shell 与浮层窗可调用（Main 按 sender 校验），按 taskId 间接寻址。
  */
 export const downloadDomain = defineDomain('download', {
+  /** 当前任务列表快照（创建时间倒序，先拉后推：页面先取快照再订阅 updated） */
+  list: invoke<() => DownloadTask[]>(),
+
   // ---- Main → Renderer 推送 ----
   /** 下载任务列表变化（开始 / 进度 / 完成 / 中断）后推送全量列表 */
   updated: push<[DownloadTask[]]>(),

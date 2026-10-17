@@ -10,7 +10,7 @@ export const windowDomain = defineDomain('window', {
   restore: invoke<() => void>(),
   isMaximized: invoke<() => boolean>(),
   close: invoke<() => void>(),
-  /** 受控退出整个应用（app.quit()）：exitGuard 拦截的是窗口 close，本通道经 before-quit 放行，供界面维护入口调用 */
+  /** 受控退出整个应用（app.quit()）：exitGuard 拦截的是窗口 close，本通道经 before-quit 放行，供界面维护入口调用。套壳业务页有合法退出入口（如 kiosk 设置页），不设身份关卡 */
   quit: invoke<() => void>(),
 
   // ---- Main → Renderer 推送 ----

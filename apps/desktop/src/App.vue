@@ -43,7 +43,7 @@ async function closeWindow(): Promise<void> {
 
 // ---- Tab 右键菜单：交由原生浮层窗渲染（页面内容保持可见），坐标为内容区 DIP ----
 function openTabContextMenu(tab: DesktopTab, x: number, y: number): void {
-  void window.desktop.overlay.menu({ tabId: tab.id, appId: tab.appId, x, y })
+  void window.desktop.menu.open({ tabId: tab.id, appId: tab.appId, x, y })
 }
 
 // ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----

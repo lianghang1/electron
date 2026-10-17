@@ -25,7 +25,7 @@ export const captureDomainDefs = {
   /** 实时预览帧推送（JPEG base64；仅推给发起预览的窗口） */
   onPreviewFrame: push<[frame: { deviceId: string, base64: string }]>(),
 
-  // ---- 内置 UI 拍摄浮层（浮层窗内闭环预览/拍摄，结果随 openCaptureDialog 的 Promise 交付） ----
+  // ---- 内置 UI 拍摄浮层（发起方通道；浮层窗内操作见 captureDialog 域） ----
   /**
    * 发起拍摄浮层：Main 打开第四类原生浮层窗（全局互斥，占用中 reject DEVICE_BUSY）。
    * Promise 在浮层结束时交付：确认回传 resolve 结果数组，用户取消/未拍 resolve 空数组，
@@ -34,15 +34,4 @@ export const captureDomainDefs = {
   openCaptureDialog: invoke<(req: CaptureDialogRequest) => Promise<CaptureResult[]>>(),
   /** 页面主动取消浮层（仅发起 tab 可调）：Promise 以空结果收尾 */
   closeCaptureDialog: invoke<() => Promise<void>>(),
-  /** 仅浮层窗可调：开启预览（帧经 onPreviewFrame 推回浮层窗自身） */
-  dialogStartPreview: invoke<(deviceId: string, opts?: { resolutionNum?: number }) => Promise<void>>(),
-  /** 仅浮层窗可调：关闭预览 */
-  dialogStopPreview: invoke<() => Promise<void>>(),
-  /**
-   * 仅浮层窗可调：拍一张。UVC 路线传 dataUrl（浮层抽帧，meta 可带成片像素）落盘；
-   * ws/SDK 路线不传，由 Main 按会话设备走 capture 会话内拍照。结果由浮层 UI 收集，确认时统一回传。
-   */
-  dialogCapture: invoke<(opts?: { dataUrl?: string, meta?: Record<string, unknown> }) => Promise<CaptureResult>>(),
-  /** 仅浮层窗可调：确认回传（非空结果数组，作为 openCaptureDialog 的 resolve 值，Main 随即关闭浮层） */
-  dialogConfirm: invoke<(results: CaptureResult[]) => Promise<void>>(),
 }
