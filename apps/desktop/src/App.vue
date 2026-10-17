@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DesktopTab, WorkAreaRect } from '@desktop/shared'
+import { CaptureConfigDialog, ScannerConfigDialog } from '@desktop/ui'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppCenter from './components/AppCenter.vue'
 import AppLauncher from './components/AppLauncher.vue'
@@ -17,6 +18,8 @@ const maximized = ref(false)
 const viewport = ref<HTMLElement | null>(null)
 /** 应用中心面板显隐：flex 成员推开 dt-main，Web 容器经 ResizeObserver 自动跟随 */
 const appCenterOpen = ref(false)
+/** 设备配置弹窗：TopBar 设备菜单选中项（Shell 内嵌模态，null = 关闭） */
+const deviceDialog = ref<'scanner' | 'capture' | null>(null)
 
 const activeTab = computed(() => tabs.value.find(tab => tab.active))
 
@@ -50,6 +53,8 @@ function openTabContextMenu(tab: DesktopTab, x: number, y: number): void {
 function syncWorkArea(): void {
   const el = viewport.value
   if (!el) { return }
+  // 窗口隐藏/最小化时测量值塌缩不可信（如 28x0），跳过上报；恢复可见时由 visibilitychange 补报
+  if (document.visibilityState !== 'visible') { return }
   const rect = el.getBoundingClientRect()
   const area: WorkAreaRect = {
     x: Math.round(rect.left),
@@ -60,12 +65,18 @@ function syncWorkArea(): void {
   void window.desktop.tabs.setWorkArea(area)
 }
 
+/** 窗口从隐藏/最小化恢复后 ResizeObserver 不一定再触发，恢复可见需补报一次 */
+function onVisibilityChange(): void {
+  if (document.visibilityState === 'visible') { syncWorkArea() }
+}
+
 let resizeObserver: ResizeObserver | null = null
 let unsubMaximized: (() => void) | null = null
 
 onMounted(() => {
   resizeObserver = new ResizeObserver(syncWorkArea)
   if (viewport.value) { resizeObserver.observe(viewport.value) }
+  document.addEventListener('visibilitychange', onVisibilityChange)
 
   unsubMaximized = window.desktop.events.on('window:maximizedChanged', (value) => {
     maximized.value = value
@@ -77,6 +88,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
+  document.removeEventListener('visibilitychange', onVisibilityChange)
   unsubMaximized?.()
 })
 </script>
@@ -111,6 +123,7 @@ onBeforeUnmount(() => {
           @minimize="minimize"
           @toggle-maximize="toggleMaximize"
           @close-window="closeWindow"
+          @open-device-config="deviceDialog = $event"
         />
         <div ref="viewport" class="relative flex-1 bg-dt-bg">
           <div v-if="tabs.length === 0" class="dt-empty">
@@ -133,6 +146,16 @@ onBeforeUnmount(() => {
         <UpdateBar />
       </main>
     </div>
+
+    <!-- 设备配置弹窗：Shell 内嵌模态，遮罩空白处点击关闭 -->
+    <Transition name="dv-fade">
+      <div v-if="deviceDialog" class="dt-devmask" @click.self="deviceDialog = null">
+        <div class="dt-devcard">
+          <ScannerConfigDialog v-if="deviceDialog === 'scanner'" @close="deviceDialog = null" />
+          <CaptureConfigDialog v-else-if="deviceDialog === 'capture'" @close="deviceDialog = null" />
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -206,5 +229,34 @@ onBeforeUnmount(() => {
 .ac-slide-leave-to {
   opacity: 0;
   transform: translateX(-12px);
+}
+
+/* 设备配置弹窗：全屏遮罩 + 居中卡片（跟随主题变量） */
+.dt-devmask {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 8, 20, 0.4);
+}
+.dt-devcard {
+  width: min(680px, calc(100vw - 48px));
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  background: var(--dt-surface);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 24px 64px rgba(2, 8, 20, 0.28);
+}
+
+.dv-fade-enter-active,
+.dv-fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+.dv-fade-enter-from,
+.dv-fade-leave-to {
+  opacity: 0;
 }
 </style>

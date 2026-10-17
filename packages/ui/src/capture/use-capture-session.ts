@@ -24,6 +24,10 @@ export interface CaptureSessionUi {
   resolutions: Ref<ResolutionOption[]>
   resolution: Ref<string>
   kind: ComputedRef<CapturePreviewKind>
+  /** 设备枚举进行中（列表加载态） */
+  loadingDevices: Ref<boolean>
+  /** 分辨率切换进行中（重启预览 / 重协商约束） */
+  switching: Ref<boolean>
   /** 预览是否开启（uvc 已拿流 / ws 会话推送中） */
   live: Ref<boolean>
   /** ws 预览帧（JPEG dataURL） */
@@ -68,6 +72,8 @@ export function useCaptureSession(
   const resolutions = ref<ResolutionOption[]>([])
   const resolution = ref('')
   const kind = computed<CapturePreviewKind>(() => deviceKind(deviceId.value))
+  const loadingDevices = ref(false)
+  const switching = ref(false)
   const live = ref(false)
   const frameSrc = ref('')
   const stream = ref<MediaStream | null>(null)
@@ -85,11 +91,16 @@ export function useCaptureSession(
   // ---- 设备枚举与选择 ----
 
   async function refreshDevices(): Promise<void> {
+    loadingDevices.value = true
     try {
       devices.value = await window.desktop.capture.listDevices()
     }
-    catch {
+    catch (err) {
       devices.value = []
+      showError(describeError(err, '设备枚举失败'))
+    }
+    finally {
+      loadingDevices.value = false
     }
     try {
       cameras.value = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput')
@@ -120,10 +131,15 @@ export function useCaptureSession(
   async function changeDevice(e: Event): Promise<void> {
     const value = (e.target as HTMLSelectElement).value
     if (value === deviceId.value) { return }
+    // 切换前预览开启：切到新设备后自动重开预览（失败经 toggleLive 显错，不阻断）
+    const wasLive = live.value
     await stopLive()
     deviceId.value = value
     resolution.value = ''
     await syncResolutions()
+    if (wasLive && deviceId.value) {
+      await toggleLive()
+    }
   }
 
   async function syncResolutions(): Promise<void> {
@@ -200,21 +216,27 @@ export function useCaptureSession(
     const value = (e.target as HTMLSelectElement).value
     resolution.value = value
     if (!live.value) { return }
-    if (kind.value === 'uvc') {
-      const track = stream.value?.getVideoTracks()[0]
-      if (!track) { return }
-      const [w, h] = parseWxH(value)
-      try {
-        await track.applyConstraints({ width: w ? { ideal: w } : undefined, height: h ? { ideal: h } : undefined })
+    switching.value = true
+    try {
+      if (kind.value === 'uvc') {
+        const track = stream.value?.getVideoTracks()[0]
+        if (!track) { return }
+        const [w, h] = parseWxH(value)
+        try {
+          await track.applyConstraints({ width: w ? { ideal: w } : undefined, height: h ? { ideal: h } : undefined })
+        }
+        catch (err) {
+          showError(describeError(err, '分辨率切换失败'))
+        }
+        return
       }
-      catch (err) {
-        showError(describeError(err, '分辨率切换失败'))
-      }
-      return
+      // ws：重启预览会话使新档位生效
+      await stopLive()
+      await toggleLive()
     }
-    // ws：重启预览会话使新档位生效
-    await stopLive()
-    await toggleLive()
+    finally {
+      switching.value = false
+    }
   }
 
   // ---- 拍摄 ----
@@ -383,6 +405,8 @@ export function useCaptureSession(
     resolutions,
     resolution,
     kind,
+    loadingDevices,
+    switching,
     live,
     frameSrc,
     stream,

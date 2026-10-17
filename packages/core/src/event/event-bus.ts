@@ -28,6 +28,8 @@ export interface PlatformEventMap {
   'notification:received': [PlatformNotification]
   'renderer:crashed': [{ appId: string, reason: string }]
   'window:maximizedChanged': [boolean]
+  /** 主窗口重新可见（show/restore）：最小化期间视图 bounds 不可靠，订阅方需重新施加 */
+  'window:shown': []
   'download:updated': [DownloadTask[]]
   'update:state': [UpdateState]
   'update:asarState': [AsarUpdateState]

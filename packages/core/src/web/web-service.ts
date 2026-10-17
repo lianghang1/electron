@@ -1,4 +1,5 @@
 import type { CallerContext, DesktopAppManifest, WorkAreaRect } from '@desktop/shared'
+import type { EventBus } from '../event/event-bus'
 import type { CallerResolver } from '../ipc/caller-context'
 import type { Logger } from '../logger/logger'
 import type { PermissionService } from '../permission/permission-service'
@@ -47,14 +48,19 @@ export class WebService {
   private htmlFullscreen = false
   /** 已挂权限 guard 的 Session，避免同一 App Session 重复挂 */
   private readonly guardedSessions = new WeakSet<Electron.Session>()
+  private offWindowShown: (() => void) | null = null
 
   constructor(
     private readonly windowService: WindowService,
     private readonly sessionService: SessionService,
     private readonly resolver: CallerResolver,
     private readonly permissionService: PermissionService,
+    private readonly events: EventBus,
     private readonly logger: Logger,
-  ) {}
+  ) {
+    // 窗口从隐藏/最小化恢复时重放容器区域：期间施加的 bounds 可能被系统丢弃
+    this.offWindowShown = this.events.on('window:shown', () => this.applyBounds())
+  }
 
   /** 创建 Web 运行时并挂到主窗口（零尺寸挂载，等 focus / setWorkArea 再展开） */
   create(
@@ -116,6 +122,13 @@ export class WebService {
 
   /** Shell 布局变化时更新容器区域，并立即作用到当前激活视图 */
   setWorkArea(rect: WorkAreaRect): void {
+    // 窗口隐藏/最小化时页面 getBoundingClientRect 返回塌缩值（如 28x0），
+    // 采信会永久污染容器区域且恢复显示后不自动纠正，必须拒绝
+    const win = this.windowService.getMainWindow()
+    if (!win || win.isMinimized() || !win.isVisible()) {
+      this.logger.debug('workArea update ignored while main window is not visible', { rect })
+      return
+    }
     this.workArea = rect
     this.applyBounds()
   }
@@ -132,6 +145,8 @@ export class WebService {
 
   /** 释放全部 Web 运行时（Application 退出时调用） */
   dispose(): void {
+    this.offWindowShown?.()
+    this.offWindowShown = null
     for (const id of [...this.runtimes.keys()]) { this.destroy(id) }
   }
 
@@ -153,16 +168,15 @@ export class WebService {
       }
       // 首帧（dom-ready）前保持零尺寸：加载骨架屏由 Shell 视图区呈现，避免视图区白屏
       const area = id === this.focusedId && runtime.ready ? this.workArea : null
-      runtime.view.setBounds(
-        area
-          ? {
-              x: Math.round(area.x),
-              y: Math.round(area.y),
-              width: Math.round(area.width),
-              height: Math.round(area.height),
-            }
-          : { x: 0, y: 0, width: 0, height: 0 },
-      )
+      const bounds = area
+        ? {
+            x: Math.round(area.x),
+            y: Math.round(area.y),
+            width: Math.round(area.width),
+            height: Math.round(area.height),
+          }
+        : { x: 0, y: 0, width: 0, height: 0 }
+      runtime.view.setBounds(bounds)
     }
   }
 

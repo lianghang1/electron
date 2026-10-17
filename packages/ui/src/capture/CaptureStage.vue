@@ -8,6 +8,8 @@ const props = defineProps<{
   frameSrc?: string
   rotate?: number
   mirror?: boolean
+  /** 无画面时的空态文案（未检测到设备 / 正在检测等） */
+  emptyText?: string
 }>()
 
 const videoEl = ref<HTMLVideoElement | null>(null)
@@ -36,7 +38,7 @@ defineExpose({ videoEl })
   <div class="cu-stage">
     <video v-if="stream" ref="videoEl" class="cu-stage__media" playsinline muted :style="{ transform }" />
     <img v-else-if="frameSrc" class="cu-stage__media" :src="frameSrc" alt="实时预览" :style="{ transform }">
-    <span v-else class="cu-stage__empty">开启预览后拍摄</span>
+    <span v-else class="cu-stage__empty">{{ props.emptyText || '开启预览后拍摄' }}</span>
   </div>
 </template>
 

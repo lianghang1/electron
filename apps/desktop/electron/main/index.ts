@@ -194,6 +194,8 @@ bootstrap({
   },
   // 飞书式沉浸顶栏：隐藏系统标题栏（自绘窗口控制是唯一入口），backgroundColor 防启动闪白
   browserWindowOptions: { autoHideMenuBar: true, titleBarStyle: 'hidden', backgroundColor: '#f6f7f9' },
+  // 系统托盘：关窗最小化到托盘，托盘菜单退出才真退
+  features: { tray: true },
   // 内部页标准源协议：处理器挂到每个 App 的 persist 分区 Session 上（core 统一注册）
   protocols: { app: handleAppRequest },
   apps: {

@@ -41,6 +41,7 @@ import { AsarUpdateService } from '../updater/asar-update-service'
 import { UpdateService } from '../updater/update-service'
 import { WebService } from '../web/web-service'
 import { OverlayWindowService } from '../window/overlay-window'
+import { TrayService } from '../window/tray-service'
 import { WindowService } from '../window/window-service'
 import { resolveResourcePath } from './paths'
 
@@ -70,6 +71,8 @@ export class DesktopRuntime {
   private windowService!: WindowService
   /** 全局浮层独立原生窗：右键菜单/确认弹窗渲染处（原生层级压过 WebContentsView） */
   private overlayService!: OverlayWindowService
+  /** 系统托盘（features.tray 开启时装配）：关窗隐藏到托盘，托盘菜单退出才真退 */
+  private trayService?: TrayService
   /** 设备系统：证卡读取（dll 真实驱动） */
   private idCardSystem?: IdCardSystem
   /** 设备守护进程：厂商 DLL 的 koffi 调用全部在此进程执行（native 崩溃隔离 + 退避重启自愈） */
@@ -100,6 +103,11 @@ export class DesktopRuntime {
       })
 
       this.windowService.createMainWindow(this.options)
+      // 托盘接管主窗 close：关窗隐藏到托盘，退出经托盘菜单 / app.quit()
+      const mainWindow = this.windowService.getMainWindow()
+      if (this.trayService && mainWindow) {
+        this.trayService.attach(mainWindow)
+      }
       // --app=<appId> 直启：主窗就绪后打开指定 App（套壳部署用）
       this.launchStartupApp()
       // 主窗就绪后预创建浮层窗：页面提前加载完成，首次弹出/授权弹窗即时呈现（免加载卡顿）
@@ -195,6 +203,15 @@ export class DesktopRuntime {
       this.resolver,
       this.logger.scope('overlay'),
     )
+    // 托盘显式开启且提供了应用图标才装配：缺图标时保持「关窗即退出」原行为
+    if (this.options.features?.tray && this.options.icon) {
+      this.trayService = new TrayService({
+        iconPath: this.options.icon,
+        title: this.options.window.title ?? this.options.app.name,
+        getWindow: () => this.windowService.getMainWindow(),
+        logger: this.logger.scope('tray'),
+      })
+    }
     this.resilienceService = new ResilienceService(this.events, this.logger.scope('resilience'))
     // 下载管理：App 首次取得 Session 时挂 will-download guard（按 manifest.download 权限放行）
     this.downloadService = new DownloadService(
@@ -291,6 +308,7 @@ export class DesktopRuntime {
       this.sessionService,
       this.resolver,
       this.permissionService,
+      this.events,
       this.logger.scope('web'),
     )
     this.tabService = new TabService(
@@ -467,6 +485,7 @@ export class DesktopRuntime {
 
   /** 逆序释放：WebContents → Store 句柄 → 事件监听 */
   private dispose(): void {
+    this.trayService?.destroy()
     this.webService?.dispose()
     this.storageService?.dispose()
     this.idCardSystem?.destroy()

@@ -48,6 +48,11 @@ export interface DesktopConfig {
   features?: {
     /** Tab 多应用承载体系（默认 true）。关闭后 tabs:* IPC 通道不注册、Tab/App/Web 服务不实例化 */
     tabs?: boolean
+    /**
+     * 系统托盘（默认 false）。开启后用户关闭主窗 = 最小化到托盘（隐藏不销毁），
+     * 托盘菜单「退出」才真正结束进程；不开启则保持「关窗即退出」
+     */
+    tray?: boolean
   }
   /** 下载行为：默认静默保存到系统下载目录（Kiosk 无人值守友好） */
   download?: {

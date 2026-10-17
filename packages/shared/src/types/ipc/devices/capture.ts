@@ -33,6 +33,8 @@ export const captureDomainDefs = {
   getConfig: invoke<() => Promise<CaptureDeviceConfig[]>>(),
   /** 运行时编辑设备配置（按 id 整条 upsert，热重建适配器） */
   setConfig: invoke<(config: CaptureDeviceConfig) => void>(),
+  /** 删除设备配置（按 id；无此 id 返回 false），热重建适配器 */
+  removeConfig: invoke<(id: string) => Promise<boolean>>(),
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo；不占用摄像头） */
   listCameras: invoke<(deviceId: string) => Promise<CaptureCameraInfo[]>>(),
 

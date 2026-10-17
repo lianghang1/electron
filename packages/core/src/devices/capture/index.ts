@@ -8,6 +8,8 @@ export interface CaptureSystem {
   listDevices: () => Promise<CaptureDevice[]>
   getConfigs: () => Promise<CaptureDeviceConfig[]>
   setConfig: (config: CaptureDeviceConfig) => void
+  /** 删除设备配置：无此 id 返回 false，删除后热重建适配器 */
+  removeConfig: (id: string) => boolean
   capture: (req: CaptureRequest) => Promise<CaptureResult>
   /** UVC 路线（渲染层 getUserMedia）拍到的 dataURL 落盘为图片文件 */
   saveDataUrl: (dataUrl: string, ext?: 'jpg' | 'png') => Promise<string>
@@ -40,6 +42,7 @@ export function createCaptureSystem(options: CaptureSystemOptions): CaptureSyste
     listDevices: () => service.listDevices(),
     getConfigs: async () => service.getConfigs(),
     setConfig: config => service.setConfig(config),
+    removeConfig: id => service.removeConfig(id),
     capture: req => service.capture(req),
     saveDataUrl: (dataUrl, ext) => service.saveDataUrl(dataUrl, ext),
     startPreview: (deviceId, onFrame, opts) => service.startPreview(deviceId, onFrame, opts),

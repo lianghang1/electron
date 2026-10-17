@@ -2,6 +2,7 @@
 import type { CaptureDialogSession } from '@desktop/shared'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import CaptureStage from './CaptureStage.vue'
+import CaptureThumbStrip from './CaptureThumbStrip.vue'
 import { useCaptureSession } from './use-capture-session'
 
 const props = defineProps<{ session: CaptureDialogSession }>()
@@ -21,6 +22,8 @@ const {
   deviceId,
   resolutions,
   resolution,
+  loadingDevices,
+  switching,
   live,
   frameSrc,
   stream,
@@ -71,6 +74,53 @@ const previewLabel = computed(() => (live.value ? '预览中' : '未开启'))
 /** 完成按钮文案：带张数，回传中显示进行时 */
 const confirmLabel = computed(() => (confirming.value ? '回传中…' : results.value.length ? `完成（${results.value.length}）` : '完成'))
 
+// ---- 放大查看（点击缩略条在预览区查看该张，再点/继续操作恢复实时预览） ----
+
+const viewingIndex = ref<number | null>(null)
+const viewingSrc = computed(() => {
+  if (viewingIndex.value === null) { return '' }
+  return results.value[viewingIndex.value]?.thumbDataUrl ?? ''
+})
+const viewing = computed(() => viewingIndex.value !== null && !!viewingSrc.value)
+
+/** 预览区空态：枚举中 → 检测中；无设备 → 引导配置 */
+const stageEmptyText = computed(() => {
+  if (loadingDevices.value) { return '正在检测设备…' }
+  if (!hasDevices.value) { return '未检测到采集设备，请检查连接或在设备管理中添加' }
+  return ''
+})
+
+function onView(index: number): void {
+  viewingIndex.value = viewingIndex.value === index ? null : index
+}
+
+function onRemove(index: number): void {
+  exitViewing()
+  removeResult(index)
+}
+
+/** 拍摄/切设备/开预览前退出查看态：UVC 抽帧依赖实时 video 元素 */
+function exitViewing(): void {
+  viewingIndex.value = null
+}
+
+// ---- 动作包装：统一收敛查看态退出 ----
+
+async function onChangeDevice(e: Event): Promise<void> {
+  exitViewing()
+  await changeDevice(e)
+}
+
+async function onToggleLive(): Promise<void> {
+  exitViewing()
+  await toggleLive()
+}
+
+async function onShoot(): Promise<void> {
+  exitViewing()
+  await shoot()
+}
+
 function onClose(): void {
   emit('close')
 }
@@ -79,6 +129,15 @@ function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.preventDefault()
     onClose()
+    return
+  }
+  // 空格拍照：输入控件内不拦截；preventDefault 防止焦点按钮被空格二次触发
+  if (e.key !== ' ') { return }
+  const tag = (e.target as HTMLElement | null)?.tagName
+  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') { return }
+  e.preventDefault()
+  if (!capturing.value && !full.value) {
+    void onShoot()
   }
 }
 
@@ -116,9 +175,16 @@ onBeforeUnmount(() => {
     <!-- 左预览 + 右控制栏：操作动线自上而下（选设备 → 分辨率 → 预览 → 拍摄） -->
     <div class="cu-dialog__body">
       <div class="cu-dialog__stage">
-        <CaptureStage ref="stageRef" :stream="stream" :frame-src="frameSrc" :rotate="rotate" :mirror="mirror" />
-        <span class="cu-dialog__chip" :class="{ 'cu-dialog__chip--live': live }">
-          <i class="cu-dialog__chip-dot" />{{ previewLabel }}
+        <CaptureStage
+          ref="stageRef"
+          :stream="viewing ? null : stream"
+          :frame-src="viewing ? viewingSrc : frameSrc"
+          :rotate="viewing ? 0 : rotate"
+          :mirror="viewing ? false : mirror"
+          :empty-text="stageEmptyText"
+        />
+        <span class="cu-dialog__chip" :class="{ 'cu-dialog__chip--live': live && !viewing }">
+          <i class="cu-dialog__chip-dot" />{{ viewing ? '查看记录' : previewLabel }}
         </span>
         <!-- 快门反馈：拍摄瞬间白闪一帧 -->
         <div v-if="capturing" class="cu-dialog__flash" />
@@ -134,9 +200,9 @@ onBeforeUnmount(() => {
       <aside class="cu-dialog__panel">
         <label class="cu-dialog__field">
           <span class="cu-dialog__label">设备</span>
-          <select class="cu-dialog__select" :value="deviceId" @change="changeDevice">
+          <select class="cu-dialog__select" :value="deviceId" @change="onChangeDevice">
             <option v-if="!hasDevices" value="">
-              未检测到设备
+              {{ loadingDevices ? '正在检测设备…' : '未检测到设备' }}
             </option>
             <template v-else>
               <optgroup v-for="group in deviceGroups" :key="group.label" :label="group.label">
@@ -148,25 +214,25 @@ onBeforeUnmount(() => {
           </select>
         </label>
         <label v-if="resolutions.length" class="cu-dialog__field">
-          <span class="cu-dialog__label">分辨率</span>
+          <span class="cu-dialog__label">分辨率<template v-if="switching">（切换中…）</template></span>
           <select class="cu-dialog__select" :value="resolution" @change="changeResolution">
             <option v-for="r in resolutions" :key="r.value" :value="r.value">
               {{ r.label }}
             </option>
           </select>
         </label>
-        <button class="cu-btn" @click="toggleLive">
+        <button class="cu-btn" @click="onToggleLive">
           {{ live ? '停止预览' : '开启预览' }}
         </button>
         <div class="cu-dialog__fx">
-          <button class="cu-btn" @click="rotateOnce">
+          <button class="cu-btn" :disabled="viewing" title="旋转实时画面" @click="rotateOnce">
             旋转
           </button>
-          <button class="cu-btn" :class="{ 'cu-btn--on': mirror }" @click="toggleMirror">
+          <button class="cu-btn" :class="{ 'cu-btn--on': mirror && !viewing }" :disabled="viewing" title="镜像实时画面" @click="toggleMirror">
             镜像
           </button>
         </div>
-        <button class="cu-btn cu-btn--primary cu-btn--shoot" :disabled="capturing || full" @click="shoot">
+        <button class="cu-btn cu-btn--primary cu-btn--shoot" :disabled="capturing || full" @click="onShoot">
           {{ capturing ? '拍摄中…' : full ? '已拍满' : '拍摄' }}
         </button>
         <span class="cu-dialog__panel-hint">
@@ -175,17 +241,7 @@ onBeforeUnmount(() => {
       </aside>
     </div>
 
-    <div class="cu-dialog__thumbs">
-      <template v-if="thumbs.length">
-        <figure v-for="item in thumbs" :key="item.index" class="cu-dialog__thumb">
-          <img :src="item.result.thumbDataUrl" :title="item.result.imagePath" alt="拍摄记录">
-          <button class="cu-dialog__thumb-del" title="删除" @click="removeResult(item.index)">
-            ×
-          </button>
-        </figure>
-      </template>
-      <span v-else class="cu-dialog__thumbs-empty">拍摄结果将显示在这里，完成后可删除重拍</span>
-    </div>
+    <CaptureThumbStrip :items="thumbs" :active-index="viewingIndex" @view="onView" @remove="onRemove" />
 
     <footer class="cu-dialog__foot">
       <button class="cu-btn cu-btn--lg" @click="onClose">
@@ -488,73 +544,6 @@ onBeforeUnmount(() => {
 .cu-btn:disabled {
   opacity: 0.5;
   cursor: default;
-}
-
-/* ---- 已拍缩略条 ---- */
-.cu-dialog__thumbs {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 86px;
-  padding: 6px;
-  border: 1px dashed #e0e5ec;
-  border-radius: 10px;
-  overflow-x: auto;
-}
-
-.cu-dialog__thumbs-empty {
-  width: 100%;
-  text-align: center;
-  font-size: 11.5px;
-  color: #a5adb8;
-}
-
-.cu-dialog__thumb {
-  position: relative;
-  margin: 0;
-  flex-shrink: 0;
-  animation: cu-thumb-in 0.18s ease-out;
-}
-
-@keyframes cu-thumb-in {
-  from {
-    opacity: 0;
-    transform: scale(0.88);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.cu-dialog__thumb img {
-  display: block;
-  height: 72px;
-  border: 1px solid #e6eaf0;
-  border-radius: 8px;
-  background: #10141c;
-}
-
-.cu-dialog__thumb-del {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  border-radius: 50%;
-  background: rgba(15, 23, 42, 0.72);
-  color: #fff;
-  font-size: 12px;
-  line-height: 18px;
-  cursor: pointer;
-  transition: background-color 0.12s;
-}
-
-.cu-dialog__thumb-del:hover {
-  background: #dc2626;
 }
 
 /* ---- 底部 ---- */

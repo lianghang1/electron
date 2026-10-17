@@ -74,6 +74,18 @@ export class CaptureService {
     this.adapters = this.buildAdapters()
   }
 
+  /** 删除设备配置：无此 id 返回 false；删除后热重建适配器 */
+  removeConfig(id: string): boolean {
+    const list = this.configs.filter(p => p.id !== id)
+    if (list.length === this.configs.length) {
+      return false
+    }
+    this.configs = list
+    this.persist?.(list)
+    this.adapters = this.buildAdapters()
+    return true
+  }
+
   getConfigs(): CaptureDeviceConfig[] {
     return this.configs.slice()
   }

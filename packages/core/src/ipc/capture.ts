@@ -5,6 +5,7 @@ import type { CaptureSystem } from '../devices/capture'
 import type { CaptureDialogSessionService } from '../devices/capture/dialog-session'
 import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
+import { DesktopError } from '@desktop/shared'
 import { handle } from './handle'
 
 export interface CaptureIpcDeps {
@@ -29,6 +30,12 @@ export function registerCaptureIpc(deps: CaptureIpcDeps): void {
   handle('capture:listDevices', () => deps.capture.listDevices())
   handle('capture:getConfig', () => deps.capture.getConfigs())
   handle('capture:setConfig', (_e, config) => deps.capture.setConfig(config))
+  handle('capture:removeConfig', async (_e, id) => {
+    if (typeof id !== 'string' || !id.trim()) {
+      throw new DesktopError('IPC_ERROR', 'invalid capture config id')
+    }
+    return deps.capture.removeConfig(id)
+  })
   handle('capture:snap', (_e, req) => deps.capture.capture(sanitizeCaptureRequest(req)))
   handle('capture:saveDataUrl', (_e, input) => deps.capture.saveDataUrl(input.dataUrl, input.ext))
   handle('capture:startPreview', (e, input) => deps.capture.startPreview(input.deviceId, (base64) => {

@@ -67,6 +67,9 @@ export class WindowService {
     // 最大化状态变化（含系统标题栏双击）→ 事件总线，由 Application 推给 Shell UI
     win.on('maximize', () => this.events.emit('window:maximizedChanged', true))
     win.on('unmaximize', () => this.events.emit('window:maximizedChanged', false))
+    // 最小化/隐藏期间 WebContentsView bounds 不可靠，重新可见后由订阅方重新施加
+    win.on('show', () => this.events.emit('window:shown'))
+    win.on('restore', () => this.events.emit('window:shown'))
 
     const load
       = is.dev && process.env.ELECTRON_RENDERER_URL
