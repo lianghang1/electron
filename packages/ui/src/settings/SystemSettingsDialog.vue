@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
+import { onMounted, ref, watch } from 'vue'
 import CaptureSettingsPanel from '../capture/CaptureSettingsPanel.vue'
 import { useCaptureConfig } from '../capture/use-capture-config'
 import ConfigDialogShell from '../dialog/ConfigDialogShell.vue'
 import ScannerSettingsPanel from '../scanner/ScannerSettingsPanel.vue'
 import { useScannerConfig } from '../scanner/use-scanner-config'
+import UiScrollArea from '../scroll/UiScrollArea.vue'
 
 /** 页签 id：与 overlay 的 DeviceConfigKind 字面量对齐（'scanner' | 'capture'），新增页签同步扩展 */
 type SettingsTab = 'scanner' | 'capture'
 
 /**
- * 系统设置弹窗：设备配置域统一入口，Tab 切换各配置面板。
+ * 系统设置弹窗：设备配置域统一入口，左侧导航切换各配置面板（布局参照主流设置页：
+ * 左侧竖导航 + 右侧分组卡片内容区）。
  * 新增配置域 = 追加一条 TABS 定义 + 一个面板组件 + 对应 composable，弹窗骨架与契约不变。
  * 页签状态归本组件持有；各面板状态由对应 composable 提供（body 展示 + 底部操作区在此分发）。
  */
@@ -23,10 +26,18 @@ const TABS: { id: SettingsTab, label: string }[] = [
   { id: 'capture', label: '拍摄' },
 ]
 
-const activeTab = ref<SettingsTab>(props.initialTab ?? 'scanner')
+/** TabsRoot 的 v-model 按 string 收发（reka 泛型为宽类型），页签判定用字面量比较 */
+const activeTab = ref<string>(props.initialTab ?? 'scanner')
 
 const scanner = useScannerConfig()
 const capture = useCaptureConfig()
+
+/** 右侧内容滚动区：切换页签复位滚动位置 */
+const paneRef = ref<InstanceType<typeof UiScrollArea> | null>(null)
+
+watch(activeTab, () => {
+  paneRef.value?.reset()
+})
 
 onMounted(() => {
   void scanner.load()
@@ -35,14 +46,22 @@ onMounted(() => {
 </script>
 
 <template>
-  <ConfigDialogShell
-    v-model:active-tab="activeTab"
-    title="系统设置"
-    :tabs="TABS"
-    @close="emit('close')"
-  >
-    <ScannerSettingsPanel v-show="activeTab === 'scanner'" v-model:config="scanner.config" :state="scanner" />
-    <CaptureSettingsPanel v-show="activeTab === 'capture'" :state="capture" />
+  <ConfigDialogShell title="系统设置" :body-height="440" @close="emit('close')">
+    <div class="ss-layout">
+      <TabsRoot v-model="activeTab" orientation="vertical">
+        <TabsList class="ss-nav" aria-label="设置分类">
+          <TabsTrigger v-for="tab in TABS" :key="tab.id" :value="tab.id" class="ss-nav__item">
+            {{ tab.label }}
+          </TabsTrigger>
+        </TabsList>
+      </TabsRoot>
+      <UiScrollArea ref="paneRef" class="ss-pane">
+        <div class="ss-pane__inner">
+          <ScannerSettingsPanel v-show="activeTab === 'scanner'" v-model:config="scanner.config" :state="scanner" />
+          <CaptureSettingsPanel v-show="activeTab === 'capture'" :state="capture" />
+        </div>
+      </UiScrollArea>
+    </div>
 
     <template #feedback>
       <span v-if="activeTab === 'scanner' && scanner.message" class="ss-feedback-ok">{{ scanner.message }}</span>
@@ -82,6 +101,58 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.ss-layout {
+  display: flex;
+  height: 100%;
+}
+
+/* ---- 左侧导航 ---- */
+.ss-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 132px;
+  flex-shrink: 0;
+  margin: 0;
+  padding-right: 12px;
+  border-right: 1px solid #eef1f5;
+}
+
+.ss-nav__item {
+  border: none;
+  background: transparent;
+  text-align: left;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #5f6673;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.ss-nav__item:hover {
+  color: #1f2328;
+  background: #f3f6f9;
+}
+
+.ss-nav__item[data-state='active'] {
+  color: #0f766e;
+  font-weight: 500;
+  background: #e9f1f0;
+}
+
+/* ---- 右侧内容区 ---- */
+.ss-pane {
+  flex: 1;
+  min-width: 0;
+}
+
+.ss-pane__inner {
+  padding: 2px 2px 2px 18px;
+}
+
 .ss-feedback-ok {
   font-size: 12px;
   color: #0f766e;

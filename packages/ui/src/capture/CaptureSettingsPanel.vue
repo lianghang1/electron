@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CaptureConfigView, ConfigDeviceStatus } from './use-capture-config'
+import UiScrollArea from '../scroll/UiScrollArea.vue'
 import CaptureDeviceForm from './CaptureDeviceForm.vue'
 
 /** 拍摄设置面板：纯展示体，状态由系统设置弹窗传入（body 区，不含弹窗 chrome 与底部操作） */
@@ -27,21 +28,23 @@ function onSnapTest(): void {
 <template>
   <div class="cu-body">
     <aside class="cu-list">
-      <button
-        v-for="config in state.configs"
-        :key="config.id"
-        class="cu-list__item"
-        :class="{ 'cu-list__item--active': config.id === state.selectedId }"
-        @click="state.select(config.id)"
-      >
-        <span class="cu-list__status" :style="{ background: STATUS_META[state.statusOf(config)].color }" />
-        <span class="cu-list__main">
-          <span class="cu-list__name">{{ config.displayName }}</span>
-          <span class="cu-list__meta">
-            {{ TRANSPORT_LABEL[config.transport] ?? config.transport }} · {{ STATUS_META[state.statusOf(config)].label }}
+      <UiScrollArea class="cu-list__scroll">
+        <button
+          v-for="config in state.configs"
+          :key="config.id"
+          class="cu-list__item"
+          :class="{ 'cu-list__item--active': config.id === state.selectedId }"
+          @click="state.select(config.id)"
+        >
+          <span class="cu-list__status" :style="{ background: STATUS_META[state.statusOf(config)].color }" />
+          <span class="cu-list__main">
+            <span class="cu-list__name">{{ config.displayName }}</span>
+            <span class="cu-list__meta">
+              {{ TRANSPORT_LABEL[config.transport] ?? config.transport }} · {{ STATUS_META[state.statusOf(config)].label }}
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+      </UiScrollArea>
     </aside>
 
     <section v-if="state.selected" class="cu-editor">
@@ -75,7 +78,8 @@ function onSnapTest(): void {
   display: flex;
   gap: 14px;
   align-items: stretch;
-  min-height: 300px;
+  /* 填满系统设置弹窗的统一内容区高度（不足留白，超高交给外层滚动） */
+  min-height: 100%;
 }
 
 /* ---- 左列表 ---- */
@@ -84,11 +88,14 @@ function onSnapTest(): void {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
   padding: 6px;
   border: 1px solid #e6eaf0;
   border-radius: 10px;
-  overflow-y: auto;
+}
+
+.cu-list__scroll {
+  flex: 1;
+  min-height: 0;
 }
 
 .cu-list__item {
@@ -102,6 +109,10 @@ function onSnapTest(): void {
   text-align: left;
   cursor: pointer;
   transition: background-color 0.12s;
+}
+
+.cu-list__item + .cu-list__item {
+  margin-top: 4px;
 }
 
 .cu-list__item:hover {
@@ -149,7 +160,6 @@ function onSnapTest(): void {
   padding: 12px 14px;
   border: 1px solid #e6eaf0;
   border-radius: 10px;
-  overflow-y: auto;
 }
 
 .cu-editor__head {
