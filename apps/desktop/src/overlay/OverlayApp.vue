@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CaptureDialogSession, DeviceConfigKind, DownloadTask, PermissionRequest, PlatformNotification, TabContextMenu, TabMenuAction } from '@desktop/shared'
+import { parseOverlayHash } from '@desktop/shared'
 import { CaptureConfigDialog, CaptureDialog, ScannerConfigDialog } from '@desktop/ui'
 import {
   DialogContent,
@@ -259,11 +260,7 @@ function scrollPanelToBottom(): void {
 const unsubs: Array<() => void> = []
 
 /** 浮层窗用途（Main 经 URL hash 透传）：仅决定渲染分支与页面级监听，不裁剪数据订阅 */
-const overlayKind = ((): 'panel' | 'dialog' | 'menu' | 'capture' | 'config' => {
-  const kind = new URLSearchParams(location.hash.split('?')[1] ?? '').get('kind')
-  if (kind === 'dialog' || kind === 'menu' || kind === 'capture' || kind === 'config') { return kind }
-  return 'panel'
-})()
+const overlayKind = parseOverlayHash(location.hash) ?? 'panel'
 
 onMounted(async () => {
   // 统一订阅：Main 按窗口身份定点推送，本窗不承载的通道不会收到消息
@@ -427,15 +424,16 @@ function dialogBtnClass(primary: boolean): string {
     </div>
 
     <!-- 设备配置浮层：全屏遮罩模态（配置窗独立页面实例承载），业务页（设备测试页）经桥发起。
-         遮罩不做动画（同拍摄浮层），卡片 pop 入场 + flex 居中定位；
-         配置弹窗组件由 @desktop/ui 提供，配置保存走设备域 IPC（全量桥），kind 作 key 原地换卡 -->
+         遮罩不做动画（同拍摄浮层），卡片 pop 入场 + flex 双轴居中（配置卡不高，标准模态形态；
+         拍摄浮层内容超高才用贴顶布局）。配置弹窗组件由 @desktop/ui 提供，
+         配置保存走设备域 IPC（全量桥），kind 作 key 原地换卡 -->
     <div
       v-if="configKind && overlayVisible"
       :key="configKind"
-      class="fixed inset-0 z-[10] flex justify-center"
+      class="fixed inset-0 z-[10] flex items-center justify-center"
     >
       <div class="absolute inset-0 bg-[rgba(15,23,42,0.55)]" />
-      <div class="ov-config__card ov-anim-pop relative mt-[4vh] w-[680px] max-w-[94vw] self-start rounded-[16px] bg-white p-[4px] shadow-[0_24px_64px_rgba(2,8,20,0.32)]">
+      <div class="ov-config__card ov-anim-pop relative w-[680px] max-w-[94vw] overflow-hidden rounded-[16px] bg-white shadow-[0_24px_64px_rgba(2,8,20,0.32)]">
         <ScannerConfigDialog v-if="configKind === 'scanner'" @close="dismissConfig" />
         <CaptureConfigDialog v-else-if="configKind === 'capture'" @close="dismissConfig" />
       </div>

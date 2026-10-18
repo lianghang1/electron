@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import ConfigDialogShell from '../dialog/ConfigDialogShell.vue'
 import { useScannerConfig } from './use-scanner-config'
 
 const emit = defineEmits<{ close: [] }>()
@@ -30,32 +31,18 @@ function removePrefix(prefix: string): void {
   config.value.prefixes = config.value.prefixes.filter(p => p !== prefix)
 }
 
-function onClose(): void {
-  emit('close')
-}
-
 onMounted(() => {
   void load()
 })
 </script>
 
 <template>
-  <div class="sc-dialog">
-    <header class="sc-dialog__head">
-      <div>
-        <h3 class="sc-dialog__title">
-          扫码枪配置
-        </h3>
-        <p class="sc-dialog__sub">
-          扫码枪为 HID 键盘仿真设备，按节奏与长度识别扫码输入
-        </p>
-      </div>
-      <button class="sc-dialog__close" title="关闭" @click="onClose">
-        ×
-      </button>
-    </header>
-
-    <div class="sc-dialog__body">
+  <ConfigDialogShell
+    title="扫码枪配置"
+    subtitle="扫码枪为 HID 键盘仿真设备，按节奏与长度识别扫码输入"
+    @close="emit('close')"
+  >
+    <div class="sc-body">
       <div class="sc-row">
         <span class="sc-row__label">启用扫码识别</span>
         <input v-model="config.enabled" type="checkbox" class="sc-switch">
@@ -63,17 +50,17 @@ onMounted(() => {
       </div>
       <div class="sc-row">
         <span class="sc-row__label">结束判定超时（ms）</span>
-        <input v-model.number="config.timeout" type="number" min="1" class="sc-row__input">
+        <input v-model.number="config.timeout" type="number" min="1" class="sc-input">
         <span class="sc-row__hint">无后续按键多久判定一次缓冲结束</span>
       </div>
       <div class="sc-row">
         <span class="sc-row__label">最小条码长度</span>
-        <input v-model.number="config.minLength" type="number" min="0" class="sc-row__input sc-row__input--sm">
+        <input v-model.number="config.minLength" type="number" min="0" class="sc-input">
         <span class="sc-row__hint">过滤人手误触</span>
       </div>
       <div class="sc-row">
         <span class="sc-row__label">结束键</span>
-        <input v-model="config.endKey" type="text" class="sc-row__input sc-row__input--sm" placeholder="Enter">
+        <input v-model="config.endKey" type="text" class="sc-input" placeholder="Enter">
         <span class="sc-row__hint">扫码枪扫码后追加的按键</span>
       </div>
       <div class="sc-row sc-row--col">
@@ -99,7 +86,7 @@ onMounted(() => {
         <input
           v-model="testCode"
           type="text"
-          class="sc-row__input sc-row__input--wide"
+          class="sc-input"
           placeholder="PB:1234567890"
           @keydown.enter.prevent="runTest"
         >
@@ -110,68 +97,23 @@ onMounted(() => {
       </div>
     </div>
 
-    <footer class="sc-dialog__foot">
-      <span v-if="message" class="sc-dialog__ok">{{ message }}</span>
-      <span v-if="error" class="sc-dialog__err">{{ error }}</span>
+    <template #feedback>
+      <span v-if="message" class="sc-feedback-ok">{{ message }}</span>
+      <span v-if="error" class="sc-feedback-err">{{ error }}</span>
+    </template>
+    <template #footer>
       <button class="sc-btn sc-btn--primary" :disabled="saving || loading" @click="save">
         {{ saving ? '保存中…' : '保存' }}
       </button>
-    </footer>
-  </div>
+    </template>
+  </ConfigDialogShell>
 </template>
 
 <style scoped>
-.sc-dialog {
+.sc-body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  font-family: system-ui, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  user-select: none;
-}
-
-.sc-dialog__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.sc-dialog__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2328;
-}
-
-.sc-dialog__sub {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: #8a919c;
-}
-
-.sc-dialog__close {
-  border: none;
-  background: transparent;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  font-size: 17px;
-  line-height: 26px;
-  color: #8a919c;
-  cursor: pointer;
-  border-radius: 7px;
-  flex-shrink: 0;
-  transition: background-color 0.12s, color 0.12s;
-}
-
-.sc-dialog__close:hover {
-  color: #1f2328;
-  background: #f3f6f9;
-}
-
-.sc-dialog__body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
 .sc-row {
@@ -186,15 +128,19 @@ onMounted(() => {
   gap: 6px;
 }
 
+.sc-row--col .sc-row__label {
+  width: auto;
+}
+
 .sc-row__label {
-  width: 120px;
+  width: 132px;
   flex-shrink: 0;
   font-size: 12.5px;
   color: #1f2328;
 }
 
-.sc-row__input {
-  width: 110px;
+.sc-input {
+  width: 180px;
   border: 1px solid #d5dae1;
   border-radius: 8px;
   padding: 6px 10px;
@@ -205,29 +151,53 @@ onMounted(() => {
   transition: border-color 0.12s;
 }
 
-.sc-row__input--sm {
-  width: 90px;
-}
-
-.sc-row__input--wide {
-  width: 180px;
-}
-
-.sc-row__input:hover,
-.sc-row__input:focus {
+.sc-input:hover,
+.sc-input:focus {
   border-color: #0f766e;
   outline: none;
 }
 
+/* 开关样式复选框：原生 checkbox 观感粗糙，自绘轨道滑块贴弹窗配色 */
 .sc-switch {
+  appearance: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border: none;
+  border-radius: 999px;
+  background: #d5dae1;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.15s;
+}
+
+.sc-switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
   width: 16px;
   height: 16px;
-  accent-color: #0f766e;
-  cursor: pointer;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(2, 8, 20, 0.2);
+  transition: transform 0.15s;
+}
+
+.sc-switch:checked {
+  background: #0f766e;
+}
+
+.sc-switch:checked::after {
+  transform: translateX(14px);
 }
 
 .sc-row__hint {
+  flex: 1;
+  min-width: 0;
   font-size: 11px;
+  line-height: 1.5;
   color: #8a919c;
 }
 
@@ -237,7 +207,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   min-height: 34px;
-  padding: 4px 6px;
+  padding: 4px 8px;
   border: 1px solid #d5dae1;
   border-radius: 8px;
   background: #fff;
@@ -282,19 +252,12 @@ onMounted(() => {
   color: #1f2328;
 }
 
-.sc-dialog__foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.sc-dialog__ok {
+.sc-feedback-ok {
   font-size: 12px;
   color: #0f766e;
 }
 
-.sc-dialog__err {
+.sc-feedback-err {
   font-size: 12px;
   color: #dc2626;
 }

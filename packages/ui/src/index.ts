@@ -9,4 +9,5 @@ export { default as CaptureConfigDialog } from './capture/CaptureConfigDialog.vu
 export { default as CaptureDialog } from './capture/CaptureDialog.vue'
 export { default as CaptureStage } from './capture/CaptureStage.vue'
 export { useCaptureSession } from './capture/use-capture-session'
+export { default as ConfigDialogShell } from './dialog/ConfigDialogShell.vue'
 export { default as ScannerConfigDialog } from './scanner/ScannerConfigDialog.vue'

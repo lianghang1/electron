@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ConfigDeviceStatus } from './use-capture-config'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import ConfigDialogShell from '../dialog/ConfigDialogShell.vue'
 import CaptureDeviceForm from './CaptureDeviceForm.vue'
 import { useCaptureConfig } from './use-capture-config'
 
@@ -70,10 +71,6 @@ function onSnapTest(): void {
   void snapTest()
 }
 
-function onClose(): void {
-  emit('close')
-}
-
 onMounted(() => {
   void load()
 })
@@ -82,146 +79,89 @@ onBeforeUnmount(resetRemoveConfirm)
 </script>
 
 <template>
-  <div class="cu-cfgdialog">
-    <header class="cu-cfgdialog__head">
-      <div>
-        <h3 class="cu-cfgdialog__title">
-          拍摄设备配置
-        </h3>
-        <p class="cu-cfgdialog__sub">
-          高拍仪 / 扫描仪接入参数，保存后立即生效（热重建适配器）
-        </p>
-      </div>
-      <button class="cu-cfgdialog__close" title="关闭" @click="onClose">
-        ×
-      </button>
-    </header>
-
-    <div class="cu-cfgdialog__body">
-      <aside class="cu-cfgdialog__list">
+  <ConfigDialogShell
+    title="拍摄设备配置"
+    subtitle="高拍仪 / 扫描仪接入参数，保存后立即生效（热重建适配器）"
+    @close="emit('close')"
+  >
+    <div class="cu-body">
+      <aside class="cu-list">
         <button
           v-for="config in configs" :key="config.id"
-          class="cu-cfgdialog__item"
-          :class="{ 'cu-cfgdialog__item--active': config.id === selectedId }"
+          class="cu-list__item"
+          :class="{ 'cu-list__item--active': config.id === selectedId }"
           @click="select(config.id)"
         >
-          <span class="cu-cfgdialog__item-status" :style="{ background: STATUS_META[statusOf(config)].color }" />
-          <span class="cu-cfgdialog__item-main">
-            <span class="cu-cfgdialog__item-name">{{ config.displayName }}</span>
-            <span class="cu-cfgdialog__item-meta">
+          <span class="cu-list__status" :style="{ background: STATUS_META[statusOf(config)].color }" />
+          <span class="cu-list__main">
+            <span class="cu-list__name">{{ config.displayName }}</span>
+            <span class="cu-list__meta">
               {{ TRANSPORT_LABEL[config.transport] ?? config.transport }} · {{ STATUS_META[statusOf(config)].label }}
             </span>
           </span>
         </button>
-        <button class="cu-cfgdialog__add" :disabled="loading" @click="createDraft">
+        <button class="cu-list__add" :disabled="loading" @click="createDraft">
           + 新增设备
         </button>
       </aside>
 
-      <section v-if="selected" class="cu-cfgdialog__editor">
-        <div class="cu-cfgdialog__editor-head">
-          <span class="cu-cfgdialog__editor-id" :title="selected.id">ID：{{ selected.id }}</span>
-          <span v-if="selectedStatus" class="cu-cfgdialog__editor-status" :style="{ color: selectedStatus.color }">
+      <section v-if="selected" class="cu-editor">
+        <div class="cu-editor__head">
+          <span class="cu-editor__id" :title="selected.id">ID：{{ selected.id }}</span>
+          <span v-if="selectedStatus" class="cu-editor__status" :style="{ color: selectedStatus.color }">
             {{ selectedStatus.label }}
           </span>
         </div>
         <CaptureDeviceForm :config="selected" />
-        <div class="cu-cfgdialog__test">
+        <div class="cu-test">
           <button
-            class="cu-cfgbtn"
+            class="cu-btn"
             :disabled="saving || snapping || loading"
             @click="onSnapTest"
           >
             {{ snapping ? '试拍中…' : '试拍' }}
           </button>
-          <span class="cu-cfgdialog__test-hint">保存当前配置并采集一张，验证连接参数</span>
-          <img v-if="snapThumb" :src="snapThumb" class="cu-cfgdialog__test-thumb" alt="试拍结果">
+          <span class="cu-test__hint">保存当前配置并采集一张，验证连接参数</span>
+          <img v-if="snapThumb" :src="snapThumb" class="cu-test__thumb" alt="试拍结果">
         </div>
       </section>
-      <p v-else class="cu-cfgdialog__empty">
+      <p v-else class="cu-empty">
         {{ loading ? '正在载入配置…' : '左侧选择或新增设备配置' }}
       </p>
     </div>
 
-    <footer class="cu-cfgdialog__foot">
-      <span v-if="message" class="cu-cfgdialog__ok">{{ message }}</span>
-      <span v-if="error" class="cu-cfgdialog__err">{{ error }}</span>
+    <template #feedback>
+      <span v-if="message" class="cu-feedback-ok">{{ message }}</span>
+      <span v-if="error" class="cu-feedback-err">{{ error }}</span>
+    </template>
+    <template #footer>
       <button
         v-if="selected"
-        class="cu-cfgbtn cu-cfgbtn--danger"
-        :class="{ 'cu-cfgbtn--confirming': confirmingRemove }"
+        class="cu-btn cu-btn--danger"
+        :class="{ 'cu-btn--confirming': confirmingRemove }"
         :disabled="saving"
         @click="onRemoveClick"
       >
         {{ confirmingRemove ? '确认删除？' : '删除' }}
       </button>
-      <button class="cu-cfgbtn cu-cfgbtn--primary" :disabled="!selected || saving || loading" @click="save">
+      <button class="cu-btn cu-btn--primary" :disabled="!selected || saving || loading" @click="save">
         {{ saving ? '保存中…' : '保存' }}
       </button>
-    </footer>
-  </div>
+    </template>
+  </ConfigDialogShell>
 </template>
 
 <style scoped>
-.cu-cfgdialog {
+.cu-body {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 640px;
-  max-width: calc(100vw - 48px);
-  font-family: system-ui, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  user-select: none;
-}
-
-.cu-cfgdialog__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.cu-cfgdialog__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #1f2328;
-}
-
-.cu-cfgdialog__sub {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: #8a919c;
-}
-
-.cu-cfgdialog__close {
-  border: none;
-  background: transparent;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  font-size: 17px;
-  line-height: 26px;
-  color: #8a919c;
-  cursor: pointer;
-  border-radius: 7px;
-  flex-shrink: 0;
-  transition: background-color 0.12s, color 0.12s;
-}
-
-.cu-cfgdialog__close:hover {
-  color: #1f2328;
-  background: #f3f6f9;
-}
-
-.cu-cfgdialog__body {
-  display: flex;
-  gap: 12px;
+  gap: 14px;
   align-items: stretch;
-  min-height: 280px;
+  min-height: 300px;
 }
 
 /* ---- 左列表 ---- */
-.cu-cfgdialog__list {
-  width: 210px;
+.cu-list {
+  width: 216px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -232,55 +172,55 @@ onBeforeUnmount(resetRemoveConfirm)
   overflow-y: auto;
 }
 
-.cu-cfgdialog__item {
+.cu-list__item {
   display: flex;
   align-items: center;
   gap: 8px;
   border: none;
   background: transparent;
-  padding: 7px 8px;
+  padding: 8px 9px;
   border-radius: 8px;
   text-align: left;
   cursor: pointer;
   transition: background-color 0.12s;
 }
 
-.cu-cfgdialog__item:hover {
+.cu-list__item:hover {
   background: #f3f6f9;
 }
 
-.cu-cfgdialog__item--active {
+.cu-list__item--active {
   background: #ccfbf1;
 }
 
-.cu-cfgdialog__item-status {
+.cu-list__status {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.cu-cfgdialog__item-main {
+.cu-list__main {
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 
-.cu-cfgdialog__item-name {
-  font-size: 12px;
+.cu-list__name {
+  font-size: 12.5px;
   color: #1f2328;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cu-cfgdialog__item-meta {
-  font-size: 10.5px;
+.cu-list__meta {
+  font-size: 11px;
   color: #8a919c;
 }
 
-.cu-cfgdialog__add {
+.cu-list__add {
   margin-top: 2px;
   border: 1px dashed #d5dae1;
   background: transparent;
@@ -293,37 +233,37 @@ onBeforeUnmount(resetRemoveConfirm)
   transition: border-color 0.12s, background-color 0.12s;
 }
 
-.cu-cfgdialog__add:hover:not(:disabled) {
+.cu-list__add:hover:not(:disabled) {
   border-color: #0f766e;
   background: #f0fdfa;
 }
 
-.cu-cfgdialog__add:disabled {
+.cu-list__add:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
 /* ---- 右编辑区 ---- */
-.cu-cfgdialog__editor {
+.cu-editor {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 12px 14px;
   border: 1px solid #e6eaf0;
   border-radius: 10px;
   overflow-y: auto;
 }
 
-.cu-cfgdialog__editor-head {
+.cu-editor__head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.cu-cfgdialog__editor-id {
+.cu-editor__id {
   font-size: 11px;
   color: #a5adb8;
   overflow: hidden;
@@ -331,13 +271,13 @@ onBeforeUnmount(resetRemoveConfirm)
   white-space: nowrap;
 }
 
-.cu-cfgdialog__editor-status {
+.cu-editor__status {
   font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
 }
 
-.cu-cfgdialog__empty {
+.cu-empty {
   flex: 1;
   display: flex;
   align-items: center;
@@ -350,20 +290,21 @@ onBeforeUnmount(resetRemoveConfirm)
 }
 
 /* ---- 试拍测试区 ---- */
-.cu-cfgdialog__test {
+.cu-test {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-top: 10px;
+  padding-top: 12px;
+  margin-top: auto;
   border-top: 1px solid #eef1f5;
 }
 
-.cu-cfgdialog__test-hint {
+.cu-test__hint {
   font-size: 11px;
   color: #8a919c;
 }
 
-.cu-cfgdialog__test-thumb {
+.cu-test__thumb {
   margin-left: auto;
   max-height: 140px;
   max-width: 45%;
@@ -371,25 +312,18 @@ onBeforeUnmount(resetRemoveConfirm)
   border: 1px solid #e6eaf0;
 }
 
-/* ---- 底部 ---- */
-.cu-cfgdialog__foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
-.cu-cfgdialog__ok {
+.cu-feedback-ok {
   font-size: 12px;
   color: #0f766e;
 }
 
-.cu-cfgdialog__err {
+.cu-feedback-err {
   font-size: 12px;
   color: #dc2626;
 }
 
-.cu-cfgbtn {
+/* ---- 操作按钮 ---- */
+.cu-btn {
   border: 1px solid #d5dae1;
   border-radius: 8px;
   padding: 7px 18px;
@@ -402,29 +336,29 @@ onBeforeUnmount(resetRemoveConfirm)
   transition: background-color 0.12s, border-color 0.12s, color 0.12s, opacity 0.12s;
 }
 
-.cu-cfgbtn--danger:hover:not(:disabled):not(.cu-cfgbtn--confirming) {
+.cu-btn--danger:hover:not(:disabled):not(.cu-btn--confirming) {
   border-color: #dc2626;
   color: #dc2626;
 }
 
-.cu-cfgbtn--confirming {
+.cu-btn--confirming {
   border-color: #dc2626;
   background: #dc2626;
   color: #fff;
 }
 
-.cu-cfgbtn--primary {
+.cu-btn--primary {
   border-color: #0f766e;
   background: #0f766e;
   color: #fff;
 }
 
-.cu-cfgbtn--primary:hover:not(:disabled) {
+.cu-btn--primary:hover:not(:disabled) {
   border-color: #0d6a63;
   background: #0d6a63;
 }
 
-.cu-cfgbtn:disabled {
+.cu-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }

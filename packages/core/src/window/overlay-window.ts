@@ -1,9 +1,10 @@
-import type { CaptureDialogSession, DeviceConfigKind, DownloadTask, OverlaySyncState, PermissionRequest, PlatformNotification, TabContextMenu } from '@desktop/shared'
+import type { CaptureDialogSession, DeviceConfigKind, DownloadTask, OverlaySyncState, OverlayWindowKind, PermissionRequest, PlatformNotification, TabContextMenu } from '@desktop/shared'
 import type { WebContents } from 'electron'
 import type { CallerResolver } from '../ipc/caller-context'
 import type { Logger } from '../logger/logger'
 import { join } from 'node:path'
 import process from 'node:process'
+import { buildOverlayHash } from '@desktop/shared'
 import { is } from '@electron-toolkit/utils'
 import { BrowserWindow } from 'electron'
 
@@ -24,9 +25,6 @@ const TOAST_TTL_MS = 8000
 const DOWNLOAD_TTL_MS = TOAST_TTL_MS
 /** 弹窗清场到隐藏的间隔（ms）：等浮层页绘制完透明空帧再 hide，2-3 帧足够，留余量 */
 const OVERLAY_CLEAR_DELAY_MS = 100
-
-/** 浮层窗用途：决定页面初始 sync 分发与渲染分支（URL hash 透传给 OverlayApp） */
-export type OverlayWindowKind = 'panel' | 'dialog' | 'menu' | 'capture' | 'config'
 
 /**
  * 浮层窗口服务：独立透明无边框 BrowserWindow 承载全局浮层。
@@ -528,12 +526,14 @@ export class OverlayWindowService {
     // 浮层页以 Shell 身份登记：与 Shell 同级信任（全量桥），回传通道经 isOverlay 关卡校验
     this.resolver.register(wc, { appId: SHELL_APP_ID, instanceId: `overlay-${win.id}` })
 
-    // kind 经 URL hash 透传：OverlayApp 按窗用途分流初始 sync 与渲染分支
+    // kind 经 URL hash 透传：OverlayApp 按窗用途分流初始 sync 与渲染分支（编解码单点在 shared）
     const devUrl = process.env.ELECTRON_RENDERER_URL
+    const hash = buildOverlayHash(kind)
     const load
       = is.dev && devUrl
-        ? win.loadURL(`${devUrl}#/overlay?kind=${kind}`)
-        : win.loadFile(join(__dirname, '../renderer/index.html'), { hash: `/overlay?kind=${kind}` })
+        ? win.loadURL(`${devUrl}${hash}`)
+        // loadFile 的 hash 参数不带 '#'
+        : win.loadFile(join(__dirname, '../renderer/index.html'), { hash: hash.slice(1) })
     void load.catch((error) => {
       this.logger.error('failed to load overlay renderer', { error: String(error) })
     })
