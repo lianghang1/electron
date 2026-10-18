@@ -18,7 +18,6 @@ const {
   statusOf,
   load,
   select,
-  createDraft,
   save,
   remove,
   snapping,
@@ -100,9 +99,6 @@ onBeforeUnmount(resetRemoveConfirm)
             </span>
           </span>
         </button>
-        <button class="cu-list__add" :disabled="loading" @click="createDraft">
-          + 新增设备
-        </button>
       </aside>
 
       <section v-if="selected" class="cu-editor">
@@ -126,7 +122,7 @@ onBeforeUnmount(resetRemoveConfirm)
         </div>
       </section>
       <p v-else class="cu-empty">
-        {{ loading ? '正在载入配置…' : '左侧选择或新增设备配置' }}
+        {{ loading ? '正在载入配置…' : '暂无可用设备配置' }}
       </p>
     </div>
 
@@ -218,29 +214,6 @@ onBeforeUnmount(resetRemoveConfirm)
 .cu-list__meta {
   font-size: 11px;
   color: #8a919c;
-}
-
-.cu-list__add {
-  margin-top: 2px;
-  border: 1px dashed #d5dae1;
-  background: transparent;
-  border-radius: 8px;
-  padding: 7px;
-  font-size: 12px;
-  font-family: inherit;
-  color: #0f766e;
-  cursor: pointer;
-  transition: border-color 0.12s, background-color 0.12s;
-}
-
-.cu-list__add:hover:not(:disabled) {
-  border-color: #0f766e;
-  background: #f0fdfa;
-}
-
-.cu-list__add:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 /* ---- 右编辑区 ---- */

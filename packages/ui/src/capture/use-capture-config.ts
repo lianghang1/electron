@@ -27,7 +27,6 @@ export interface CaptureConfigUi {
   statusOf: (config: CaptureDeviceConfig) => ConfigDeviceStatus
   load: () => Promise<void>
   select: (id: string) => void
-  createDraft: () => void
   save: () => Promise<void>
   remove: () => Promise<void>
   /** 试拍测试进行中标记 */
@@ -87,20 +86,6 @@ export function useCaptureConfig(): CaptureConfigUi {
     snapThumb.value = ''
   }
 
-  /** 新建草稿：自动生成 id 并选中，保存前仅存在于本地列表 */
-  function createDraft(): void {
-    const draft: CaptureDeviceConfig = {
-      id: `custom-${crypto.randomUUID().slice(0, 8)}`,
-      brand: '',
-      displayName: '新建设备',
-      transport: 'ws',
-      ws: { url: '' },
-    }
-    configs.value = [...configs.value, draft]
-    selectedId.value = draft.id
-    error.value = ''
-  }
-
   async function save(): Promise<void> {
     const config = selected.value
     if (!config) { return }
@@ -132,7 +117,7 @@ export function useCaptureConfig(): CaptureConfigUi {
       const removed = await window.desktop.capture.removeConfig(config.id)
       configs.value = configs.value.filter(c => c.id !== config.id)
       selectedId.value = configs.value[0]?.id ?? ''
-      showMessage(removed ? '已删除' : '已移除本地未保存项')
+      showMessage(removed ? '已删除' : '未找到对应配置')
     }
     catch (err) {
       error.value = describeError(err, '删除失败')
@@ -182,7 +167,6 @@ export function useCaptureConfig(): CaptureConfigUi {
     statusOf,
     load,
     select,
-    createDraft,
     save,
     remove,
     snapping,
