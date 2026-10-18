@@ -29,6 +29,8 @@ export interface CaptureConfigView {
   message: string
   error: string
   selected: CaptureDeviceConfig | undefined
+  /** 选中配置与最近一次保存值存在差异（未保存黄条依据） */
+  dirty: boolean
   /** 选中配置对应的统一设备状态（设备 id = "<transport>:<配置 id>"） */
   statusOf: (config: CaptureDeviceConfig) => ConfigDeviceStatus
   /** 删除两步确认武装中（按钮变「确认删除？」） */
@@ -61,6 +63,15 @@ export function useCaptureConfig(): CaptureConfigView {
 
   const selected = computed(() => configs.value.find(c => c.id === selectedId.value))
 
+  /** 各配置最近一次保存值快照（dirty 判定基准，按配置 id 存 JSON） */
+  const savedSnapshots = ref(new Map<string, string>())
+
+  const dirty = computed(() => {
+    const config = selected.value
+    if (!config) { return false }
+    return savedSnapshots.value.get(config.id) !== JSON.stringify(config)
+  })
+
   function statusOf(config: CaptureDeviceConfig): ConfigDeviceStatus {
     const device = devices.value.find(d => d.id === `${config.transport}:${config.id}`)
     return device?.status ?? 'missing'
@@ -72,6 +83,7 @@ export function useCaptureConfig(): CaptureConfigView {
     error.value = ''
     try {
       configs.value = await window.desktop.capture.getConfig()
+      savedSnapshots.value = new Map(configs.value.map(c => [c.id, JSON.stringify(c)]))
       try {
         devices.value = await window.desktop.capture.listDevices()
       }
@@ -109,6 +121,7 @@ export function useCaptureConfig(): CaptureConfigView {
     error.value = ''
     try {
       await window.desktop.capture.setConfig(snapshot(config))
+      savedSnapshots.value.set(config.id, JSON.stringify(config))
       showMessage('已保存')
     }
     catch (err) {
@@ -127,6 +140,7 @@ export function useCaptureConfig(): CaptureConfigView {
     try {
       const removed = await window.desktop.capture.removeConfig(config.id)
       configs.value = configs.value.filter(c => c.id !== config.id)
+      savedSnapshots.value.delete(config.id)
       selectedId.value = configs.value[0]?.id ?? ''
       showMessage(removed ? '已删除' : '未找到对应配置')
     }
@@ -202,6 +216,7 @@ export function useCaptureConfig(): CaptureConfigView {
     message,
     error,
     selected,
+    dirty,
     statusOf,
     confirmingRemove,
     load,

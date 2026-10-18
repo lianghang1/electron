@@ -28,6 +28,16 @@ export type {
 export { decodeIpcError, DesktopError, encodeIpcError, IpcRemoteError } from './errors'
 export type { DesktopErrorCode, IpcErrorPayload } from './errors'
 
+/* ---------------- 展示工具（浮层 / 应用页共用） ---------------- */
+
+export { formatBytes } from './format'
+
+/* ---------------- 浮层窗契约与权限文案（OverlayWindow 独立原生窗 / 应用页共用） ---------------- */
+
+export { buildOverlayHash, OVERLAY_HASH, parseOverlayHash } from './overlay-contract'
+export type { OverlayWindowKind } from './overlay-contract'
+export { PERMISSION_LABELS, permissionLabel } from './permission-labels'
+
 /* ---------------- 域契约定义原语（defineDomain：契约定义即映射） ---------------- */
 
 export type { DesktopApi, DesktopEvents } from './types/api'
@@ -89,11 +99,6 @@ export { captureDomain, deviceDomain, platformDomains, printDomain, scannerDomai
 /* ---------------- 下载任务 ---------------- */
 
 export type { DesktopInvoke, DesktopIpc } from './types/ipc'
-
-/* ---------------- 浮层（OverlayWindow 独立原生窗） ---------------- */
-
-export { buildOverlayHash, OVERLAY_HASH, parseOverlayHash } from './overlay-contract'
-export type { OverlayWindowKind } from './overlay-contract'
 export type { DeviceConfigKind, OverlaySyncState, TabContextMenu, TabMenuAction } from './types/ipc/overlay'
 
 /* ---------------- App 清单与来源（多 App 注册） ---------------- */

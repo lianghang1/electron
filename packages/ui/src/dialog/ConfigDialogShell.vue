@@ -1,23 +1,15 @@
 <script setup lang="ts">
 /**
- * 配置弹窗外壳：统一承载弹窗 chrome（标题/副标题/关闭钮 + 分隔线 + 底部操作区），
- * 内容由使用方经插槽注入。所有配置类弹窗共用，保证弹窗形态一致。
- * bodyHeight 设置后内容区恒高（overflow hidden），内部滚动交给内容层（如 UiScrollArea）。
+ * 配置弹窗外壳：统一承载弹窗 chrome（标题/关闭钮 + 分隔线 + 底部操作区），
+ * 高度撑满父容器（父级给定弹窗整体尺寸，如 880×620 卡片），内容区自适应伸缩，
+ * 内部滚动交给内容层（如 UiScrollArea）。
  */
-import { computed } from 'vue'
-
-const props = defineProps<{
+defineProps<{
   title: string
   subtitle?: string
-  /** 内容区固定高度（px）：设置后弹窗高度恒定，超出内容由使用方滚动查看 */
-  bodyHeight?: number
 }>()
 
 const emit = defineEmits<{ close: [] }>()
-
-const bodyStyle = computed(() => (props.bodyHeight
-  ? { height: `${props.bodyHeight}px` }
-  : undefined))
 </script>
 
 <template>
@@ -32,11 +24,13 @@ const bodyStyle = computed(() => (props.bodyHeight
         </p>
       </div>
       <button class="cfg-shell__close" title="关闭" @click="emit('close')">
-        ×
+        <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+          <path d="m4 4 8 8m0-8-8 8" />
+        </svg>
       </button>
     </header>
 
-    <div class="cfg-shell__body" :class="{ 'cfg-shell__body--fixed': bodyHeight }" :style="bodyStyle">
+    <div class="cfg-shell__body">
       <slot />
     </div>
 
@@ -55,43 +49,57 @@ const bodyStyle = computed(() => (props.bodyHeight
 .cfg-shell {
   display: flex;
   flex-direction: column;
-  padding: 18px 22px 16px;
+  height: 100%;
   font-family: system-ui, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   user-select: none;
 }
 
 .cfg-shell__head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding-bottom: 12px;
+  flex-shrink: 0;
+  height: 52px;
+  padding: 0 20px;
   border-bottom: 1px solid #eef1f5;
+}
+
+.cfg-shell__headings {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
 }
 
 .cfg-shell__title {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
-  line-height: 22px;
+  line-height: 20px;
   color: #1f2328;
+  flex-shrink: 0;
 }
 
 .cfg-shell__sub {
-  margin: 3px 0 0;
-  font-size: 12px;
-  line-height: 1.5;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 16px;
   color: #8a919c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cfg-shell__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
   width: 28px;
   height: 28px;
   padding: 0;
-  font-size: 18px;
-  line-height: 28px;
   color: #8a919c;
   cursor: pointer;
   border-radius: 8px;
@@ -105,11 +113,8 @@ const bodyStyle = computed(() => (props.bodyHeight
 }
 
 .cfg-shell__body {
-  padding-top: 16px;
-}
-
-/* 固定高度形态：溢出裁切，内部滚动由内容层组件接管 */
-.cfg-shell__body--fixed {
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -117,8 +122,9 @@ const bodyStyle = computed(() => (props.bodyHeight
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 16px;
-  padding-top: 12px;
+  flex-shrink: 0;
+  height: 56px;
+  padding: 0 20px;
   border-top: 1px solid #eef1f5;
 }
 

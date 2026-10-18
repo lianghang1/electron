@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { AppPermissionState, DesktopTab, RegisteredApp } from '@desktop/shared'
+import { permissionLabel } from '@desktop/shared'
 import { AccordionContent, AccordionHeader, AccordionItem, AccordionRoot, AccordionTrigger, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogOverlay, AlertDialogRoot, AlertDialogTitle } from 'reka-ui'
 import { computed, ref, watch } from 'vue'
-import { permissionLabel } from '../composables/use-permission-labels'
 
 const props = defineProps<{
   /** 注册表全量条目（含来源） */

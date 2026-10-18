@@ -139,13 +139,14 @@ function removePrefix(prefix: string): void {
 .sc-body {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .sc-group__title {
   margin: 0 0 8px;
   font-size: 13px;
   font-weight: 600;
+  line-height: 18px;
   color: #1f2328;
 }
 
@@ -161,11 +162,11 @@ function removePrefix(prefix: string): void {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 11px 14px;
+  padding: 12px 16px;
 }
 
 .sc-row + .sc-row {
-  border-top: 1px solid #eef1f5;
+  border-top: 1px solid #f0f2f5;
 }
 
 .sc-row--stack {
@@ -182,12 +183,13 @@ function removePrefix(prefix: string): void {
 }
 
 .sc-row__label {
-  font-size: 12.5px;
+  font-size: 13px;
+  line-height: 18px;
   color: #1f2328;
 }
 
 .sc-row__desc {
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.5;
   color: #8a919c;
 }
@@ -201,9 +203,10 @@ function removePrefix(prefix: string): void {
 
 .sc-input {
   width: 120px;
+  height: 30px;
   border: 1px solid #d5dae1;
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 0 10px;
   font-size: 12px;
   font-family: inherit;
   color: #1f2328;
@@ -319,6 +322,11 @@ function removePrefix(prefix: string): void {
   cursor: pointer;
   flex-shrink: 0;
   transition: background-color 0.12s, border-color 0.12s, opacity 0.12s;
+}
+
+.sc-btn:hover:not(:disabled) {
+  border-color: #0f766e;
+  color: #0f766e;
 }
 
 .sc-btn:disabled {

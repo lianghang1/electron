@@ -1,4 +1,4 @@
-import type { Permission } from '@desktop/shared'
+import type { Permission } from './types/permission'
 
 /** 平台权限的展示文案（权限请求横幅 / 应用中心详情共用） */
 export const PERMISSION_LABELS: Record<Permission, string> = {

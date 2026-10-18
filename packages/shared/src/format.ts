@@ -1,4 +1,4 @@
-/** 字节数 → 可读大小（浮层下载面板用） */
+/** 字节数 → 可读大小（下载面板等展示用） */
 export function formatBytes(bytes: number): string {
   if (bytes <= 0) { return '0 B' }
   const units = ['B', 'KB', 'MB', 'GB']

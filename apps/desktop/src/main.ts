@@ -1,8 +1,8 @@
 import { parseOverlayHash } from '@desktop/shared'
+import { OverlayApp } from '@desktop/ui'
 import { createApp } from 'vue'
 
 import App from './App.vue'
-import OverlayApp from './overlay/OverlayApp.vue'
 
 import './styles/css/reset.css'
 import './styles/css/transition.css'

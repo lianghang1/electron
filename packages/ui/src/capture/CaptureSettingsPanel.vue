@@ -3,14 +3,15 @@ import type { CaptureConfigView, ConfigDeviceStatus } from './use-capture-config
 import UiScrollArea from '../scroll/UiScrollArea.vue'
 import CaptureDeviceForm from './CaptureDeviceForm.vue'
 
-/** 拍摄设置面板：纯展示体，状态由系统设置弹窗传入（body 区，不含弹窗 chrome 与底部操作） */
+/** 拍摄设置面板：纯展示体，状态由系统设置弹窗传入（body 区，不含弹窗 chrome 与底部操作区） */
 const props = defineProps<{ state: CaptureConfigView }>()
 
-const STATUS_META: Record<ConfigDeviceStatus, { label: string, color: string }> = {
-  ready: { label: '就绪', color: '#22c55e' },
-  offline: { label: '离线', color: '#f59e0b' },
-  unavailable: { label: '不可用', color: '#6b7688' },
-  missing: { label: '未接入', color: '#d1d5db' },
+/** 状态徽标元数据：文案 + 软底色配色（列表与编辑区头部分层展示用） */
+const STATUS_META: Record<ConfigDeviceStatus, { label: string, text: string, bg: string }> = {
+  ready: { label: '就绪', text: '#15803d', bg: '#dcfce7' },
+  offline: { label: '离线', text: '#b45309', bg: '#fef3c7' },
+  unavailable: { label: '不可用', text: '#57606a', bg: '#eceff3' },
+  missing: { label: '未接入', text: '#8a919c', bg: '#f3f5f8' },
 }
 
 const TRANSPORT_LABEL: Record<string, string> = {
@@ -36,12 +37,13 @@ function onSnapTest(): void {
           :class="{ 'cu-list__item--active': config.id === state.selectedId }"
           @click="state.select(config.id)"
         >
-          <span class="cu-list__status" :style="{ background: STATUS_META[state.statusOf(config)].color }" />
-          <span class="cu-list__main">
-            <span class="cu-list__name">{{ config.displayName }}</span>
-            <span class="cu-list__meta">
-              {{ TRANSPORT_LABEL[config.transport] ?? config.transport }} · {{ STATUS_META[state.statusOf(config)].label }}
-            </span>
+          <span class="cu-list__name">{{ config.displayName }}</span>
+          <span class="cu-list__meta">
+            <span
+              class="cu-badge"
+              :style="{ color: STATUS_META[state.statusOf(config)].text, background: STATUS_META[state.statusOf(config)].bg }"
+            >{{ STATUS_META[state.statusOf(config)].label }}</span>
+            <span class="cu-tag">{{ TRANSPORT_LABEL[config.transport] ?? config.transport }}</span>
           </span>
         </button>
       </UiScrollArea>
@@ -49,10 +51,13 @@ function onSnapTest(): void {
 
     <section v-if="state.selected" class="cu-editor">
       <div class="cu-editor__head">
+        <span class="cu-editor__name">{{ state.selected.displayName }}</span>
+        <span
+          class="cu-badge"
+          :style="{ color: STATUS_META[state.statusOf(state.selected)].text, background: STATUS_META[state.statusOf(state.selected)].bg }"
+        >{{ STATUS_META[state.statusOf(state.selected)].label }}</span>
+        <span class="cu-tag">{{ TRANSPORT_LABEL[state.selected.transport] ?? state.selected.transport }}</span>
         <span class="cu-editor__id" :title="state.selected.id">ID：{{ state.selected.id }}</span>
-        <span class="cu-editor__status" :style="{ color: STATUS_META[state.statusOf(state.selected)].color }">
-          {{ STATUS_META[state.statusOf(state.selected)].label }}
-        </span>
       </div>
       <CaptureDeviceForm :config="state.selected" />
       <div class="cu-test">
@@ -76,7 +81,7 @@ function onSnapTest(): void {
 <style scoped>
 .cu-body {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   align-items: stretch;
   /* 填满系统设置弹窗的统一内容区高度（不足留白，超高交给外层滚动） */
   min-height: 100%;
@@ -84,27 +89,31 @@ function onSnapTest(): void {
 
 /* ---- 左列表 ---- */
 .cu-list {
-  width: 216px;
+  width: 224px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  align-self: flex-start;
   padding: 6px;
   border: 1px solid #e6eaf0;
   border-radius: 10px;
+  background: #fbfcfd;
 }
 
 .cu-list__scroll {
   flex: 1;
   min-height: 0;
+  max-height: 420px;
 }
 
 .cu-list__item {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
   border: none;
   background: transparent;
-  padding: 8px 9px;
+  padding: 8px 10px;
   border-radius: 8px;
   text-align: left;
   cursor: pointer;
@@ -112,42 +121,61 @@ function onSnapTest(): void {
 }
 
 .cu-list__item + .cu-list__item {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .cu-list__item:hover {
-  background: #f3f6f9;
+  background: #f0f3f7;
 }
 
 .cu-list__item--active {
-  background: #ccfbf1;
+  background: #d9efed;
 }
 
-.cu-list__status {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.cu-list__main {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+.cu-list__item--active:hover {
+  background: #d9efed;
 }
 
 .cu-list__name {
   font-size: 12.5px;
+  font-weight: 500;
   color: #1f2328;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/* 徽标行：状态 + 接入方式分层展示 */
 .cu-list__meta {
-  font-size: 11px;
-  color: #8a919c;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cu-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cu-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid #e3e8ee;
+  background: #fff;
+  font-size: 10.5px;
+  color: #57606a;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 /* ---- 右编辑区 ---- */
@@ -156,8 +184,8 @@ function onSnapTest(): void {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 14px;
+  padding: 14px 16px 16px;
   border: 1px solid #e6eaf0;
   border-radius: 10px;
 }
@@ -165,21 +193,27 @@ function onSnapTest(): void {
 .cu-editor__head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f2f5;
 }
 
-.cu-editor__id {
-  font-size: 11px;
-  color: #a5adb8;
+.cu-editor__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1f2328;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cu-editor__status {
+.cu-editor__id {
+  margin-left: auto;
   font-size: 11px;
-  font-weight: 600;
+  color: #a5adb8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   flex-shrink: 0;
 }
 
@@ -212,8 +246,8 @@ function onSnapTest(): void {
 
 .cu-test__thumb {
   margin-left: auto;
-  max-height: 140px;
-  max-width: 45%;
+  max-height: 120px;
+  max-width: 40%;
   border-radius: 8px;
   border: 1px solid #e6eaf0;
 }
@@ -229,6 +263,11 @@ function onSnapTest(): void {
   cursor: pointer;
   flex-shrink: 0;
   transition: background-color 0.12s, border-color 0.12s, opacity 0.12s;
+}
+
+.cu-btn:hover:not(:disabled) {
+  border-color: #0f766e;
+  color: #0f766e;
 }
 
 .cu-btn:disabled {

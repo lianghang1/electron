@@ -1,5 +1,5 @@
 import type { ScannerConfig, ScanResult } from '@desktop/shared'
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 
 /**
  * 扫码枪设置面板视图状态（reactive 扁平化，经 props 传入面板直接绑定，
@@ -14,6 +14,8 @@ export interface ScannerConfigView {
   /** 保存/测试成功提示（短暂展示后清除） */
   message: string
   error: string
+  /** 表单与最近一次保存值存在差异（未保存黄条依据） */
+  dirty: boolean
   load: () => Promise<void>
   save: () => Promise<void>
   /** 模拟扫码测试：先保存当前表单配置再走真实识别链路，结果经 message 反馈 */
@@ -39,12 +41,30 @@ export function useScannerConfig(): ScannerConfigView {
   const error = ref('')
   let messageTimer: ReturnType<typeof setTimeout> | null = null
 
+  /** 最近一次保存值快照（dirty 判定基准） */
+  const savedSnapshot = ref('')
+
+  /** IPC 白名单收敛后的完整形态（快照与编辑态同构，避免字段缺失导致的假 dirty） */
+  function toSnapshot(value: ScannerConfig): string {
+    return JSON.stringify({
+      enabled: value.enabled,
+      timeout: value.timeout,
+      minLength: value.minLength,
+      endKey: value.endKey,
+      prefixes: value.prefixes,
+      requirePrefix: value.requirePrefix,
+    })
+  }
+
+  const dirty = computed(() => toSnapshot(config.value) !== savedSnapshot.value)
+
   /** 载入当前配置（失败显错，保留占位值供编辑） */
   async function load(): Promise<void> {
     loading.value = true
     error.value = ''
     try {
       config.value = await window.desktop.scanner.getConfig()
+      savedSnapshot.value = toSnapshot(config.value)
     }
     catch (err) {
       error.value = describeError(err, '配置载入失败')
@@ -70,6 +90,7 @@ export function useScannerConfig(): ScannerConfigView {
         requirePrefix: config.value.requirePrefix,
       })
       config.value = await window.desktop.scanner.getConfig()
+      savedSnapshot.value = toSnapshot(config.value)
       showMessage('已保存')
     }
     catch (err) {
@@ -130,7 +151,7 @@ export function useScannerConfig(): ScannerConfigView {
     }, 2500)
   }
 
-  return reactive({ config, loading, saving, testing, message, error, load, save, simulate })
+  return reactive({ config, loading, saving, testing, message, error, dirty, load, save, simulate })
 }
 
 function describeError(err: unknown, fallback: string): string {
