@@ -1,8 +1,7 @@
 import type { CaptureDevice, CaptureDeviceConfig } from '@desktop/shared'
-import type { ComputedRef, Ref } from 'vue'
-import { computed, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref } from 'vue'
 
-/** 配置弹窗可选接入方式（uvc=本机摄像头无需配置、stub=内置测试，不进管理界面） */
+/** 配置面板可选接入方式（uvc=本机摄像头无需配置、stub=内置测试，不进管理界面） */
 export const CONFIG_TRANSPORTS: { value: CaptureDeviceConfig['transport'], label: string }[] = [
   { value: 'ws', label: '高拍仪（WebSocket）' },
   { value: 'dll', label: 'SDK 直连（DLL）' },
@@ -13,31 +12,42 @@ export const CONFIG_TRANSPORTS: { value: CaptureDeviceConfig['transport'], label
 /** 设备状态展示序（用于列表状态点配色） */
 export type ConfigDeviceStatus = CaptureDevice['status'] | 'missing'
 
-/** 拍摄设备配置弹窗状态与动作：列表 + 选中编辑 + 保存/删除（未保存改动关闭即丢弃） */
-export interface CaptureConfigUi {
-  configs: Ref<CaptureDeviceConfig[]>
-  selectedId: Ref<string>
-  loading: Ref<boolean>
-  saving: Ref<boolean>
+/** 删除两步确认的自动复位时长：超时未确认视为放弃 */
+const REMOVE_CONFIRM_MS = 3000
+
+/**
+ * 拍摄设置面板视图状态（reactive 扁平化，经 props 传入面板直接绑定，
+ * 状态归系统设置弹窗持有，面板只做展示与动作转发）。
+ * 列表 + 选中编辑 + 保存/删除，未保存改动关闭即丢弃。
+ */
+export interface CaptureConfigView {
+  configs: CaptureDeviceConfig[]
+  selectedId: string
+  loading: boolean
+  saving: boolean
   /** 保存/删除成功提示（短暂展示后清除） */
-  message: Ref<string>
-  error: Ref<string>
-  selected: ComputedRef<CaptureDeviceConfig | undefined>
+  message: string
+  error: string
+  selected: CaptureDeviceConfig | undefined
   /** 选中配置对应的统一设备状态（设备 id = "<transport>:<配置 id>"） */
   statusOf: (config: CaptureDeviceConfig) => ConfigDeviceStatus
+  /** 删除两步确认武装中（按钮变「确认删除？」） */
+  confirmingRemove: boolean
   load: () => Promise<void>
   select: (id: string) => void
   save: () => Promise<void>
   remove: () => Promise<void>
+  /** 两步确认删除：首次点击武装（超时自动复位），再次点击执行删除 */
+  requestRemove: () => void
   /** 试拍测试进行中标记 */
-  snapping: Ref<boolean>
+  snapping: boolean
   /** 试拍结果缩略图（空串 = 暂无结果/设备未返回缩略图） */
-  snapThumb: Ref<string>
-  /** 试拍测试：先保存当前草稿（未保存配置无对应设备），再按设备 id 采集一张 */
+  snapThumb: string
+  /** 试拍测试：先保存当前配置，再按设备 id 采集一张 */
   snapTest: () => Promise<void>
 }
 
-export function useCaptureConfig(): CaptureConfigUi {
+export function useCaptureConfig(): CaptureConfigView {
   const configs = ref<CaptureDeviceConfig[]>([])
   const devices = ref<CaptureDevice[]>([])
   const selectedId = ref('')
@@ -84,6 +94,7 @@ export function useCaptureConfig(): CaptureConfigUi {
     selectedId.value = id
     error.value = ''
     snapThumb.value = ''
+    resetRemoveConfirm()
   }
 
   async function save(): Promise<void> {
@@ -127,7 +138,34 @@ export function useCaptureConfig(): CaptureConfigUi {
     }
   }
 
-  /** 试拍测试：先保存当前草稿（未保存的配置没有对应设备），再按 "<transport>:<配置 id>" 采集一张 */
+  /** 删除两步确认：首次点击武装，超时未确认自动复位（免弹窗的轻量确认） */
+  const confirmingRemove = ref(false)
+  let removeTimer: ReturnType<typeof setTimeout> | null = null
+
+  function requestRemove(): void {
+    if (confirmingRemove.value) {
+      resetRemoveConfirm()
+      void remove()
+      return
+    }
+    confirmingRemove.value = true
+    removeTimer = setTimeout(() => {
+      confirmingRemove.value = false
+      removeTimer = null
+    }, REMOVE_CONFIRM_MS)
+  }
+
+  function resetRemoveConfirm(): void {
+    confirmingRemove.value = false
+    if (removeTimer) {
+      clearTimeout(removeTimer)
+      removeTimer = null
+    }
+  }
+
+  onScopeDispose(resetRemoveConfirm)
+
+  /** 试拍测试：先保存当前配置（未保存参数不生效），再按 "<transport>:<配置 id>" 采集一张 */
   async function snapTest(): Promise<void> {
     await save()
     if (error.value) { return }
@@ -156,7 +194,7 @@ export function useCaptureConfig(): CaptureConfigUi {
     }, 2500)
   }
 
-  return {
+  return reactive({
     configs,
     selectedId,
     loading,
@@ -165,14 +203,16 @@ export function useCaptureConfig(): CaptureConfigUi {
     error,
     selected,
     statusOf,
+    confirmingRemove,
     load,
     select,
     save,
     remove,
+    requestRemove,
     snapping,
     snapThumb,
     snapTest,
-  }
+  })
 }
 
 /** 保存前校验：transport 对应的必填连接参数 */

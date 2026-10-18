@@ -1,20 +1,30 @@
 <script setup lang="ts">
 /**
  * 配置弹窗外壳：统一承载弹窗 chrome（标题/副标题/关闭钮 + 分隔线 + 底部操作区），
- * 内容由使用方经插槽注入。所有设备配置类弹窗共用，保证弹窗形态一致，
- * 新增配置弹窗只需填 body 与 footer 插槽，不再各自手写贴边布局。
+ * 内容由使用方经插槽注入。所有设备配置类弹窗共用，保证弹窗形态一致。
+ * 多页签形态（系统设置）：传入 tabs 后 header 分隔线由页签行接管，
+ * activeTab 走 v-model:active-tab，页签行仅负责切换，页签内容与底部操作由使用方渲染。
  */
-defineProps<{
+const props = defineProps<{
   title: string
   subtitle?: string
+  /** 顶部页签定义（系统设置类多页签弹窗），空/缺省 = 单页表单 */
+  tabs?: { id: string, label: string }[]
+  activeTab?: string
 }>()
 
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ 'close': [], 'update:activeTab': [id: string] }>()
+
+function selectTab(id: string): void {
+  if (id !== props.activeTab) {
+    emit('update:activeTab', id)
+  }
+}
 </script>
 
 <template>
   <div class="cfg-shell">
-    <header class="cfg-shell__head">
+    <header class="cfg-shell__head" :class="{ 'cfg-shell__head--tabbed': tabs?.length }">
       <div class="cfg-shell__headings">
         <h3 class="cfg-shell__title">
           {{ title }}
@@ -27,6 +37,18 @@ const emit = defineEmits<{ close: [] }>()
         ×
       </button>
     </header>
+
+    <nav v-if="tabs?.length" class="cfg-shell__tabs">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        class="cfg-shell__tab"
+        :class="{ 'cfg-shell__tab--active': tab.id === activeTab }"
+        @click="selectTab(tab.id)"
+      >
+        {{ tab.label }}
+      </button>
+    </nav>
 
     <div class="cfg-shell__body">
       <slot />
@@ -59,6 +81,11 @@ const emit = defineEmits<{ close: [] }>()
   gap: 12px;
   padding-bottom: 12px;
   border-bottom: 1px solid #eef1f5;
+}
+
+/* 多页签形态：header 分隔线隐藏，由页签行底线接管（保持占位高度不变） */
+.cfg-shell__head--tabbed {
+  border-bottom-color: transparent;
 }
 
 .cfg-shell__title {
@@ -94,6 +121,44 @@ const emit = defineEmits<{ close: [] }>()
 .cfg-shell__close:hover {
   color: #1f2328;
   background: #f3f6f9;
+}
+
+.cfg-shell__tabs {
+  display: flex;
+  gap: 18px;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.cfg-shell__tab {
+  position: relative;
+  border: none;
+  background: transparent;
+  padding: 0 2px 9px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #8a919c;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.cfg-shell__tab:hover {
+  color: #1f2328;
+}
+
+.cfg-shell__tab--active {
+  color: #0f766e;
+  font-weight: 600;
+}
+
+.cfg-shell__tab--active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: #0f766e;
+  border-radius: 2px 2px 0 0;
 }
 
 .cfg-shell__body {

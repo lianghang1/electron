@@ -209,6 +209,15 @@ export class DesktopRuntime {
         iconPath: this.options.icon,
         title: this.options.window.title ?? this.options.app.name,
         getWindow: () => this.windowService.getMainWindow(),
+        // 托盘「设置」→ 系统设置浮层（设备配置统一弹窗），定位首个页签
+        openSettings: () => {
+          try {
+            this.overlayService.pushConfigDialog('scanner')
+          }
+          catch (error) {
+            this.logger.warn('open settings overlay failed', { error: String(error) })
+          }
+        },
         logger: this.logger.scope('tray'),
       })
     }

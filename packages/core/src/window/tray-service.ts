@@ -8,6 +8,8 @@ export interface TrayServiceDeps {
   /** 托盘悬浮提示（应用名） */
   title: string
   getWindow: () => BrowserWindow | undefined
+  /** 「设置」动作：系统设置浮层以主窗为 parent，点击时先唤起主窗再回调 */
+  openSettings: () => void
   logger: Logger
 }
 
@@ -30,6 +32,13 @@ export class TrayService {
     this.tray.setToolTip(this.deps.title)
     this.tray.setContextMenu(Menu.buildFromTemplate([
       { label: '显示主窗口', click: () => this.showWindow() },
+      {
+        label: '设置',
+        click: () => {
+          this.showWindow()
+          this.deps.openSettings()
+        },
+      },
       { type: 'separator' },
       { label: '退出', click: () => app.quit() },
     ]))

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CaptureDialogSession, DeviceConfigKind, DownloadTask, PermissionRequest, PlatformNotification, TabContextMenu, TabMenuAction } from '@desktop/shared'
 import { parseOverlayHash } from '@desktop/shared'
-import { CaptureConfigDialog, CaptureDialog, ScannerConfigDialog } from '@desktop/ui'
+import { CaptureDialog, SystemSettingsDialog } from '@desktop/ui'
 import {
   DialogContent,
   DialogDescription,
@@ -424,9 +424,9 @@ function dialogBtnClass(primary: boolean): string {
     </div>
 
     <!-- 设备配置浮层：全屏遮罩模态（配置窗独立页面实例承载），业务页（设备测试页）经桥发起。
-         遮罩不做动画（同拍摄浮层），卡片 pop 入场 + flex 双轴居中（配置卡不高，标准模态形态；
-         拍摄浮层内容超高才用贴顶布局）。配置弹窗组件由 @desktop/ui 提供，
-         配置保存走设备域 IPC（全量桥），kind 作 key 原地换卡 -->
+         系统设置统一弹窗承载各配置域（Tab 切换），openConfig 的 kind 语义 = 打开并定位页签；
+         遮罩不做动画（同拍摄浮层），卡片 pop 入场 + flex 双轴居中（拍摄浮层内容超高才用贴顶布局）。
+         kind 作 key：弹窗开着时另一入口按钮改变 kind → 原地换弹窗并定位到对应页签 -->
     <div
       v-if="configKind && overlayVisible"
       :key="configKind"
@@ -434,8 +434,7 @@ function dialogBtnClass(primary: boolean): string {
     >
       <div class="absolute inset-0 bg-[rgba(15,23,42,0.55)]" />
       <div class="ov-config__card ov-anim-pop relative w-[680px] max-w-[94vw] overflow-hidden rounded-[16px] bg-white shadow-[0_24px_64px_rgba(2,8,20,0.32)]">
-        <ScannerConfigDialog v-if="configKind === 'scanner'" @close="dismissConfig" />
-        <CaptureConfigDialog v-else-if="configKind === 'capture'" @close="dismissConfig" />
+        <SystemSettingsDialog :initial-tab="configKind" @close="dismissConfig" />
       </div>
     </div>
 

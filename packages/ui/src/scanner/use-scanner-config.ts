@@ -1,17 +1,19 @@
 import type { ScannerConfig, ScanResult } from '@desktop/shared'
-import type { Ref } from 'vue'
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 
-/** 扫码枪配置弹窗状态与动作：载入全量配置 → 本地编辑 → 提交 patch → 回读确认 */
-export interface ScannerConfigUi {
-  config: Ref<ScannerConfig>
-  loading: Ref<boolean>
-  saving: Ref<boolean>
-  /** 保存/测试进行中标记（防重复提交） */
-  testing: Ref<boolean>
+/**
+ * 扫码枪设置面板视图状态（reactive 扁平化，经 props 传入面板直接绑定，
+ * 状态归系统设置弹窗持有，面板只做展示与动作转发）。
+ */
+export interface ScannerConfigView {
+  config: ScannerConfig
+  loading: boolean
+  saving: boolean
+  /** 模拟扫码测试进行中标记（防重复提交） */
+  testing: boolean
   /** 保存/测试成功提示（短暂展示后清除） */
-  message: Ref<string>
-  error: Ref<string>
+  message: string
+  error: string
   load: () => Promise<void>
   save: () => Promise<void>
   /** 模拟扫码测试：先保存当前表单配置再走真实识别链路，结果经 message 反馈 */
@@ -28,7 +30,7 @@ const EMPTY_CONFIG: ScannerConfig = {
   requirePrefix: false,
 }
 
-export function useScannerConfig(): ScannerConfigUi {
+export function useScannerConfig(): ScannerConfigView {
   const config = ref<ScannerConfig>({ ...EMPTY_CONFIG })
   const loading = ref(false)
   const saving = ref(false)
@@ -52,7 +54,7 @@ export function useScannerConfig(): ScannerConfigUi {
     }
   }
 
-  /** 保存：全字段 patch 提交（ipc 层白名单收敛）→ 回读持久化结果 */
+  /** 保存：全字段 patch 提交（ipc 层白名单收敛）→ 回读确认 */
   async function save(): Promise<void> {
     if (!validate()) { return }
     saving.value = true
@@ -128,7 +130,7 @@ export function useScannerConfig(): ScannerConfigUi {
     }, 2500)
   }
 
-  return { config, loading, saving, testing, message, error, load, save, simulate }
+  return reactive({ config, loading, saving, testing, message, error, load, save, simulate })
 }
 
 function describeError(err: unknown, fallback: string): string {
