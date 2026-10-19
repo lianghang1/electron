@@ -32,9 +32,9 @@ export class PrintService {
     private readonly windows: HiddenWindowPool,
     private readonly registry: PrinterRegistry,
     deps: {
-      /** 归档 PDF 目录（建议 userData/print-archive） */
+      /** 归档 PDF 目录（平台统一根目录 files/print-archive/） */
       archiveDir: string
-      /** 任务簿文件（userData/print-jobs.json） */
+      /** 任务簿文件（平台统一根目录 storage/print-jobs.json） */
       jobsFile: string
       /** SumatraPDF 路径（资源根解析；缺省禁用 PDF 直通通道回退） */
       sumatraPath?: string

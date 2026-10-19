@@ -1,7 +1,8 @@
 import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import { is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+// 图标放 build/：resources 是主进程默认 publicDir，其内 ?asset 不复制文件进 out，打包后在 asar 内失效
+import icon from '../../build/icon.png?asset'
 import { appId, displayName, productName } from '../identity.cjs'
 
 /**

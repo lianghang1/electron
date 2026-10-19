@@ -156,7 +156,7 @@ export class CaptureService {
         throw captureError('ADAPTER_UNAVAILABLE', `设备适配器不可用: ${String(device.meta.note ?? transport)}`)
       }
       const prev = this.locks.get(req.deviceId) ?? Promise.resolve()
-      // 保存目录是平台内部事务：恒注入 userData/capture，渲染层不可指定（防任意路径写文件）
+      // 保存目录是平台内部事务：恒注入统一根目录 files/capture/，渲染层不可指定（防任意路径写文件）
       const reqWithDir: AdapterCaptureRequest = { ...req, saveDir: this.defaultSaveDir }
       // 链上已 catch（登记锁不吞结果），单分支即可
       const task = prev.then(() => adapter.capture(reqWithDir, device))

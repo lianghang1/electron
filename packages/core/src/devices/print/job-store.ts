@@ -1,5 +1,5 @@
 import type { JobStatus, PrintError, PrintRequest, PrintResult } from '@desktop/shared'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 interface JobRecord {
@@ -26,6 +26,8 @@ export class JobStore {
 
   constructor(filePath: string) {
     this.filePath = path.resolve(filePath)
+    // 任务簿是 storage/ 目录下与 electron-store 并列的独立写方，不依赖其建目录
+    mkdirSync(path.dirname(this.filePath), { recursive: true })
     this.load()
   }
 

@@ -4,7 +4,9 @@ import { extname, join, resolve, sep } from 'node:path'
 import process from 'node:process'
 import { bootstrap, resolveResourcePath } from '@desktop/core'
 import { app, protocol } from 'electron'
-import icon from '../../resources/icon.png?asset'
+// 图标必须放 build/（不命中 electron-vite 主进程默认 publicDir=resources）：publicDir 内的
+// ?asset 不复制文件进 out，仅生成相对 out 的路径——dev 恰好命中，打包后在 asar 内失效致托盘无图标
+import icon from '../../build/icon.png?asset'
 import { appId, productName } from '../identity.cjs'
 
 // 仅 Windows：全屏浮层（拍摄/授权弹窗/右键菜单）盖住主窗时，Chromium 原生遮挡计算

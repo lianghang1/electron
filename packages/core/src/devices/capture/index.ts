@@ -30,7 +30,7 @@ export interface CaptureSystemOptions {
   persist?: (configs: CaptureDeviceConfig[]) => void
   /** 结构化日志（采集日志不含图片内容） */
   logger?: Logger
-  /** 采集图片保存目录（绝对路径，平台自管 userData/capture，渲染层不可指定） */
+  /** 采集图片保存目录（绝对路径，平台自管统一根目录 files/capture/，渲染层不可指定） */
   defaultSaveDir: string
 }
 

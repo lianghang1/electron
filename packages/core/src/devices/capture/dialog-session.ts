@@ -114,7 +114,7 @@ export class CaptureDialogSessionService {
 
   /**
    * 浮层内拍摄：UVC 传 dataUrl（浮层抽帧，落平台默认目录，meta 随结果透传——如成片像素）；
-   * SDK 路线不传，按会话设备走统一采集（保存目录恒为平台 userData/capture，渲染层不可指定）。
+   * SDK 路线不传，按会话设备走统一采集（保存目录恒为平台 files/capture/，渲染层不可指定）。
    * 结果由浮层 UI 收集，确认时统一回传。
    */
   async capture(sender: WebContents, opts?: { dataUrl?: string, meta?: Record<string, unknown> }): Promise<CaptureResult> {

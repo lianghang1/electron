@@ -1,6 +1,7 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { app, session } from 'electron'
+import { cookiesDir } from '../storage/app-paths'
 
 /** Session 创建通知监听器：App 首次取得 Session 时回调（缓存命中不触发） */
 type SessionCreatedListener = (appId: string, appSession: Electron.Session) => void
@@ -33,7 +34,7 @@ export class SessionService {
   /** 已做过启动回放的分区（每轮启动一次） */
   private readonly restoredPartitions = new Set<string>()
   private readonly cookiesFileFor = (appId: string) =>
-    path.join(app.getPath('userData'), `app-${appId}-cookies.json`)
+    path.join(cookiesDir(), `app-${appId}-cookies.json`)
 
   constructor() {
     // 退出前快照：will-quit 时窗口仍在、Cookie 管理器数据完整
@@ -108,6 +109,9 @@ export class SessionService {
         sameSite: cookie.sameSite,
       }
     })
-    writeFileSync(this.cookiesFileFor(appId), JSON.stringify(stored), 'utf-8')
+    // 快照目录无其他创建方（restore 只读、迁移仅在旧快照存在时建目录），写前必须确保存在
+    const file = this.cookiesFileFor(appId)
+    mkdirSync(path.dirname(file), { recursive: true })
+    writeFileSync(file, JSON.stringify(stored), 'utf-8')
   }
 }

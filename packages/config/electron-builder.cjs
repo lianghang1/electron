@@ -83,6 +83,11 @@ exports.createElectronBuilderConfig = function createElectronBuilderConfig(optio
       ],
       icon: 'build/icon.ico',
     },
+    nsis: {
+      // 卸载保留用户数据（userData/ 下配置 / 日志 / 业务文件）：卸载向导的
+      // 「删除应用程序数据」复选框默认不勾选，重装或升级后登录态与配置不丢
+      deleteAppDataOnUninstall: false,
+    },
     npmRebuild: false,
     electronDownload: {
       mirror: 'https://npmmirror.com/mirrors/electron/',

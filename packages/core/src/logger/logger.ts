@@ -2,6 +2,7 @@ import type { LogFunctions } from 'electron-log'
 import fs from 'node:fs'
 import path from 'node:path'
 import log from 'electron-log/main'
+import { logsDir } from '../storage/app-paths'
 
 /** 历史日志保留天数，超期文件在启动时清理 */
 const LOG_RETENTION_DAYS = 14
@@ -70,8 +71,8 @@ export class Logger {
 
 /**
  * 根 Logger：一次性配置 electron-log 传输分级与文件轮转。
- * 文件目录沿用 electron-log 默认值（userData/logs），按天拆分为 main-YYYY-MM-DD.log，
- * 单日超 1MB 追加序号轮转，历史日志保留 LOG_RETENTION_DAYS 天。
+ * 文件目录为平台统一日志目录（userData/platform/logs，见 app-paths.ts），按天拆分为
+ * main-YYYY-MM-DD.log，单日超 1MB 追加序号轮转，历史日志保留 LOG_RETENTION_DAYS 天。
  * - 文件：dev 全量（含 debug），生产从 info 起
  * - 控制台：dev 全量，生产仅 error（避免污染终端）
  */
@@ -97,9 +98,8 @@ function toDateText(date: Date): string {
  * - 启动时按文件修改时间清理超过保留期的历史日志（含旧版 main.log / main.old.log）
  */
 function configureFileRotation(): void {
-  log.transports.file.resolvePathFn = (variables) => {
-    const logDir = path.dirname(variables.libraryDefaultDir)
-    return path.join(logDir, `main-${toDateText(new Date())}.log`)
+  log.transports.file.resolvePathFn = () => {
+    return path.join(logsDir(), `main-${toDateText(new Date())}.log`)
   }
 
   log.transports.file.archiveLogFn = (file) => {

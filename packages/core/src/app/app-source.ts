@@ -15,12 +15,12 @@ export function isAppManifest(value: unknown): value is DesktopAppManifest {
 }
 
 /**
- * 本地配置文件 App 源：<userData>/apps.json（DesktopAppManifest 数组）。
+ * 本地配置文件 App 源：<平台配置目录>/apps.json（DesktopAppManifest 数组）。
  * 平台的多源注册入口之一：代码注册内置 App，外部文件注册扩展 App，
  * 远程源（loadRemoteAppManifests）与本地源共用同一结构校验。
  */
-export function loadLocalAppManifests(userDataPath: string, logger: Logger): DesktopAppManifest[] {
-  const file = join(userDataPath, 'apps.json')
+export function loadLocalAppManifests(dir: string, logger: Logger): DesktopAppManifest[] {
+  const file = join(dir, 'apps.json')
   if (!existsSync(file)) { return [] }
 
   try {

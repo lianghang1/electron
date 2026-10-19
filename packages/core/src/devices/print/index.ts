@@ -2,7 +2,6 @@ import type { JobStatus, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter }
 import type { BrowserWindow } from 'electron'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
-import { join } from 'node:path'
 import { HiddenWindowPool } from './hidden-window'
 import { PrinterRegistry } from './printer-registry'
 import { PrintService } from './service'
@@ -30,8 +29,10 @@ export interface PrintSystem {
 }
 
 export interface PrintSystemOptions {
-  /** 运行时状态目录（传 userData）：归档 PDF 与任务簿存放处 */
-  stateDir: string
+  /** 任务簿文件绝对路径（任务历史持久化，统一根目录的 storage/ 下） */
+  jobsFile: string
+  /** 归档 PDF 目录绝对路径（统一根目录的 files/ 下） */
+  archiveDir: string
   /** SumatraPDF 绝对路径（未传/未就位时 PDF 直通回退 Chromium 窗口） */
   sumatraPath?: string
   /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁（无主隐藏窗会让 window-all-closed 永不触发，进程常驻） */
@@ -47,12 +48,11 @@ export interface PrintSystemOptions {
  */
 export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
   const windows = new HiddenWindowPool(options.getParent)
-  const archiveDir = join(options.stateDir, 'print-archive')
   const registry = new PrinterRegistry(windows, options.host)
   const log: PrintLogFn = (level, message, meta) => options.logger?.[level](message, meta)
   const service = new PrintService(windows, registry, {
-    archiveDir,
-    jobsFile: join(options.stateDir, 'print-jobs.json'),
+    archiveDir: options.archiveDir,
+    jobsFile: options.jobsFile,
     sumatraPath: options.sumatraPath,
     logger: log,
   })

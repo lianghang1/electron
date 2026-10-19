@@ -15,7 +15,7 @@ interface AuditEntry {
 }
 
 /**
- * 审计日志：平台安全相关事件的 append-only 结构化留痕（userData/audit/，按天分文件）。
+ * 审计日志：平台安全相关事件的 append-only 结构化留痕（<日志目录>/audit/，按天分文件）。
  * 与运行日志（electron-log，会轮转、含海量运行信息）分离——审计要求完整可追溯；
  * 事件量小（权限决策 / 崩溃 / App 生命周期），同步写保证退出前落盘，失败只告警不阻断业务。
  */
@@ -26,9 +26,9 @@ export class AuditService {
   constructor(
     private readonly events: EventBus,
     private readonly logger: Logger,
-    userDataPath: string,
+    logDir: string,
   ) {
-    this.dir = join(userDataPath, 'audit')
+    this.dir = join(logDir, 'audit')
   }
 
   start(): void {

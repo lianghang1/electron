@@ -33,6 +33,7 @@ import { attachSystemLogging } from '../logger/system'
 import { PermissionService } from '../permission/permission-service'
 import { ResilienceService } from '../resilience/resilience'
 import { SessionService } from '../session/session-service'
+import { configDir, filesDir, logsDir, migrateLegacyLayout } from '../storage/app-paths'
 import { createDeviceStore } from '../storage/device-store'
 import { StorageService } from '../storage/storage-service'
 import { createStore } from '../storage/store'
@@ -166,6 +167,8 @@ export class DesktopRuntime {
 
   /** 日志根 + 系统级日志（未捕获异常 / 进程崩溃 / renderer 控制台桥接） */
   private setupLogging(): void {
+    // 旧版散落在 userData 根目录的自管数据迁入统一根目录（幂等，须在首次写盘前执行）
+    migrateLegacyLayout()
     this.logger = createRootLogger({
       debug: is.dev,
       // 日志根作用域跟随启动的 App：com.company.kiosk → kiosk
@@ -184,7 +187,7 @@ export class DesktopRuntime {
   /** 形态无关的基础服务：审计 / 会话 / 存储 / 权限 / 窗口 / 韧性 / 下载 */
   private setupServices(): void {
     // 审计日志：权限决策 / 崩溃 / App 生命周期的 append-only 留痕（与运行日志分离）
-    this.auditService = new AuditService(this.events, this.logger.scope('audit'), app.getPath('userData'))
+    this.auditService = new AuditService(this.events, this.logger.scope('audit'), logsDir())
     this.auditService.start()
 
     this.sessionService = new SessionService()
@@ -280,13 +283,13 @@ export class DesktopRuntime {
     })
     app.on('browser-window-created', (_, win) => this.scannerSystem?.attachWindow(win))
 
-    // 图像采集：设备配置持久化，图片默认落 userData/capture
+    // 图像采集：设备配置持久化，图片落统一根目录 files/capture/
     const captureStore = createDeviceStore<{ devices?: CaptureDeviceConfig[] }>('capture-configs')
     this.captureSystem = createCaptureSystem({
       resourcesRoot,
       initialConfigs: captureStore.load().devices,
       persist: configs => captureStore.save({ devices: configs }),
-      defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(app.getPath('userData'), 'capture'),
+      defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(filesDir(), 'capture'),
       logger: this.logger.scope('device:capture'),
     })
     // 拍摄浮层会话：overlayService 已在前置装配步骤创建
@@ -298,7 +301,8 @@ export class DesktopRuntime {
     // 打印：SumatraPDF 相对资源根解析（缺省 devices/print/SumatraPDF.exe），绝对路径原样
     const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'devices/print/SumatraPDF.exe'
     this.printSystem = createPrintSystem({
-      stateDir: app.getPath('userData'),
+      jobsFile: join(configDir(), 'print-jobs.json'),
+      archiveDir: join(filesDir(), 'print-archive'),
       sumatraPath: isAbsolute(sumatraRel) ? sumatraRel : join(resourcesRoot, sumatraRel),
       // 打印隐藏窗挂主窗口为 parent：主窗关闭级联销毁池窗，退出链路才能走完
       getParent: () => this.windowService.getMainWindow(),
@@ -364,7 +368,7 @@ export class DesktopRuntime {
       }
     }
     registerApps(this.options.apps.manifests ?? [], 'code')
-    registerApps(loadLocalAppManifests(app.getPath('userData'), this.logger), 'apps.json')
+    registerApps(loadLocalAppManifests(configDir(), this.logger), 'apps.json')
     // 远程源异步拉取：origin 白名单把关（默认空 = 禁用），失败不拖垮启动，注册成功后经事件正常流转
     if (this.options.apps.remoteUrl) {
       void loadRemoteAppManifests(

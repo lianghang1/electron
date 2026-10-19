@@ -105,11 +105,10 @@ try {
   }
 
   // 统一莲花占位图标（正式图标用 resources/brand/generate.ts 流程生成后替换）：
-  // resources/icon.png 供 bootstrap 窗口图标（main 经 ?asset 相对引用，与 kiosk 同构）；
-  // build/icon.ico 供 NSIS/exe；build/icon.png 供 linux deb
+  // build/icon.png 供 linux deb 与 main 经 ?asset 构建进 out（窗口/托盘图标）；
+  // build/icon.ico 供 NSIS/exe。不放 resources/——那是主进程默认 publicDir，其内
+  // ?asset 不复制文件进 out，打包后路径在 asar 内失效致托盘无图标
   const kioskDir = join(APPS_DIR, 'funeral-kiosk')
-  mkdirSync(join(appDir, 'resources'), { recursive: true })
-  cpSync(join(kioskDir, 'resources/icon.png'), join(appDir, 'resources/icon.png'))
   cpSync(join(kioskDir, 'build/icon.png'), join(appDir, 'build/icon.png'))
   cpSync(join(kioskDir, 'build/icon.ico'), join(appDir, 'build/icon.ico'))
 
