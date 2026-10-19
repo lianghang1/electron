@@ -9,6 +9,7 @@ import { useOverlayStore } from '../use-overlay-store'
  * 右上角消息面板（panel 窗渲染分支）：下载通知卡 + 通知 toast（reka Toast：悬停暂停 / 滑动关闭 / 单条 ×）。
  * 透明窗鼠标穿透联动：按命中元素切换穿透（命中 body = 透明区 → 穿透），命中卡片/按钮才接管；
  * 内容变化量「自然内容高度」回报 Main 调整窗口尺寸，超高内部滚动 + 自动滚到底。
+ * 样式全部 scoped 自包含：本包须可在任意宿主应用复用，不依赖宿主的 UnoCSS 管线。
  */
 const store = useOverlayStore()
 
@@ -20,11 +21,11 @@ const STATUS_TEXT: Record<DownloadTask['status'], string> = {
 }
 
 /** 下载卡片图标底色（按状态）：进行中青玉 / 完成绿 / 失败红 */
-const DL_ICON_BG: Record<DownloadTask['status'], string> = {
-  progressing: 'bg-[#0f766e]',
-  completed: 'bg-[#16a34a]',
-  cancelled: 'bg-[#dc2626]',
-  interrupted: 'bg-[#dc2626]',
+const DL_ICON_CLASS: Record<DownloadTask['status'], string> = {
+  progressing: 'ov-dl__icon--progressing',
+  completed: 'ov-dl__icon--completed',
+  cancelled: 'ov-dl__icon--failed',
+  interrupted: 'ov-dl__icon--failed',
 }
 
 /** reka Toast 的关闭事件统一走 Main（控制态由 Main 数据推导，页面不私存） */
@@ -96,23 +97,23 @@ watch(() => [store.toasts, store.downloads], () => {
     <div
       v-if="store.hasPanelContent"
       ref="panelRef"
-      class="ov-panel relative m-[12px] flex max-h-[calc(100vh-24px)] w-[320px] flex-col overflow-y-auto pointer-events-none"
+      class="ov-panel"
     >
       <!-- 下载通知卡：与通知 toast 同款外观，逐条独立（不聚合）；终态 8s 自动消失，× 手动关闭 -->
       <div
         v-for="task in store.downloads"
         :key="task.id"
-        class="ov-dl ov-anim-slide pointer-events-auto relative mb-[8px] flex rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white px-[12px] pb-[10px] pt-[9px] shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
+        class="ov-dl ov-anim-slide"
         :title="task.path"
       >
-        <span class="ov-dl__icon mr-[8px] mt-[2px] flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] text-white" :class="DL_ICON_BG[task.status]">
+        <span class="ov-dl__icon" :class="DL_ICON_CLASS[task.status]">
           <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
         </span>
-        <div class="ov-dl__main min-w-0 flex-1">
-          <p class="ov-dl__name m-0 truncate text-[12.5px] font-600 text-[#1f2328]">
+        <div class="ov-dl__main">
+          <p class="ov-dl__name">
             {{ task.filename }}
           </p>
-          <p class="ov-dl__desc m-0 mt-[2px] text-[11.5px] text-[#57606a]">
+          <p class="ov-dl__desc">
             {{ STATUS_TEXT[task.status] }}
             <template v-if="task.status === 'progressing' && task.percent >= 0">
               · {{ task.percent }}%
@@ -123,54 +124,50 @@ watch(() => [store.toasts, store.downloads], () => {
           </p>
           <div
             v-if="task.status === 'progressing' && task.percent >= 0"
-            class="ov-dl__track mt-[6px] h-[4px] w-full overflow-hidden rounded-[2px] bg-[#e8ecf1]"
+            class="ov-dl__track"
           >
-            <div class="ov-dl__bar h-full rounded-[2px] bg-[#0f766e] transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
+            <div class="ov-dl__bar" :style="{ width: `${task.percent}%` }" />
           </div>
-          <div v-if="task.status === 'completed'" class="ov-dl__ops mt-[6px] flex justify-end">
-            <button class="ov-dl__op flex-none cursor-pointer rounded-[6px] border border-[#d5dae1] bg-white px-[10px] py-[3px] text-[11px] text-[#1f2328] transition-colors duration-[120ms] hover:border-[#0f766e] hover:text-[#0f766e]" @click="store.openTask(task.id)">
+          <div v-if="task.status === 'completed'" class="ov-dl__ops">
+            <button class="ov-dl__op" @click="store.openTask(task.id)">
               打开
             </button>
-            <button class="ov-dl__op flex-none cursor-pointer rounded-[6px] border border-[#d5dae1] bg-white px-[10px] py-[3px] text-[11px] text-[#1f2328] transition-colors duration-[120ms] hover:border-[#0f766e] hover:text-[#0f766e]" @click="store.revealTask(task.id)">
+            <button class="ov-dl__op" @click="store.revealTask(task.id)">
               文件夹
             </button>
           </div>
         </div>
         <button
-          class="ov-dl__close absolute right-[6px] top-[6px] h-[18px] w-[18px] cursor-pointer border-none bg-transparent p-0 text-[12px] leading-[18px] text-[#8a919c] transition-colors duration-[120ms] hover:text-[#1f2328]"
+          class="ov-dl__close"
           @click="store.dismissDownload(task.id)"
         >
           ×
         </button>
       </div>
-      <ToastViewport
-        class="ov-panel__toasts m-0 flex-none list-none p-0 [&>*+*]:mt-2"
-      >
+      <ToastViewport class="ov-panel__toasts">
         <ToastRoot
           v-for="toast in store.toasts"
           :key="toast.id"
           :open="true"
           :duration="8000"
-          class="ov-toast ov-anim-slide pointer-events-auto relative flex rounded-[12px] border border-[rgba(2,8,20,0.1)] bg-white px-[12px] pb-[10px] pt-[9px] shadow-[0_4px_14px_rgba(2,8,20,0.08)]"
+          class="ov-toast ov-anim-slide"
           @update:open="value => onToastOpenChange(toast.id, value)"
         >
-          <span class="ov-toast__icon mr-[8px] mt-[2px] flex h-[22px] w-[22px] flex-none items-center justify-center rounded-[7px] bg-[#0f766e] text-white">
+          <span class="ov-toast__icon">
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           </span>
-          <div class="ov-toast__main min-w-0 flex-1">
-            <p class="ov-toast__app m-0 text-[11px] text-[#8a919c]">
+          <div class="ov-toast__main">
+            <p class="ov-toast__app">
               {{ toast.appName }}
             </p>
-            <ToastTitle class="ov-toast__title m-0 mt-[2px] text-[12.5px] font-600 text-[#1f2328]">
+            <ToastTitle class="ov-toast__title">
               {{ toast.title }}
             </ToastTitle>
-            <ToastDescription v-if="toast.body" class="ov-toast__body m-0 mt-[2px] text-[11.5px] leading-[1.5] text-[#57606a]">
+            <ToastDescription v-if="toast.body" class="ov-toast__body">
               {{ toast.body }}
             </ToastDescription>
           </div>
-          <ToastClose
-            class="ov-toast__close absolute right-[6px] top-[6px] h-[18px] w-[18px] cursor-pointer border-none bg-transparent p-0 text-[12px] leading-[18px] text-[#8a919c] transition-colors duration-[120ms] hover:text-[#1f2328]"
-          >
+          <ToastClose class="ov-toast__close">
             ×
           </ToastClose>
         </ToastRoot>
@@ -180,17 +177,204 @@ watch(() => [store.toasts, store.downloads], () => {
 </template>
 
 <style scoped>
-/* 面板超高内部滚动：隐藏滚动条（窗口高度贴合内容，只有极端堆积才滚动，滚动条无视觉意义） */
 .ov-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-height: calc(100vh - 24px);
+  margin: 12px;
+  overflow-y: auto;
+  pointer-events: none;
+  /* 面板超高内部滚动：隐藏滚动条（窗口高度贴合内容，只有极端堆积才滚动，滚动条无视觉意义） */
   scrollbar-width: none;
 }
+
 .ov-panel::-webkit-scrollbar {
   width: 0;
   height: 0;
 }
 
-/* 相邻操作按钮间距（保留 margin 方案，不使用 gap） */
-.ov-dl__op + .ov-dl__op {
-  margin-left: 6px;
+/* ---- 下载通知卡 ---- */
+.ov-dl {
+  position: relative;
+  display: flex;
+  flex: none;
+  margin-bottom: 8px;
+  padding: 9px 12px 10px;
+  border: 1px solid rgba(2, 8, 20, 0.1);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(2, 8, 20, 0.08);
+  pointer-events: auto;
+}
+
+.ov-dl__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  margin-right: 8px;
+  border-radius: 7px;
+  color: #fff;
+}
+
+.ov-dl__icon--progressing {
+  background: #0f766e;
+}
+
+.ov-dl__icon--completed {
+  background: #16a34a;
+}
+
+.ov-dl__icon--failed {
+  background: #dc2626;
+}
+
+.ov-dl__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ov-dl__name {
+  margin: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1f2328;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ov-dl__desc {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: #57606a;
+}
+
+.ov-dl__track {
+  width: 100%;
+  height: 4px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: #e8ecf1;
+}
+
+.ov-dl__bar {
+  height: 100%;
+  border-radius: 2px;
+  background: #0f766e;
+  transition: width 0.2s;
+}
+
+.ov-dl__ops {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.ov-dl__op {
+  flex: none;
+  padding: 3px 10px;
+  border: 1px solid #d5dae1;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2328;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.ov-dl__op:hover {
+  border-color: #0f766e;
+  color: #0f766e;
+}
+
+.ov-dl__close,
+.ov-toast__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #8a919c;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.ov-dl__close:hover,
+.ov-toast__close:hover {
+  color: #1f2328;
+}
+
+/* ---- 通知 toast（reka Toast）---- */
+.ov-panel__toasts {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ov-toast + .ov-toast {
+  margin-top: 8px;
+}
+
+.ov-toast {
+  position: relative;
+  display: flex;
+  padding: 9px 12px 10px;
+  border: 1px solid rgba(2, 8, 20, 0.1);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(2, 8, 20, 0.08);
+  pointer-events: auto;
+}
+
+.ov-toast__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  margin-right: 8px;
+  border-radius: 7px;
+  background: #0f766e;
+  color: #fff;
+}
+
+.ov-toast__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ov-toast__app {
+  margin: 0;
+  font-size: 11px;
+  color: #8a919c;
+}
+
+.ov-toast__title {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1f2328;
+}
+
+.ov-toast__body {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #57606a;
 }
 </style>

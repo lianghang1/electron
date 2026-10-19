@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CaptureDialogSession } from '@desktop/shared'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import UiSelect from '../select/UiSelect.vue'
 import CaptureStage from './CaptureStage.vue'
 import CaptureThumbStrip from './CaptureThumbStrip.vue'
 import { useCaptureSession } from './use-capture-session'
@@ -48,7 +49,7 @@ const {
   clearError,
 } = useCaptureSession(props.session, () => stageRef.value?.videoEl ?? null)
 
-/** 设备下拉双分组：高拍仪/采集设备（业务库） + 本机摄像头（getUserMedia） */
+/** 设备下拉双分组：高拍仪/采集设备（业务库） + 本机摄像头（getUserMedia），空组不展示 */
 const deviceGroups = computed(() => [
   {
     label: '高拍仪 / 采集设备',
@@ -61,9 +62,14 @@ const deviceGroups = computed(() => [
     label: '本机摄像头',
     items: cameras.value.map((c, i) => ({ value: `uvc:${c.deviceId}`, label: c.label || `摄像头 ${i + 1}` })),
   },
-])
+].filter(group => group.items.length > 0))
 
-const hasDevices = computed(() => deviceGroups.value.some(g => g.items.length > 0))
+const hasDevices = computed(() => deviceGroups.value.length > 0)
+/** reka 不允许空字符串选项值：分辨率「默认档」在会话内是 ''，经哨兵值过 UiSelect 边界 */
+const RESOLUTION_DEFAULT = 'default'
+const resolutionModelValue = computed(() => resolution.value === '' ? RESOLUTION_DEFAULT : resolution.value)
+const resolutionOptions = computed(() => resolutions.value
+  .map(r => ({ value: r.value === '' ? RESOLUTION_DEFAULT : r.value, label: r.label })))
 /** 缩略条数据：保留原始下标供删除；无缩略图的结果不占位 */
 const thumbs = computed(() => results.value
   .map((result, index) => ({ result, index }))
@@ -106,9 +112,14 @@ function exitViewing(): void {
 
 // ---- 动作包装：统一收敛查看态退出 ----
 
-async function onChangeDevice(e: Event): Promise<void> {
+async function onChangeDevice(value: string): Promise<void> {
   exitViewing()
-  await changeDevice(e)
+  await changeDevice(value)
+}
+
+async function onResolutionChange(value: string): Promise<void> {
+  exitViewing()
+  await changeResolution(value === RESOLUTION_DEFAULT ? '' : value)
 }
 
 async function onToggleLive(): Promise<void> {
@@ -131,10 +142,10 @@ function onKeydown(e: KeyboardEvent): void {
     onClose()
     return
   }
-  // 空格拍照：输入控件内不拦截；preventDefault 防止焦点按钮被空格二次触发
+  // 空格拍照：输入控件与展开的下拉内不拦截；preventDefault 防止焦点按钮被空格二次触发
   if (e.key !== ' ') { return }
-  const tag = (e.target as HTMLElement | null)?.tagName
-  if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') { return }
+  const target = e.target as HTMLElement | null
+  if (target?.closest('input, textarea, select, [role="listbox"], [role="option"]')) { return }
   e.preventDefault()
   if (!capturing.value && !full.value) {
     void onShoot()
@@ -200,26 +211,23 @@ onBeforeUnmount(() => {
       <aside class="cu-dialog__panel">
         <label class="cu-dialog__field">
           <span class="cu-dialog__label">设备</span>
-          <select class="cu-dialog__select" :value="deviceId" @change="onChangeDevice">
-            <option v-if="!hasDevices" value="">
-              {{ loadingDevices ? '正在检测设备…' : '未检测到设备' }}
-            </option>
-            <template v-else>
-              <optgroup v-for="group in deviceGroups" :key="group.label" :label="group.label">
-                <option v-for="item in group.items" :key="item.value" :value="item.value">
-                  {{ item.label }}
-                </option>
-              </optgroup>
-            </template>
-          </select>
+          <UiSelect
+            :model-value="deviceId"
+            :options="[]"
+            :groups="deviceGroups"
+            :disabled="!hasDevices"
+            :placeholder="loadingDevices ? '正在检测设备…' : '未检测到设备'"
+            @update:model-value="onChangeDevice"
+          />
         </label>
         <label v-if="resolutions.length" class="cu-dialog__field">
           <span class="cu-dialog__label">分辨率<template v-if="switching">（切换中…）</template></span>
-          <select class="cu-dialog__select" :value="resolution" @change="changeResolution">
-            <option v-for="r in resolutions" :key="r.value" :value="r.value">
-              {{ r.label }}
-            </option>
-          </select>
+          <UiSelect
+            :model-value="resolutionModelValue"
+            :options="resolutionOptions"
+            :disabled="switching"
+            @update:model-value="onResolutionChange"
+          />
         </label>
         <button class="cu-btn" @click="onToggleLive">
           {{ live ? '停止预览' : '开启预览' }}
@@ -458,24 +466,6 @@ onBeforeUnmount(() => {
 .cu-dialog__label {
   font-size: 11px;
   color: #8a919c;
-}
-
-.cu-dialog__select {
-  width: 100%;
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  padding: 6px 10px;
-  font-size: 12px;
-  font-family: inherit;
-  color: #1f2328;
-  background: #fff;
-  transition: border-color 0.12s;
-}
-
-.cu-dialog__select:hover,
-.cu-dialog__select:focus {
-  border-color: #0f766e;
-  outline: none;
 }
 
 .cu-dialog__fx {

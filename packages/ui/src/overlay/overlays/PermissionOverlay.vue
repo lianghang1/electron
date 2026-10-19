@@ -9,6 +9,7 @@ import { useOverlayStore } from '../use-overlay-store'
  * 逐条决策（只渲染队首），ESC = 本次拒绝（贴近浏览器权限弹窗习惯），
  * 遮罩/卡片外点击不关闭（模态语义：必须显式决策或等待超时）。
  * 卡片样式固定高对比配色（不随 Shell 主题），保证任意背景下清晰可读。
+ * 样式全部 scoped 自包含：本包须可在任意宿主应用复用，不依赖宿主的 UnoCSS 管线。
  */
 const store = useOverlayStore()
 
@@ -64,24 +65,16 @@ function onDialogEscape(event: KeyboardEvent): void {
     store.respond(store.currentRequest.requestId, false)
   }
 }
-
-/** 决策按钮外观：主次按钮共用形状，颜色各给一份（避免同属性类级联冲突） */
-function dialogBtnClass(primary: boolean): string {
-  const base = 'ov-btn h-[32px] cursor-pointer rounded-[8px] border px-[18px] ml-[8px] text-[13px] font-500 font-[inherit] transition-colors duration-[120ms]'
-  return primary
-    ? `${base} ov-btn--primary border-[#0f766e] bg-[#0f766e] text-white hover:border-[#0d6a63] hover:bg-[#0d6a63]`
-    : `${base} border-[#d5dae1] bg-white text-[#1f2328] hover:bg-[#f3f6f9]`
-}
 </script>
 
 <template>
   <DialogRoot :open="store.currentRequest !== null">
     <DialogOverlay
       v-if="store.overlayVisible"
-      class="ov-dialog fixed inset-0 z-[10] bg-[rgba(15,23,42,0.28)] ov-anim-fade"
+      class="ov-dialog ov-anim-fade"
     />
     <DialogContent
-      class="fixed inset-0 z-[20] flex flex-col items-center justify-center"
+      class="ov-dialog__content"
       @escape-key-down="onDialogEscape"
       @pointer-down-outside="keepDialogOpen"
       @interact-outside="keepDialogOpen"
@@ -89,27 +82,27 @@ function dialogBtnClass(primary: boolean): string {
       <div
         v-if="store.currentRequest && store.overlayVisible"
         :key="store.currentRequest.requestId"
-        class="ov-dialog__card ov-anim-pop box-border w-[400px] rounded-[12px] border-x border-b border-x-[rgba(2,8,20,0.1)] border-b-[rgba(2,8,20,0.1)] bg-white px-[18px] pb-[14px] pt-[16px] shadow-[0_8px_24px_rgba(2,8,20,0.16)]"
+        class="ov-dialog__card ov-anim-pop"
       >
-        <div class="ov-dialog__head mb-[10px] flex items-center">
-          <span class="ov-dialog__icon mr-[8px] flex h-[28px] w-[28px] flex-none items-center justify-center rounded-[8px] bg-[#0f766e] text-white">
+        <div class="ov-dialog__head">
+          <span class="ov-dialog__icon">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
           </span>
-          <DialogTitle class="ov-dialog__title m-0 text-[14px] font-600 text-[#1f2328]">
+          <DialogTitle class="ov-dialog__title">
             权限请求
           </DialogTitle>
         </div>
-        <DialogDescription class="ov-dialog__text m-0 mb-[6px] text-[13px] leading-[1.6] text-[#57606a] [&_strong]:font-600 [&_strong]:text-[#1f2328]">
+        <DialogDescription class="ov-dialog__text">
           <strong>{{ store.currentRequest.appName }}</strong> 请求使用「{{ permissionLabel(store.currentRequest.permission) }}」，请确认是否允许。
         </DialogDescription>
-        <p class="ov-dialog__hint m-0 mb-[12px] text-[11.5px] text-[#8a919c]">
-          <b class="ov-dialog__count font-600 text-[#0f766e] tabular-nums">{{ countdowns[store.currentRequest.requestId] ?? REQUEST_TIMEOUT_S }}</b> 秒内未处理将按本次拒绝，不影响下次使用
+        <p class="ov-dialog__hint">
+          <b class="ov-dialog__count">{{ countdowns[store.currentRequest.requestId] ?? REQUEST_TIMEOUT_S }}</b> 秒内未处理将按本次拒绝，不影响下次使用
         </p>
-        <div class="ov-dialog__actions flex justify-end">
-          <button :class="dialogBtnClass(false)" @click="store.respond(store.currentRequest.requestId, false)">
+        <div class="ov-dialog__actions">
+          <button class="ov-btn" @click="store.respond(store.currentRequest.requestId, false)">
             拒绝
           </button>
-          <button :class="dialogBtnClass(true)" @click="store.respond(store.currentRequest.requestId, true)">
+          <button class="ov-btn ov-btn--primary" @click="store.respond(store.currentRequest.requestId, true)">
             允许
           </button>
         </div>
@@ -119,8 +112,117 @@ function dialogBtnClass(primary: boolean): string {
 </template>
 
 <style scoped>
-/* 决策卡顶部品牌色描边（其余三边由 Uno 的 border-x/border-b 负责，避免同属性级联） */
+.ov-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.ov-dialog__content {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
 .ov-dialog__card {
+  box-sizing: border-box;
+  width: 400px;
+  padding: 16px 18px 14px;
+  border: 1px solid rgba(2, 8, 20, 0.1);
+  /* 顶部品牌色描边压住普通边框，形成决策卡的识别条 */
   border-top: 3px solid #0f766e;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(2, 8, 20, 0.16);
+}
+
+.ov-dialog__head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.ov-dialog__icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-right: 8px;
+  border-radius: 8px;
+  background: #0f766e;
+  color: #fff;
+}
+
+.ov-dialog__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f2328;
+}
+
+.ov-dialog__text {
+  margin: 0 0 6px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #57606a;
+}
+
+.ov-dialog__text strong {
+  font-weight: 600;
+  color: #1f2328;
+}
+
+.ov-dialog__hint {
+  margin: 0 0 12px;
+  font-size: 11.5px;
+  color: #8a919c;
+}
+
+.ov-dialog__count {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #0f766e;
+}
+
+.ov-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ov-btn {
+  height: 32px;
+  margin-left: 8px;
+  padding: 0 18px;
+  border: 1px solid #d5dae1;
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2328;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.12s, background-color 0.12s;
+}
+
+.ov-btn:hover {
+  background: #f3f6f9;
+}
+
+.ov-btn--primary {
+  border-color: #0f766e;
+  background: #0f766e;
+  color: #fff;
+}
+
+.ov-btn--primary:hover {
+  border-color: #0d6a63;
+  background: #0d6a63;
 }
 </style>

@@ -7,6 +7,7 @@ import { useOverlayStore } from '../use-overlay-store'
  * Tab 右键菜单浮层（menu 窗渲染分支）：原生浮层窗承载（页面内容保持可见，无需视图抑制）。
  * 全屏透明层拦截点击（点菜单外 = 关闭），菜单卡锚定 Shell 转发的右键坐标，
  * 固定浅色配色（不随 Shell 主题，浮层页统一策略）；支持键盘导航（ESC 关闭 / 上下移动 / Enter 选中）。
+ * 样式全部 scoped 自包含：本包须可在任意宿主应用复用，不依赖宿主的 UnoCSS 管线。
  */
 const store = useOverlayStore()
 
@@ -79,22 +80,19 @@ const menuPos = computed(() => {
   <div
     v-if="store.menu && store.overlayVisible"
     :key="store.menu.id"
-    class="ov-menu ov-anim-fade fixed inset-0 z-[10]"
+    class="ov-menu ov-anim-fade"
     @contextmenu.prevent
     @pointerdown.self="store.dismissMenu"
   >
     <div
-      class="ov-menu__card ov-anim-pop fixed min-w-[184px] rounded-[10px] border border-[rgba(2,8,20,0.1)] bg-white p-[4px] shadow-[0_10px_28px_rgba(2,8,20,0.18),0_2px_8px_rgba(2,8,20,0.1)]"
+      class="ov-menu__card ov-anim-pop"
       :style="menuPos"
     >
       <template v-for="(item, i) in visibleMenuItems" :key="item.action">
-        <div v-if="i === visibleMenuItems.length - 1" class="ov-menu__sep mx-[6px] my-[4px] h-px bg-[#e8ecf1]" />
+        <div v-if="i === visibleMenuItems.length - 1" class="ov-menu__sep" />
         <button
-          class="ov-menu__item flex h-[28px] w-full cursor-pointer items-center rounded-[6px] border-none bg-transparent px-[10px] text-left text-[12.5px] font-[inherit] transition-colors duration-[120ms]"
-          :class="[
-            item.danger ? 'text-[#dc2626]' : 'text-[#1f2328]',
-            i === highlightIndex ? (item.danger ? 'bg-[#fee2e2]' : 'bg-[#f3f6f9]') : '',
-          ]"
+          class="ov-menu__item"
+          :class="{ 'ov-menu__item--danger': item.danger, 'ov-menu__item--active': i === highlightIndex }"
           @pointermove="highlightIndex = i"
           @click="store.selectMenu(item.action)"
         >
@@ -106,7 +104,57 @@ const menuPos = computed(() => {
 </template>
 
 <style scoped>
-/* 菜单项 hover/键盘高亮外的降级：pointermove 已切高亮，无系统 :hover 依赖 */
+.ov-menu {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+
+.ov-menu__card {
+  position: fixed;
+  min-width: 184px;
+  padding: 4px;
+  border: 1px solid rgba(2, 8, 20, 0.1);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(2, 8, 20, 0.18), 0 2px 8px rgba(2, 8, 20, 0.1);
+}
+
+.ov-menu__sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: #e8ecf1;
+}
+
+.ov-menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #1f2328;
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.ov-menu__item--danger {
+  color: #dc2626;
+}
+
+.ov-menu__item--active {
+  background: #f3f6f9;
+}
+
+.ov-menu__item--danger.ov-menu__item--active {
+  background: #fee2e2;
+}
+
 .ov-menu__item:focus {
   outline: none;
 }

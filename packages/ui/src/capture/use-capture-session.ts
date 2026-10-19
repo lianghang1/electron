@@ -47,9 +47,9 @@ export interface CaptureSessionUi {
   confirming: Ref<boolean>
   error: Ref<string>
   refreshDevices: () => Promise<void>
-  changeDevice: (e: Event) => Promise<void>
+  changeDevice: (value: string) => Promise<void>
   toggleLive: () => Promise<void>
-  changeResolution: (e: Event) => Promise<void>
+  changeResolution: (value: string) => Promise<void>
   shoot: () => Promise<void>
   removeResult: (index: number) => void
   confirm: () => Promise<void>
@@ -128,8 +128,7 @@ export function useCaptureSession(
     return cam ? `${UVC_PREFIX}${cam.deviceId}` : ''
   }
 
-  async function changeDevice(e: Event): Promise<void> {
-    const value = (e.target as HTMLSelectElement).value
+  async function changeDevice(value: string): Promise<void> {
     if (value === deviceId.value) { return }
     // 切换前预览开启：切到新设备后自动重开预览（失败经 toggleLive 显错，不阻断）
     const wasLive = live.value
@@ -212,8 +211,7 @@ export function useCaptureSession(
     frameSrc.value = ''
   }
 
-  async function changeResolution(e: Event): Promise<void> {
-    const value = (e.target as HTMLSelectElement).value
+  async function changeResolution(value: string): Promise<void> {
     resolution.value = value
     if (!live.value) { return }
     switching.value = true
