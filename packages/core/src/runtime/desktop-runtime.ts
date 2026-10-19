@@ -39,6 +39,7 @@ import { createStore } from '../storage/store'
 import { TabService } from '../tab/tab-service'
 import { AsarUpdateService } from '../updater/asar-update-service'
 import { UpdateService } from '../updater/update-service'
+import { compareVersions } from '../updater/version'
 import { WebService } from '../web/web-service'
 import { OverlayWindowService } from '../window/overlay-window'
 import { TrayService } from '../window/tray-service'
@@ -119,10 +120,13 @@ export class DesktopRuntime {
         () => this.windowService.getMainWindow(),
         {
           hasPendingAsar: () => this.asarUpdateService.hasPending(),
-          installPendingPackage: () => {
-            if (!this.updateService.isDownloaded()) { return false }
-            this.updateService.install()
-            return true
+          // 重启路径更新择优 + 退出竞态防御：生效版本 = max(内置, 生效热更)，
+          // 整包已下载且新于它 → quitAndInstall 接管；否则关闭退出自动安装再 relaunch
+          prepareRelaunch: async () => {
+            const builtin = app.getVersion()
+            const hot = await this.asarUpdateService.getEffectiveHotVersion()
+            const effective = hot && compareVersions(hot, builtin) > 0 ? hot : builtin
+            return this.updateService.resolveRelaunch(effective)
           },
         },
       )

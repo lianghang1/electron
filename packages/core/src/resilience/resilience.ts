@@ -19,13 +19,16 @@ const RESTART_POLL_MS = 60_000
 /**
  * 定时重启的更新决策依赖（装配根闭包注入，规避服务创建顺序）：
  * - hasPendingAsar：热更已下载校验待生效（重启即由引导器 apply）
- * - installPackage：整包已下载（退出并安装）
+ * - prepareRelaunch：重启前更新择优 + 退出竞态防御（见接口注释）
  */
 interface RestartDeps {
   /** 热更已下载校验待生效（重启即由引导器 apply） */
   hasPendingAsar: () => boolean
-  /** 整包已下载 → quitAndInstall 并返回 true；无则返回 false */
-  installPendingPackage: () => boolean
+  /**
+   * 重启前更新择优：整包已下载且新于生效版本 → quitAndInstall 接管退出（返回 true）；
+   * 否则关闭 electron-updater 退出时自动安装（防 relaunch 竞态），返回 false 继续重启
+   */
+  prepareRelaunch: () => Promise<boolean>
 }
 
 /**
@@ -33,7 +36,7 @@ interface RestartDeps {
  * - crashReload：渲染进程崩溃自动重载，指数退避 + 滑动窗口熔断
  * - autoLaunch：开机自启（系统登录项，仅生产生效，dev 挂的是 electron.exe 无意义）
  * - exitGuard：拦截用户发起的窗口关闭（Alt+F4 等），app.quit() / app.exit() 不受影响
- * - scheduledRestart：每日定时重启，动作按更新状态择优（热更生效 / 整包安装 / 纯重启）
+ * - scheduledRestart：每日定时重启，动作按更新状态择优（整包安装 / 热更生效 / 纯重启），
  */
 export class ResilienceService {
   /** 崩溃时间戳（熔断滑动窗口） */
@@ -145,7 +148,7 @@ export class ResilienceService {
 
   /**
    * 定时重启：分钟级轮询匹配时刻（比一次性 setTimeout 更能容忍休眠唤醒/时钟跳变），
-   * 同一天只触发一次。动作按更新状态择优：热更生效 > 整包安装 > 纯重启释放内存
+   * 同一天只触发一次。动作按更新状态择优：整包安装 > 热更生效 > 纯重启释放内存
    */
   private attachScheduledRestart(
     schedule: { hour?: number, minute?: number },
@@ -159,16 +162,29 @@ export class ResilienceService {
       const day = now.toDateString()
       if (day === this.lastRestartDay) { return }
       this.lastRestartDay = day
-      if (restartDeps?.hasPendingAsar()) {
-        this.logger.info('scheduled restart: relaunching to apply pending asar update')
-        app.relaunch()
-        app.exit(0)
-        return
-      }
-      if (restartDeps?.installPendingPackage()) { return } // quitAndInstall 已接管退出流程
-      this.logger.info(`scheduled daily restart at ${hour}:${String(minute).padStart(2, '0')}`)
+      void this.performScheduledRestart(restartDeps, hour, minute)
+    }, RESTART_POLL_MS)
+  }
+
+  /**
+   * 定时重启动作：prepareRelaunch 先做更新择优与退出竞态防御（择优失败不阻塞重启本身），
+   * 未接管时按 热更生效 > 纯重启 继续。
+   */
+  private async performScheduledRestart(restartDeps: RestartDeps | undefined, hour: number, minute: number): Promise<void> {
+    try {
+      if (await restartDeps?.prepareRelaunch()) { return } // quitAndInstall 已接管退出流程
+    }
+    catch (error) {
+      this.logger.warn('prepare relaunch failed, fallback to plain restart', { error: String(error) })
+    }
+    if (restartDeps?.hasPendingAsar()) {
+      this.logger.info('scheduled restart: relaunching to apply pending asar update')
       app.relaunch()
       app.exit(0)
-    }, RESTART_POLL_MS)
+      return
+    }
+    this.logger.info(`scheduled daily restart at ${hour}:${String(minute).padStart(2, '0')}`)
+    app.relaunch()
+    app.exit(0)
   }
 }

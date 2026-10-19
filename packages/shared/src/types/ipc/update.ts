@@ -9,6 +9,8 @@ export const updateDomain = defineDomain('update', {
   check: invoke<() => void>(),
   /** 重启应用以生效更新：有 asar 热更 pending → 重启替换；有整包已下载 → 安装器重启（Shell 专属） */
   install: invoke<() => void>(),
+  /** 取消进行中的 asar 热更下载（无进行中下载为空操作，状态归位 idle） */
+  cancelAsarDownload: invoke<() => void>(),
   /** 当前整包更新状态快照（先拉后推：页面先取快照再订阅 stateUpdated） */
   getState: invoke<() => UpdateState>(),
   /** 当前 asar 热更状态快照（先拉后推：页面先取快照再订阅 asarStateUpdated） */

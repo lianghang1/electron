@@ -19,6 +19,7 @@ async function install() {
         <span class="upd-desc">
           <template v-if="asar.status === 'downloading'">正在下载 {{ asar.version }} {{ asar.percent !== undefined && asar.percent >= 0 ? `${Math.floor(asar.percent)}%` : '' }}</template>
           <template v-else-if="asar.status === 'pending'">新版本 {{ asar.version }} 已就绪，重启应用生效</template>
+          <template v-else-if="asar.status === 'blocked'">已检测到新版本 {{ asar.version }}，需整包更新后生效</template>
           <template v-else-if="asar.status === 'error'">热更包下载失败：{{ asar.message ?? '未知错误' }}</template>
         </span>
       </div>

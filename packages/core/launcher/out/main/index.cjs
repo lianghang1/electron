@@ -16,7 +16,8 @@ const { pathToFileURL } = require('node:url')
  *   core-<version>.asar ← 各版本热更包（文件名带版本，下载即终名，永不 rename——规避文件锁）
  *   current.json        ← 当前生效指针 { version, file, appliedAt }
  *   pending.json        ← 待生效标记 { version, file, sha256 }（AsarUpdateService 校验通过后写入）
- *   first-run.json      ← 替换后首启判活标记 { startedAt }
+ *   first-run.json      ← 替换后首启判活标记 { startedAt }（仅日志参考；存活判定看文件存在性，
+ *                         loadCore 稳定后经进程内定时器删除——对系统时钟回拨免疫）
  *
  * 时序保证：替换只发生在 userData 内的指针文件写入，零 rename、零文件锁冲突；
  * 与安装位置（含 Program Files）写权限无关。
@@ -32,12 +33,16 @@ const STABLE_MS = 60_000
 // 内置包版本基准：asar 根 package.json 由 afterPack 按 app 打包元数据生成（本文件在 out/main 下，根在两级之上）
 const BUILTIN_VERSION = require('../../package.json').version ?? '0.0.0'
 
-/** 数字段版本比较（>0: a 新于 b），与 AsarUpdateService.compareVersions 同规则（改动需两侧同步）。
- * 缺段按 '0' 补齐（'1.0' 与 '1.0.0' 相等）；非数字段（预发布后缀）退化为字符串比较，
+/** 版本比较（>0: a 新于 b），与 AsarUpdateService.compareVersions 同规则（改动需两侧同步，
+ * 一致性由 packages/core/test/version-consistency.test.ts 强制）。
+ * semver 规则：核心数字段逐段比较、缺段补 0；核心相等时带预发布的更旧，预发布标识符
+ * 逐段比较（数值 < 字母、前缀相同段少者旧）；'+ 构建元数据' 忽略。
  * 不得返回 NaN——NaN 会让"清单是否更新"的判定失效（每次启动重复下载） */
 function compareVersions(a, b) {
-  const pa = String(a).split(/[.-]/)
-  const pb = String(b).split(/[.-]/)
+  const [coreA, preA] = splitRelease(String(a))
+  const [coreB, preB] = splitRelease(String(b))
+  const pa = coreA.split('.')
+  const pb = coreB.split('.')
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const av = pa[i] ?? '0'
     const bv = pb[i] ?? '0'
@@ -46,6 +51,47 @@ function compareVersions(a, b) {
     if (!Number.isNaN(an) && !Number.isNaN(bn)) {
       if (an !== bn)
         return an - bn
+    } else if (av !== bv) {
+      return av < bv ? -1 : 1
+    }
+  }
+  return comparePreRelease(preA, preB)
+}
+
+/** 拆分 semver 形状：核心段（第一个 '-' 之前）与预发布段分离，'+ 构建元数据' 忽略 */
+function splitRelease(version) {
+  const withoutBuild = version.split('+')[0] ?? version
+  const dashIndex = withoutBuild.indexOf('-')
+  if (dashIndex === -1)
+    return [withoutBuild, '']
+  return [withoutBuild.slice(0, dashIndex), withoutBuild.slice(dashIndex + 1)]
+}
+
+/** 预发布序：无预发布 = 正式版，新于任何预发布；都有则逐段比较（数值 < 字母、段少者旧） */
+function comparePreRelease(a, b) {
+  if (!a && !b)
+    return 0
+  if (!a)
+    return 1
+  if (!b)
+    return -1
+  const pa = a.split('.')
+  const pb = b.split('.')
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const av = pa[i]
+    const bv = pb[i]
+    if (av === undefined)
+      return -1
+    if (bv === undefined)
+      return 1
+    const an = /^\d+$/.test(av)
+    const bn = /^\d+$/.test(bv)
+    if (an && bn) {
+      const diff = Number.parseInt(av, 10) - Number.parseInt(bv, 10)
+      if (diff !== 0)
+        return diff
+    } else if (an !== bn) {
+      return an ? -1 : 1
     } else if (av !== bv) {
       return av < bv ? -1 : 1
     }
@@ -78,9 +124,10 @@ function log(message) {
 }
 
 /**
- * 上次替换后的首启判活：
- * - 未存活 STABLE_MS → 删 current 指针与热更文件（回滚到内置包，防变砖）
- * - 已稳定 → 清理当前版本之外的全部热更包
+ * 上次替换后的首启判活：first-run.json 仍在 = 上次启动未存活满 STABLE_MS
+ * （该标记由 loadCore 稳定后经进程内定时器删除，进程早死则留存）→ 回滚到内置包。
+ * 判定只看文件存在性，对系统时钟回拨 / NTP 校时免疫；孤儿热更包清理由
+ * AsarUpdateService 下载新包时执行（下载即清）。
  */
 function settleOrRollback() {
   const dir = UPDATER_DIR()
@@ -90,23 +137,27 @@ function settleOrRollback() {
     return
   const current = readJson(currentPath)
   try {
-    if (Date.now() - firstRun.startedAt < STABLE_MS) {
-      if (current?.file)
-        ofs.rmSync(path.join(dir, current.file), { force: true })
-      fs.rmSync(currentPath, { force: true })
-      log('hot asar rollback applied (last run died too fast)')
-    }
-    else if (current?.file) {
-      for (const name of fs.readdirSync(dir)) {
-        if (name.startsWith('core-') && name.endsWith('.asar') && name !== current.file)
-          ofs.rmSync(path.join(dir, name), { force: true })
-      }
-    }
+    if (current?.file)
+      ofs.rmSync(path.join(dir, current.file), { force: true })
+    fs.rmSync(currentPath, { force: true })
+    log(`hot asar rollback applied (last run died too fast, startedAt=${firstRun.startedAt})`)
     fs.rmSync(path.join(dir, 'first-run.json'), { force: true })
   }
   catch (error) {
     log(`settle/rollback failed: ${error}`)
   }
+}
+
+/** 稳定判定：成功加载核心后经进程内定时器删除首启标记（对墙钟免疫）；进程早死则标记留存待回滚 */
+function scheduleStableClear() {
+  setTimeout(() => {
+    try {
+      fs.rmSync(path.join(UPDATER_DIR(), 'first-run.json'), { force: true })
+    }
+    catch (error) {
+      log(`stable mark clear failed: ${error}`)
+    }
+  }, STABLE_MS)
 }
 
 /** 消费 pending 标记：切换 current 指针指向新热更包（sha256 已由 AsarUpdateService 校验） */
@@ -169,6 +220,7 @@ async function loadCore() {
       // 主进程 bundle 为 CJS（共享 vite 工厂固定输出 out/main/index.cjs），import() 走 CJS interop
       await import(pathToFileURL(path.join(root, 'out', 'main', 'index.cjs')).href)
       log(`loaded ${label} core from ${root}`)
+      scheduleStableClear()
       return
     }
     catch (error) {
@@ -194,4 +246,4 @@ if (require.main === module) {
   loadCore()
 }
 
-module.exports = { compareVersions, settleOrRollback, applyPending }
+module.exports = { compareVersions, settleOrRollback, applyPending, scheduleStableClear }

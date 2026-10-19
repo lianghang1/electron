@@ -36,6 +36,9 @@ export function registerUpdateIpc(deps: UpdateIpcDeps): void {
     }
     updateService?.install()
   })
+  handle('update:cancelAsarDownload', () => {
+    asarService?.cancel()
+  })
   handle('update:getState', () => updateService?.getState() ?? IDLE_UPDATE_STATE)
   handle('update:getAsarState', () => asarService?.getState() ?? IDLE_ASAR_STATE)
 }

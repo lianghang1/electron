@@ -11,14 +11,18 @@ export interface UpdateState {
 
 /**
  * asar 热更新状态（Main → Shell 推送负载）：
- * pending = 已下载校验通过，重启应用后由引导器完成替换。
+ * pending = 已下载校验通过，重启应用后由引导器完成替换；
+ * blocked = 发现热更版本但 minResourcesVersion 门槛未满足，等待整包更新先行
+ * （与 idle 区分：现场可识别"没有更新"与"在等整包"）。
  */
 export interface AsarUpdateState {
-  status: 'idle' | 'checking' | 'downloading' | 'pending' | 'error'
+  status: 'idle' | 'checking' | 'downloading' | 'pending' | 'blocked' | 'error'
   /** 热更包版本号 */
   version?: string
   /** 下载进度 0-100（downloading 时有效） */
   percent?: number
+  /** blocked 时有效：热更要求的最低 resources 版本 */
+  minResourcesVersion?: string
   /** 错误信息（error 时有效） */
   message?: string
 }
@@ -65,8 +69,12 @@ export interface AsarBundleManifest {
 export interface UpdateAsarSource {
   /** 判断接口地址（相对 updates.url 解析，也可绝对地址） */
   endpoint: string
-  /** 请求头（鉴权等，可选） */
+  /** 请求方法（默认 GET） */
+  method?: 'GET' | 'POST'
+  /** 请求头（鉴权等） */
   headers?: Record<string, string>
+  /** 请求体（method 为 POST 时随请求发送，如 JSON 表单） */
+  body?: string
   /** 响应适配：后端响应 → 内部清单；缺省 = 响应即原生清单 */
   transform?: (raw: unknown) => UpdateManifest
 }
