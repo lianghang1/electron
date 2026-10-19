@@ -7,6 +7,16 @@ import { defineConfig, presetWind3 } from 'unocss'
  */
 export default defineConfig({
   presets: [presetWind3()],
+  // Shell 组件下沉在 packages/ui（workspace 源码引用，不在本 app root 内），
+  // 默认管线扫不到，必须显式纳入，否则 Shell 的 Uno 工具类整块丢失
+  content: {
+    pipeline: {
+      include: [
+        /\.(vue|ts|tsx)($|\?)/,
+        '../../packages/ui/src/**/*.{vue,ts}',
+      ],
+    },
+  },
   theme: {
     colors: {
       dt: {

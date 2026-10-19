@@ -9,6 +9,11 @@ import { useApps } from './composables/use-apps'
 import { useTabs } from './composables/use-tabs'
 import { useTheme } from './composables/use-theme'
 
+// Shell 自包含样式：dt-* 设计令牌随主题换肤（:root[data-theme]，见 use-theme）
+import './styles/reset.css'
+import './styles/transition.css'
+import './styles/tokens.css'
+
 const { apps } = useApps()
 const { tabs, open, close, activate } = useTabs()
 const { theme, toggle: toggleTheme } = useTheme()

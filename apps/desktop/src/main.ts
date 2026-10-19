@@ -1,15 +1,7 @@
-import { parseOverlayHash } from '@desktop/shared'
-import { OverlayApp } from '@desktop/ui'
-import { createApp } from 'vue'
+import { mountShellApp } from '@desktop/ui'
 
-import App from './App.vue'
-
-import './styles/css/reset.css'
-import './styles/css/transition.css'
-import './styles/tokens.css'
 import 'virtual:uno.css'
 
-// 同一 renderer 入口双形态：#/overlay 开头的 hash 是浮层原生窗的页面（右键菜单等），
-// 其余情况是 Shell 框架本体；浮层 hash 编解码单点在 shared overlay-contract
-const isOverlay = parseOverlayHash(window.location.hash) !== null
-createApp(isOverlay ? OverlayApp : App).mount('#app')
+// Shell 整体内置于 @desktop/ui（双形态：#/overlay hash 挂 OverlayApp，其余挂 Shell）；
+// reset / transition / dt-* 令牌样式随 ShellApp 自包含引入
+mountShellApp()

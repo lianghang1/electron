@@ -7,10 +7,11 @@ import { fileURLToPath } from 'node:url'
 import { syncDevResources } from './sync-dev-resources'
 
 /**
- * 新 App 脚手架：按 scripts/templates/app 模板树生成与 kiosk 同构的单应用全屏形态骨架。
- *   pnpm gen:app <slug> <中文名>
- *   例如：pnpm gen:app census 人口普查自助终端
- * 生成的是 Kiosk 形态（全屏 + 韧性 + 无 Tab）；Desktop Shell 形态（Tab 多应用）请复制 apps/desktop 改造。
+ * 新 App 脚手架：按模板树生成与形态同构的单应用骨架。
+ *   pnpm gen:app <slug> <中文名> [--desktop]
+ *   例如：pnpm gen:app census 人口普查自助终端（缺省 Kiosk：全屏 + 韧性 + 无 Tab）
+ *   例如：pnpm gen:app manager 运营管理台 --desktop（Desktop Shell：Tab 多应用 + 沉浸顶栏 + 应用中心）
+ * Desktop Shell 的 Shell 本体内置于 packages/ui（mountShellApp），应用侧 renderer 零 Shell 代码。
  * 完成后执行 pnpm install 建立 workspace 链接。
  *
  * 模板即真实文件（可直接编辑、lint、diff），令牌 @@XXX@@ 在生成时替换
@@ -21,11 +22,13 @@ import { syncDevResources } from './sync-dev-resources'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const APPS_DIR = join(ROOT, 'apps')
-const TEMPLATE_DIR = join(ROOT, 'scripts', 'templates', 'app')
 
-const [slug, displayName] = process.argv.slice(2)
+const args = process.argv.slice(2)
+const isDesktop = args.includes('--desktop')
+const positional = args.filter(arg => arg !== '--desktop')
+const [slug, displayName] = positional
 if (!slug || !displayName) {
-  console.error('usage: pnpm gen:app <slug> <中文名>')
+  console.error('usage: pnpm gen:app <slug> <中文名> [--desktop]')
   console.error('example: pnpm gen:app census 人口普查自助终端')
   process.exit(1)
 }
@@ -39,6 +42,8 @@ if (existsSync(appDir)) {
   console.error(`apps/${slug} 已存在`)
   process.exit(1)
 }
+
+const TEMPLATE_DIR = join(ROOT, 'scripts', 'templates', isDesktop ? 'desktop' : 'app')
 
 /** productName / executableName 必须 ASCII（electron-builder 对非 ASCII productName 强制回退 sanitize 名） */
 const productName = slug.split('-').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join('')
@@ -124,7 +129,13 @@ catch (error) {
 }
 
 console.log(`created apps/${slug}`)
-console.log(`  形态        Kiosk（全屏单应用）`)
+console.log(`  形态        ${isDesktop ? 'Desktop Shell（Tab 多应用框架）' : 'Kiosk（全屏单应用）'}`)
 console.log(`  appId       ${appId}`)
 console.log(`  productName ${productName}（ASCII，面向用户的中文见窗口标题）`)
-console.log(`next: pnpm install → pnpm --filter @app/${slug} dev`)
+if (isDesktop) {
+  console.log(`next: pnpm install → pnpm --filter @app/${slug} dev`)
+  console.log(`提示: 业务入口在 electron/main/index.ts 的 apps.manifests 声明（写法参照 apps/desktop）`)
+}
+else {
+  console.log(`next: pnpm install → pnpm --filter @app/${slug} dev`)
+}

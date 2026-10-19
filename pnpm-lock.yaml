@@ -108,6 +108,103 @@ importers:
         specifier: ^8.22.0
         version: 8.22.0
 
+  apps/cemetery-desktop:
+    dependencies:
+      '@desktop/utils':
+        specifier: workspace:*
+        version: link:../../packages/utils
+      '@electron-toolkit/utils':
+        specifier: 'catalog:'
+        version: 4.0.0(electron@39.2.6)
+      '@fun-design/http-alova-axios':
+        specifier: 'catalog:'
+        version: 0.0.5(vue@3.5.25(typescript@5.8.3))
+      '@fun-design/use':
+        specifier: 2.0.1
+        version: 2.0.1(@fun-design/utils@2.0.0)(vue@3.5.25(typescript@5.8.3))
+      '@vueuse/core':
+        specifier: 'catalog:'
+        version: 15.0.0(vue@3.5.25(typescript@5.8.3))
+      alova:
+        specifier: 'catalog:'
+        version: 3.5.5
+      axios:
+        specifier: 'catalog:'
+        version: 1.20.0
+      dayjs:
+        specifier: 'catalog:'
+        version: 1.11.21
+      pinia:
+        specifier: 4.0.3
+        version: 4.0.3(@vue/devtools-api@8.2.1)(typescript@5.8.3)(vue@3.5.25(typescript@5.8.3))
+      pinia-plugin-persistedstate:
+        specifier: 4.7.1
+        version: 4.7.1(pinia@4.0.3(@vue/devtools-api@8.2.1)(typescript@5.8.3)(vue@3.5.25(typescript@5.8.3)))
+      vue-router:
+        specifier: 5.4.0
+        version: 5.4.0(@vue/compiler-sfc@3.5.43)(esbuild@0.28.2)(pinia@4.0.3(@vue/devtools-api@8.2.1)(typescript@5.8.3)(vue@3.5.25(typescript@5.8.3)))(rollup@4.64.5)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1))(vue@3.5.25(typescript@5.8.3))
+    devDependencies:
+      '@desktop/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@desktop/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@desktop/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@desktop/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@iconify/json':
+        specifier: 2.2.541
+        version: 2.2.541
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.13.3
+      '@unocss/preset-rem-to-px':
+        specifier: 'catalog:'
+        version: 66.10.5
+      '@vitejs/plugin-vue':
+        specifier: 'catalog:'
+        version: 6.0.9(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1))(vue@3.5.25(typescript@5.8.3))
+      '@vitejs/plugin-vue-jsx':
+        specifier: 'catalog:'
+        version: 5.1.6(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1))(vue@3.5.25(typescript@5.8.3))
+      electron:
+        specifier: 'catalog:'
+        version: 39.2.6
+      electron-builder:
+        specifier: 'catalog:'
+        version: 26.0.12(electron-builder-squirrel-windows@26.0.12)
+      electron-vite:
+        specifier: 'catalog:'
+        version: 5.0.0(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1))
+      sass:
+        specifier: 'catalog:'
+        version: 1.105.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.8.3
+      unocss:
+        specifier: 'catalog:'
+        version: 66.10.5(cac@7.0.1)(rollup@4.64.5)(srvx@1.0.5)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1))
+      unplugin-auto-import:
+        specifier: 'catalog:'
+        version: 21.1.0(@vueuse/core@15.0.0(vue@3.5.25(typescript@5.8.3)))(esbuild@0.28.2)(oxc-parser@0.150.0)(rollup@4.64.5)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1))
+      unplugin-vue-components:
+        specifier: 'catalog:'
+        version: 32.1.0(esbuild@0.28.2)(rollup@4.64.5)(vite@7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1))(vue@3.5.25(typescript@5.8.3))
+      vite:
+        specifier: 'catalog:'
+        version: 7.3.6(@types/node@24.13.3)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1)
+      vue:
+        specifier: 'catalog:'
+        version: 3.5.25(typescript@5.8.3)
+      vue-tsc:
+        specifier: 'catalog:'
+        version: 3.3.12(typescript@5.8.3)
+
   apps/desktop:
     dependencies:
       '@desktop/ui':
@@ -235,6 +332,9 @@ importers:
       '@desktop/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@desktop/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
       '@iconify/json':
         specifier: 2.2.541
         version: 2.2.541

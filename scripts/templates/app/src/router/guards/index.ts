@@ -1,8 +1,8 @@
 import type { Router } from 'vue-router'
 import { createPermissionGuard } from './permission'
-import { createTitlenGuard } from './title'
+import { createTitleGuard } from './title'
 
 export function createRouterGuards(router: Router) {
   createPermissionGuard(router)
-  createTitlenGuard(router)
+  createTitleGuard(router)
 }

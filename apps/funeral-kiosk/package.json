@@ -42,6 +42,7 @@
     "@desktop/config": "workspace:*",
     "@desktop/core": "workspace:*",
     "@desktop/shared": "workspace:*",
+    "@desktop/ui": "workspace:*",
     "@iconify/json": "2.2.541",
     "@iconify/utils": "3.1.7",
     "@types/node": "catalog:",

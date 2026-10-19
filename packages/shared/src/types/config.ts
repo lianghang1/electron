@@ -27,7 +27,7 @@ export interface DesktopConfig {
     minHeight?: number
   }
   apps: {
-    /** 是否允许接入第三方 App；第一阶段平台只跑 internal App */
+    /** 是否允许接入第三方 App； */
     allowThirdParty: boolean
     /** 内置 App 清单（代码注册，保底、优先） */
     manifests?: DesktopAppManifest[]

@@ -1,0 +1,33 @@
+
+.text-ellipsis,
+.text-ellipsis-1 {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@for $i from 2 through 5 {
+  .text-ellipsis-#{$i} {
+    display: -webkit-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-break: break-all;
+    -webkit-line-clamp: #{$i};
+    -webkit-box-orient: vertical;
+  }
+}
+
+.v-hover {
+  opacity: 0.9 !important;
+}
+
+/* ===== 弹出确认框（naive-ui dialog）操作按钮加大：触屏/平板场景更好点 =====
+   按钮尺寸由组件内联 CSS 变量控制，需用 !important 覆盖内联声明 */
+.n-dialog__action .n-button {
+  --n-height: 44px !important;
+  --n-font-size: 15px !important;
+  --n-padding: 0 24px !important;
+  --n-icon-size: 18px !important;
+
+  min-width: 96px;
+}
