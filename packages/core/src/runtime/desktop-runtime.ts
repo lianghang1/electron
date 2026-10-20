@@ -36,6 +36,7 @@ import { ResilienceService } from '../resilience/resilience'
 import { SessionService } from '../session/session-service'
 import { configDir, filesDir, logsDir, migrateLegacyLayout } from '../storage/app-paths'
 import { createDeviceStore } from '../storage/device-store'
+import { cleanupExpiredFiles } from '../storage/files-retention'
 import { StorageService } from '../storage/storage-service'
 import { createStore } from '../storage/store'
 import { TabService } from '../tab/tab-service'
@@ -175,6 +176,8 @@ export class DesktopRuntime {
       // 日志根作用域跟随启动的 App：com.company.kiosk → kiosk
       scope: this.options.app.id.split('.').pop() ?? 'desktop',
     })
+    // 业务产物（拍照 / 打印 / 签名）过期清理：保留期缺省 7 天，随每次启动执行
+    cleanupExpiredFiles(this.options.files?.retentionDays, this.logger)
     attachSystemLogging(this.logger, this.resolver, this.events)
     // 崩溃防护第 1 层：IPC handler 异常统一留痕（主进程排障盲区补齐）
     attachHandleLogger(this.logger.scope('ipc'))
@@ -303,7 +306,7 @@ export class DesktopRuntime {
     const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'devices/print/SumatraPDF.exe'
     this.printSystem = createPrintSystem({
       jobsFile: join(configDir(), 'print-jobs.json'),
-      archiveDir: join(filesDir(), 'print-archive'),
+      archiveDir: join(filesDir(), 'print'),
       sumatraPath: isAbsolute(sumatraRel) ? sumatraRel : join(resourcesRoot, sumatraRel),
       // 打印隐藏窗挂主窗口为 parent：主窗关闭级联销毁池窗，退出链路才能走完
       getParent: () => this.windowService.getMainWindow(),

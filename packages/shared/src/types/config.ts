@@ -81,6 +81,14 @@ export interface DesktopConfig {
     /** 每次下载弹系统另存对话框让用户选目录（桌面形态可开）；默认 false */
     saveAs?: boolean
   }
+  /** 业务产物文件（filesDir 之下：拍照 / 打印 / 签名）的保留策略 */
+  files?: {
+    /**
+     * 产物保留天数：按文件修改时间计算（产物落盘后不再改动，mtime 即产生时间），
+     * 启动时清理过期文件；缺省 7，0 或负数视为关闭清理
+     */
+    retentionDays?: number
+  }
   /** 自动更新：不配置 url 则更新体系整体关闭 */
   updates?: {
     /** 更新服务器地址（latest.yml 所在目录，整包更新 electron-updater 用；asar 清单相对它解析） */

@@ -35,7 +35,7 @@ export function cookiesDir(): string {
   return join(platformDataRoot(), 'cookies')
 }
 
-/** 业务产物文件根目录：capture / print-archive / signature 按域分目录 */
+/** 业务产物文件根目录：capture / print / signature 按域分目录 */
 export function filesDir(): string {
   return join(platformDataRoot(), 'files')
 }
@@ -53,7 +53,9 @@ export function migrateLegacyLayout(): void {
   moveDir(join(userData, 'logs'), logsDir())
   moveDir(join(userData, 'audit'), join(logsDir(), 'audit'))
   moveDir(join(userData, 'capture'), join(filesDir(), 'capture'))
-  moveDir(join(userData, 'print-archive'), join(filesDir(), 'print-archive'))
+  moveDir(join(userData, 'print-archive'), join(filesDir(), 'print'))
+  // 历史命名收敛：print-archive → print（旧版已迁入统一根目录的机器补迁，幂等）
+  moveDir(join(filesDir(), 'print-archive'), join(filesDir(), 'print'))
   moveFile(join(userData, 'apps.json'), join(configDir(), 'apps.json'))
   moveFile(join(userData, 'print-jobs.json'), join(configDir(), 'print-jobs.json'))
   moveCookiesSnapshots(userData)

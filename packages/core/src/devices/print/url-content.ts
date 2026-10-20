@@ -22,7 +22,7 @@ export interface DownloadedUrl {
 }
 
 /**
- * 下载 URL 负载到归档目录（print-archive/<jobId>.<ext>），复用任务归档生命周期。
+ * 下载 URL 负载到归档目录（print/<jobId>.<ext>），复用任务归档生命周期。
  * 类型判定链：fileType 显式提示 > Content-Type > URL 扩展名 > PDF 兜底（记 warn）。
  */
 export async function downloadUrlContent(

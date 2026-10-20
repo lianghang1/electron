@@ -32,7 +32,7 @@ export class PrintService {
     private readonly windows: HiddenWindowPool,
     private readonly registry: PrinterRegistry,
     deps: {
-      /** 归档 PDF 目录（平台统一根目录 files/print-archive/） */
+      /** 归档 PDF 目录（平台统一根目录 files/print/） */
       archiveDir: string
       /** 任务簿文件（平台统一根目录 storage/print-jobs.json） */
       jobsFile: string

@@ -61,9 +61,9 @@ onBeforeUnmount(() => {
 .ov-capture__card {
   position: relative;
   align-self: flex-start;
-  margin-top: 4vh;
+  margin-top: 8vh;
   box-sizing: border-box;
-  width: 820px;
+  width: 920px;
   max-width: 94vw;
   padding: 20px;
   border-radius: 16px;
