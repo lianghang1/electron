@@ -1,60 +1,45 @@
-import presetRemToPx from '@unocss/preset-rem-to-px'
-import {
-  defineConfig,
-  presetIcons,
-  presetWind3,
-  transformerDirectives,
-  transformerVariantGroup,
-} from 'unocss'
+import { defineConfig, presetWind3 } from 'unocss'
 
+/**
+ * CemeteryDesktop · UnoCSS 预设。
+ * 色板全部映射到 Shell 令牌（dt-*，packages/ui/src/shell/styles/tokens.css），
+ * 工具类随 Shell 主题自动换肤：用法如 bg-dt-surface / text-dt-text-2 / border-dt-line / bg-dt-brand。
+ */
 export default defineConfig({
-  presets: [
-    presetIcons({
-      scale: 1.2,
-      warn: true,
-      extraProperties: {
-        'display': 'inline-block',
-        'vertical-align': 'middle',
-      },
-    }),
-    // baseFontSize 16 = 标准 Tailwind/UnoCSS 刻度（1rem=16px），与参考项目一致
-    presetRemToPx({ baseFontSize: 16 }),
-    presetWind3(),
-  ],
-  shortcuts: [
-    ['border-s', 'border border-solid'],
-    ['wh-full', 'w-full h-full'],
-    ['f-c-c', 'flex justify-center items-center'],
-    ['f-col-c', 'flex-col justify-center items-center'],
-    ['flex-items', 'flex items-center'],
-    ['flex-justify', 'flex justify-center'],
-    ['flex-col', 'flex flex-col'],
-  ],
-  transformers: [transformerDirectives(), transformerVariantGroup()],
-  rules: [
-    [
-      'p-safe',
-      {
-        padding:
-          'env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)',
-      },
-    ],
-    ['pt-safe', { 'padding-top': 'env(safe-area-inset-top)' }],
-    ['pb-safe', { 'padding-bottom': 'env(safe-area-inset-bottom)' }],
-    // backdrop-blur 刻度（preset-mini 未内置，参考项目依赖 frosted-glass 效果）
-    [
-      /^backdrop-blur(?:-(sm|md|lg|xl|2xl|3xl))?$/,
-      (m) => {
-        const map = { 'sm': '4px', 'md': '12px', 'lg': '16px', 'xl': '24px', '2xl': '40px', '3xl': '64px' }
-        const v = m[1] ? map[m[1] as keyof typeof map] : '8px'
-        return { 'backdrop-filter': `blur(${v})` }
-      },
-    ],
-  ],
+  presets: [presetWind3()],
+  // Shell 组件下沉在 packages/ui（workspace 源码引用，不在本 app root 内），
+  // 默认管线扫不到，必须显式纳入，否则 Shell 的 Uno 工具类整块丢失
+  content: {
+    pipeline: {
+      include: [
+        /\.(vue|ts|tsx)($|\?)/,
+        '../../packages/ui/src/**/*.{vue,ts}',
+      ],
+    },
+  },
   theme: {
     colors: {
-      primary: 'var(--v-color-primary)',
-      success: 'var(--v-color-success)',
+      dt: {
+        'bg': 'var(--dt-bg)',
+        'surface': 'var(--dt-surface)',
+        'surface-2': 'var(--dt-surface-2)',
+        'hover': 'var(--dt-hover)',
+        'line': 'var(--dt-line)',
+        'line-soft': 'var(--dt-line-soft)',
+        'text': 'var(--dt-text)',
+        'text-2': 'var(--dt-text-2)',
+        'text-3': 'var(--dt-text-3)',
+        'brand': 'var(--dt-brand)',
+        'brand-hover': 'var(--dt-brand-hover)',
+        'brand-soft': 'var(--dt-brand-soft)',
+        'brand-text': 'var(--dt-brand-text)',
+        'brand-on': 'var(--dt-brand-on)',
+        'success': 'var(--dt-success)',
+        'warning': 'var(--dt-warning)',
+        'danger': 'var(--dt-danger)',
+        'danger-soft': 'var(--dt-danger-soft)',
+        'danger-text': 'var(--dt-danger-text)',
+      },
     },
   },
 })

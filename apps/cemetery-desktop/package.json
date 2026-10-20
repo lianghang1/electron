@@ -17,36 +17,20 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "@desktop/utils": "workspace:*",
-    "@electron-toolkit/utils": "catalog:",
-    "@fun-design/http-alova-axios": "catalog:",
-    "@fun-design/use": "2.0.1",
-    "@vueuse/core": "catalog:",
-    "alova": "catalog:",
-    "axios": "catalog:",
-    "dayjs": "catalog:",
-    "pinia": "4.0.3",
-    "pinia-plugin-persistedstate": "4.7.1",
-    "vue-router": "5.4.0"
+    "@desktop/ui": "workspace:*",
+    "@electron-toolkit/utils": "catalog:"
   },
   "devDependencies": {
     "@desktop/config": "workspace:*",
     "@desktop/core": "workspace:*",
     "@desktop/shared": "workspace:*",
-    "@desktop/ui": "workspace:*",
-    "@iconify/json": "2.2.541",
     "@types/node": "catalog:",
-    "@unocss/preset-rem-to-px": "catalog:",
     "@vitejs/plugin-vue": "catalog:",
-    "@vitejs/plugin-vue-jsx": "catalog:",
     "electron": "catalog:",
     "electron-builder": "catalog:",
     "electron-vite": "catalog:",
-    "sass": "catalog:",
     "typescript": "catalog:",
     "unocss": "catalog:",
-    "unplugin-auto-import": "catalog:",
-    "unplugin-vue-components": "catalog:",
     "vite": "catalog:",
     "vue": "catalog:",
     "vue-tsc": "catalog:"

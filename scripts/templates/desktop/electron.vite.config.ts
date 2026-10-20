@@ -11,6 +11,8 @@ export default createElectronViteConfig({
       rollupOptions: {
         // 设备守护进程独立 bundle：utilityProcess.fork 的入口（厂商 DLL 崩溃隔离）
         input: { 'device-host': fileURLToPath(new URL('electron/main/device-host.ts', import.meta.url)) },
+        // ws 的可选 native 加速依赖：未安装属正常，运行时由 ws 内部 try/catch 兜底，external 避免打包期解析失败
+        external: ['bufferutil', 'utf-8-validate'],
       },
     },
   },
