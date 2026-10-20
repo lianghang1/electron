@@ -17,11 +17,11 @@ export interface DesktopAppManifest {
   }
   icon?: string
   /**
-   * Shell 外壳形态：full = 完整外壳（左侧导航 + 顶栏，默认）；
-   * single = 套壳模式，该 App 的 Tab 激活时隐藏外壳、Web 铺满窗口
-   * （顶栏保留固定 Tab 条与窗口控制，Tab 不可关闭，右键菜单无「关闭标签页」）
+   * App 形态：app = 常规应用（默认，进左侧导航与应用中心）；
+   * resource = 资源直嵌——直接嵌入打开的网页，启动自动打开为固定 Tab（不可关闭），
+   * 不进左侧导航与应用中心，Shell 只保留头部 Tab 条与窗口控制。
    */
-  chrome?: 'full' | 'single'
+  kind?: 'app' | 'resource'
   /** App 声明需要的平台权限，实际放行以 Main 的 PermissionService 为准 */
   permissions?: Permission[]
   security?: AppSecurityPolicy

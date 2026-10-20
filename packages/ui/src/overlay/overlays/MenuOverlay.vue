@@ -19,7 +19,7 @@ const MENU_ITEMS: Array<{ action: TabMenuAction, label: string, danger?: boolean
   { action: 'close', label: '关闭标签页' },
 ]
 
-/** 实际渲染项：套壳模式（Main 按 chrome: 'single' 下发 closable=false）剔除「关闭标签页」 */
+/** 实际渲染项：资源模式（Main 按 manifest.kind 下发 closable=false）剔除「关闭标签页」 */
 const visibleMenuItems = computed(() =>
   store.menu && !store.menu.closable
     ? MENU_ITEMS.filter(item => item.action !== 'close')

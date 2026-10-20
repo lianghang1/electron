@@ -20,7 +20,7 @@ export interface OverlayIpcDeps {
   overlayService: OverlayWindowService
   /** 拍摄浮层关闭回传：执行会话收尾（回收预览 / 隐藏拍摄窗 / 通知发起 tab） */
   captureDialog: CaptureDialogSessionService
-  /** 菜单打开时按 manifest.chrome 计算 closable（套壳模式 Tab 不给关闭入口） */
+  /** 菜单打开时按 manifest.kind 计算 closable（资源型 App 的 Tab 不给关闭入口） */
   registry: AppRegistry
   /** 菜单动作执行：选中项由 Main 直接调 service，Shell 无需中转 */
   tabService?: TabService
@@ -56,8 +56,8 @@ export function registerOverlayIpc(deps: OverlayIpcDeps): void {
     const x = Number(menu.x)
     const y = Number(menu.y)
     if (!Number.isFinite(x) || !Number.isFinite(y)) { throw new DesktopError('IPC_ERROR', 'invalid menu anchor') }
-    // 套壳模式（chrome: 'single'）Tab 固定不可关：菜单不给「关闭标签页」入口
-    const closable = deps.registry.get(menu.appId)?.chrome !== 'single'
+    // 资源型 App（kind: 'resource'）Tab 固定不可关：菜单不给「关闭标签页」入口
+    const closable = deps.registry.get(menu.appId)?.kind !== 'resource'
     deps.overlayService.pushMenu({ tabId: menu.tabId, appId: menu.appId, x, y, closable })
   })
   // 菜单窗回传：选中菜单项 → Main 执行动作后关闭菜单

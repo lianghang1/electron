@@ -25,11 +25,14 @@ const appCenterOpen = ref(false)
 
 const activeTab = computed(() => tabs.value.find(tab => tab.active))
 
-/** 套壳模式：激活 App 声明 chrome: 'single' 时隐藏左侧导航与应用中心（顶栏保留固定 Tab 条），Web 铺满窗口 */
-const chromeHidden = computed(() => {
+/** 资源型 App 不进左侧导航与应用中心（启动直开的嵌入网页，非用户手动发起的入口） */
+const launchableApps = computed(() => apps.value.filter(app => app.manifest.kind !== 'resource'))
+
+/** 资源模式：激活 Tab 是资源型 App 时隐藏左侧导航与应用中心（头部保留固定 Tab 条），Web 铺满窗口 */
+const resourceMode = computed(() => {
   const tab = activeTab.value
   if (!tab) { return false }
-  return apps.value.some(app => app.manifest.id === tab.appId && app.manifest.chrome === 'single')
+  return apps.value.some(app => app.manifest.id === tab.appId && app.manifest.kind === 'resource')
 })
 
 // ---- 窗口控制（顶栏自绘按钮，titleBarStyle: hidden 后为唯一入口） ----
@@ -97,14 +100,14 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dt-shell">
-    <!-- 套壳模式：左侧导航与应用中心隐藏，TopBar 降级为「Tab 条 + 窗口控制」
+    <!-- 资源模式：左侧导航与应用中心隐藏，TopBar 降级为「Tab 条 + 窗口控制」
          （Tab 不可关闭），整栏仍为窗口拖拽区；Web 视图区经 ResizeObserver 自动让位 -->
     <div class="flex flex-1 min-h-0">
-      <AppLauncher v-if="!chromeHidden" :apps="apps" :tabs="tabs" @open="open" />
+      <AppLauncher v-if="!resourceMode" :apps="launchableApps" :tabs="tabs" @open="open" />
       <Transition name="ac-slide">
         <AppCenter
-          v-if="appCenterOpen && !chromeHidden"
-          :apps="apps"
+          v-if="appCenterOpen && !resourceMode"
+          :apps="launchableApps"
           :tabs="tabs"
           @open="open"
           @close="appCenterOpen = false"
@@ -116,7 +119,7 @@ onBeforeUnmount(() => {
           :maximized="maximized"
           :app-center-open="appCenterOpen"
           :theme="theme"
-          :single="chromeHidden"
+          :resource="resourceMode"
           @activate="activate"
           @close="close"
           @context-menu="openTabContextMenu"

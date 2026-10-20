@@ -110,8 +110,8 @@ export class DesktopRuntime {
       if (this.trayService && mainWindow) {
         this.trayService.attach(mainWindow)
       }
-      // --app=<appId> 直启：主窗就绪后打开指定 App（套壳部署用）
-      this.launchStartupApp()
+      // 资源型 App 直开：声明即启动打开为固定 Tab（资源部署主入口，远程源注册后经事件补开）
+      void this.openResourceApps()
       // 主窗就绪后预创建浮层窗：页面提前加载完成，首次弹出/授权弹窗即时呈现（免加载卡顿）
       this.overlayService.prewarm()
       // 运行韧性（无人值守场景，默认全关）：主窗口就绪后挂载；
@@ -450,28 +450,36 @@ export class DesktopRuntime {
   }
 
   /**
-   * --app=<appId> 直启：主窗就绪后打开指定 App。
-   * 目标 App 尚未注册（远程源异步拉取）时挂 app:registered 事件兜底，注册即开。
+   * 资源型 App（kind: 'resource'）直开：启动时按声明顺序全部打开为固定 Tab，
+   * 第一个为启动主 Tab。代码源资源在 setupAppRegistry 已同步注册完毕，此处直接扫描；
+   * apps.json / 远程源异步注册的资源经 app:registered 事件补开（opened 去重防双开）。
    */
-  private launchStartupApp(): void {
-    const appId = process.argv.find(arg => arg.startsWith('--app='))?.slice('--app='.length)
-    if (!appId) { return }
-    if (!this.tabService) {
-      this.logger.warn('--app launch skipped: tab services disabled')
-      return
+  private async openResourceApps(): Promise<void> {
+    if (!this.tabService) { return }
+    const opened = new Set<string>()
+    const open = async (manifest: DesktopAppManifest): Promise<string | null> => {
+      if (manifest.kind !== 'resource' || opened.has(manifest.id)) { return null }
+      opened.add(manifest.id)
+      try {
+        const tab = await this.tabService?.open({ appId: manifest.id })
+        return tab?.id ?? null
+      }
+      catch (error) {
+        this.logger.warn(`resource app open failed: ${manifest.id}`, { error: String(error) })
+        return null
+      }
     }
-    const open = (): boolean => {
-      if (!this.registry.has(appId)) { return false }
-      void this.tabService?.open({ appId }).catch((error) => {
-        this.logger.warn(`startup app open failed: ${appId}`, { error: String(error) })
-      })
-      return true
+    const openedTabIds: string[] = []
+    for (const app of this.registry.list()) {
+      const tabId = await open(app.manifest)
+      if (tabId) { openedTabIds.push(tabId) }
     }
-    if (open()) { return }
-    const offRegistered = this.events.on('app:registered', (manifest) => {
-      if (manifest.id === appId && open()) { offRegistered() }
-    })
-    this.logger.info('startup app pending registration', { appId })
+    // open 每次都会激活新开的 Tab：多资源时最后归位到第一个，作为启动主 Tab
+    const [firstTabId] = openedTabIds
+    if (openedTabIds.length > 1 && firstTabId) {
+      await this.tabService.activate(firstTabId)
+    }
+    this.events.on('app:registered', manifest => void open(manifest))
   }
 
   /**

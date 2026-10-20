@@ -29,7 +29,7 @@ export interface DesktopConfig {
   apps: {
     /** 是否允许接入第三方 App； */
     allowThirdParty: boolean
-    /** 内置 App 清单（代码注册，保底、优先） */
+    /** 内置 App 清单（代码注册，保底、优先）；kind: 'resource' 条目为资源直嵌（启动自动打开） */
     manifests?: DesktopAppManifest[]
     /**
      * 远程 App 清单源（HTTP URL，返回 DesktopAppManifest 数组）。

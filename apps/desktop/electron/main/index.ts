@@ -127,7 +127,8 @@ async function handleAppRequest(request: Request): Promise<Response> {
 /**
  * 第一阶段代码注册的测试 App（PRD #38）。
  * lab / devices 为本地静态测试页，用于验证 AppRegistry / AppInstance / Tab /
- * WebContents / Session / Permission / 导航策略与平台设备域通道；fsy 为第三方远程源对照。
+ * WebContents / Session / Permission / 导航策略与平台设备域通道；
+ * FSY（kind: 'resource'）为资源直嵌形态的联调对照。
  */
 const builtinApps: DesktopAppManifest[] = [
   {
@@ -139,14 +140,15 @@ const builtinApps: DesktopAppManifest[] = [
     permissions: ['storage'],
   },
   {
+    // 资源直嵌（kind: 'resource'）：与常规 App 对照——启动直开为固定 Tab，
+    // 不进左侧导航与应用中心（test/lab/devices 走完整外壳）
     id: 'fsy',
     name: 'FSY',
     version: '1.0.0',
     type: 'internal',
+    kind: 'resource',
     entry: { type: 'web', url: 'https://gmuat.fsygroup.com/' },
     permissions: ['storage'],
-    // 套壳模式：激活时隐藏外壳、Web 铺满窗口（顶栏保留固定 Tab 条与窗口控制，Tab 不可关闭）
-    chrome: 'single',
   },
   {
     // 平台功能实验室：声明全部权限，与 FSY（仅 storage）对照——

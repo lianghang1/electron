@@ -39,7 +39,7 @@ bootstrap({
         name: '智慧陵园',
         version: '1.0.0',
         type: 'internal',
-        chrome: 'single',
+        kind: 'resource',
         entry: { type: 'web', url: 'https://gmuat.fsygroup.com/' },
         permissions: ['storage'],
       },
