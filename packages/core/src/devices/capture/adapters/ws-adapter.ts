@@ -5,6 +5,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { parseWsUrl, tcpProbe } from '../../kernel/channel/ws-channel'
 import { captureError } from '../errors'
+import { diagnoseCamSdkService, ensureCamSdkService } from '../vendors/camsdk-service'
 import { getCaptureVendor } from '../vendors/registry'
 
 /**
@@ -26,7 +27,11 @@ export class WsAdapter implements CaptureAdapter {
         .filter(p => p.transport === 'ws' && p.ws)
         .map(async (p) => {
           const { host, port } = parseWsUrl(p.ws!.url)
-          const alive = await tcpProbe(host, port)
+          let alive = await tcpProbe(host, port)
+          // 探活失败先尝试自动拉起厂商服务（camsdk 自愈），仍不通再走离线提示
+          if (!alive && p.ws!.protocol === 'camsdk') {
+            alive = await ensureCamSdkService(p.ws!.url)
+          }
           // 协议未经验证的配置（verified: false）只探活不采集：声明 ready 会误导上层直接拍照
           const verified = p.ws!.verified !== false
           return {
@@ -39,7 +44,7 @@ export class WsAdapter implements CaptureAdapter {
             meta: {
               url: p.ws!.url,
               note: !alive
-                ? '本地服务未运行（需安装厂商 SDK 服务端）'
+                ? await this.offlineNote(p.ws!)
                 : verified
                   ? '本地服务运行中'
                   : '服务在线，但该设备 ws 协议帧待真机实测，暂未适配采集',
@@ -104,8 +109,12 @@ export class WsAdapter implements CaptureAdapter {
       throw captureError('ADAPTER_UNAVAILABLE', `${config.brand}设备不支持实时预览/摄像头枚举`)
     }
     const { host, port } = parseWsUrl(ws.url)
-    if (!await tcpProbe(host, port)) {
-      throw captureError('DEVICE_OFFLINE', `${config.brand}本地采集服务未运行（${host}:${port}），请确认厂商 SDK 服务端已安装`, { url: ws.url })
+    let reachable = await tcpProbe(host, port)
+    if (!reachable && ws.protocol === 'camsdk') {
+      reachable = await ensureCamSdkService(ws.url)
+    }
+    if (!reachable) {
+      throw captureError('DEVICE_OFFLINE', await this.offlineNote(ws), { url: ws.url })
     }
     return fn(vendor, ws)
   }
@@ -117,6 +126,17 @@ export class WsAdapter implements CaptureAdapter {
       throw captureError('ADAPTER_UNAVAILABLE', `${config.brand}设备配置了未知的 ws 协议: ${String(ws.protocol)}`)
     }
     return vendor
+  }
+
+  /** 自动拉起失败后的离线提示：camsdk 协议附带 Windows 服务四态诊断，诊断不可用回落默认文案 */
+  private async offlineNote(ws: NonNullable<CaptureDeviceConfig['ws']>): Promise<string> {
+    if (ws.protocol === 'camsdk') {
+      const diagnosed = await diagnoseCamSdkService(ws.url)
+      if (diagnosed) {
+        return diagnosed
+      }
+    }
+    return '本地服务未运行（需安装厂商 SDK 服务端）'
   }
 
   private async saveCaptureBase64(req: AdapterCaptureRequest, profileId: string, base64: string): Promise<string> {
