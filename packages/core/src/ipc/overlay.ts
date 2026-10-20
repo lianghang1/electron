@@ -102,6 +102,18 @@ export function registerOverlayIpc(deps: OverlayIpcDeps): void {
     }
     deps.overlayService.dismissConfigDialog()
   })
+  // Shell 发起：打开应用中心浮层窗（原生窗承载，盖过 Web 容器区域）
+  handle('overlay:openAppCenter', (e) => {
+    assertShell(deps.resolver.resolve(e.sender))
+    deps.overlayService.pushAppCenter()
+  })
+  // 仅供应用中心窗页面回传：关闭应用中心（ESC / 遮罩点击 / 关闭按钮）
+  handle('overlay:dismissAppCenter', (e) => {
+    if (!deps.overlayService.isAppCenterWindow(e.sender)) {
+      throw new DesktopError('PERMISSION_DENIED', 'This channel is app-center-overlay-only')
+    }
+    deps.overlayService.dismissAppCenter()
+  })
 }
 
 /** 菜单动作 → service 调用（reload/close 需要 Tab 体系装配，未启用时动作静默忽略） */

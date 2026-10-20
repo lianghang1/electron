@@ -14,6 +14,7 @@ import { app, BrowserWindow } from 'electron'
 import { AppRegistry } from '../app/app-registry'
 import { AppService } from '../app/app-service'
 import { loadLocalAppManifests, loadRemoteAppManifests } from '../app/app-source'
+import { synthesizeResourceEntry } from '../app/resource-entry'
 import { AuditService } from '../audit/audit-service'
 import { CacheService } from '../cache/cache-service'
 import { createCaptureSystem } from '../devices/capture'
@@ -214,7 +215,7 @@ export class DesktopRuntime {
     if (this.options.features?.tray && this.options.icon) {
       this.trayService = new TrayService({
         iconPath: this.options.icon,
-        title: this.options.window.title ?? this.options.app.name,
+        title: this.options.window.title ?? this.options.app.displayName,
         getWindow: () => this.windowService.getMainWindow(),
         // 托盘「设置」→ 系统设置浮层（设备配置统一弹窗），定位首个页签
         openSettings: () => {
@@ -367,10 +368,14 @@ export class DesktopRuntime {
         }
       }
     }
-    registerApps(this.options.apps.manifests ?? [], 'code')
+    // 单站直嵌形态：顶层 entry 合成为 resource App（与 apps 的互斥已在 bootstrap 校验）
+    if (this.options.entry) {
+      registerApps([synthesizeResourceEntry(this.options.app.id, this.options.entry)], 'code')
+    }
+    registerApps(this.options.apps?.manifests ?? [], 'code')
     registerApps(loadLocalAppManifests(configDir(), this.logger), 'apps.json')
     // 远程源异步拉取：origin 白名单把关（默认空 = 禁用），失败不拖垮启动，注册成功后经事件正常流转
-    if (this.options.apps.remoteUrl) {
+    if (this.options.apps?.remoteUrl) {
       void loadRemoteAppManifests(
         this.options.apps.remoteUrl,
         this.logger,

@@ -7,7 +7,7 @@ import { app, protocol } from 'electron'
 // 图标必须放 build/（不命中 electron-vite 主进程默认 publicDir=resources）：publicDir 内的
 // ?asset 不复制文件进 out，仅生成相对 out 的路径——dev 恰好命中，打包后在 asar 内失效致托盘无图标
 import icon from '../../build/icon.png?asset'
-import { appId, productName } from '../identity.cjs'
+import { appId, displayName, productName } from '../identity.cjs'
 
 // 仅 Windows：全屏浮层（拍摄/授权弹窗/右键菜单）盖住主窗时，Chromium 原生遮挡计算
 // 会把主窗判为完全遮挡而暂停渲染合成——浮层下页面逻辑照跑但画面不更新，结果/提示
@@ -132,21 +132,12 @@ async function handleAppRequest(request: Request): Promise<Response> {
  */
 const builtinApps: DesktopAppManifest[] = [
   {
-    id: 'test',
-    name: '测试',
-    version: '1.0.0',
-    type: 'internal',
-    entry: { type: 'web', url: 'http://localhost:8080/' },
-    permissions: ['storage'],
-  },
-  {
     // 资源直嵌（kind: 'resource'）：与常规 App 对照——启动直开为固定 Tab，
     // 不进左侧导航与应用中心（test/lab/devices 走完整外壳）
     id: 'fsy',
     name: 'FSY',
     version: '1.0.0',
     type: 'internal',
-    kind: 'resource',
     entry: { type: 'web', url: 'https://gmuat.fsygroup.com/' },
     permissions: ['storage'],
   },
@@ -188,6 +179,7 @@ bootstrap({
   app: {
     id: appId,
     name: productName,
+    displayName,
     version: '1.0.0',
   },
   window: {

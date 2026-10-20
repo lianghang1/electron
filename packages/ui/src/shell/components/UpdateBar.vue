@@ -62,11 +62,9 @@ async function install() {
   flex: none;
   display: flex;
   align-items: center;
-  height: 52px;
-  padding: 0 16px;
-  background: var(--dt-surface);
-  border-top: 1px solid var(--dt-line);
-  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
+  height: 44px;
+  padding: 0 8px;
+  background: transparent;
 }
 .upd-dot {
   width: 8px;

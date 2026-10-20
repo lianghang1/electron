@@ -2,21 +2,22 @@
 import type { DesktopTab } from '@desktop/shared'
 import type { ShellTheme } from '../composables/use-theme'
 import { ref } from 'vue'
+import AppTooltip from './AppTooltip.vue'
 import WindowControls from './WindowControls.vue'
 
 defineProps<{
   tabs: DesktopTab[]
   /** 窗口最大化状态：切换最大化按钮图标 */
   maximized?: boolean
-  /** 应用中心面板展开态：入口按钮高亮 */
-  appCenterOpen?: boolean
   /** 当前主题：切换主题按钮图标 */
   theme: ShellTheme
-  /** 资源模式：只保留 Tab 条与窗口控制（无品牌/应用中心/主题），Tab 不提供关闭入口 */
+  /** 资源模式：隐藏应用中心/主题切换；Tab 条仅在多资源声明时保留（单资源由品牌区替代） */
   resource?: boolean
+  /** 宿主应用名称（bootstrap app.name）：品牌区展示，资源与非资源模式一致 */
+  hostName?: string
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   activate: [tabId: string]
   close: [tabId: string]
   /** Tab 右键：转发锚点坐标（内容区 DIP），菜单经原生浮层窗渲染（页面内容保持可见） */
@@ -37,22 +38,37 @@ function onTabsWheel(e: WheelEvent): void {
 </script>
 
 <template>
-  <!-- 沉浸式顶栏（飞书式）：品牌 / 应用中心 / Tab / 主题 / 窗口控制合一，
+  <!-- 单层顶栏：品牌 / 应用中心 / 标签 / 主题 / 窗口控制合一；
        整栏为窗口拖拽区，可交互控件一律 no-drag -->
-  <div class="dt-topbar">
-    <div v-if="!resource" class="dt-topbar__brand">
-      Desktop
+  <header class="dt-topbar">
+    <div class="dt-topbar__brand">
+      <span class="dt-topbar__logo">
+        <svg viewBox="0 0 14 14" width="12" height="12">
+          <g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
+            <rect x="1.5" y="1.5" width="4.4" height="4.4" rx="1.2" />
+            <rect x="8.1" y="1.5" width="4.4" height="4.4" rx="1.2" />
+            <rect x="1.5" y="8.1" width="4.4" height="4.4" rx="1.2" />
+            <rect x="8.1" y="8.1" width="4.4" height="4.4" rx="1.2" />
+          </g>
+        </svg>
+      </span>
+      {{ hostName || 'Desktop' }}
     </div>
-    <button
-      v-if="!resource"
-      class="dt-topbar__center"
-      :class="{ 'dt-topbar__center--open': appCenterOpen }"
-      title="应用中心"
-      @click="$emit('toggleCenter')"
-    >
-      应用中心
-    </button>
-    <div ref="tabsEl" class="dt-topbar__tabs" @wheel="onTabsWheel">
+    <AppTooltip v-if="!resource" text="打开应用中心">
+      <button class="dt-chip" @click="$emit('toggleCenter')">
+        <svg viewBox="0 0 14 14" width="12" height="12">
+          <g fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round">
+            <rect x="1.5" y="1.5" width="4.4" height="4.4" rx="1.2" />
+            <rect x="8.1" y="1.5" width="4.4" height="4.4" rx="1.2" />
+            <rect x="1.5" y="8.1" width="4.4" height="4.4" rx="1.2" />
+            <rect x="8.1" y="8.1" width="4.4" height="4.4" rx="1.2" />
+          </g>
+        </svg>
+        应用中心
+      </button>
+    </AppTooltip>
+    <!-- Tab 条：非资源模式恒显；资源模式仅多资源声明时保留（单资源由品牌区替代） -->
+    <div v-if="!resource || tabs.length > 1" ref="tabsEl" class="dt-topbar__tabs" @wheel="onTabsWheel">
       <button
         v-for="tab in tabs"
         :key="tab.id"
@@ -62,6 +78,11 @@ function onTabsWheel(e: WheelEvent): void {
         @click="$emit('activate', tab.id)"
         @contextmenu.prevent="$emit('contextMenu', tab, $event.clientX, $event.clientY)"
       >
+        <!-- 固定 Tab（资源模式）：锁形图标标识常驻，无关闭入口 -->
+        <svg v-if="resource" class="dt-tab__lock" viewBox="0 0 12 12" width="10" height="10">
+          <rect x="2.2" y="5" width="7.6" height="5.4" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.2" />
+          <path d="M4 5V3.6a2 2 0 0 1 4 0V5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+        </svg>
         <svg
           v-if="tab.isLoading"
           class="dt-tab__spinner"
@@ -85,75 +106,88 @@ function onTabsWheel(e: WheelEvent): void {
 
     <div class="dt-topbar__spacer" />
 
-    <div class="dt-topbar__controls">
-      <button v-if="!resource" class="dt-winbtn dt-winbtn--theme" title="切换主题" @click="$emit('toggleTheme')">
-        <svg v-if="theme === 'light'" viewBox="0 0 16 16" width="14" height="14"><path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /></svg>
-        <svg v-else viewBox="0 0 16 16" width="14" height="14"><circle cx="8" cy="8" r="3.2" fill="currentColor" /><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1" /></g></svg>
+    <AppTooltip v-if="!resource" :text="theme === 'light' ? '切换深色模式' : '切换浅色模式'">
+      <button class="dt-topbar__iconbtn" @click="$emit('toggleTheme')">
+        <svg v-if="theme === 'light'" viewBox="0 0 16 16" width="15" height="15"><path d="M13.5 9.5A5.5 5.5 0 1 1 6.5 2.5a4.5 4.5 0 0 0 7 7Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" /></svg>
+        <svg v-else viewBox="0 0 16 16" width="15" height="15"><circle cx="8" cy="8" r="3.2" fill="currentColor" /><g stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><path d="M8 1.2v1.6M8 13.2v1.6M1.2 8h1.6M13.2 8h1.6M3.2 3.2l1.1 1.1M11.7 11.7l1.1 1.1M12.8 3.2l-1.1 1.1M4.3 11.7l-1.1 1.1" /></g></svg>
       </button>
-      <WindowControls
-        :maximized="maximized"
-        @minimize="$emit('minimize')"
-        @toggle-maximize="$emit('toggleMaximize')"
-        @close-window="$emit('closeWindow')"
-      />
-    </div>
-  </div>
+    </AppTooltip>
+    <span v-if="!resource" class="dt-topbar__sep" />
+    <WindowControls
+      :maximized="maximized"
+      @minimize="$emit('minimize')"
+      @toggle-maximize="$emit('toggleMaximize')"
+      @close-window="$emit('closeWindow')"
+    />
+  </header>
 </template>
 
 <style scoped>
 .dt-topbar {
-  height: 40px;
+  position: relative;
+  z-index: 2;
+  height: 44px;
   flex: none;
   display: flex;
   align-items: center;
+  gap: 8px;
+  padding-left: 12px;
   background: var(--dt-surface);
   border-bottom: 1px solid var(--dt-line);
-  padding-left: 12px;
   -webkit-app-region: drag;
-  /* 缎面微光：暗色下顶部 1px 内高光，替代毛玻璃质感 */
-  box-shadow: var(--dt-glow);
-  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
 }
 .dt-topbar__brand {
-  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--dt-text);
-  margin-right: 10px;
+  margin-right: 2px;
 }
-.dt-topbar__center {
-  border: none;
-  background: transparent;
-  border-radius: var(--dt-radius-1);
-  padding: 4px 10px;
-  font-size: 12px;
-  color: var(--dt-text-2);
-  cursor: pointer;
-  font-family: inherit;
-  -webkit-app-region: no-drag;
-  transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
-}
-.dt-topbar__center:hover {
-  background: var(--dt-hover);
-  color: var(--dt-text);
-}
-.dt-topbar__center--open {
+.dt-topbar__logo {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--dt-radius-2);
   background: var(--dt-brand);
   color: var(--dt-brand-on);
 }
-.dt-topbar__center--open:hover {
-  background: var(--dt-brand-hover);
-  color: var(--dt-brand-on);
+
+/* 应用中心入口：图标 + 文字按钮 */
+.dt-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border: none;
+  background: transparent;
+  border-radius: var(--dt-radius-1);
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--dt-text-2);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
+}
+.dt-chip:hover {
+  background: var(--dt-surface-hover);
+  color: var(--dt-text);
 }
 
 .dt-topbar__tabs {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
   overflow-x: auto;
   overflow-y: hidden;
   min-width: 0;
   -webkit-app-region: no-drag;
-  /* Tab 条不显示滚动条（滚动条会挤压 40px 高度连带出竖向滚动条），滚轮横滚代替 */
+  /* Tab 条不显示滚动条（滚动条会挤压高度连带出竖向滚动条），滚轮横滚代替 */
   scrollbar-width: none;
 }
 .dt-topbar__tabs::-webkit-scrollbar {
@@ -164,17 +198,17 @@ function onTabsWheel(e: WheelEvent): void {
   height: 100%;
 }
 
-/* Tab：hover 浅灰圆角块，激活 = 青玉浅底 + 底部主色指示条 + 常显关闭钮（资源模式不渲染） */
+/* 扁平 Tab：无完整边框，激活 = 浅品牌底 + 品牌文字 */
 .dt-tab {
-  position: relative;
   display: flex;
   align-items: center;
-  height: 28px;
+  gap: 6px;
+  height: 30px;
   border: none;
-  border-radius: 7px;
+  border-radius: var(--dt-radius-2);
   background: transparent;
   padding: 0 6px 0 12px;
-  font-size: 13px;
+  font-size: 12.5px;
   color: var(--dt-text-2);
   cursor: pointer;
   white-space: nowrap;
@@ -191,23 +225,16 @@ function onTabsWheel(e: WheelEvent): void {
   color: var(--dt-brand-text);
   font-weight: 500;
 }
-.dt-tab--active::after {
-  content: '';
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: -6px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--dt-brand);
-}
 /* 固定 Tab（资源模式）：无关闭钮，左右内边距对称 */
 .dt-tab--fixed {
   padding: 0 12px;
 }
+.dt-tab__lock {
+  flex: none;
+  opacity: 0.7;
+}
 .dt-tab__spinner {
   flex: none;
-  margin-right: 6px;
   color: var(--dt-brand);
   animation: dt-tab-spin 0.9s linear infinite;
 }
@@ -230,9 +257,9 @@ function onTabsWheel(e: WheelEvent): void {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
+  border-radius: var(--dt-radius-1);
   color: var(--dt-text-3);
-  margin-left: 4px;
+  margin-left: 2px;
   opacity: 0;
   transition: opacity var(--dt-dur) var(--dt-ease), background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
 }
@@ -245,30 +272,31 @@ function onTabsWheel(e: WheelEvent): void {
   color: var(--dt-text);
 }
 
-/* 主题切换按钮：复用窗口控制按钮基类视觉（基类实现见 WindowControls.vue） */
-.dt-topbar__controls {
-  display: flex;
-  height: 100%;
-  flex: none;
-  -webkit-app-region: no-drag;
-}
-.dt-winbtn {
-  width: 44px;
-  height: 100%;
+/* 主题切换：窗口控制左侧的图标按钮 */
+.dt-topbar__iconbtn {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
+  border-radius: var(--dt-radius-1);
   color: var(--dt-text-2);
   cursor: pointer;
+  -webkit-app-region: no-drag;
   transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
 }
-.dt-winbtn:hover {
-  background: var(--dt-hover);
+.dt-topbar__iconbtn:hover {
+  background: var(--dt-surface-hover);
   color: var(--dt-text);
 }
-.dt-winbtn--theme {
-  width: 36px;
+/* 主题切换与窗口控制之间的分隔线 */
+.dt-topbar__sep {
+  width: 1px;
+  height: 20px;
+  flex: none;
+  background: var(--dt-line);
+  margin: 0 6px;
 }
 </style>

@@ -22,6 +22,15 @@ function startCrashReporter(): void {
  * app 的 electron/main/index.ts 只需要调用它并传入 DesktopConfig + 差异项。
  */
 export function bootstrap(options: BootstrapOptions): void {
+  assertEntryAppsExclusive(options)
   startCrashReporter()
   new DesktopRuntime(options).start()
+}
+
+/** 内容承载形态互斥：单站直嵌（entry）与多 App 平台（apps）二选一，防止两种形态混配出歧义配置 */
+function assertEntryAppsExclusive(options: BootstrapOptions): void {
+  const hasApps = Boolean(options.apps?.manifests?.length || options.apps?.remoteUrl)
+  if (options.entry && hasApps) {
+    throw new Error('[bootstrap] entry 与 apps 互斥：单站直嵌形态用 entry，多 App 形态用 apps.manifests')
+  }
 }

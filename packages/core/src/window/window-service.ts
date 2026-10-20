@@ -28,7 +28,7 @@ export class WindowService {
       height: options.window.height,
       minWidth: options.window.minWidth,
       minHeight: options.window.minHeight,
-      title: options.window.title ?? options.app.name,
+      title: options.window.title ?? options.app.displayName,
       show: false,
       autoHideMenuBar: true,
       ...(process.platform === 'linux' && options.icon ? { icon: options.icon } : {}),

@@ -24,7 +24,8 @@ export class AppService {
   async open(appId: string): Promise<AppInstance> {
     const manifest = this.registry.get(appId)
     if (!manifest) { throw new DesktopError('APP_NOT_FOUND', `App not registered: ${appId}`) }
-    if (manifest.type === 'third-party' && !this.config.apps.allowThirdParty) { throw new DesktopError('APP_NOT_ALLOWED', `Third-party app is not allowed: ${appId}`) }
+    // apps 块缺省（单站直嵌 / Kiosk 自渲染形态）时 allowThirdParty 视为 false，安全默认
+    if (manifest.type === 'third-party' && !this.config.apps?.allowThirdParty) { throw new DesktopError('APP_NOT_ALLOWED', `Third-party app is not allowed: ${appId}`) }
 
     const existingId = this.activeByApp.get(appId)
     if (existingId) {

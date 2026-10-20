@@ -10,9 +10,9 @@
 export const OVERLAY_HASH = '#/overlay'
 
 /** 浮层窗用途：决定页面初始 sync 分发与渲染分支 */
-export type OverlayWindowKind = 'panel' | 'dialog' | 'menu' | 'capture' | 'config'
+export type OverlayWindowKind = 'panel' | 'dialog' | 'menu' | 'capture' | 'config' | 'app-center'
 
-const KINDS: readonly OverlayWindowKind[] = ['panel', 'dialog', 'menu', 'capture', 'config']
+const KINDS: readonly OverlayWindowKind[] = ['panel', 'dialog', 'menu', 'capture', 'config', 'app-center']
 
 /** 编码浮层窗加载 hash：`#/overlay?kind=<kind>` */
 export function buildOverlayHash(kind: OverlayWindowKind): string {

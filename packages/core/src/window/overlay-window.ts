@@ -17,8 +17,8 @@ const PANEL_WIDTH = 320
 const SHADOW = 12
 /** 浮层窗到屏幕工作区边缘的最小间距 */
 const SCREEN_MARGIN = 8
-/** Shell 顶栏高度（TopBar 40px）：消息窗从顶栏之下开始，不遮挡顶部导航 */
-const TOPBAR_HEIGHT = 40
+/** Shell 顶栏高度（44px 单层）：消息窗从顶栏之下开始，不遮挡顶部导航 */
+const TOPBAR_HEIGHT = 44
 /** 通知 toast 自动消失时长（ms）：太短用户容易错过 */
 const TOAST_TTL_MS = 8000
 /** 下载卡片终态自动消失时长：与通知 toast 同款体验（进行中的任务常驻展示进度） */
@@ -42,6 +42,8 @@ const OVERLAY_CLEAR_DELAY_MS = 100
  *   预览/拍摄在浮层窗内闭环，结果回传发起 tab
  * - config 设备配置浮层：全屏遮罩模态，业务页（设备测试页）经桥发起，
  *   OverlayApp 挂载 @desktop/ui 配置弹窗，配置保存走设备域 IPC，无需会话管理
+ * - app-center 应用中心浮层：全屏遮罩模态，仅 Shell 经桥发起，
+ *   OverlayApp 挂载应用中心面板，数据（应用/权限/缓存）由浮层页自行经桥拉取
  *
  * panel 内容高度动态：页面渲染后经 overlay:resize 量高回报，Main 据此调整窗口；
  * dialog / menu 尺寸由 Main 直接确定（全屏铺开），无需回报。
@@ -52,6 +54,7 @@ export class OverlayWindowService {
   private menuWin: BrowserWindow | null = null
   private captureWin: BrowserWindow | null = null
   private configWin: BrowserWindow | null = null
+  private appCenterWin: BrowserWindow | null = null
 
   /** 右下角消息区数据源（Main 持有，窗口复用时全量重推） */
   private toasts: PlatformNotification[] = []
@@ -69,6 +72,8 @@ export class OverlayWindowService {
   private captureSession: CaptureDialogSession | null = null
   /** 挂起中的设备配置浮层类别（config 窗数据源） */
   private configKind: DeviceConfigKind | null = null
+  /** 应用中心浮层开关（app-center 窗数据源） */
+  private appCenterOpen = false
   /** 清场隐藏延迟器：空帧绘制落地后再 hide；期间来了新请求则取消（窗口保持可见） */
   private dialogHideTimer: NodeJS.Timeout | null = null
   /** 菜单窗清场隐藏延迟器（与 dialogHideTimer 同策略，窗口独立互不影响） */
@@ -77,6 +82,8 @@ export class OverlayWindowService {
   private captureHideTimer: NodeJS.Timeout | null = null
   /** 配置窗清场隐藏延迟器（与 dialogHideTimer 同策略，窗口独立互不影响） */
   private configHideTimer: NodeJS.Timeout | null = null
+  /** 应用中心窗清场隐藏延迟器（与 dialogHideTimer 同策略，窗口独立互不影响） */
+  private appCenterHideTimer: NodeJS.Timeout | null = null
   /** 菜单实例序号：生成菜单 id */
   private menuSeq = 0
 
@@ -313,6 +320,47 @@ export class OverlayWindowService {
     return this.configKind
   }
 
+  // ---- 应用中心浮层（仅 Shell 发起，无会话语义） ----
+
+  /** 应用中心浮层弹出：全屏遮罩模态，重复调用仅聚焦已有窗口 */
+  pushAppCenter(): void {
+    // 清场隐藏还没落地就有新请求：取消延迟隐藏，窗口保持可见
+    if (this.appCenterHideTimer) {
+      clearTimeout(this.appCenterHideTimer)
+      this.appCenterHideTimer = null
+    }
+    this.appCenterOpen = true
+    const win = this.ensureAppCenter()
+    this.applyFullscreenBounds(win)
+    // 数据先行：页面在窗口隐藏状态下渲染就绪，show 瞬间即有内容（与 pushConfigDialog 同策略）
+    win.webContents.send('overlay:appCenterUpdated', true)
+    if (!win.isVisible()) { win.show() }
+    win.focus()
+  }
+
+  /** 关闭应用中心浮层（弹窗关闭回传）：清场后隐藏应用中心窗 */
+  dismissAppCenter(): void {
+    if (!this.appCenterOpen) { return }
+    this.appCenterOpen = false
+    if (!this.appCenterWin) { return }
+    // 清场先行：推空让页面在可见状态下移除卡片并绘制透明帧，再隐藏（防残留帧，同 dismissMenu）
+    this.appCenterWin.webContents.send('overlay:appCenterUpdated', false)
+    this.appCenterHideTimer = setTimeout(() => {
+      this.appCenterHideTimer = null
+      this.appCenterWin?.hide()
+    }, OVERLAY_CLEAR_DELAY_MS)
+  }
+
+  private ensureAppCenter(): BrowserWindow {
+    if (this.appCenterWin) { return this.appCenterWin }
+    const parent = this.getParent()
+    if (!parent) { throw new Error('[overlay] main window is not ready') }
+    const win = this.createOverlayWindow(parent, 'app-center')
+    // 应用中心不因失焦消失（全屏遮罩模态）：用户显式关闭
+    this.appCenterWin = win
+    return win
+  }
+
   private ensureConfig(): BrowserWindow {
     if (this.configWin) { return this.configWin }
     const parent = this.getParent()
@@ -362,6 +410,7 @@ export class OverlayWindowService {
       menu: this.menuWin?.webContents === sender ? this.menu : null,
       captureSession: this.captureWin?.webContents === sender ? this.captureSession : null,
       configKind: this.configWin?.webContents === sender ? this.configKind : null,
+      appCenterOpen: this.appCenterWin?.webContents === sender ? this.appCenterOpen : false,
     }
   }
 
@@ -378,6 +427,7 @@ export class OverlayWindowService {
       this.ensureMenu()
       this.ensureCapture()
       this.ensureConfig()
+      this.ensureAppCenter()
     }
     catch (error) {
       this.logger.warn('overlay prewarm failed', { error: String(error) })
@@ -391,6 +441,7 @@ export class OverlayWindowService {
       || this.menuWin?.webContents === sender
       || this.captureWin?.webContents === sender
       || this.configWin?.webContents === sender
+      || this.appCenterWin?.webContents === sender
   }
 
   /** 拍摄窗校验：overlay:dismissCapture 仅接受拍摄窗自身（取消会话语义） */
@@ -401,6 +452,11 @@ export class OverlayWindowService {
   /** 配置窗校验：overlay:dismissConfig 仅接受配置窗自身（关闭浮层语义） */
   isConfigWindow(sender: WebContents): boolean {
     return this.configWin?.webContents === sender
+  }
+
+  /** 应用中心窗校验：overlay:dismissAppCenter 仅接受应用中心窗自身（关闭浮层语义） */
+  isAppCenterWindow(sender: WebContents): boolean {
+    return this.appCenterWin?.webContents === sender
   }
 
   // ---- 内部：消息区 ----
@@ -438,7 +494,7 @@ export class OverlayWindowService {
   }
 
   /**
-   * 消息窗右上角锚定：对齐主窗口内容区右上角，顶部让出 Shell 顶栏（40px），
+   * 消息窗右上角锚定：对齐主窗口内容区右上角，顶部让出 Shell 顶栏（44px），
    * 高度钳制在顶栏之下到内容区底边之间（浮层是主窗口的子窗，只允许出现在软件窗口范围内）。
    */
   private anchorPanel(parent: BrowserWindow, height: number): Electron.Rectangle {
@@ -521,6 +577,7 @@ export class OverlayWindowService {
       if (this.menuWin === win) { this.menuWin = null }
       if (this.captureWin === win) { this.captureWin = null }
       if (this.configWin === win) { this.configWin = null }
+      if (this.appCenterWin === win) { this.appCenterWin = null }
       this.resolver.unregister(wcId)
     })
     // 浮层页以 Shell 身份登记：与 Shell 同级信任（全量桥），回传通道经 isOverlay 关卡校验

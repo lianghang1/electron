@@ -4,7 +4,7 @@ import { app } from 'electron'
 // 图标必须放 build/（不命中 electron-vite 主进程默认 publicDir=resources）：publicDir 内的
 // ?asset 不复制文件进 out，仅生成相对 out 的路径——dev 恰好命中，打包后在 asar 内失效致托盘无图标
 import icon from '../../build/icon.png?asset'
-import { appId, productName } from '../identity.cjs'
+import { appId, displayName, productName } from '../identity.cjs'
 
 // 仅 Windows：全屏浮层（拍摄/授权弹窗/右键菜单）盖住主窗时，Chromium 原生遮挡计算
 // 会把主窗判为完全遮挡而暂停渲染合成——浮层下页面逻辑照跑但画面不更新，结果/提示
@@ -23,6 +23,7 @@ bootstrap({
   app: {
     id: appId,
     name: productName,
+    displayName,
     version: '1.0.0',
   },
   window: {
@@ -38,13 +39,15 @@ bootstrap({
   apps: {
     allowThirdParty: false,
     // 内置 App 清单（Desktop 形态的业务入口，打开即 Tab 页），写法参照 apps/desktop 的 builtinApps；
-    // 资源直嵌条目标 kind: 'resource'（套壳形态）：启动自动打开为固定 Tab，带头部 Tab 条、无左侧导航与应用中心
+    // 资源直嵌条目标 kind: 'resource'（多站/混合形态）：启动自动打开为固定 Tab，带头部 Tab 条、无左侧导航与应用中心
     manifests: [
       // {
       //   id: 'site', name: '站点名', version: '1.0.0', type: 'internal', kind: 'resource',
       //   entry: { type: 'web', url: 'https://example.com/' }, permissions: ['storage'],
       // },
     ],
+    // 单站直嵌形态（整个应用就是一个网页的定制壳）：改用顶层 entry，一行即成、与 apps 互斥——
+    // entry: { url: 'https://example.com/' }（分区标识缺省派生 app.id，权限缺省 ['storage']）
   },
   // 更新体系联调开关：设置 DESKTOP_UPDATE_FEED 环境变量后启用（生产部署改成真实更新服务器地址）
   updates: process.env.DESKTOP_UPDATE_FEED

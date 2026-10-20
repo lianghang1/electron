@@ -34,6 +34,8 @@ export interface OverlaySyncState {
   captureSession: CaptureDialogSession | null
   /** 挂起中的设备配置浮层类别（配置窗数据源，null = 无浮层） */
   configKind: DeviceConfigKind | null
+  /** 应用中心浮层开关（应用中心窗数据源） */
+  appCenterOpen: boolean
 }
 
 /**
@@ -69,6 +71,10 @@ export const overlayDomain = defineDomain('overlay', {
   openConfig: invoke<(kind: DeviceConfigKind) => void>(),
   /** 仅供配置浮层窗页面回传：关闭配置浮层（用户点击弹窗关闭 / ESC） */
   dismissConfig: invoke<() => void>(),
+  /** 仅 Shell 发起：打开应用中心浮层窗（全屏遮罩模态，盖过 Web 容器区域） */
+  openAppCenter: invoke<() => void>(),
+  /** 仅供应用中心窗页面回传：关闭应用中心（ESC / 遮罩点击 / 关闭按钮） */
+  dismissAppCenter: invoke<() => void>(),
 
   // ---- Main → Renderer 推送 ----
   /** Tab 右键菜单变化推送（菜单窗数据源，null = 已关闭） */
@@ -77,4 +83,6 @@ export const overlayDomain = defineDomain('overlay', {
   captureUpdated: push<[CaptureDialogSession | null]>(),
   /** 设备配置浮层变化推送（配置窗数据源，null = 已关闭） */
   configUpdated: push<[DeviceConfigKind | null]>(),
+  /** 应用中心浮层开关推送（应用中心窗数据源） */
+  appCenterUpdated: push<[boolean]>(),
 })

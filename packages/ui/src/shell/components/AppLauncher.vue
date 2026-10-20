@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DesktopTab, RegisteredApp } from '@desktop/shared'
 import { computed } from 'vue'
+import AppTooltip from './AppTooltip.vue'
 
 const props = defineProps<{
   apps: RegisteredApp[]
@@ -12,7 +13,7 @@ const emit = defineEmits<{ open: [appId: string] }>()
 
 const activeAppId = computed(() => props.tabs.find(tab => tab.active)?.appId)
 
-/** 字母头像柔和色板（按 appId 稳定取色，避免全青玉一片；识别色与主题主色无关） */
+/** 字母头像柔和色板（按 appId 稳定取色保证辨识度；浅底淡彩，非高饱和实心块） */
 const AVATAR_COLORS = ['#0f9d8f', '#7c5cff', '#e0663c', '#c2379e', '#2f8af5', '#d9a514']
 function avatarColor(appId: string): string {
   let hash = 0
@@ -22,22 +23,31 @@ function avatarColor(appId: string): string {
 </script>
 
 <template>
-  <!-- 飞书式窄导航：图标上 / 文字下的纵排导航项，激活项主色高亮 + 左侧指示条 -->
-  <aside class="dt-launcher">
-    <button
-      v-for="app in apps"
-      :key="app.manifest.id"
-      class="dt-launcher__item"
-      :class="{ 'dt-launcher__item--active': app.manifest.id === activeAppId }"
-      :title="app.manifest.name"
-      @click="emit('open', app.manifest.id)"
-    >
-      <span class="dt-launcher__icon" :style="{ background: avatarColor(app.manifest.id) }">
-        {{ app.manifest.name.slice(0, 1) }}
-      </span>
-      <span class="dt-launcher__name">{{ app.manifest.name }}</span>
-    </button>
-  </aside>
+  <!-- 左侧应用导航（72px 窄栏）：字母头像（无自定义图标时）+ 悬停 Tooltip，
+       默认中性、悬停浅灰底、激活浅品牌底 + 左侧品牌指示条 -->
+  <nav class="dt-launcher" aria-label="应用导航">
+    <AppTooltip v-for="app in apps" :key="app.manifest.id" :text="app.manifest.name">
+      <button
+        class="dt-launcher__item"
+        :class="{ 'dt-launcher__item--active': app.manifest.id === activeAppId }"
+        @click="emit('open', app.manifest.id)"
+      >
+        <!-- 有自定义图标用图片，否则用首字母淡彩头像（同色系深浅区分应用） -->
+        <img
+          v-if="app.manifest.icon"
+          :src="app.manifest.icon"
+          alt=""
+          class="dt-launcher__img"
+        >
+        <span
+          v-else
+          class="dt-launcher__letter"
+          :style="{ '--dt-app-color': avatarColor(app.manifest.id) }"
+        >{{ app.manifest.name.slice(0, 1) }}</span>
+        <span v-if="app.manifest.id === activeAppId" class="dt-launcher__indicator" />
+      </button>
+    </AppTooltip>
+  </nav>
 </template>
 
 <style scoped>
@@ -47,73 +57,78 @@ function avatarColor(appId: string): string {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
+  padding: 12px;
   background: var(--dt-surface);
   border-right: 1px solid var(--dt-line);
-  padding: 10px 8px;
   overflow-y: auto;
   overflow-x: hidden;
-  transition: background var(--dt-dur) var(--dt-ease), border-color var(--dt-dur) var(--dt-ease);
+  scrollbar-width: none;
+}
+.dt-launcher::-webkit-scrollbar {
+  display: none;
 }
 .dt-launcher__item {
   position: relative;
-  width: 100%;
-  max-width: 56px;
+  width: 48px;
+  height: 48px;
   flex: none;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
   border: none;
   background: transparent;
-  border-radius: 8px;
-  padding: 8px 0 7px;
+  border-radius: var(--dt-radius-4);
+  color: var(--dt-text-2);
   cursor: pointer;
   font-family: inherit;
-  transition: background var(--dt-dur) var(--dt-ease);
+  transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
 }
 .dt-launcher__item:hover {
-  background: var(--dt-hover);
+  background: var(--dt-surface-hover);
 }
 .dt-launcher__item--active {
   background: var(--dt-brand-soft);
+  color: var(--dt-brand-text);
 }
-.dt-launcher__item--active::before {
-  content: '';
+.dt-launcher__item:focus-visible {
+  outline: 2px solid var(--dt-brand);
+  outline-offset: -2px;
+}
+.dt-launcher__img {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--dt-radius-1);
+  object-fit: cover;
+}
+/* 首字母淡彩头像：14% 底色 + 原色文字，既可辨识又不高饱和 */
+.dt-launcher__letter {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--dt-radius-2);
+  background: color-mix(in srgb, var(--dt-app-color) 14%, var(--dt-surface));
+  color: var(--dt-app-color);
+  font-size: 13px;
+  font-weight: 600;
+  transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
+}
+/* 激活态字母加深一档，与浅品牌底仍保持色相区分 */
+.dt-launcher__item--active .dt-launcher__letter {
+  background: color-mix(in srgb, var(--dt-app-color) 24%, var(--dt-surface));
+  color: color-mix(in srgb, var(--dt-app-color) 78%, #000);
+}
+/* 激活指示条：绝对定位于项左缘，不引起图标偏移 */
+.dt-launcher__indicator {
   position: absolute;
   left: 0;
   top: 50%;
   transform: translateY(-50%);
   width: 3px;
   height: 22px;
-  border-radius: 0 3px 3px 0;
+  border-radius: 0 2px 2px 0;
   background: var(--dt-brand);
-}
-.dt-launcher__icon {
-  width: 32px;
-  height: 32px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 5px;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 14%);
-}
-.dt-launcher__name {
-  font-size: 11px;
-  color: var(--dt-text-2);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 4px;
-  transition: color var(--dt-dur) var(--dt-ease);
-}
-.dt-launcher__item--active .dt-launcher__name {
-  color: var(--dt-brand-text);
-  font-weight: 600;
 }
 </style>

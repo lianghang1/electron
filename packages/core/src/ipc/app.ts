@@ -34,7 +34,7 @@ function buildAppContext(context: CallerContext, deps: AppIpcDeps): AppContext {
       instanceId: context.instanceId,
       manifest: {
         id: SHELL_APP_ID,
-        name: deps.config.app.name,
+        name: deps.config.app.displayName,
         version: deps.config.app.version,
         type: 'internal',
         entry: { type: 'web', url: '' },

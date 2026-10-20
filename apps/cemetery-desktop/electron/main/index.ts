@@ -2,7 +2,7 @@ import process from 'node:process'
 import { bootstrap } from '@desktop/core'
 import { app } from 'electron'
 import icon from '../../build/icon.png?asset'
-import { appId, productName } from '../identity.cjs'
+import { appId, displayName, productName } from '../identity.cjs'
 
 // 仅 Windows：全屏浮层（拍摄/授权弹窗/右键菜单）盖住主窗时，Chromium 原生遮挡计算
 // 会把主窗判为完全遮挡而暂停渲染合成——浮层下页面逻辑照跑但画面不更新，结果/提示
@@ -15,7 +15,11 @@ bootstrap({
   app: {
     id: appId,
     name: productName,
+    displayName,
     version: '1.0.0',
+  },
+  entry: {
+    url: 'https://gmuat.fsygroup.com/',
   },
   window: {
     width: 1200,
@@ -30,20 +34,6 @@ bootstrap({
   },
   features: {
     tray: true,
-  },
-  apps: {
-    allowThirdParty: false,
-    manifests: [
-      {
-        id: 'cemetery',
-        name: '智慧陵园',
-        version: '1.0.0',
-        type: 'internal',
-        kind: 'resource',
-        entry: { type: 'web', url: 'https://gmuat.fsygroup.com/' },
-        permissions: ['storage'],
-      },
-    ],
   },
   updates: process.env.DESKTOP_UPDATE_FEED
     ? { url: process.env.DESKTOP_UPDATE_FEED, asar: 'asar-manifest.json' }

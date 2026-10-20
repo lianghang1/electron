@@ -1,75 +1,107 @@
 /**
- * 青玉 Studio 设计令牌（方向 C 双主题）· 全部视觉值的单一数据源。
+ * Shell 设计令牌 · 全部视觉值的单一数据源（IDE 平面风）。
  * 浅色为默认；深色挂在 :root[data-theme='dark']，组件零改动换肤。
- * 组件与 OverlayWindow 浮层页一律只引用 var(--dt-*)，禁止散落硬编码色值。
+ *
+ * 品牌色单点：--dt-brand 是唯一样本，其余品牌变体全部经 color-mix 从它派生；
+ * 应用端只需覆盖 :root { --dt-brand: <色值> } 即可整体换主题。
+ * 全部令牌放在 @layer 中（层内样式优先级恒低于未分层样式），
+ * 应用端覆盖无需关心样式引入顺序。
+ * 组件一律只引用 var(--dt-*)，禁止散落硬编码色值。
+ *
+ * 平面风约束：白底 + 1px 低对比边框分层，不用渐变底衬 / 玻璃模糊 / 厚重投影，
+ * 投影仅保留浮层（弹窗、Tooltip）所需的轻量单层。
  */
-:root {
-  /* 画布与面板 */
-  --dt-bg: #f5f6f8;
-  --dt-surface: #ffffff;
-  --dt-surface-2: #f9fafb;
-  --dt-hover: #f2f3f5;
-  --dt-line: #e7e9ec;
-  --dt-line-soft: #f3f4f6;
+@layer dt-tokens {
+  :root {
+    /* 品牌色唯一样本（默认青玉；应用端覆盖此一个变量即整体换肤） */
+    --dt-brand: #0d9488;
+    --dt-brand-hover: color-mix(in srgb, var(--dt-brand) 90%, #000);
+    --dt-brand-soft: color-mix(in srgb, var(--dt-brand) 10%, #fff);
+    --dt-brand-text: color-mix(in srgb, var(--dt-brand) 76%, #000);
+    --dt-brand-on: #ffffff;
 
-  /* 文字 */
-  --dt-text: #1f2328;
-  --dt-text-2: #6b7280;
-  --dt-text-3: #9ca3af;
+    /* 画布与面板 */
+    --dt-bg: #f0f2f5;
+    --dt-surface: #ffffff;
+    --dt-surface-hover: #f3f5f7;
+    --dt-hover: #e8ebee;
+    --dt-line: #e1e5eb;
+    --dt-line-strong: #d0d5dd;
+    --dt-line-soft: #eceff2;
 
-  /* 青玉主色阶（500 为浅色主色） */
-  --dt-brand: #0f9d8f;
-  --dt-brand-hover: #0d8a7e;
-  --dt-brand-soft: #e6f5f3;
-  --dt-brand-text: #0b6b61;
-  --dt-brand-on: #ffffff;
+    /* 文字 */
+    --dt-text: #202938;
+    --dt-text-2: #667085;
+    --dt-text-3: #98a2b3;
 
-  /* 语义色 */
-  --dt-success: #0d9f6e;
-  --dt-warning: #efaa17;
-  --dt-danger: #d92d20;
-  --dt-danger-soft: #fef3f2;
-  --dt-danger-text: #d92d20;
+    /* Tooltip（浅色下深底反白） */
+    --dt-tip-bg: #202938;
+    --dt-tip-text: #ffffff;
 
-  /* 缎面微光（暗色面板顶部 1px 内高光，替代毛玻璃） */
-  --dt-glow: none;
+    /* 语义色 */
+    --dt-success: #0d9f6e;
+    --dt-warning: #efaa17;
+    --dt-danger: #d92d20;
+    --dt-danger-soft: #fef3f2;
+    --dt-danger-text: #d92d20;
 
-  /* 形状 / 动效 / 阴影 */
-  --dt-radius-1: 6px;
-  --dt-radius-2: 10px;
-  --dt-radius-3: 12px;
-  --dt-dur: 120ms;
-  --dt-ease: cubic-bezier(0.2, 0, 0, 1);
-  --dt-shadow-bar: 0 4px 12px rgba(2, 8, 20, 8%);
+    /* 形状：r1 控件 / r2 小卡 / r3 中卡 / r4 大卡 / r5 弹层 */
+    --dt-radius-1: 6px;
+    --dt-radius-2: 8px;
+    --dt-radius-3: 10px;
+    --dt-radius-4: 12px;
+    --dt-radius-5: 14px;
+
+    /* 浮层轻投影（仅弹窗 / Tooltip 使用，平面布局不投影） */
+    --dt-shadow-pop:
+      0 4px 12px rgb(15 23 42 / 8%),
+      0 16px 40px rgb(15 23 42 / 12%);
+
+    /* 动效：轻量、克制、快速 */
+    --dt-dur: 140ms;
+    --dt-dur-slow: 180ms;
+    --dt-ease: cubic-bezier(0.2, 0.9, 0.25, 1);
+  }
+
+  :root[data-theme='dark'] {
+    --dt-bg: #101115;
+    --dt-surface: #17181c;
+    --dt-surface-hover: #1f2025;
+    --dt-hover: #26272e;
+    --dt-line: #2b2d35;
+    --dt-line-strong: #3a3d47;
+    --dt-line-soft: #232429;
+
+    --dt-text: #f0f2f4;
+    --dt-text-2: #9aa0aa;
+    --dt-text-3: #63676f;
+
+    --dt-tip-bg: #f0f2f4;
+    --dt-tip-text: #17181c;
+
+    /* 暗色下派生方向反转：hover/文字提亮保对比度，soft 掺入深面板 */
+    --dt-brand-hover: color-mix(in srgb, var(--dt-brand) 84%, #fff);
+    --dt-brand-soft: color-mix(in srgb, var(--dt-brand) 22%, var(--dt-surface));
+    --dt-brand-text: color-mix(in srgb, var(--dt-brand) 45%, #fff);
+
+    --dt-success: #34d399;
+    --dt-warning: #fbbf24;
+    --dt-danger: #f97066;
+    --dt-danger-soft: #2a1215;
+    --dt-danger-text: #f97066;
+
+    --dt-shadow-pop:
+      0 4px 12px rgb(0 0 0 / 40%),
+      0 16px 40px rgb(0 0 0 / 44%);
+  }
 }
 
-:root[data-theme='dark'] {
-  /* 深墨蓝画布 + 缎面面板 */
-  --dt-bg: #0b1220;
-  --dt-surface: #101a2b;
-  --dt-surface-2: #0e1828;
-  --dt-hover: #1a2740;
-  --dt-line: #223049;
-  --dt-line-soft: #1a2740;
-
-  --dt-text: #e6eaf2;
-  --dt-text-2: #8a94a8;
-  --dt-text-3: #5a6478;
-
-  /* 暗色下主色提亮保证对比度 */
-  --dt-brand: #2dd4bf;
-  --dt-brand-hover: #5cdfce;
-  --dt-brand-soft: #123b36;
-  --dt-brand-text: #7be8d8;
-  --dt-brand-on: #06231f;
-
-  --dt-success: #34d399;
-  --dt-warning: #fbbf24;
-  --dt-danger: #f97066;
-  --dt-danger-soft: #2a1215;
-  --dt-danger-text: #f97066;
-
-  --dt-glow: inset 0 1px 0 rgba(255, 255, 255, 5%);
-
-  --dt-shadow-bar: none;
+/* 无障碍：系统要求减少动效时压平过渡与动画（tokens.css 仅 Shell 窗口引入） */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

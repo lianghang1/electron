@@ -17,4 +17,7 @@ const appId = 'com.company.desktop'
  */
 const productName = 'Desktop'
 
-module.exports = { appId, productName }
+/** 面向用户的显示名：窗口标题 / Shell 品牌区（本产品无独立中文名，与 productName 一致） */
+const displayName = 'Desktop'
+
+module.exports = { appId, productName, displayName }

@@ -8,3 +8,6 @@ export declare const appId: string
 
 /** 英文产品名：exe 名 / 安装目录 / 安装包文件名前缀（对应 bootstrap.app.name）。必须 ASCII（原因见 identity.cjs 注释） */
 export declare const productName: string
+
+/** 面向用户的显示名：窗口标题 / Shell 品牌区使用 */
+export declare const displayName: string

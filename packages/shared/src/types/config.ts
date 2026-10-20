@@ -1,4 +1,5 @@
 import type { DesktopAppManifest } from './manifest'
+import type { Permission } from './permission'
 import type { UpdateAsarSource } from './update'
 
 /**
@@ -8,9 +9,12 @@ import type { UpdateAsarSource } from './update'
  */
 export interface DesktopConfig {
   app: {
-    /** AppUserModelId（Windows 任务栏分组），如 'com.company.desktop' */
+    /** AppUserModelId（Windows 任务栏分组），如 'com.company.desktop'；单实例锁 / 分区 scope / 协议源等运行时身份均由此派生 */
     id: string
+    /** 英文产品名（对应 identity.productName）：内部标识场景使用，不面向用户展示 */
     name: string
+    /** 面向用户的显示名（对应 identity.displayName）：窗口标题缺省与 Shell 品牌区等界面显示使用 */
+    displayName: string
     version: string
   }
   window: {
@@ -19,16 +23,34 @@ export interface DesktopConfig {
      * Electron 其余全部属性走 WindowOverrides.browserWindowOptions 透传，
      * 同名时逃生口覆盖此处的默认值——不要把 Electron 属性逐个搬上来。
      */
-    /** 窗口标题，缺省用 app.name */
+    /** 窗口标题，缺省用 app.displayName */
     title?: string
     width: number
     height: number
     minWidth?: number
     minHeight?: number
   }
-  apps: {
+  /**
+   * 单站直嵌形态：整个应用就是一个网页（定制壳最常见交付形态），启动自动打开为固定主 Tab。
+   * 与 apps 互斥（同时配置启动期报错）；要承载多 App / 混合形态改用 apps.manifests。
+   * manifest 的其余字段（name/version/type）全部无需关心：注册表按 resource 形态自动兜底
+   * （名称缺省取 URL 域名，仅多资源 Tab 标题会显示）。
+   */
+  entry?: {
+    /** 直嵌内容的分区标识（cookie 隔离与 Tab 实例键），缺省派生 app.id（打包身份，跨版本稳定） */
+    id?: string
+    /** 直嵌网页地址 */
+    url: string
+    /** 平台权限放行清单，缺省 ['storage']（登录态持久化刚需） */
+    permissions?: Permission[]
+  }
+  /**
+   * 多 App 平台形态的内容承载：常规 App + 资源直嵌混配。
+   * 与 entry 互斥（同时配置启动期报错）；单站直嵌 / 无清单形态（Kiosk 自渲染）缺省本块。
+   */
+  apps?: {
     /** 是否允许接入第三方 App； */
-    allowThirdParty: boolean
+    allowThirdParty?: boolean
     /** 内置 App 清单（代码注册，保底、优先）；kind: 'resource' 条目为资源直嵌（启动自动打开） */
     manifests?: DesktopAppManifest[]
     /**

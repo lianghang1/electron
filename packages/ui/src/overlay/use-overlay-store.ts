@@ -37,6 +37,7 @@ export interface OverlayStore {
   menu: TabContextMenu | null
   captureSession: CaptureDialogSession | null
   configKind: DeviceConfigKind | null
+  appCenterOpen: boolean
   /** 窗口可见（隐藏期不插入卡片 DOM，保证入场动画完整播放） */
   overlayVisible: boolean
   /** 权限决策卡：只渲染队首请求，决策后 Main 推送余下请求 */
@@ -53,6 +54,7 @@ export interface OverlayStore {
   dismissMenu: () => void
   dismissCapture: () => void
   dismissConfig: () => void
+  dismissAppCenter: () => void
 }
 
 function createOverlayStore(): OverlayStore {
@@ -62,6 +64,7 @@ function createOverlayStore(): OverlayStore {
   const menu = ref<TabContextMenu | null>(null)
   const captureSession = ref<CaptureDialogSession | null>(null)
   const configKind = ref<DeviceConfigKind | null>(null)
+  const appCenterOpen = ref(false)
 
   /** 浮层窗用途：仅决定渲染分支与页面级监听，不裁剪数据订阅 */
   const kind = parseOverlayHash(window.location.hash) ?? 'panel'
@@ -97,6 +100,9 @@ function createOverlayStore(): OverlayStore {
     window.desktop.events.on('overlay:configUpdated', (kindValue) => {
       configKind.value = kindValue
     }),
+    window.desktop.events.on('overlay:appCenterUpdated', (open) => {
+      appCenterOpen.value = open
+    }),
   )
   onScopeDispose(() => {
     for (const off of unsubs) {
@@ -112,6 +118,7 @@ function createOverlayStore(): OverlayStore {
     menu.value = state.menu
     captureSession.value = state.captureSession
     configKind.value = state.configKind
+    appCenterOpen.value = state.appCenterOpen
   })
 
   const currentRequest = computed(() => dialogs.value[0] ?? null)
@@ -148,6 +155,10 @@ function createOverlayStore(): OverlayStore {
     configKind.value = null
     void window.desktop.overlay.dismissConfig()
   }
+  const dismissAppCenter = (): void => {
+    appCenterOpen.value = false
+    void window.desktop.overlay.dismissAppCenter()
+  }
 
   return reactive({
     kind,
@@ -157,6 +168,7 @@ function createOverlayStore(): OverlayStore {
     menu,
     captureSession,
     configKind,
+    appCenterOpen: computed(() => appCenterOpen.value),
     overlayVisible: computed(() => overlayVisible.value),
     currentRequest,
     hasPanelContent,
@@ -169,5 +181,6 @@ function createOverlayStore(): OverlayStore {
     dismissMenu,
     dismissCapture,
     dismissConfig,
+    dismissAppCenter,
   })
 }

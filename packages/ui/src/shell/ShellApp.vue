@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { DesktopTab, WorkAreaRect } from '@desktop/shared'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import AppCenter from './components/AppCenter.vue'
 import AppLauncher from './components/AppLauncher.vue'
+import CommandPalette from './components/CommandPalette.vue'
 import TopBar from './components/TopBar.vue'
 import UpdateBar from './components/UpdateBar.vue'
 import { useApps } from './composables/use-apps'
@@ -14,14 +14,12 @@ import './styles/reset.css'
 import './styles/transition.css'
 import './styles/tokens.css'
 
-const { apps } = useApps()
+const { apps, hostName } = useApps()
 const { tabs, open, close, activate } = useTabs()
 const { theme, toggle: toggleTheme } = useTheme()
 
 const maximized = ref(false)
 const viewport = ref<HTMLElement | null>(null)
-/** 应用中心面板显隐：flex 成员推开 dt-main，Web 容器经 ResizeObserver 自动跟随 */
-const appCenterOpen = ref(false)
 
 const activeTab = computed(() => tabs.value.find(tab => tab.active))
 
@@ -47,6 +45,11 @@ async function toggleMaximize(): Promise<void> {
 
 async function closeWindow(): Promise<void> {
   await window.desktop.window.close()
+}
+
+/** 应用中心：原生浮层窗承载（DOM 无法盖过 WebContentsView），重复调用仅聚焦 */
+function openAppCenter(): void {
+  void window.desktop.overlay.openAppCenter()
 }
 
 // ---- Tab 右键菜单：交由原生浮层窗渲染（页面内容保持可见），坐标为内容区 DIP ----
@@ -100,42 +103,34 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="dt-shell">
-    <!-- 资源模式：左侧导航与应用中心隐藏，TopBar 降级为「Tab 条 + 窗口控制」
-         （Tab 不可关闭），整栏仍为窗口拖拽区；Web 视图区经 ResizeObserver 自动让位 -->
-    <div class="flex flex-1 min-h-0">
+    <!-- 单层顶栏：品牌（宿主名）/ 应用中心 / 标签 / 主题 / 窗口控制合一；
+         资源模式降级为「品牌 + 窗口控制」（单资源）或「品牌 + 固定 Tab 条 + 窗口控制」（多资源） -->
+    <TopBar
+      :tabs="tabs"
+      :maximized="maximized"
+      :theme="theme"
+      :resource="resourceMode"
+      :host-name="hostName"
+      @activate="activate"
+      @close="close"
+      @context-menu="openTabContextMenu"
+      @toggle-theme="toggleTheme"
+      @toggle-center="openAppCenter"
+      @minimize="minimize"
+      @toggle-maximize="toggleMaximize"
+      @close-window="closeWindow"
+    />
+    <div class="dt-body">
       <AppLauncher v-if="!resourceMode" :apps="launchableApps" :tabs="tabs" @open="open" />
-      <Transition name="ac-slide">
-        <AppCenter
-          v-if="appCenterOpen && !resourceMode"
-          :apps="launchableApps"
-          :tabs="tabs"
-          @open="open"
-          @close="appCenterOpen = false"
-        />
-      </Transition>
-      <main class="flex-1 flex flex-col min-w-0">
-        <TopBar
-          :tabs="tabs"
-          :maximized="maximized"
-          :app-center-open="appCenterOpen"
-          :theme="theme"
-          :resource="resourceMode"
-          @activate="activate"
-          @close="close"
-          @context-menu="openTabContextMenu"
-          @toggle-theme="toggleTheme"
-          @toggle-center="appCenterOpen = !appCenterOpen"
-          @minimize="minimize"
-          @toggle-maximize="toggleMaximize"
-          @close-window="closeWindow"
-        />
-        <div ref="viewport" class="relative flex-1 bg-dt-bg">
+      <main class="dt-main">
+        <!-- 内容区：即 WebContentsView 对位区域（矩形语义经 getBoundingClientRect 上报） -->
+        <div ref="viewport" class="dt-canvas">
           <div v-if="tabs.length === 0" class="dt-empty">
             <p class="dt-empty__title">
               打开一个应用开始工作
             </p>
             <p class="dt-empty__desc">
-              从左侧导航或应用中心进入
+              从左侧导航或应用中心进入，Ctrl+K 唤起命令面板
             </p>
           </div>
           <div v-else-if="activeTab?.isLoading" class="dt-loading">
@@ -150,11 +145,20 @@ onBeforeUnmount(() => {
         <UpdateBar />
       </main>
     </div>
+    <CommandPalette
+      :apps="launchableApps"
+      :tabs="tabs"
+      @open-app="open"
+      @activate-tab="activate"
+      @toggle-theme="toggleTheme"
+      @toggle-center="openAppCenter"
+    />
   </div>
 </template>
 
 <style scoped>
 .dt-shell {
+  position: relative;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -167,8 +171,37 @@ onBeforeUnmount(() => {
     'Segoe UI',
     'PingFang SC',
     sans-serif;
-  transition: background var(--dt-dur) var(--dt-ease);
+  transition: background var(--dt-dur-slow) var(--dt-ease);
 }
+
+/* 平面布局：侧栏（带右边框）+ 内容区（白底），无间隙无投影 */
+.dt-body {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  min-width: 0;
+}
+
+.dt-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--dt-surface);
+}
+
+/* 内容区：WebContentsView 以矩形对位（DOM 与原生视图同底色，无边角缝隙） */
+.dt-canvas {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--dt-surface);
+  transition: background var(--dt-dur-slow) var(--dt-ease);
+}
+
 .dt-empty {
   height: 100%;
   display: flex;
@@ -212,16 +245,5 @@ onBeforeUnmount(() => {
   to {
     transform: rotate(360deg);
   }
-}
-
-/* 应用中心面板：推开式出现（flex 成员），淡入 + 轻微左移 */
-.ac-slide-enter-active,
-.ac-slide-leave-active {
-  transition: all 0.2s ease;
-}
-.ac-slide-enter-from,
-.ac-slide-leave-to {
-  opacity: 0;
-  transform: translateX(-12px);
 }
 </style>

@@ -16,6 +16,7 @@ bootstrap({
   app: {
     id: appId,
     name: productName,
+    displayName,
     version: '1.0.0',
   },
   window: {
