@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CaptureDialogSession } from '@desktop/shared'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import UiButton from '../button/UiButton.vue'
 import UiSelect from '../select/UiSelect.vue'
 import CaptureStage from './CaptureStage.vue'
 import CaptureThumbStrip from './CaptureThumbStrip.vue'
@@ -229,20 +230,20 @@ onBeforeUnmount(() => {
             @update:model-value="onResolutionChange"
           />
         </label>
-        <button class="cu-btn" @click="onToggleLive">
+        <UiButton @click="onToggleLive">
           {{ live ? '停止预览' : '开启预览' }}
-        </button>
+        </UiButton>
         <div class="cu-dialog__fx">
-          <button class="cu-btn" :disabled="viewing" title="旋转实时画面" @click="rotateOnce">
+          <UiButton :disabled="viewing" title="旋转实时画面" @click="rotateOnce">
             旋转
-          </button>
-          <button class="cu-btn" :class="{ 'cu-btn--on': mirror && !viewing }" :disabled="viewing" title="镜像实时画面" @click="toggleMirror">
+          </UiButton>
+          <UiButton :active="mirror && !viewing" :disabled="viewing" title="镜像实时画面" @click="toggleMirror">
             镜像
-          </button>
+          </UiButton>
         </div>
-        <button class="cu-btn cu-btn--primary cu-btn--shoot" :disabled="capturing || full" @click="onShoot">
+        <UiButton variant="primary" size="lg" :disabled="capturing || full" @click="onShoot">
           {{ capturing ? '拍摄中…' : full ? '已拍满' : '拍摄' }}
-        </button>
+        </UiButton>
         <span class="cu-dialog__panel-hint">
           {{ maxCount > 1 ? `可拍 ${maxCount} 张，拍完点击右下角「完成」` : '拍好后点击右下角「完成」' }}
         </span>
@@ -252,12 +253,12 @@ onBeforeUnmount(() => {
     <CaptureThumbStrip :items="thumbs" :active-index="viewingIndex" @view="onView" @remove="onRemove" />
 
     <footer class="cu-dialog__foot">
-      <button class="cu-btn cu-btn--lg" @click="onClose">
+      <UiButton @click="onClose">
         取消
-      </button>
-      <button class="cu-btn cu-btn--primary cu-btn--lg" :disabled="!canConfirm || confirming" @click="confirm">
+      </UiButton>
+      <UiButton variant="primary" :disabled="!canConfirm || confirming" @click="confirm">
         {{ confirmLabel }}
-      </button>
+      </UiButton>
     </footer>
   </div>
 </template>
@@ -473,7 +474,7 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-.cu-dialog__fx .cu-btn {
+.cu-dialog__fx button {
   flex: 1;
 }
 
@@ -481,59 +482,6 @@ onBeforeUnmount(() => {
   font-size: 11px;
   line-height: 1.5;
   color: #8a919c;
-}
-
-/* ---- 按钮 ---- */
-.cu-btn {
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  padding: 6px 14px;
-  font-size: 12px;
-  font-family: inherit;
-  color: #1f2328;
-  background: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color 0.12s, border-color 0.12s, color 0.12s, opacity 0.12s;
-}
-
-.cu-btn:hover:not(:disabled):not(.cu-btn--primary):not(.cu-btn--on) {
-  border-color: #b8c0cb;
-  background: #f3f6f9;
-}
-
-.cu-btn--primary {
-  border-color: #0f766e;
-  background: #0f766e;
-  color: #fff;
-}
-
-.cu-btn--primary:hover:not(:disabled) {
-  border-color: #0d6a63;
-  background: #0d6a63;
-}
-
-.cu-btn--shoot {
-  padding: 10px 14px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.cu-btn--lg {
-  padding: 8px 24px;
-  font-size: 13px;
-}
-
-.cu-btn--on,
-.cu-btn--on:hover:not(:disabled) {
-  border-color: transparent;
-  background: #ccfbf1;
-  color: #0f766e;
-}
-
-.cu-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 
 /* ---- 底部 ---- */

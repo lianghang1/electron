@@ -77,6 +77,7 @@ const menuPos = computed(() => {
 </script>
 
 <template>
+  <!-- 非 dialog 语义（锚点菜单卡，reka Menu 原语需 trigger 不适配浮层窗坐标锚定），外壳自绘 -->
   <div
     v-if="store.menu && store.overlayVisible"
     :key="store.menu.id"

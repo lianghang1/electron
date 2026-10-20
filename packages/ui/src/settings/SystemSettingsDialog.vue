@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
 import { computed, onMounted, ref, watch } from 'vue'
+import UiButton from '../button/UiButton.vue'
 import CaptureSettingsPanel from '../capture/CaptureSettingsPanel.vue'
 import { useCaptureConfig } from '../capture/use-capture-config'
-import ConfigDialogShell from '../dialog/ConfigDialogShell.vue'
+import UiDialog from '../dialog/UiDialog.vue'
 import ScannerSettingsPanel from '../scanner/ScannerSettingsPanel.vue'
 import { useScannerConfig } from '../scanner/use-scanner-config'
 import UiScrollArea from '../scroll/UiScrollArea.vue'
@@ -54,7 +55,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <ConfigDialogShell title="系统设置" subtitle="设备与通用配置" @close="emit('close')">
+  <UiDialog title="系统设置" subtitle="设备与通用配置" :width="880" :height="620" @close="emit('close')">
     <div class="ss-layout">
       <TabsRoot v-model="activeTab" orientation="vertical">
         <TabsList class="ss-nav" aria-label="设置分类">
@@ -98,34 +99,34 @@ onMounted(() => {
       <span v-else-if="activeTab === 'capture' && capture.error" class="ss-feedback-err">{{ capture.error }}</span>
     </template>
     <template #footer>
-      <button
+      <UiButton
         v-if="activeTab === 'scanner'"
-        class="ss-btn ss-btn--primary"
+        variant="primary"
         :disabled="scanner.saving || scanner.loading"
         @click="scanner.save()"
       >
         {{ scanner.saving ? '保存中…' : '保存' }}
-      </button>
+      </UiButton>
       <template v-else>
-        <button
+        <UiButton
           v-if="capture.selected"
-          class="ss-btn"
-          :class="capture.confirmingRemove ? 'ss-btn--confirming' : 'ss-btn--danger'"
+          variant="danger"
+          :solid="capture.confirmingRemove"
           :disabled="capture.saving"
           @click="capture.requestRemove()"
         >
           {{ capture.confirmingRemove ? '确认删除？' : '删除' }}
-        </button>
-        <button
-          class="ss-btn ss-btn--primary"
+        </UiButton>
+        <UiButton
+          variant="primary"
           :disabled="!capture.selected || capture.saving || capture.loading"
           @click="capture.save()"
         >
           {{ capture.saving ? '保存中…' : '保存' }}
-        </button>
+        </UiButton>
       </template>
     </template>
-  </ConfigDialogShell>
+  </UiDialog>
 </template>
 
 <style scoped>
@@ -236,45 +237,5 @@ onMounted(() => {
 .ss-feedback-err {
   font-size: 12px;
   color: #dc2626;
-}
-
-.ss-btn {
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  padding: 7px 18px;
-  font-size: 12.5px;
-  font-family: inherit;
-  color: #1f2328;
-  background: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color 0.12s, border-color 0.12s, color 0.12s, opacity 0.12s;
-}
-
-.ss-btn--danger:hover:not(:disabled):not(.ss-btn--confirming) {
-  border-color: #dc2626;
-  color: #dc2626;
-}
-
-.ss-btn--confirming {
-  border-color: #dc2626;
-  background: #dc2626;
-  color: #fff;
-}
-
-.ss-btn--primary {
-  border-color: #0f766e;
-  background: #0f766e;
-  color: #fff;
-}
-
-.ss-btn--primary:hover:not(:disabled) {
-  border-color: #0d6a63;
-  background: #0d6a63;
-}
-
-.ss-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>

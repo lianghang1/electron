@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import type { DesktopTab, RegisteredApp } from '@desktop/shared'
-import { DialogContent, DialogDescription, DialogOverlay, DialogRoot, DialogTitle } from 'reka-ui'
+import type { AcceptableValue } from 'reka-ui'
+import { ComboboxInput, ComboboxItem, ComboboxRoot, DialogContent, DialogDescription, DialogOverlay, DialogRoot, DialogTitle } from 'reka-ui'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 /**
  * Ctrl+K 命令面板：应用 / 标签页 / Shell 动作的统一键盘入口。
- * 打开态与检索自管理；动作经事件交由 ShellApp 执行（单向数据流），
- * 模态语义（焦点圈养 / ESC / 遮罩）由 reka Dialog 承担。
+ * 打开态与检索自管理；动作经事件交由 ShellApp 执行（单向数据流）。
+ * 模态语义（焦点圈养 / ESC / 遮罩）由 reka Dialog 承担；
+ * 列表键盘导航（上下移动 / Enter 选中 / 输入复位高亮）由 reka Combobox 原语承担，
+ * 过滤仍由本地 filtered 计算完成（ignoreFilter 关闭 reka 内置过滤）。
  */
 const props = defineProps<{
   apps: RegisteredApp[]
@@ -29,8 +32,6 @@ interface Command {
 
 const open = ref(false)
 const query = ref('')
-const cursor = ref(0)
-const inputEl = ref<HTMLInputElement | null>(null)
 
 const commands = computed<Command[]>(() => {
   const list: Command[] = props.apps.map(app => ({
@@ -61,13 +62,8 @@ const filtered = computed(() => {
 watch(open, (value) => {
   if (value) {
     query.value = ''
-    cursor.value = 0
-    // 等内容渲染后落焦搜索框（reka 焦点圈养已就位）
-    requestAnimationFrame(() => { inputEl.value?.focus() })
   }
 })
-
-watch(filtered, () => { cursor.value = 0 })
 
 function onGlobalKeydown(e: KeyboardEvent): void {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
@@ -76,24 +72,15 @@ function onGlobalKeydown(e: KeyboardEvent): void {
   }
 }
 
-/** 输入框内键盘导航：Enter 时阻止按钮原生激活，执行仅触发一次 */
-function onInputKeydown(e: KeyboardEvent): void {
-  if (e.key === 'ArrowDown') {
-    e.preventDefault()
-    cursor.value = Math.min(cursor.value + 1, filtered.value.length - 1)
+/** Combobox 选中（Enter / 点击）→ 执行命令并收起；非字符串值（反选同项）忽略 */
+function onSelect(value: AcceptableValue): void {
+  if (typeof value !== 'string') {
+    return
   }
-  else if (e.key === 'ArrowUp') {
-    e.preventDefault()
-    cursor.value = Math.max(cursor.value - 1, 0)
+  const cmd = commands.value.find(item => item.id === value)
+  if (!cmd) {
+    return
   }
-  else if (e.key === 'Enter') {
-    e.preventDefault()
-    runCommand(filtered.value[cursor.value])
-  }
-}
-
-function runCommand(cmd: Command | undefined): void {
-  if (!cmd) { return }
   open.value = false
   cmd.run()
 }
@@ -117,41 +104,45 @@ onBeforeUnmount(() => {
       <DialogDescription class="cp-sr">
         搜索应用、标签页与快捷动作
       </DialogDescription>
-      <div class="cp-search">
-        <svg class="cp-search__icon" viewBox="0 0 14 14" width="13" height="13">
-          <circle cx="6.2" cy="6.2" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4" />
-          <path d="M9.4 9.4 12.6 12.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
-        </svg>
-        <input
-          ref="inputEl"
-          v-model="query"
-          class="cp-search__input"
-          placeholder="搜索应用、标签页或动作…"
-          @keydown="onInputKeydown"
-        >
-        <kbd class="cp-kbd">esc</kbd>
-      </div>
-      <div class="cp-list">
-        <p v-if="filtered.length === 0" class="cp-empty">
-          没有匹配的结果
-        </p>
-        <button
-          v-for="(cmd, index) in filtered"
-          :key="cmd.id"
-          class="cp-item"
-          :class="{ 'cp-item--active': index === cursor }"
-          :title="cmd.label"
-          @click="runCommand(cmd)"
-          @mousemove="cursor = index"
-        >
-          <span class="cp-item__label">{{ cmd.label }}</span>
-          <span class="cp-item__hint">{{ cmd.hint }}</span>
-        </button>
-      </div>
-      <footer class="cp-foot">
-        <span><kbd class="cp-kbd">↑</kbd><kbd class="cp-kbd">↓</kbd> 选择</span>
-        <span><kbd class="cp-kbd">↵</kbd> 执行</span>
-      </footer>
+      <ComboboxRoot
+        :ignore-filter="true"
+        :highlight-on-hover="true"
+        :reset-search-term-on-select="false"
+        @update:model-value="onSelect"
+      >
+        <div class="cp-search">
+          <svg class="cp-search__icon" viewBox="0 0 14 14" width="13" height="13">
+            <circle cx="6.2" cy="6.2" r="4.2" fill="none" stroke="currentColor" stroke-width="1.4" />
+            <path d="M9.4 9.4 12.6 12.6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          </svg>
+          <ComboboxInput
+            v-model="query"
+            class="cp-search__input"
+            placeholder="搜索应用、标签页或动作…"
+          >
+            <kbd class="cp-kbd">esc</kbd>
+          </comboboxinput>
+        </div>
+        <div class="cp-list">
+          <p v-if="filtered.length === 0" class="cp-empty">
+            没有匹配的结果
+          </p>
+          <ComboboxItem
+            v-for="cmd in filtered"
+            :key="cmd.id"
+            :value="cmd.id"
+            class="cp-item"
+            :title="cmd.label"
+          >
+            <span class="cp-item__label">{{ cmd.label }}</span>
+            <span class="cp-item__hint">{{ cmd.hint }}</span>
+          </ComboboxItem>
+        </div>
+        <footer class="cp-foot">
+          <span><kbd class="cp-kbd">↑</kbd><kbd class="cp-kbd">↓</kbd> 选择</span>
+          <span><kbd class="cp-kbd">↵</kbd> 执行</span>
+        </footer>
+      </ComboboxRoot>
     </DialogContent>
   </DialogRoot>
 </template>
@@ -224,8 +215,6 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border: none;
-  background: transparent;
   border-radius: var(--dt-radius-2);
   padding: 9px 10px;
   font-size: 13px;
@@ -235,7 +224,8 @@ onBeforeUnmount(() => {
   cursor: pointer;
   transition: background var(--dt-dur) var(--dt-ease), color var(--dt-dur) var(--dt-ease);
 }
-.cp-item--active {
+/* 高亮态由 reka data-highlighted 驱动（键盘上下与鼠标悬停统一走原语） */
+.cp-item[data-highlighted] {
   background: var(--dt-brand-soft);
   color: var(--dt-brand-text);
 }

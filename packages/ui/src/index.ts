@@ -6,10 +6,11 @@
  * 与平台桥（window.desktop）联动，高帧率数据（预览帧/笔迹点）在浮层窗内闭环，
  * 业务结果经桥回传发起方。按功能域组织：src/<domain>/，Shell 在 src/shell/。
  */
+export { default as UiButton } from './button/UiButton.vue'
 export { default as CaptureDialog } from './capture/CaptureDialog.vue'
 export { default as CaptureStage } from './capture/CaptureStage.vue'
 export { useCaptureSession } from './capture/use-capture-session'
-export { default as ConfigDialogShell } from './dialog/ConfigDialogShell.vue'
+export { default as UiDialog } from './dialog/UiDialog.vue'
 export { mountPlatformApp, mountShellApp } from './mount'
 export { default as OverlayApp } from './overlay/OverlayApp.vue'
 export { useOverlayStore } from './overlay/use-overlay-store'

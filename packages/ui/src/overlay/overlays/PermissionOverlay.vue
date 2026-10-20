@@ -2,6 +2,7 @@
 import { permissionLabel } from '@desktop/shared'
 import { DialogContent, DialogDescription, DialogOverlay, DialogRoot, DialogTitle } from 'reka-ui'
 import { onBeforeUnmount, reactive, watch } from 'vue'
+import UiButton from '../../button/UiButton.vue'
 import { useOverlayStore } from '../use-overlay-store'
 
 /**
@@ -99,12 +100,12 @@ function onDialogEscape(event: KeyboardEvent): void {
           <b class="ov-dialog__count">{{ countdowns[store.currentRequest.requestId] ?? REQUEST_TIMEOUT_S }}</b> 秒内未处理将按本次拒绝，不影响下次使用
         </p>
         <div class="ov-dialog__actions">
-          <button class="ov-btn" @click="store.respond(store.currentRequest.requestId, false)">
+          <UiButton @click="store.respond(store.currentRequest.requestId, false)">
             拒绝
-          </button>
-          <button class="ov-btn ov-btn--primary" @click="store.respond(store.currentRequest.requestId, true)">
+          </UiButton>
+          <UiButton variant="primary" @click="store.respond(store.currentRequest.requestId, true)">
             允许
-          </button>
+          </UiButton>
         </div>
       </div>
     </DialogContent>
@@ -194,35 +195,6 @@ function onDialogEscape(event: KeyboardEvent): void {
 .ov-dialog__actions {
   display: flex;
   justify-content: flex-end;
-}
-
-.ov-btn {
-  height: 32px;
-  margin-left: 8px;
-  padding: 0 18px;
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  background: #fff;
-  color: #1f2328;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: border-color 0.12s, background-color 0.12s;
-}
-
-.ov-btn:hover {
-  background: #f3f6f9;
-}
-
-.ov-btn--primary {
-  border-color: #0f766e;
-  background: #0f766e;
-  color: #fff;
-}
-
-.ov-btn--primary:hover {
-  border-color: #0d6a63;
-  background: #0d6a63;
+  gap: 8px;
 }
 </style>

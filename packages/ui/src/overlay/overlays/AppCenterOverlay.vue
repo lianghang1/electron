@@ -2,7 +2,9 @@
 import type { AppPermissionState, DesktopTab, RegisteredApp } from '@desktop/shared'
 import { permissionLabel } from '@desktop/shared'
 import { AccordionContent, AccordionHeader, AccordionItem, AccordionRoot, AccordionTrigger, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogOverlay, AlertDialogRoot, AlertDialogTitle } from 'reka-ui'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import UiButton from '../../button/UiButton.vue'
+import UiDialog from '../../dialog/UiDialog.vue'
 import { useOverlayStore } from '../use-overlay-store'
 
 /**
@@ -133,20 +135,6 @@ function dismiss(): void {
   store.dismissAppCenter()
 }
 
-function onKeyDown(e: KeyboardEvent): void {
-  if (e.key === 'Escape') {
-    dismiss()
-  }
-}
-
-onMounted(() => {
-  window.addEventListener('keydown', onKeyDown)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('keydown', onKeyDown)
-})
-
 /** 打开应用：Main 在主窗开 Tab，浮层随即收起 */
 function openApp(appId: string): void {
   void window.desktop.tabs.open({ appId })
@@ -173,202 +161,138 @@ function isRunning(appId: string): boolean {
 </script>
 
 <template>
-  <div v-if="store.appCenterOpen && store.overlayVisible" class="ov-appcenter">
-    <div class="ov-appcenter__mask" @click="dismiss" />
+  <UiDialog
+    v-if="store.appCenterOpen && store.overlayVisible"
+    title="应用中心"
+    :width="380"
+    height="min(620px, 88vh)"
+    @close="dismiss"
+  >
+    <!-- reka-ui Accordion（单开）：只接管展开态与无障碍交互，外观完全自绘 -->
+    <AccordionRoot
+      v-model="expandedId"
+      type="single"
+      collapsible
+      class="ac-list"
+    >
+      <p v-if="apps.length === 0" class="ac-empty">
+        暂无已注册应用
+      </p>
 
-    <div class="ov-appcenter__card">
-      <header class="ac-header">
-        <span class="ac-title">应用中心</span>
-        <button class="ac-close" title="关闭" @click="dismiss">
-          <svg viewBox="0 0 10 10" width="9" height="9"><path d="M1 1l8 8M9 1l-8 8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" /></svg>
-        </button>
-      </header>
-
-      <!-- reka-ui Accordion（单开）：只接管展开态与无障碍交互，外观完全自绘 -->
-      <AccordionRoot
-        v-model="expandedId"
-        type="single"
-        collapsible
-        class="ac-list"
+      <AccordionItem
+        v-for="app in apps"
+        :key="app.manifest.id"
+        :value="app.manifest.id"
+        class="ac-card"
       >
-        <p v-if="apps.length === 0" class="ac-empty">
-          暂无已注册应用
-        </p>
-
-        <AccordionItem
-          v-for="app in apps"
-          :key="app.manifest.id"
-          :value="app.manifest.id"
-          class="ac-card"
-        >
-          <AccordionHeader class="ac-card__row">
-            <button
-              class="ac-card__main"
-              :title="`打开 ${app.manifest.name}`"
-              @click="openApp(app.manifest.id)"
+        <AccordionHeader class="ac-card__row">
+          <button
+            class="ac-card__main"
+            :title="`打开 ${app.manifest.name}`"
+            @click="openApp(app.manifest.id)"
+          >
+            <img
+              v-if="app.manifest.icon"
+              :src="app.manifest.icon"
+              alt=""
+              class="ac-card__icon"
             >
-              <img
-                v-if="app.manifest.icon"
-                :src="app.manifest.icon"
-                alt=""
-                class="ac-card__icon"
-              >
-              <span v-else class="ac-card__icon ac-card__icon--letter">{{ app.manifest.name.slice(0, 1) }}</span>
-              <span class="ac-card__meta">
-                <span class="ac-card__name">
-                  {{ app.manifest.name }}
-                  <span v-if="isRunning(app.manifest.id)" class="ac-card__running" title="运行中" />
-                </span>
-                <span class="ac-card__info">
-                  v{{ app.manifest.version }} · {{ SOURCE_LABELS[app.source] }} · {{ app.manifest.type === 'internal' ? '内部' : '第三方' }}
-                </span>
+            <span v-else class="ac-card__icon ac-card__icon--letter">{{ app.manifest.name.slice(0, 1) }}</span>
+            <span class="ac-card__meta">
+              <span class="ac-card__name">
+                {{ app.manifest.name }}
+                <span v-if="isRunning(app.manifest.id)" class="ac-card__running" title="运行中" />
               </span>
-            </button>
-            <AccordionTrigger class="ac-card__toggle" title="权限详情">
-              ›
-            </AccordionTrigger>
-          </AccordionHeader>
+              <span class="ac-card__info">
+                v{{ app.manifest.version }} · {{ SOURCE_LABELS[app.source] }} · {{ app.manifest.type === 'internal' ? '内部' : '第三方' }}
+              </span>
+            </span>
+          </button>
+          <AccordionTrigger class="ac-card__toggle" title="权限详情">
+            ›
+          </AccordionTrigger>
+        </AccordionHeader>
 
-          <AccordionContent class="ac-card__content">
-            <div class="ac-card__detail">
-              <p v-if="permissionLoading" class="ac-hint">
-                加载中…
-              </p>
-              <p v-else-if="permissionStates.length === 0" class="ac-hint">
-                无权限记录
-              </p>
-              <template v-else>
-                <div
-                  v-for="state in permissionStates"
-                  :key="state.permission"
-                  class="ac-perm"
-                >
-                  <span class="ac-perm__name">{{ permissionLabel(state.permission) }}</span>
-                  <span class="ac-perm__state" :class="stateClass(state)">{{ stateText(state) }}</span>
-                </div>
-              </template>
-
-              <div class="ac-clear">
-                <button
-                  v-if="hasRuntimeDecisions"
-                  class="ac-clear__btn"
-                  :class="{ 'ac-clear__btn--done': doneKey === clearKey(app.manifest.id, 'perm') }"
-                  @click.stop="askConfirm(app.manifest.id, 'perm')"
-                >
-                  {{ doneKey === clearKey(app.manifest.id, 'perm') ? '已重置' : '重置授权' }}
-                </button>
-                <button
-                  class="ac-clear__btn"
-                  :class="{ 'ac-clear__btn--done': doneKey === clearKey(app.manifest.id, 'cache') }"
-                  @click.stop="clearApp(app.manifest.id, 'cache')"
-                >
-                  {{ doneKey === clearKey(app.manifest.id, 'cache') ? '已清理' : '清理缓存' }}
-                </button>
-                <button
-                  class="ac-clear__btn ac-clear__btn--danger"
-                  @click.stop="askConfirm(app.manifest.id, 'site')"
-                >
-                  {{ doneKey === clearKey(app.manifest.id, 'site') ? '已清理' : '清除站点数据' }}
-                </button>
-              </div>
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      </AccordionRoot>
-
-      <!-- 敏感操作确认：reka AlertDialog 承担模态语义 / 焦点圈养 / ESC；不 Portal，卡片内模态 -->
-      <AlertDialogRoot
-        :open="confirmTarget !== null"
-        @update:open="onOpenChange"
-      >
-        <AlertDialogContent class="ac-confirm">
-          <AlertDialogOverlay class="ac-confirm__scrim" />
-          <div class="ac-confirm__card">
-            <AlertDialogTitle class="ac-confirm__title">
-              {{ confirmTarget?.kind === 'site' ? '清除站点数据？' : '重置授权？' }}
-            </AlertDialogTitle>
-            <AlertDialogDescription class="ac-confirm__desc">
-              {{ confirmTarget?.kind === 'site'
-                ? `将清除「${confirmTarget?.name}」的全部站点数据（Cookie / 登录态等），效果等于退出登录。`
-                : `将撤销「${confirmTarget?.name}」的全部运行时授权决策，下次使用时会重新询问。` }}
-            </AlertDialogDescription>
-            <div class="ac-confirm__actions">
-              <AlertDialogCancel class="ac-confirm__btn">
-                取消
-              </AlertDialogCancel>
-              <!-- 确认按钮不用 AlertDialogAction：其内部关闭会先清空 confirmTarget，导致 click 回调读到空值 -->
-              <button
-                type="button"
-                class="ac-confirm__btn ac-confirm__btn--danger"
-                @click="onConfirm"
+        <AccordionContent class="ac-card__content">
+          <div class="ac-card__detail">
+            <p v-if="permissionLoading" class="ac-hint">
+              加载中…
+            </p>
+            <p v-else-if="permissionStates.length === 0" class="ac-hint">
+              无权限记录
+            </p>
+            <template v-else>
+              <div
+                v-for="state in permissionStates"
+                :key="state.permission"
+                class="ac-perm"
               >
-                {{ confirmTarget?.kind === 'site' ? '确认清除' : '确认重置' }}
-              </button>
+                <span class="ac-perm__name">{{ permissionLabel(state.permission) }}</span>
+                <span class="ac-perm__state" :class="stateClass(state)">{{ stateText(state) }}</span>
+              </div>
+            </template>
+
+            <div class="ac-clear">
+              <UiButton
+                v-if="hasRuntimeDecisions"
+                size="sm"
+                :variant="doneKey === clearKey(app.manifest.id, 'perm') ? 'success' : 'default'"
+                @click.stop="askConfirm(app.manifest.id, 'perm')"
+              >
+                {{ doneKey === clearKey(app.manifest.id, 'perm') ? '已重置' : '重置授权' }}
+              </UiButton>
+              <UiButton
+                size="sm"
+                :variant="doneKey === clearKey(app.manifest.id, 'cache') ? 'success' : 'default'"
+                @click.stop="clearApp(app.manifest.id, 'cache')"
+              >
+                {{ doneKey === clearKey(app.manifest.id, 'cache') ? '已清理' : '清理缓存' }}
+              </UiButton>
+              <UiButton
+                size="sm"
+                variant="danger"
+                @click.stop="askConfirm(app.manifest.id, 'site')"
+              >
+                {{ doneKey === clearKey(app.manifest.id, 'site') ? '已清理' : '清除站点数据' }}
+              </UiButton>
             </div>
           </div>
-        </AlertDialogContent>
-      </AlertDialogRoot>
-    </div>
-  </div>
+        </AccordionContent>
+      </AccordionItem>
+    </AccordionRoot>
+
+    <!-- 敏感操作确认：reka AlertDialog 承担模态语义 / 焦点圈养 / ESC；不 Portal，卡片内模态 -->
+    <AlertDialogRoot
+      :open="confirmTarget !== null"
+      @update:open="onOpenChange"
+    >
+      <AlertDialogContent class="ac-confirm">
+        <AlertDialogOverlay class="ac-confirm__scrim" />
+        <div class="ac-confirm__card">
+          <AlertDialogTitle class="ac-confirm__title">
+            {{ confirmTarget?.kind === 'site' ? '清除站点数据？' : '重置授权？' }}
+          </AlertDialogTitle>
+          <AlertDialogDescription class="ac-confirm__desc">
+            {{ confirmTarget?.kind === 'site'
+              ? `将清除「${confirmTarget?.name}」的全部站点数据（Cookie / 登录态等），效果等于退出登录。`
+              : `将撤销「${confirmTarget?.name}」的全部运行时授权决策，下次使用时会重新询问。` }}
+          </AlertDialogDescription>
+          <div class="ac-confirm__actions">
+            <AlertDialogCancel as-child>
+              <UiButton>取消</UiButton>
+            </AlertDialogCancel>
+            <!-- 确认按钮不用 AlertDialogAction：其内部关闭会先清空 confirmTarget，导致 click 回调读到空值 -->
+            <UiButton variant="danger" solid @click="onConfirm">
+              {{ confirmTarget?.kind === 'site' ? '确认清除' : '确认重置' }}
+            </UiButton>
+          </div>
+        </div>
+      </AlertDialogContent>
+    </AlertDialogRoot>
+  </UiDialog>
 </template>
 
 <style scoped>
-.ov-appcenter {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.ov-appcenter__mask {
-  position: absolute;
-  inset: 0;
-  background: rgb(15 23 42 / 55%);
-  animation: ac-fade 0.16s ease;
-}
-.ov-appcenter__card {
-  position: relative;
-  width: 380px;
-  height: min(620px, 88vh);
-  display: flex;
-  flex-direction: column;
-  background: #ffffff;
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgb(2 8 20 / 10%), 0 24px 56px rgb(2 8 20 / 24%);
-  overflow: hidden;
-  animation: ac-pop 0.18s cubic-bezier(0.2, 0.9, 0.25, 1);
-}
-.ac-header {
-  height: 48px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 8px 0 18px;
-  border-bottom: 1px solid #ededf0;
-}
-.ac-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #1b1b1f;
-}
-.ac-close {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  color: #5b5b64;
-  cursor: pointer;
-  transition: background 0.14s, color 0.14s;
-}
-.ac-close:hover {
-  background: #f0f0f2;
-  color: #1b1b1f;
-}
 .ac-list {
   flex: 1;
   overflow-y: auto;
@@ -529,31 +453,9 @@ function isRunning(appId: string): boolean {
   padding-top: 8px;
   border-top: 1px solid #ededf0;
 }
-.ac-clear__btn {
+
+.ac-clear button {
   flex: 1;
-  height: 26px;
-  border: 1px solid #e4e4e7;
-  border-radius: 8px;
-  background: #ffffff;
-  font-size: 12px;
-  font-family: inherit;
-  color: #5b5b64;
-  cursor: pointer;
-  transition: background 0.14s, color 0.14s, border-color 0.14s;
-}
-.ac-clear__btn:hover {
-  background: #f0f0f2;
-}
-.ac-clear__btn--danger {
-  color: #d92d20;
-  border-color: rgb(217 45 32 / 35%);
-}
-.ac-clear__btn--danger:hover {
-  background: #fef3f2;
-}
-.ac-clear__btn--done {
-  color: #0d9f6e;
-  border-color: rgb(13 159 110 / 35%);
 }
 
 /* 敏感操作确认弹窗：卡片内模态（不 Portal），遮罩 + 居中卡片 */
@@ -597,30 +499,7 @@ function isRunning(appId: string): boolean {
 .ac-confirm__actions {
   display: flex;
   justify-content: flex-end;
-}
-.ac-confirm__btn {
-  height: 28px;
-  margin-left: 8px;
-  padding: 0 14px;
-  border: 1px solid #e4e4e7;
-  border-radius: 8px;
-  background: #ffffff;
-  font-size: 12px;
-  font-family: inherit;
-  color: #5b5b64;
-  cursor: pointer;
-  transition: background 0.14s, color 0.14s;
-}
-.ac-confirm__btn:hover {
-  background: #f0f0f2;
-}
-.ac-confirm__btn--danger {
-  border-color: #d92d20;
-  background: #d92d20;
-  color: #ffffff;
-}
-.ac-confirm__btn--danger:hover {
-  background: #bf291b;
+  gap: 8px;
 }
 @keyframes ac-fade {
   from {
