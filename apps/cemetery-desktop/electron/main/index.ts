@@ -19,7 +19,7 @@ bootstrap({
     version: '1.0.0',
   },
   entry: {
-    url: 'https://gmuat.fsygroup.com/',
+    url: 'http://localhost:8080/',
   },
   window: {
     width: 1200,

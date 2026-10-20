@@ -44,9 +44,9 @@ export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
     capabilities: { ocr: true },
   },
   {
-    id: 'huashi-camsdk-9000',
+    id: 'huashi-camsdk',
     brand: '华视',
-    displayName: '华视高拍仪（本地服务 9000）',
+    displayName: '华视高拍仪（本地服务）',
     transport: 'ws',
     // 华视 CamSDKServer（高拍仪 SDK 常驻服务）JSON 协议：
     // GetCameraInfo / OpenCamera / GetCameraVideoBuff / CameraCapture(base64) / CloseCamera
