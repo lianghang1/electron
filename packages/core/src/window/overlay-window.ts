@@ -25,6 +25,8 @@ const TOAST_TTL_MS = 8000
 const DOWNLOAD_TTL_MS = TOAST_TTL_MS
 /** 弹窗清场到隐藏的间隔（ms）：等浮层页绘制完透明空帧再 hide，2-3 帧足够，留余量 */
 const OVERLAY_CLEAR_DELAY_MS = 100
+/** 消息窗创建时的初始内容高度估算：真实高度由页面量高回报修正 */
+const PANEL_INITIAL_HEIGHT = 200
 
 /**
  * 浮层窗口服务：独立透明无边框 BrowserWindow 承载全局浮层。
@@ -203,8 +205,13 @@ export class OverlayWindowService {
   private applyFullscreenBounds(win: BrowserWindow | null): void {
     const parent = this.getParent()
     if (!parent || !win) { return }
+    win.setBounds(this.fullscreenRect(parent))
+  }
+
+  /** 主窗内容区矩形：全屏遮罩类浮层窗的铺开目标位 */
+  private fullscreenRect(parent: BrowserWindow): Electron.Rectangle {
     const content = parent.getContentBounds()
-    win.setBounds({ x: content.x, y: content.y, width: content.width, height: content.height })
+    return { x: content.x, y: content.y, width: content.width, height: content.height }
   }
 
   // ---- Tab 右键菜单 ----
@@ -355,7 +362,7 @@ export class OverlayWindowService {
     if (this.appCenterWin) { return this.appCenterWin }
     const parent = this.getParent()
     if (!parent) { throw new Error('[overlay] main window is not ready') }
-    const win = this.createOverlayWindow(parent, 'app-center')
+    const win = this.createOverlayWindow(parent, 'app-center', this.fullscreenRect(parent))
     // 应用中心不因失焦消失（全屏遮罩模态）：用户显式关闭
     this.appCenterWin = win
     return win
@@ -365,7 +372,7 @@ export class OverlayWindowService {
     if (this.configWin) { return this.configWin }
     const parent = this.getParent()
     if (!parent) { throw new Error('[overlay] main window is not ready') }
-    const win = this.createOverlayWindow(parent, 'config')
+    const win = this.createOverlayWindow(parent, 'config', this.fullscreenRect(parent))
     // 配置浮层不因失焦消失（全屏遮罩模态）：状态由 Main 统一管理（用户关闭）
     this.configWin = win
     return win
@@ -375,7 +382,7 @@ export class OverlayWindowService {
     if (this.captureWin) { return this.captureWin }
     const parent = this.getParent()
     if (!parent) { throw new Error('[overlay] main window is not ready') }
-    const win = this.createOverlayWindow(parent, 'capture')
+    const win = this.createOverlayWindow(parent, 'capture', this.fullscreenRect(parent))
     // 拍摄浮层不因失焦消失（全屏遮罩模态）：会话由 Main 统一管理（用户关闭 / tab 关闭）
     this.captureWin = win
     return win
@@ -510,7 +517,9 @@ export class OverlayWindowService {
 
   private ensurePanel(parent: BrowserWindow): BrowserWindow {
     if (this.panelWin) { return this.panelWin }
-    const win = this.createOverlayWindow(parent, 'panel')
+    // 创建即锚定右下（初始高度估算，页面量高回报后修正）：Windows 对从未显示过的窗口
+    // 首次 setBounds 会丢弃位置（owned + transparent 组合），后续推送只在已 show 的窗口上生效
+    const win = this.createOverlayWindow(parent, 'panel', this.anchorPanel(parent, PANEL_INITIAL_HEIGHT))
     // 消息窗不抢焦点（showInactive），常驻到内容清空后由 refreshPanel 隐藏
     this.panelWin = win
     return win
@@ -520,7 +529,7 @@ export class OverlayWindowService {
     if (this.dialogWin) { return this.dialogWin }
     const parent = this.getParent()
     if (!parent) { throw new Error('[overlay] main window is not ready') }
-    const win = this.createOverlayWindow(parent, 'dialog')
+    const win = this.createOverlayWindow(parent, 'dialog', this.fullscreenRect(parent))
     // 决策弹窗不因失焦消失（全屏遮罩模态）：挂起请求由 Main 统一管理（决策 / 30s 超时 / App 关闭）
     this.dialogWin = win
     return win
@@ -530,17 +539,23 @@ export class OverlayWindowService {
     if (this.menuWin) { return this.menuWin }
     const parent = this.getParent()
     if (!parent) { throw new Error('[overlay] main window is not ready') }
-    const win = this.createOverlayWindow(parent, 'menu')
+    const win = this.createOverlayWindow(parent, 'menu', this.fullscreenRect(parent))
     // 菜单不因失焦消失（全屏透明模态）：挂起菜单由 Main 统一管理（选中 / ESC / 点击菜单外）
     this.menuWin = win
     return win
   }
 
-  /** 浮层窗公共底座：透明无边框、不进任务栏；经 URL hash 透传 kind 供渲染分支 */
-  private createOverlayWindow(parent: BrowserWindow, kind: OverlayWindowKind): BrowserWindow {
+  /**
+   * 浮层窗公共底座：透明无边框、不进任务栏；经 URL hash 透传 kind 供渲染分支。
+   * initial 必传且为目标位：Windows 对从未显示过的窗口会丢弃首次 setBounds 的位置，
+   * 创建时即就位才能保证首次弹出位置正确（后续 setBounds 只在已 show 的窗口上做修正）。
+   */
+  private createOverlayWindow(parent: BrowserWindow, kind: OverlayWindowKind, initial: Electron.Rectangle): BrowserWindow {
     const win = new BrowserWindow({
-      width: 100,
-      height: 0,
+      x: initial.x,
+      y: initial.y,
+      width: initial.width,
+      height: initial.height,
       show: false,
       frame: false,
       transparent: true,

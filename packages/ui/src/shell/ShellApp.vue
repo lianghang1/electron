@@ -57,6 +57,13 @@ function openTabContextMenu(tab: DesktopTab, x: number, y: number): void {
   void window.desktop.overlay.openMenu({ tabId: tab.id, appId: tab.appId, x, y })
 }
 
+/** 资源模式页面操作入口：顶栏按钮唤出与 Tab 右键同一菜单（刷新/清缓存/清站点数据） */
+function openPageMenu(x: number, y: number): void {
+  const tab = activeTab.value
+  if (!tab) { return }
+  void window.desktop.overlay.openMenu({ tabId: tab.id, appId: tab.appId, x, y })
+}
+
 // ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----
 function syncWorkArea(): void {
   const el = viewport.value
@@ -114,6 +121,7 @@ onBeforeUnmount(() => {
       @activate="activate"
       @close="close"
       @context-menu="openTabContextMenu"
+      @page-menu="openPageMenu"
       @toggle-theme="toggleTheme"
       @toggle-center="openAppCenter"
       @minimize="minimize"

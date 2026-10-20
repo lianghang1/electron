@@ -17,11 +17,13 @@ defineProps<{
   hostName?: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   activate: [tabId: string]
   close: [tabId: string]
   /** Tab 右键：转发锚点坐标（内容区 DIP），菜单经原生浮层窗渲染（页面内容保持可见） */
   contextMenu: [tab: DesktopTab, x: number, y: number]
+  /** 页面操作（资源模式）：菜单锚定按钮右下角，坐标与 Tab 右键同坐标系 */
+  pageMenu: [x: number, y: number]
   toggleCenter: []
   toggleTheme: []
   minimize: []
@@ -34,6 +36,12 @@ const tabsEl = ref<HTMLElement | null>(null)
 /** Tab 条不显示滚动条：竖向滚轮转横向滚动（Chrome 行为） */
 function onTabsWheel(e: WheelEvent): void {
   tabsEl.value?.scrollBy({ left: e.deltaY })
+}
+
+/** 页面操作菜单锚点：按钮右下角（视口 DIP，与 Tab 右键菜单同坐标系） */
+function onPageMenu(e: MouseEvent): void {
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+  emit('pageMenu', rect.right, rect.bottom)
 }
 </script>
 
@@ -113,6 +121,16 @@ function onTabsWheel(e: WheelEvent): void {
       </button>
     </AppTooltip>
     <span v-if="!resource" class="dt-topbar__sep" />
+    <!-- 页面操作（资源模式）：刷新/清缓存/清站点数据入口，与 Tab 右键共用同一原生菜单 -->
+    <AppTooltip v-if="resource" text="页面操作">
+      <button class="dt-topbar__iconbtn" @click="onPageMenu">
+        <svg viewBox="0 0 16 16" width="15" height="15">
+          <circle cx="8" cy="3.4" r="1.3" fill="currentColor" />
+          <circle cx="8" cy="8" r="1.3" fill="currentColor" />
+          <circle cx="8" cy="12.6" r="1.3" fill="currentColor" />
+        </svg>
+      </button>
+    </AppTooltip>
     <WindowControls
       :maximized="maximized"
       @minimize="$emit('minimize')"
