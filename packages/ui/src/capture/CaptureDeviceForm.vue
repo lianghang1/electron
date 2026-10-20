@@ -137,7 +137,7 @@ function onKvInput(): void {
       </h4>
       <label class="cap-row">
         <span class="cap-row__label">DLL 路径</span>
-        <input v-model="config.dll.file" type="text" class="cap-row__input" placeholder="相对资源根（如 devices/zhaolin/ZLSDK.dll）或绝对路径">
+        <input v-model="config.dll.file" type="text" class="cap-row__input" placeholder="相对资源根（如 devices/huashi/win64/Termb.dll）或绝对路径">
       </label>
       <label class="cap-row cap-row--top">
         <span class="cap-row__label">函数签名</span>

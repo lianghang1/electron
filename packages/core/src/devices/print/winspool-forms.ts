@@ -1,8 +1,8 @@
 import type { PrinterDefaults, PrinterPaper } from '@desktop/shared'
-import type { KoffiModule } from '../idcard/drivers/koffi'
+import type { KoffiModule } from '../kernel/koffi'
 import { Buffer } from 'node:buffer'
-import process from 'node:process'
-import { koffiAvailable, requireKoffi } from '../idcard/drivers/koffi'
+import { koffiAvailable, requireKoffi } from '../kernel/koffi'
+import { detectDevicePlatform } from '../platform'
 
 /**
  * winspool.drv 直调：读取打印机驱动注册的纸张表单（名字 + 物理尺寸）与打印默认值（DEVMODE）。
@@ -119,7 +119,7 @@ function getFormSize(koffi: KoffiModule, getForm: BoolFn, handle: number | bigin
 }
 
 export function queryWinspoolForms(printerName: string): PrinterPaper[] | null {
-  if (process.platform !== 'win32' || !koffiAvailable()) { return null }
+  if (!detectDevicePlatform().winspoolSupported || !koffiAvailable()) { return null }
 
   let close: (() => void) | undefined
   try {
@@ -193,7 +193,7 @@ export interface WinspoolHardware {
  * DEVMODE 解析失败仅缺 defaults，能力位仍有效；整体失败返回 null。
  */
 export function queryWinspoolHardware(printerName: string): WinspoolHardware | null {
-  if (process.platform !== 'win32' || !koffiAvailable()) { return null }
+  if (!detectDevicePlatform().winspoolSupported || !koffiAvailable()) { return null }
 
   let close: (() => void) | undefined
   try {

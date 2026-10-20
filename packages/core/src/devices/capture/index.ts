@@ -1,5 +1,6 @@
 import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
+import type { DeviceHost } from '../host/device-host'
 import { CaptureService } from './service'
 
 export { BUILT_IN_CAPTURE_CONFIGS } from './configs'
@@ -24,6 +25,8 @@ export interface CaptureSystem {
 export interface CaptureSystemOptions {
   /** 设备资源根（DLL 相对路径基准，宿主解析开发/打包差异） */
   resourcesRoot: string
+  /** 设备守护进程（DLL 探测的 koffi 调用崩溃隔离在 host 进程，主进程零 native 依赖） */
+  host: DeviceHost
   /** 初始设备配置（持久化回注；不传 = 出厂配置） */
   initialConfigs?: CaptureDeviceConfig[]
   /** 运行时编辑持久化（未注入则编辑仅内存生效） */

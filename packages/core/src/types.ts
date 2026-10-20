@@ -36,14 +36,14 @@ export interface WindowOverrides {
     /**
      * SDK 资源根（厂商 DLL 与外置 exe 的共同基准目录）：缺省 resources/ ——
      * dev 为 <应用根>/resources，打包为 <resourcesPath>/resources。
-     * DLL 位置如 devices/huashi/Termb.dll，外置 exe 如 devices/print/SumatraPDF.exe。
+     * DLL 位置如 devices/huashi/win64/Termb.dll，外置 exe 如 devices/print/win64/SumatraPDF.exe。
      */
     resourcesRoot?: string
     /** 摄像采集（capture 域） */
     capture?: { saveDir?: string }
     /** 打印（print 域） */
     print?: {
-      /** SumatraPDF 可执行文件位置（PDF 打印后端）：相对 resourcesRoot（缺省 devices/print/SumatraPDF.exe）或绝对路径 */
+      /** SumatraPDF 可执行文件位置（PDF 打印后端）：相对 resourcesRoot（缺省 devices/print/win64/SumatraPDF.exe）或绝对路径 */
       sumatraPath?: string
     }
   }

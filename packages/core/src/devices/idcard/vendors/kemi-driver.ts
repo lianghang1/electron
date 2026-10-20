@@ -6,10 +6,10 @@ import { HuashiDriver } from './huashi-driver'
  *
  * 复用华视驱动全部读卡流程，仅覆写品牌与 DLL 位置。
  * CVR 兼容为贴牌假设（未见科密官方手册），设备 note 已标注该状态；
- * DLL 约定路径 resources/devices/kemi/，SDK 主 DLL 若不叫 Termb.dll 按实际名改 dllFile。
+ * DLL 约定路径 resources/devices/kemi/win64/，SDK 主 DLL 若不叫 Termb.dll 按实际名改 dllFile。
  */
 export class KemiDriver extends HuashiDriver {
   override readonly brand = '科密'
   override readonly displayName = '科密 CVR 兼容证卡读卡器（USB，待真机验证）'
-  override readonly dllFile = 'devices/kemi/Termb.dll'
+  override readonly dllFile = 'devices/kemi/win64/Termb.dll'
 }

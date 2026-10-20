@@ -65,7 +65,7 @@ exports.default = async function afterPack(context) {
   const launcherSize = fs.statSync(asarPath).size
   console.log(`  • launcher structure ready (${info.name}@${info.version}): app.asar=${launcherSize}B, app.core.asar=${coreSize}B`)
 
-  // 4. koffi（FFI，原生模块）asar 外分发，运行时由 devices/idcard/drivers/koffi 访问器显式锚定
+  // 4. koffi（FFI，原生模块）asar 外分发，运行时由 devices/kernel/koffi 访问器显式锚定
   copyKoffi(context.packager.projectDir || process.cwd(), resourcesDir)
 
   // 5. resources 版本标记：热更协议 minResourcesVersion 的比对基准（热更只换代码，热更代码

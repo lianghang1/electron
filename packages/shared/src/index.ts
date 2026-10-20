@@ -63,9 +63,10 @@ export type {
   CaptureTransport,
 } from './types/devices/capture'
 
-/* ---------------- 设备类型（scanner / capture / print） ---------------- */
+/* ---------------- 设备类型（idcard / iccard / scanner / capture / print / signature） ---------------- */
 
-export type { IcCardData, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from './types/devices/idcard'
+export type { IcCardData, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest } from './types/devices/iccard'
+export type { IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from './types/devices/idcard'
 export type {
   ChannelId,
   ChannelPreference,
@@ -90,11 +91,11 @@ export type {
 export type { ScanErrorCode, ScannerConfig, ScannerLogFn, ScanOptions, ScanResult } from './types/devices/scanner'
 export type { SignDevice, SignDeviceTransport, SignErrorCode, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint } from './types/devices/signature'
 
-/* ---------------- 设备通道（device:*，读卡器 / 打印机） ---------------- */
+/* ---------------- 设备通道（idcard / iccard / print / scanner / capture / signature 域） ---------------- */
 
 export type { DownloadTask, DownloadTaskStatus } from './types/download'
 
-export { captureDomain, deviceDomain, platformDomains, printDomain, scannerDomain } from './types/ipc'
+export { captureDomain, iccardDomain, idcardDomain, platformDomains, printDomain, scannerDomain } from './types/ipc'
 
 /* ---------------- 下载任务 ---------------- */
 

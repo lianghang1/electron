@@ -1,7 +1,7 @@
 import type { DomainIpc } from '../../domain'
 import { appDomain } from './app'
 import { cacheDomain } from './cache'
-import { captureDomain, deviceDomain, printDomain, scannerDomain, signatureDomain } from './devices'
+import { captureDomain, iccardDomain, idcardDomain, printDomain, scannerDomain, signatureDomain } from './devices'
 import { downloadDomain } from './download'
 import { notificationDomain } from './notification'
 import { overlayDomain } from './overlay'
@@ -33,7 +33,8 @@ export type DesktopIpc
     & DomainIpc<typeof updateDomain>
     & DomainIpc<typeof downloadDomain>
     & DomainIpc<typeof cacheDomain>
-    & DomainIpc<typeof deviceDomain>
+    & DomainIpc<typeof idcardDomain>
+    & DomainIpc<typeof iccardDomain>
     & DomainIpc<typeof signatureDomain>
     & DomainIpc<typeof scannerDomain>
     & DomainIpc<typeof captureDomain>
@@ -51,7 +52,8 @@ export const platformDomains = [
   cacheDomain,
   updateDomain,
   downloadDomain,
-  deviceDomain,
+  idcardDomain,
+  iccardDomain,
   signatureDomain,
   scannerDomain,
   captureDomain,
@@ -61,7 +63,7 @@ export const platformDomains = [
 ] as const
 
 /** 域对象再导出：Main 侧实现（广播通道等）直接取用 */
-export { captureDomain, deviceDomain, printDomain, scannerDomain, signatureDomain } from './devices'
+export { captureDomain, iccardDomain, idcardDomain, printDomain, scannerDomain, signatureDomain } from './devices'
 
 /** 契约中 invoke 形态的 channel 子集：Main 侧 handle 包装 / Preload invoke 只看这里 */
 export type DesktopInvoke = {

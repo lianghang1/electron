@@ -181,13 +181,13 @@ function handleKeyInput(key: string) {
 onMounted(() => {
   playText(tipText.value)
 
-  window.desktop.device.listReaders().then((readers) => {
+  window.desktop.idcard.listReaders().then((readers) => {
     console.log(readers)
   })
 
   // dll:huashi
 
-  window.desktop.device.readIdCard({
+  window.desktop.idcard.readIdCard({
     deviceId: 'dll:huashi',
   }).then((data) => {
     console.log(data)

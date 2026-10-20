@@ -3,7 +3,6 @@ import { existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import process from 'node:process'
-import { idCardError } from '../errors'
 
 /** koffi 声明的原生函数（返回值/入参类型由签名字符串声明，出参经 Buffer 手工解析） */
 export type KoffiFn = (...args: unknown[]) => unknown
@@ -42,6 +41,18 @@ function packagedKoffiPresent(): boolean {
   return Boolean(packagedKoffiDir && existsSync(path.join(packagedKoffiDir, 'package.json')))
 }
 
+/** koffi 加载失败的结构化错误：code 穿越守护进程 IPC 供调用链分支（ADAPTER_UNAVAILABLE 为设备域通用码） */
+class KoffiUnavailableError extends Error {
+  readonly code = 'ADAPTER_UNAVAILABLE'
+  readonly detail?: unknown
+
+  constructor(message: string, detail?: unknown) {
+    super(message)
+    this.name = 'KoffiUnavailableError'
+    this.detail = detail
+  }
+}
+
 /** koffi 是否可用（进程级常量）：设备枚举据此产出状态提示，requireKoffi 兜底 */
 export function koffiAvailable(): boolean {
   if (packagedKoffiPresent()) {
@@ -67,7 +78,7 @@ export function requireKoffi(detail?: unknown): KoffiModule {
     koffi = dir && packagedKoffiPresent() ? nodeRequire(dir) : nodeRequire('koffi')
   }
   catch {
-    throw idCardError('ADAPTER_UNAVAILABLE', 'koffi 不可用（dev: npm i koffi；打包: 缺 resources/node_modules/koffi）', detail)
+    throw new KoffiUnavailableError('koffi 不可用（dev: npm i koffi；打包: 缺 resources/node_modules/koffi）', detail)
   }
   return koffi
 }

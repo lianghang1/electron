@@ -1,19 +1,20 @@
 import { defineDomain } from '../../../domain'
 import { captureDomainDefs } from './capture'
-import { idCardDomainDefs } from './idcard'
+import { iccardDomainDefs } from './iccard'
+import { idcardDomainDefs } from './idcard'
 import { printDomainDefs } from './print'
 import { scannerDomainDefs } from './scanner'
 import { signatureDomainDefs } from './signature'
 
 /**
  * 设备域契约：外设硬件通道（读卡器 / 打印机 / 扫码枪 / 摄像头 / 签名板…）。
- * idcard / signature 聚合进各自域（DesktopApi.device / .signature 分组）；
- * scanner / capture / print 是独立原子域（通道量大、职责独立，各自一个 DesktopApi 分组）。
- * handler 由 core 设备服务注册：缺省内置 mock/stub，宿主经 bootstrap.devices 配置真实资源。
+ * idcard（身份证）/ iccard（IC 卡）/ signature / scanner / capture / print 均为独立原子域
+ * （按设备类型一文件，各自一个 DesktopApi 分组）。
+ * handler 由 core 设备服务注册：宿主经 bootstrap.devices 配置真实资源。
  */
-export const deviceDomain = defineDomain('device', {
-  ...idCardDomainDefs,
-})
+export const idcardDomain = defineDomain('idcard', idcardDomainDefs)
+
+export const iccardDomain = defineDomain('iccard', iccardDomainDefs)
 
 export const signatureDomain = defineDomain('signature', signatureDomainDefs)
 

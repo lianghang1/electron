@@ -2,6 +2,7 @@ import type { AdapterCaptureRequest, CaptureAdapter, CaptureDevice, CaptureDevic
 import { Buffer } from 'node:buffer'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { probeHttp } from '../../kernel/channel/http-channel'
 import { captureError } from '../errors'
 
 /**
@@ -30,25 +31,11 @@ export class ServiceAdapter implements CaptureAdapter {
           displayName: p.displayName,
           brand: p.brand,
           transport: 'service' as const,
-          status: (await this.probe(p.service!.baseUrl)) ? ('ready' as const) : ('offline' as const),
+          status: (await probeHttp(p.service!.baseUrl)) ? ('ready' as const) : ('offline' as const),
           capabilities: { crop: true, desewarp: true, ...(p.capabilities ?? {}) },
           meta: { baseUrl: p.service!.baseUrl },
         })),
     )
-  }
-
-  /** 服务探活：GET baseUrl，2s 超时 */
-  private async probe(baseUrl: string): Promise<boolean> {
-    try {
-      const ctrl = new AbortController()
-      const t = setTimeout(() => ctrl.abort(), 2000)
-      await fetch(baseUrl, { signal: ctrl.signal })
-      clearTimeout(t)
-      return true // 只要连上（哪怕 404）就算服务活着
-    }
-    catch {
-      return false
-    }
   }
 
   async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {

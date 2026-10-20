@@ -294,10 +294,10 @@
     <div class="panel" id="job-list"><div class="empty">加载中…</div></div>
   </section>
 
-  <!-- ══════════ 证卡 ══════════ -->
+  <!-- ══════════ 证卡（身份证 idcard 域 + IC 卡 iccard 域） ══════════ -->
   <section class="page" id="page-idcard">
     <div class="toolbar">
-      <span class="section-label">证卡读取</span>
+      <span class="section-label">身份证阅读</span>
       <select class="input" id="id-reader" style="min-width: 260px;"><option value="">检测读卡器中…</option></select>
       <span class="spacer"></span>
       <button class="btn danger-ghost" id="btn-id-clear">清空</button>
@@ -322,7 +322,8 @@
     <div id="sec-ic-read" hidden>
       <div class="toolbar">
         <span class="section-label">IC 卡读取（Mifare）</span>
-        <span class="hint">与身份证共用读卡器，同一时刻串行；出厂白键卡片无需输入密钥</span>
+        <select class="input" id="ic-reader" style="min-width: 260px;"><option value="">检测读卡器中…</option></select>
+        <span class="hint">出厂白键卡片无需输入密钥</span>
       </div>
       <div class="panel padded">
         <div class="form-grid" style="align-items: center;">
@@ -553,6 +554,7 @@
 <script src="js/common.js"></script>
 <script src="js/print.js"></script>
 <script src="js/idcard.js"></script>
+<script src="js/iccard.js"></script>
 <script src="js/capture.js"></script>
 <script src="js/capture-config.js"></script>
 <script src="js/scanner.js"></script>

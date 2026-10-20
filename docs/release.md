@@ -6,7 +6,7 @@
 
 1. `pnpm typecheck && pnpm lint && pnpm test` 全绿。
 2. 确认 `pnpm-workspace.yaml` 版本变动已提交（catalog / 依赖变更影响所有应用）。
-3. 设备驱动文件有更新时，确认改的是仓库根 `resources/devices/`（单一来源），并随**整包**发布。
+3. 设备驱动文件有更新时，确认改的是 `packages/core/src/devices/**/assets/`（单一来源），并随**整包**发布。
 
 ## 发布通道判定
 

@@ -22,11 +22,14 @@
 
 ## 设备资源（厂商 DLL / 打印组件）
 
-- 设备驱动文件**单一来源在仓库根 `resources/devices/`**（与消费它们的 `packages/core` 驱动代码同仓演进）。
+- 设备驱动文件**单一来源在 `packages/core/src/devices/**/assets/`**（跟消费它们的驱动类同目录演进，
+  assets 父目录名 = 厂商名，目录下按平台分目录 win64/linux-arm64…）。
 - 各应用目录下的 `resources/devices` 是 postinstall 自动**单向复制**的产物（`pnpm sync:resources` 可手动重建）：
-  根目录是唯一真源，应用侧是再生成的普通目录。**不要往应用侧放文件**——手工添加的内容会在下次同步时
+  devices 树是唯一真源，应用侧是再生成的普通目录。**不要往应用侧放文件**——手工添加的内容会在下次同步时
   丢失（同步脚本会大声警告）。
-- 设备资源更新 = 更新仓库根 `resources/devices/` 下的文件 → 随**整包更新**发布（热更不带 resources，
+- 同步前脚本会先做声明 ↔ 源对账（`host/asset-audit`）：驱动 dllFile 与源资产对不上（目录名打错 / SDK
+  漏放 / 孤儿厂商目录）直接报错终止，`pnpm test` 同规则兜底。
+- 设备资源更新 = 更新 devices 树对应厂商 `assets/` 下的文件 → 随**整包更新**发布（热更不带 resources，
   热更代码依赖新版驱动能力时用 `pnpm hotfix --min-resources-version` 做配对保护）。
 
 ## 目录速查（安装后）

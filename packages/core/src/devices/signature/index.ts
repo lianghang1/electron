@@ -1,10 +1,13 @@
 import type { Logger } from '../../logger/logger'
+import type { DeviceHost } from '../host/device-host'
 import type { SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
 import { SignatureService } from './service'
 
 export interface SignatureSystemOptions {
   /** 设备资源根（DLL 等 SDK 资源的基准目录，宿主解析开发/打包差异） */
   resourcesRoot: string
+  /** 设备守护进程（DLL 探测的 koffi 调用崩溃隔离在 host 进程，主进程零 native 依赖） */
+  host: DeviceHost
   logger: Logger
 }
 
@@ -21,7 +24,7 @@ export interface SignatureSystem {
 
 /** 创建手写签名系统（与 idcard/capture 系统同构，signature 域通道由 core/src/ipc/signature.ts 注册） */
 export function createSignatureSystem(options: SignatureSystemOptions): SignatureSystem {
-  const service = new SignatureService(options.resourcesRoot, options.logger)
+  const service = new SignatureService(options.host, options.resourcesRoot, options.logger)
   return {
     listDevices: () => service.listDevices(),
     start: (req, onStroke) => service.start(req, onStroke),

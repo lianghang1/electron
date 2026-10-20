@@ -259,7 +259,7 @@ function generate(): void {
     cpSync(join(kioskDir, 'build/icon.png'), join(appDir, 'build/icon.png'))
     cpSync(join(kioskDir, 'build/icon.ico'), join(appDir, 'build/icon.ico'))
 
-    // 设备资源无需生成：resources/devices 由同步脚本从仓库级单一来源单向复制（postinstall 也会自动执行）
+    // 设备资源无需生成：resources/devices 由同步脚本从 devices 树 assets 真源单向复制（postinstall 也会自动执行）
     syncDevResources()
 
     verifyGenerated(templateFiles)

@@ -1,5 +1,6 @@
 import type { AppSource, CaptureDeviceConfig, DesktopAppManifest } from '@desktop/shared'
 import type { CaptureSystem } from '../devices/capture'
+import type { IcCardSystem } from '../devices/iccard'
 import type { IdCardSystem } from '../devices/idcard'
 import type { PrintSystem } from '../devices/print'
 import type { ScannerSystem } from '../devices/scanner'
@@ -20,8 +21,10 @@ import { CacheService } from '../cache/cache-service'
 import { createCaptureSystem } from '../devices/capture'
 import { CaptureDialogSessionService } from '../devices/capture/dialog-session'
 import { DeviceHost } from '../devices/host/device-host'
+import { createIcCardSystem } from '../devices/iccard'
 import { createIdCardSystem } from '../devices/idcard'
 import { createPrintSystem } from '../devices/print'
+import { SUMATRA_PDF_FILE } from '../devices/print/sumatra'
 import { createScannerSystem, SCANNER_DEFAULTS } from '../devices/scanner'
 import { createSignatureSystem } from '../devices/signature'
 import { DownloadService } from '../download/download-service'
@@ -77,8 +80,10 @@ export class DesktopRuntime {
   private overlayService!: OverlayWindowService
   /** 系统托盘（features.tray 开启时装配）：关窗隐藏到托盘，托盘菜单退出才真退 */
   private trayService?: TrayService
-  /** 设备系统：证卡读取（dll 真实驱动） */
-  private idCardSystem?: IdCardSystem
+  /** 设备系统：身份证阅读（dll 真实驱动） */
+  private idcardSystem?: IdCardSystem
+  /** 设备系统：M1 IC 卡读写（dll 真实驱动） */
+  private iccardSystem?: IcCardSystem
   /** 设备守护进程：厂商 DLL 的 koffi 调用全部在此进程执行（native 崩溃隔离 + 退避重启自愈） */
   private deviceHost?: DeviceHost
   /** 设备系统：扫码枪（键盘仿真观察，恒创建） */
@@ -253,7 +258,7 @@ export class DesktopRuntime {
   /**
    * 设备系统装配：资源根统一经 resolveResourcePath 解析（缺省 resources/ —— dev 为
    * <应用根>/resources，打包为 <resourcesPath>/resources），DLL 与外置 exe 均相对它寻址
-   * （idcard/capture/signature 的 devices/<brand>/、print 的 devices/print/）。
+   * （idcard/capture/signature 的 devices/<brand>/<平台>/、print 的 devices/print/<平台>/）。
    * 运行时编辑持久化由 electron-store 托管（userData），capture 的存储缺键时回落出厂档案
    * （不设 defaults，避免空值覆盖）。
    */
@@ -267,14 +272,21 @@ export class DesktopRuntime {
     // 预热：后台提前拉起守护进程（fork + koffi 加载），证卡/打印首次操作免等秒级冷启动
     void this.deviceHost.warmup()
 
-    this.idCardSystem = createIdCardSystem({
+    this.idcardSystem = createIdCardSystem({
       resourcesRoot,
       host: this.deviceHost,
       logger: this.logger.scope('device:idcard'),
     })
 
+    this.iccardSystem = createIcCardSystem({
+      resourcesRoot,
+      host: this.deviceHost,
+      logger: this.logger.scope('device:iccard'),
+    })
+
     this.signatureSystem = createSignatureSystem({
       resourcesRoot,
+      host: this.deviceHost,
       logger: this.logger.scope('device:signature'),
     })
 
@@ -291,6 +303,7 @@ export class DesktopRuntime {
     const captureStore = createDeviceStore<{ devices?: CaptureDeviceConfig[] }>('capture-configs')
     this.captureSystem = createCaptureSystem({
       resourcesRoot,
+      host: this.deviceHost,
       initialConfigs: captureStore.load().devices,
       persist: configs => captureStore.save({ devices: configs }),
       defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(filesDir(), 'capture'),
@@ -302,8 +315,8 @@ export class DesktopRuntime {
       overlay: this.overlayService,
     })
 
-    // 打印：SumatraPDF 相对资源根解析（缺省 devices/print/SumatraPDF.exe），绝对路径原样
-    const sumatraRel = this.options.devices?.print?.sumatraPath ?? 'devices/print/SumatraPDF.exe'
+    // 打印：SumatraPDF 相对资源根解析（出厂位置 SUMATRA_PDF_FILE），绝对路径原样
+    const sumatraRel = this.options.devices?.print?.sumatraPath ?? SUMATRA_PDF_FILE
     this.printSystem = createPrintSystem({
       jobsFile: join(configDir(), 'print-jobs.json'),
       archiveDir: join(filesDir(), 'print'),
@@ -402,7 +415,8 @@ export class DesktopRuntime {
       asarService: this.options.updates?.asar ? this.asarUpdateService : undefined,
       overlayService: this.overlayService,
       downloadService: this.downloadService,
-      idCard: this.idCardSystem,
+      idcard: this.idcardSystem,
+      iccard: this.iccardSystem,
       signature: this.signatureSystem,
       scanner: this.scannerSystem,
       capture: this.captureSystem,
@@ -521,7 +535,8 @@ export class DesktopRuntime {
     this.trayService?.destroy()
     this.webService?.dispose()
     this.storageService?.dispose()
-    this.idCardSystem?.destroy()
+    this.idcardSystem?.destroy()
+    this.iccardSystem?.destroy()
     this.signatureSystem?.destroy()
     this.scannerSystem?.destroy()
     this.captureSystem?.destroy()

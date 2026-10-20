@@ -39,9 +39,9 @@ pnpm gen:app <slug> <中文名>  # 脚手架生成新应用（详见 docs/app-sc
 配置公共部分集中在 `@desktop/config/electron-builder` 工厂与 `@desktop/config/vite` 工厂，
 应用侧只声明差异；新增应用用 `pnpm gen:app` 脚手架，自动继承全部契约。
 
-**设备资源单一来源**：厂商 DLL / 打印组件等硬件文件在仓库根 `resources/devices/`（与
-`packages/core` 驱动代码同仓演进），各应用 `resources/devices` 由 postinstall 单向复制生成——
-更新驱动文件只改一处，所有应用自动生效。
+**设备资源单一来源**：厂商 DLL / 打印组件等硬件文件在 `packages/core/src/devices/**/assets/`（跟
+驱动类同目录演进，assets 父目录名 = 厂商名，目录下按 win64/linux-arm64 等平台分目录），各应用
+`resources/devices` 由 postinstall 同步脚本单向复制生成——更新驱动文件只改一处，所有应用自动生效。
 
 ## 文档
 

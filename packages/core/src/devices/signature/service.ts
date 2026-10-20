@@ -1,4 +1,5 @@
 import type { Logger } from '../../logger/logger'
+import type { DeviceHost } from '../host/device-host'
 import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
 
 import { DllSignAdapter } from './adapters/dll-adapter'
@@ -15,9 +16,9 @@ export class SignatureService {
   /** 活动会话：设备 ID + 发起方的笔迹推送回调 */
   private active: { deviceId: string, onStroke: (point: SignStrokePoint) => void } | null = null
 
-  constructor(resourcesRoot: string, private readonly logger: Logger) {
+  constructor(host: DeviceHost, resourcesRoot: string, private readonly logger: Logger) {
     this.adapters = new Map<string, SignAdapter>([
-      ['dll', new DllSignAdapter(resourcesRoot)],
+      ['dll', new DllSignAdapter(host, resourcesRoot)],
     ])
   }
 

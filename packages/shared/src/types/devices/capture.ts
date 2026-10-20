@@ -1,4 +1,4 @@
-/** capture 模块统一契约 —— 多品牌（华视/哲林/良田/点易拍…）× 多接入方式（dll/service/wia/uvc/stub） */
+/** capture 模块统一契约 —— 多品牌（华视/良田/点易拍…）× 多接入方式（dll/service/wia/uvc/stub） */
 
 /** 接入方式（适配器路线） */
 export type CaptureTransport = 'dll' | 'service' | 'wia' | 'uvc' | 'stub' | 'ws'

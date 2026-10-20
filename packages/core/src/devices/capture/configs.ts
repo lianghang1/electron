@@ -15,27 +15,12 @@ export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
     capabilities: { crop: true, desewarp: true, dualPage: true },
   },
   {
-    id: 'zhaolin-zl1000',
-    brand: '哲林',
-    displayName: '哲林 ZL-1000（DLL SDK）',
-    transport: 'dll',
-    dll: {
-      file: 'devices/zhaolin/ZLSDK.dll',
-      functions: {
-        DevOpen: 'int __stdcall DevOpen(int nType, int nIndex)',
-        DevCapture: 'int __stdcall DevCapture(int hDev)',
-        DevClose: 'int __stdcall DevClose(int hDev)',
-      },
-    },
-    capabilities: { crop: true, desewarp: true, ocr: true },
-  },
-  {
     id: 'huashi-cvr100',
     brand: '华视',
     displayName: '华视 CVR-100（DLL SDK）',
     transport: 'dll',
     dll: {
-      file: 'devices/huashi/Termb.dll',
+      file: 'devices/huashi/win64/Termb.dll',
       functions: {
         Init: 'int __stdcall InitComm(int iPort)',
         ReadCard: 'int __stdcall ReadBaseMsg(unsigned char *pmsg, unsigned int *len)',

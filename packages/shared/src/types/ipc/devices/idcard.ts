@@ -1,40 +1,21 @@
-import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdCardData, IdReaderDevice } from '../../devices/idcard'
+import type { IdCardData, IdReaderDevice } from '../../devices/idcard'
 import { invoke } from '../../../domain'
 
 /**
- * 设备域 · 证卡读取切片（身份证阅读器 / IC 读卡器）。
- * 与 print / capture 平级的独立原子模块（按设备类型一文件，device 域聚合）。
+ * idcard 域 · 身份证阅读器。
+ * 与 print / capture / iccard 平级的独立原子域（按设备类型一文件，各自一个 DesktopApi 分组）。
  * 不与 capture 合并的理由：产出物不同（结构化 PII 数据 vs 图片文件），
  * 合规约束不同（PII 禁日志、即用即弃、脱敏）。
  *
  * 异常契约：失败 reject（IpcRemoteError，code 见 IdReaderErrorCode），
  * 渲染层 try/catch 按错误码分支。
  */
-export const idCardDomainDefs = {
-  /** 列出全部读卡器（真实硬件优先，mock 兜底；capabilities 声明各驱动支持的卡型） */
+export const idcardDomainDefs = {
+  /** 列出身份证阅读器（仅具备身份证能力的读卡器） */
   listReaders: invoke<() => Promise<IdReaderDevice[]>>(),
   /**
    * 读一张身份证（打开 → 认证 → 读取 → 关闭全程锁定）。
-   * deviceId 缺省时平台自动选用第一个支持身份证且就绪的读卡器。
+   * deviceId 缺省时平台自动选用第一个就绪的阅读器。
    */
   readIdCard: invoke<(req?: { deviceId?: string }) => Promise<IdCardData>>(),
-  /**
-   * 读 M1 IC 卡一个扇区（寻卡 → 防碰撞 → 选卡 → 密钥认证 → 读块）。
-   * 返回原始块数据 + 字符串组 texts（数据块按 0x00 截断解码为 UTF-8、尾部空块不返回，
-   * 与 writeIcCardTexts 的 texts 互逆）。
-   * deviceId 缺省时自动选用第一个支持 IC 卡且就绪的读卡器；
-   * key/keyType/sector 缺省 = 出厂白键 A 键读 1 扇区。
-   */
-  readIcCard: invoke<(req?: IcCardReadRequest & { deviceId?: string }) => Promise<IcCardReadResult>>(),
-  /**
-   * 写一个 M1 IC 卡数据块（寻卡 → 认证 → 写块）。
-   * deviceId 缺省时自动选用第一个支持写卡且就绪的读卡器；
-   * 危险操作：驱动强制拒绝密钥控制块与厂商块，业务数据块照写不校验内容。
-   */
-  writeIcCard: invoke<(req: IcCardWriteRequest & { deviceId?: string }) => Promise<void>>(),
-  /**
-   * 写一个扇区的字符串组：texts 按序占用扇区数据块（UTF-8、0x00 结尾补齐 16 字节），未占用数据块清零。
-   * 约束见 IcCardTextsWriteRequest；deviceId 缺省时自动选用第一个支持写卡且就绪的读卡器。
-   */
-  writeIcCardTexts: invoke<(req: IcCardTextsWriteRequest & { deviceId?: string }) => Promise<void>>(),
 }

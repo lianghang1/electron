@@ -4,6 +4,7 @@ import type { AppService } from '../app/app-service'
 import type { CacheService } from '../cache/cache-service'
 import type { CaptureSystem } from '../devices/capture'
 import type { CaptureDialogSessionService } from '../devices/capture/dialog-session'
+import type { IcCardSystem } from '../devices/iccard'
 import type { IdCardSystem } from '../devices/idcard'
 import type { PrintSystem } from '../devices/print'
 import type { ScannerSystem } from '../devices/scanner'
@@ -22,8 +23,9 @@ import type { CallerResolver } from './caller-context'
 import { registerAppIpc } from './app'
 import { registerCacheIpc } from './cache'
 import { registerCaptureIpc } from './capture'
-import { registerDeviceIpc } from './device'
 import { registerDownloadIpc } from './download'
+import { registerIccardIpc } from './iccard'
+import { registerIdcardIpc } from './idcard'
 import { registerNotificationIpc } from './notification'
 import { registerOverlayIpc } from './overlay'
 import { registerPermissionIpc } from './permission'
@@ -53,8 +55,10 @@ export interface PlatformIpcDeps {
   overlayService: OverlayWindowService
   /** 下载管理：任务面板操作（打开文件 / 定位文件夹）与面板关闭联动 */
   downloadService: DownloadService
-  /** 设备系统（读卡器等外设硬件）：bootstrap 装配，未配置时设备通道返回不可用结果 */
-  idCard?: IdCardSystem
+  /** 身份证阅读系统（bootstrap 装配）：未配置时通道以 ADAPTER_UNAVAILABLE 拒绝 */
+  idcard?: IdCardSystem
+  /** IC 卡读写系统（bootstrap 装配）：未配置时通道以 ADAPTER_UNAVAILABLE 拒绝 */
+  iccard?: IcCardSystem
   /** 手写签名系统（bootstrap 装配）：未配置时签名通道返回不可用结果 */
   signature?: SignatureSystem
   /** 扫码枪系统（bootstrap 装配，恒创建） */
@@ -102,7 +106,8 @@ export function registerPlatformIpc(deps: PlatformIpcDeps): void {
   registerCacheIpc({ cacheService: deps.cacheService, registry: deps.registry, tabService: deps.tabService, resolver: deps.resolver })
   registerUpdateIpc({ updateService: deps.updateService, asarService: deps.asarService, resolver: deps.resolver })
   registerDownloadIpc({ downloadService: deps.downloadService, overlayService: deps.overlayService, resolver: deps.resolver })
-  registerDeviceIpc({ idCard: deps.idCard })
+  registerIdcardIpc({ idcard: deps.idcard })
+  registerIccardIpc({ iccard: deps.iccard })
   registerSignatureIpc({ signature: deps.signature })
   registerScannerIpc({ scanner: deps.scanner })
   registerCaptureIpc({

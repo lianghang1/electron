@@ -1,16 +1,16 @@
 /* eslint-disable node/prefer-global/buffer */
 /* eslint-disable node/prefer-global/process */
-import type { BrandDriver, IdCardData } from '../types'
-import type { KoffiFn, KoffiLib } from './koffi'
+import type { KoffiFn, KoffiLib } from '../../kernel/koffi'
+import type { IdCardData, IdCardDriver } from '../types'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { requireKoffi } from '../../kernel/koffi'
 import { idCardError } from '../errors'
-import { requireKoffi } from './koffi'
 
 /**
  * 华视电子身份证阅读器驱动（深圳华视 SDK V7.1.8，函数以《身份证阅读器SDK使用手册.doc》为准）。
  *
- * DLL（resources/devices/huashi/）：
+ * DLL（resources/devices/huashi/win64/）：
  *   Termb.dll      主 API 动态库（入口）
  *   sdtapi.dll     安全模块通讯库
  *   WltRS.dll      照片解码库（SDK 运行时自行加载，本驱动不直接调用）
@@ -66,15 +66,15 @@ function normalizeDate(raw: string): string {
 }
 
 /**
- * 华视驱动 —— "一个厂商 = 一个驱动类"：身份/DLL 位置/端口/行为全部内聚于此（实现 BrandDriver）。
- * 新增厂商 = drivers/ 加一个同类驱动 + dll-adapter 注册表加一行。
+ * 华视驱动 —— "一个厂商 = 一个驱动类"：身份/DLL 位置/端口/行为全部内聚于此（实现 IdCardDriver）。
+ * 新增厂商 = vendors/ 加一个同类驱动 + host/run.ts 驱动注册表加一行。
  */
-export class HuashiDriver implements BrandDriver {
+export class HuashiDriver implements IdCardDriver {
   // 显式 string 标注（放宽字面量收窄）：CVR 兼容贴牌驱动（科密等）子类覆写品牌/位置
   readonly brand: string = '华视'
   readonly displayName: string = '华视 CVR-100 证卡读卡器（USB）'
   /** DLL 相对宿主资源根的出厂位置 */
-  readonly dllFile: string = 'devices/huashi/Termb.dll'
+  readonly dllFile: string = 'devices/huashi/win64/Termb.dll'
   /** 1001-1016 = USB；1-16 = 串口 */
   readonly port = 1001
   /** 进程级全局资源互斥：华视系 SDK 靠 chdir 找相邻资源，dll:huashi 与 dll:kemi 不得并发 open（科密子类继承同组） */

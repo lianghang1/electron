@@ -1,4 +1,5 @@
 import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { DeviceHost } from '../host/device-host'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -12,6 +13,8 @@ import { captureError, toCaptureError } from './errors'
 export interface CaptureServiceOptions {
   /** 设备资源根（DLL 相对路径基准，宿主解析开发/打包差异） */
   resourcesRoot: string
+  /** 设备守护进程（DLL 探测的 koffi 调用崩溃隔离在 host 进程） */
+  host: DeviceHost
   /** 初始设备配置（持久化回注；不传 = 出厂配置） */
   initialConfigs?: CaptureDeviceConfig[]
   /** 运行时编辑持久化（未注入则编辑仅内存生效） */
@@ -38,12 +41,14 @@ export class CaptureService {
   private readonly defaultSaveDir: string
   private readonly persist?: (configs: CaptureDeviceConfig[]) => void
   private readonly resourcesRoot: string
+  private readonly host: DeviceHost
 
   constructor(options: CaptureServiceOptions) {
     this.logger = options.logger ?? (() => {})
     this.defaultSaveDir = path.resolve(options.defaultSaveDir)
     this.persist = options.persist
     this.resourcesRoot = options.resourcesRoot
+    this.host = options.host
     this.configs = options.initialConfigs ?? BUILT_IN_CAPTURE_CONFIGS
     this.adapters = this.buildAdapters()
   }
@@ -54,7 +59,7 @@ export class CaptureService {
     const adapters: [string, CaptureAdapter][] = [
       ['service', new ServiceAdapter(this.configs)],
       ['wia', new WiaAdapter()],
-      ['dll', new DllAdapter(this.configs, this.resourcesRoot)],
+      ['dll', new DllAdapter(this.host, this.configs, this.resourcesRoot)],
       ['ws', new WsAdapter(this.configs)],
     ]
     return new Map<string, CaptureAdapter>(adapters)

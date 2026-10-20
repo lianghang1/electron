@@ -189,7 +189,7 @@
         <button class="op" data-op="tabs-activate">tabs.activate 激活自己</button>
         <button class="op" data-op="tabs-reload">tabs.reload 重载自己</button>
         <button class="op" data-op="window-max">window.isMaximized</button>
-        <button class="op" data-op="device-idcard">device.readIdCard 读卡</button>
+        <button class="op" data-op="idcard-read">idcard.readIdCard 读卡</button>
         <button class="op" data-op="update-check">update.check 检查更新</button>
       </div>
       <div class="fields" style="margin-top:10px">
@@ -534,9 +534,9 @@
       const max = await window.desktop.window.isMaximized()
       log(`window.isMaximized: ${max ? '已最大化' : '非最大化'}`, 'ok')
     },
-    'device-idcard': async () => {
+    'idcard-read': async () => {
       try {
-        const data = await window.desktop.device.readIdCard()
+        const data = await window.desktop.idcard.readIdCard()
         log(`readIdCard: ${data.name} · ${data.idNumber.replace(/^(.{4}).*(.{3})$/, '$1****$2')} · ${data.gender}`, 'ok')
       }
       catch (err) {

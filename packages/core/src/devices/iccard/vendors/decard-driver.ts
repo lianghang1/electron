@@ -1,15 +1,15 @@
 /* eslint-disable node/prefer-global/buffer */
-import type { BrandDriver, IcCardData, IcCardReadRequest, IcCardWriteRequest } from '../types'
-import type { KoffiFn, KoffiLib } from './koffi'
+import type { KoffiFn, KoffiLib } from '../../kernel/koffi'
+import type { IcCardData, IcCardDriver, IcCardReadRequest, IcCardWriteRequest } from '../types'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { idCardError } from '../errors'
-import { requireKoffi } from './koffi'
+import { requireKoffi } from '../../kernel/koffi'
+import { icCardError } from '../errors'
 
 /**
  * 德卡 IC 卡读卡器驱动（dcrf32.dll，Mifare Classic 全系列通用 API，返回码 0 = 成功）。
  *
- * DLL（resources/devices/decard/dcrf32.dll，x64；USB 通讯依赖须与 DLL 同目录放置 libusb-1.0.dll）。
+ * DLL（resources/devices/decard/win64/dcrf32.dll，x64；USB 通讯依赖须与 DLL 同目录放置 libusb-1.0.dll）。
  * 端口约定（dcrf32.h）：0-99 = 串口，100-199 = USB（100 = 第一个 USB 设备），<0 = 打开失败。
  *   dc_init(port, baud)          打开设备 → 句柄
  *        ↓
@@ -39,7 +39,7 @@ const DATA_BLOCKS = 3
 function normalizeKey(raw?: string): Buffer {
   const key = (raw ?? DEFAULT_KEY).trim()
   if (!/^[0-9a-f]{12}$/i.test(key)) {
-    throw idCardError('VALIDATION_FAILED', 'IC 卡密钥不合法（应为 12 位 hex）')
+    throw icCardError('VALIDATION_FAILED', 'IC 卡密钥不合法（应为 12 位 hex）')
   }
   return Buffer.from(key, 'hex')
 }
@@ -48,20 +48,20 @@ function normalizeKey(raw?: string): Buffer {
 function normalizeSector(raw?: number): number {
   const sector = raw ?? 1
   if (!Number.isInteger(sector) || sector < 0 || sector > 15) {
-    throw idCardError('VALIDATION_FAILED', '扇区号不合法（应为 0-15）')
+    throw icCardError('VALIDATION_FAILED', '扇区号不合法（应为 0-15）')
   }
   return sector
 }
 
 /**
- * 德卡驱动 —— "一个厂商 = 一个驱动类"（实现 BrandDriver，只声明 IC 卡能力）。
- * 新增厂商 = drivers/ 加一个同类驱动 + dll-adapter 注册表加一行。
+ * 德卡驱动 —— "一个厂商 = 一个驱动类"（实现 IcCardDriver，只声明 IC 卡能力）。
+ * 新增厂商 = vendors/ 加一个同类驱动 + host/run.ts 驱动注册表加一行。
  */
-export class DecardDriver implements BrandDriver {
+export class DecardDriver implements IcCardDriver {
   readonly brand = '德卡'
   readonly displayName = '德卡 IC 卡读卡器（USB）'
   /** DLL 相对宿主资源根的出厂位置 */
-  readonly dllFile = 'devices/decard/dcrf32.dll'
+  readonly dllFile = 'devices/decard/win64/dcrf32.dll'
   /** 端口号：100-199 = USB（100 = 第一个 USB 设备），0-99 = 串口（USB 路线波特率被忽略） */
   readonly port = 100
   readonly baud = 115200
@@ -84,7 +84,7 @@ export class DecardDriver implements BrandDriver {
   private ensureLoaded(): void {
     if (this.lib) { return }
     if (!existsSync(this.dllPath)) {
-      throw idCardError('DEVICE_OFFLINE', `德卡 DLL 未就位: ${this.dllPath}`, { dllPath: this.dllPath })
+      throw icCardError('DEVICE_OFFLINE', `德卡 DLL 未就位: ${this.dllPath}`, { dllPath: this.dllPath })
     }
     this.lib = requireKoffi({ dllPath: this.dllPath }).load(this.dllPath)
     const f = this.lib.func.bind(this.lib)
@@ -109,7 +109,7 @@ export class DecardDriver implements BrandDriver {
     // SDK 约定 <0 = 失败：负句柄非空指针（koffi 指针返回值为无符号 BigInt，负值回绕成高位 1），须一并拒绝
     const valid = typeof handle === 'bigint' && handle > 0n && handle < 0x8000000000000000n
     if (!valid) {
-      throw idCardError('DEVICE_OFFLINE', `打开德卡读卡器失败（端口 ${this.port}）`, { port: this.port })
+      throw icCardError('DEVICE_OFFLINE', `打开德卡读卡器失败（端口 ${this.port}）`, { port: this.port })
     }
     this.handle = handle
   }
@@ -118,7 +118,7 @@ export class DecardDriver implements BrandDriver {
   readIcCard(req: IcCardReadRequest): IcCardData {
     this.ensureLoaded()
     if (!this.handle) {
-      throw idCardError('DEVICE_OFFLINE', '读卡器未打开')
+      throw icCardError('DEVICE_OFFLINE', '读卡器未打开')
     }
     const sector = normalizeSector(req?.sector)
     const key = normalizeKey(req?.key)
@@ -129,23 +129,23 @@ export class DecardDriver implements BrandDriver {
     const tagType = Buffer.alloc(2)
     let ret = this.fns.dc_request(h, 1, tagType)
     if (ret !== 0) {
-      throw idCardError('READ_FAILED', '寻卡失败：请将 IC 卡放置在读卡区', { stage: 'request', ret })
+      throw icCardError('READ_FAILED', '寻卡失败：请将 IC 卡放置在读卡区', { stage: 'request', ret })
     }
     // 防碰撞 → UID（经典 API 走单级级联，4 字节 UID）
     const snr = Buffer.alloc(4)
     ret = this.fns.dc_anticoll(h, 0, snr)
     if (ret !== 0) {
-      throw idCardError('READ_FAILED', '防碰撞失败', { stage: 'anticoll', ret })
+      throw icCardError('READ_FAILED', '防碰撞失败', { stage: 'anticoll', ret })
     }
     // 选卡（_Snr 按值传 uint；size 出参为 SAK，本流程不消费）
     ret = this.fns.dc_select(h, snr.readUInt32LE(0), Buffer.alloc(1))
     if (ret !== 0) {
-      throw idCardError('READ_FAILED', '选卡失败', { stage: 'select', ret })
+      throw icCardError('READ_FAILED', '选卡失败', { stage: 'select', ret })
     }
     // 密钥认证
     ret = this.fns.dc_authentication_pass(h, mode, sector, key)
     if (ret !== 0) {
-      throw idCardError('READ_FAILED', `扇区 ${sector} 密钥认证失败（密钥不匹配或扇区被锁定）`, { stage: 'authentication', sector, ret })
+      throw icCardError('READ_FAILED', `扇区 ${sector} 密钥认证失败（密钥不匹配或扇区被锁定）`, { stage: 'authentication', sector, ret })
     }
     // 读数据块：存取控制位可能只放行部分块，可读则读，全部不可读才算失败
     const blocks: Record<number, string> = {}
@@ -158,7 +158,7 @@ export class DecardDriver implements BrandDriver {
       }
     }
     if (Object.keys(blocks).length === 0) {
-      throw idCardError('READ_FAILED', `扇区 ${sector} 数据块全部不可读（存取控制位限制）`, { stage: 'read', sector })
+      throw icCardError('READ_FAILED', `扇区 ${sector} 数据块全部不可读（存取控制位限制）`, { stage: 'read', sector })
     }
     // 读卡成功蜂鸣提示（失败不响，结果由返回值与错误呈现）
     this.fns.dc_beep(h, 30)
@@ -176,18 +176,18 @@ export class DecardDriver implements BrandDriver {
   private normalizeWrite(req: IcCardWriteRequest): { block: number, data: Buffer, sector: number, key: Buffer, mode: number } {
     const block = req?.block
     if (!Number.isInteger(block) || block < 0 || block > 63) {
-      throw idCardError('VALIDATION_FAILED', '块地址不合法（应为 0-63）')
+      throw icCardError('VALIDATION_FAILED', '块地址不合法（应为 0-63）')
     }
     // 危险块强制拒绝：每扇区末块 = 密钥/存取控制块（写坏即锁卡），0 扇区 0 块 = 厂商块（UID 区一次性）
     if (block % BLOCKS_PER_SECTOR === BLOCKS_PER_SECTOR - 1) {
-      throw idCardError('VALIDATION_FAILED', `块 ${block} 是密钥控制块，禁止写入（写坏将导致扇区永久锁死）`)
+      throw icCardError('VALIDATION_FAILED', `块 ${block} 是密钥控制块，禁止写入（写坏将导致扇区永久锁死）`)
     }
     if (block === 0) {
-      throw idCardError('VALIDATION_FAILED', '块 0 是厂商块（UID 区），禁止写入')
+      throw icCardError('VALIDATION_FAILED', '块 0 是厂商块（UID 区），禁止写入')
     }
     const data = Buffer.from((req?.data ?? '').trim(), 'hex')
     if (!/^[0-9a-f]{32}$/i.test((req?.data ?? '').trim()) || data.length !== 16) {
-      throw idCardError('VALIDATION_FAILED', '写入数据不合法（应为 32 位 hex = 16 字节）')
+      throw icCardError('VALIDATION_FAILED', '写入数据不合法（应为 32 位 hex = 16 字节）')
     }
     const sector = Math.floor(block / BLOCKS_PER_SECTOR)
     return { block, data, sector, key: normalizeKey(req?.key), mode: req?.keyType === 'B' ? 4 : 0 }
@@ -197,7 +197,7 @@ export class DecardDriver implements BrandDriver {
   writeIcCard(req: IcCardWriteRequest): void {
     this.ensureLoaded()
     if (!this.handle) {
-      throw idCardError('DEVICE_OFFLINE', '读卡器未打开')
+      throw icCardError('DEVICE_OFFLINE', '读卡器未打开')
     }
     const { block, data, sector, key, mode } = this.normalizeWrite(req)
     const h = this.handle
@@ -205,24 +205,24 @@ export class DecardDriver implements BrandDriver {
     const tagType = Buffer.alloc(2)
     let ret = this.fns.dc_request(h, 1, tagType)
     if (ret !== 0) {
-      throw idCardError('READ_FAILED', '寻卡失败：请将 IC 卡放置在读卡区', { stage: 'request', ret })
+      throw icCardError('READ_FAILED', '寻卡失败：请将 IC 卡放置在读卡区', { stage: 'request', ret })
     }
     const snr = Buffer.alloc(4)
     ret = this.fns.dc_anticoll(h, 0, snr)
     if (ret !== 0) {
-      throw idCardError('READ_FAILED', '防碰撞失败', { stage: 'anticoll', ret })
+      throw icCardError('READ_FAILED', '防碰撞失败', { stage: 'anticoll', ret })
     }
     ret = this.fns.dc_select(h, snr.readUInt32LE(0), Buffer.alloc(1))
     if (ret !== 0) {
-      throw idCardError('READ_FAILED', '选卡失败', { stage: 'select', ret })
+      throw icCardError('READ_FAILED', '选卡失败', { stage: 'select', ret })
     }
     ret = this.fns.dc_authentication_pass(h, mode, sector, key)
     if (ret !== 0) {
-      throw idCardError('READ_FAILED', `扇区 ${sector} 密钥认证失败（密钥不匹配或扇区被锁定）`, { stage: 'authentication', sector, ret })
+      throw icCardError('READ_FAILED', `扇区 ${sector} 密钥认证失败（密钥不匹配或扇区被锁定）`, { stage: 'authentication', sector, ret })
     }
     ret = this.fns.dc_write(h, block, data)
     if (ret !== 0) {
-      throw idCardError('WRITE_FAILED', `块 ${block} 写入失败（存取控制位可能禁止写）`, { stage: 'write', block, ret })
+      throw icCardError('WRITE_FAILED', `块 ${block} 写入失败（存取控制位可能禁止写）`, { stage: 'write', block, ret })
     }
     this.fns.dc_beep(h, 60)
   }
