@@ -49,7 +49,7 @@
 - 引导器（内置包/热更包加载、回滚）：`%APPDATA%\<产品名>\desktop-updater\launcher.log`
 - 主进程业务日志：`%APPDATA%\<产品名>\logs\main.log`
 - 设备状态：应用内设备测试页（lab）或渲染桥 `window.desktop.capture.listDevices()`
-- 高拍仪 offline：应用探活失败时自动给出华视服务四态诊断 note（服务未注册=SDK 未装 / 已装但自启被禁 /
+- 高拍仪 offline：应用探活失败时自动给出 CamSDK 服务四态诊断 note（服务未注册=SDK 未装 / 已装但自启被禁 /
   已装但未运行 / 运行中但端口不通），按 note 提示直接处理；服务自启配置归部署期基线管（安装后重启一次验证）
 - 更新卡住的常见原因：feed 未设置（环境变量）、清单被 CDN 缓存（要求 `Cache-Control: no-cache`）、
   版本号未严格递增

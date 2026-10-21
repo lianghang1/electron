@@ -86,7 +86,7 @@ kiosk / 无人值守设备统一**用户级目录**安装（默认 `%LocalAppDat
 
 ## 真机验证记录（2026-10-19，双通道更新优化）
 
-对照 [update-improvement-plan.md](./update-improvement-plan.md) §7 清单逐项验证，环境：本地双通道验证服务器（JSON body 清单、可切场景）+ `Desktop-1.0.0-x64.exe` 真机。
+验证环境：本地双通道验证服务器（JSON body 清单、可切场景）+ `Desktop-1.0.0-x64.exe` 真机。
 
 | # | 清单项 | 结论 |
 |---|---|---|
