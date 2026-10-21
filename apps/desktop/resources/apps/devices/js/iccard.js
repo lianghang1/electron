@@ -261,9 +261,9 @@ $('#btn-ic-t-read').addEventListener('click', () => void readIcTexts())
 $('#btn-ic-t-write').addEventListener('click', () => void writeIcTexts())
 $('#ic-reader').addEventListener('change', syncIcSections)
 
-// ── 清空（页面级按钮）：本文件清 IC 卡区，身份证区由 idcard.js 自清 ──
+// ── 清空（页签级按钮）：本文件清 IC 卡区，身份证页签由 idcard.js 自清 ──
 
-$('#btn-id-clear').addEventListener('click', () => {
+$('#btn-ic-clear').addEventListener('click', () => {
   $('#ic-result').hidden = true
   $('#ic-uid').textContent = ''
   $('#ic-number').textContent = ''
@@ -272,7 +272,8 @@ $('#btn-id-clear').addEventListener('click', () => {
   $('#ic-t-result').hidden = true
   $('#ic-t-items').innerHTML = ''
   $('#ic-status').textContent = '选择读卡器后点击读取'
+  toast('已清空 IC 卡结果')
 })
 
 registerRefresher(refreshIcReaders)
-void refreshIcReaders()
+registerTab('iccard', { once: refreshIcReaders, activate: refreshIcReaders })

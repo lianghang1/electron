@@ -5,6 +5,8 @@ import UiButton from '../button/UiButton.vue'
 import CaptureSettingsPanel from '../capture/CaptureSettingsPanel.vue'
 import { useCaptureConfig } from '../capture/use-capture-config'
 import UiDialog from '../dialog/UiDialog.vue'
+import IcCardSettingsPanel from '../iccard/IcCardSettingsPanel.vue'
+import { useIccardConfig } from '../iccard/use-iccard-config'
 import IdCardSettingsPanel from '../idcard/IdCardSettingsPanel.vue'
 import { useIdcardConfig } from '../idcard/use-idcard-config'
 import ScannerSettingsPanel from '../scanner/ScannerSettingsPanel.vue'
@@ -12,8 +14,8 @@ import { useScannerConfig } from '../scanner/use-scanner-config'
 import UiScrollArea from '../scroll/UiScrollArea.vue'
 import SignatureSettingsPanel from '../signature/SignatureSettingsPanel.vue'
 import { useSignatureConfig } from '../signature/use-signature-config'
-/** 页签 id：与 overlay 的 DeviceConfigKind 字面量对齐（'scanner' | 'capture' | 'idcard' | 'signature'），新增页签同步扩展 */
-type SettingsTab = 'scanner' | 'capture' | 'idcard' | 'signature'
+/** 页签 id：与 overlay 的 DeviceConfigKind 字面量对齐（'scanner' | 'capture' | 'idcard' | 'signature' | 'iccard'），新增页签同步扩展 */
+type SettingsTab = 'scanner' | 'capture' | 'idcard' | 'signature' | 'iccard'
 
 /**
  * 系统设置弹窗：左分组导航 + 右滚动内容区（参照主流设置页：分组竖导航 + 堆叠表单面板）。
@@ -32,6 +34,7 @@ const NAV_GROUPS: { label: string, items: { id: SettingsTab, label: string }[] }
       { id: 'scanner', label: '扫码枪' },
       { id: 'capture', label: '拍摄' },
       { id: 'idcard', label: '身份证读卡' },
+      { id: 'iccard', label: 'IC 卡读写' },
       { id: 'signature', label: '签名屏' },
     ],
   },
@@ -43,6 +46,7 @@ const activeTab = ref<string>(props.initialTab ?? 'scanner')
 const scanner = useScannerConfig()
 const capture = useCaptureConfig()
 const idcard = useIdcardConfig()
+const iccard = useIccardConfig()
 const signature = useSignatureConfig()
 
 /** 各页签的未保存标记与操作区状态（footer/feedback 按页签取用） */
@@ -50,11 +54,18 @@ const TAB_STATES = {
   scanner,
   capture,
   idcard,
+  iccard,
   signature,
 } as const
 
 /** 当前页签存在未保存更改（内容区顶部黄条提示，不阻断操作） */
 const activeDirty = computed(() => TAB_STATES[activeTab.value as SettingsTab]?.dirty ?? false)
+
+/** 当前页签可保存：存在选中档案且不在载入/保存中 */
+const canSave = computed(() => {
+  const state = TAB_STATES[activeTab.value as SettingsTab]
+  return !!state?.selected && !state.saving && !state.loading
+})
 
 /** 右侧内容滚动区：切换页签复位滚动位置 */
 const paneRef = ref<InstanceType<typeof UiScrollArea> | null>(null)
@@ -67,6 +78,7 @@ onMounted(() => {
   void scanner.load()
   void capture.load()
   void idcard.load()
+  void iccard.load()
   void signature.load()
 })
 </script>
@@ -102,49 +114,31 @@ onMounted(() => {
         </div>
         <UiScrollArea ref="paneRef" class="ss-pane">
           <div class="ss-pane__inner">
-            <ScannerSettingsPanel v-show="activeTab === 'scanner'" v-model:config="scanner.config" :state="scanner" />
+            <ScannerSettingsPanel v-show="activeTab === 'scanner'" :state="scanner" />
             <CaptureSettingsPanel v-show="activeTab === 'capture'" :state="capture" />
-            <IdCardSettingsPanel v-show="activeTab === 'idcard'" v-model:config="idcard.config" :state="idcard" />
-            <SignatureSettingsPanel v-show="activeTab === 'signature'" v-model:config="signature.config" :state="signature" />
+            <IdCardSettingsPanel v-show="activeTab === 'idcard'" :state="idcard" />
+            <IcCardSettingsPanel v-show="activeTab === 'iccard'" :state="iccard" />
+            <SignatureSettingsPanel v-show="activeTab === 'signature'" :state="signature" />
           </div>
         </UiScrollArea>
       </div>
     </div>
 
     <template #feedback>
-      <template v-for="tab in ['scanner', 'capture', 'idcard', 'signature'] as const" :key="tab">
+      <template v-for="tab in ['scanner', 'capture', 'idcard', 'iccard', 'signature'] as const" :key="tab">
         <span v-if="activeTab === tab && TAB_STATES[tab].message" class="ss-feedback-ok">{{ TAB_STATES[tab].message }}</span>
         <span v-else-if="activeTab === tab && TAB_STATES[tab].error" class="ss-feedback-err">{{ TAB_STATES[tab].error }}</span>
       </template>
     </template>
     <template #footer>
-      <!-- 扫码枪/身份证/签名屏 = 纯保存型表单；拍摄页额外带设备档案删除 -->
+      <!-- 五个设备页签均为「选择条 + 保存」形态：删除经面板内选择条两步确认，footer 仅保存 -->
       <UiButton
-        v-if="activeTab !== 'capture'"
         variant="primary"
-        :disabled="TAB_STATES[activeTab as SettingsTab].saving || TAB_STATES[activeTab as SettingsTab].loading"
+        :disabled="!canSave"
         @click="TAB_STATES[activeTab as SettingsTab].save()"
       >
         {{ TAB_STATES[activeTab as SettingsTab].saving ? '保存中…' : '保存' }}
       </UiButton>
-      <template v-else>
-        <UiButton
-          v-if="capture.selected"
-          variant="danger"
-          :solid="capture.confirmingRemove"
-          :disabled="capture.saving"
-          @click="capture.requestRemove()"
-        >
-          {{ capture.confirmingRemove ? '确认删除？' : '删除' }}
-        </UiButton>
-        <UiButton
-          variant="primary"
-          :disabled="!capture.selected || capture.saving || capture.loading"
-          @click="capture.save()"
-        >
-          {{ capture.saving ? '保存中…' : '保存' }}
-        </UiButton>
-      </template>
     </template>
   </UiDialog>
 </template>

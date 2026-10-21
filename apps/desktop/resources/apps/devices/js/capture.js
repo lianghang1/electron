@@ -53,7 +53,6 @@ async function refreshCaptureDevices() {
   if (!sel.innerHTML) sel.innerHTML = '<option value="">未检测到设备</option>'
   sel.value = prev && [...sel.options].some(o => o.value === prev) ? prev : sel.options[0]?.value ?? ''
   capToggleOpButtons()
-  syncCapConfig()
 }
 
 function stopStream() {
@@ -70,6 +69,13 @@ async function stopAllLive() {
     try { await window.desktop.capture.stopPreview(deviceId) }
     catch { /* 会话可能已掉线，忽略 */ }
   }
+}
+
+/** 停掉实时画面并回到占位提示（关闭按钮与离开采集页签共用） */
+async function stopLiveAndResetStage() {
+  await stopAllLive()
+  $('#cap-stage').innerHTML = '<span class="placeholder">选择设备后拍摄</span>'
+  capToggleOpButtons()
 }
 
 async function openCamera() {
@@ -188,15 +194,10 @@ $('#cap-device').addEventListener('change', async () => {
   current = null
   $('#btn-cap-print').disabled = true
   capToggleOpButtons()
-  syncCapConfig()
   void syncResolutionOptions()
 })
 $('#btn-cap-open').addEventListener('click', () => void (capKind() === 'camsdk' ? startWsPreview() : openCamera()))
-$('#btn-cap-close').addEventListener('click', async () => {
-  await stopAllLive()
-  $('#cap-stage').innerHTML = '<span class="placeholder">选择设备后拍摄</span>'
-  capToggleOpButtons()
-})
+$('#btn-cap-close').addEventListener('click', () => void stopLiveAndResetStage())
 $('#btn-cap-shot').addEventListener('click', () => void (capIsUvc() && stream ? captureUvcFrame() : captureByDevice()))
 $('#btn-cap-rotate').addEventListener('click', () => { rot = (rot + 90) % 360; applyPreviewTransform() })
 $('#btn-cap-mirror').addEventListener('click', (e) => {
@@ -306,13 +307,11 @@ $('#cap-resolution').addEventListener('change', async () => {
 $('#btn-cap-dialog').addEventListener('click', async () => {
   const sel = $('#cap-device')
   const deviceId = sel.value || undefined
-  console.log('deviceId', deviceId)
   // UVC 摄像头的 deviceId 跨窗口随机化，必须带设备名供浮层二次匹配
   const deviceLabel = sel.selectedOptions[0]?.label || undefined
   try {
     // maxCount=3 便于连拍多张看效果；缺省 maxCount=1 每拍一张替换前一张
     const results = await window.desktop.capture.openCaptureDialog({ deviceId, deviceLabel, title: '拍摄浮层', maxCount: 3 })
-    console.log(results)
     for (const r of results) { pushRecord(r, '拍摄浮层') }
     if (results.length) { toast(`拍摄完成（${results.length} 张）`) }
   }

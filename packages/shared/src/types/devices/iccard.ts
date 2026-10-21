@@ -8,6 +8,38 @@ import type { IdReaderDevice, IdReaderTransport } from './idcard'
 
 export type { IdReaderDevice, IdReaderTransport }
 
+/** 档案公共段：档案 id / 名称 / 厂商（iccard 域 ws/dll 两路线共用） */
+interface IcReaderProfileBase {
+  id: string
+  displayName: string
+  /** 厂商标识（面板展示用） */
+  brand: string
+}
+
+/**
+ * 设备档案（多设备档案制，与 capture/idcard 同构）：
+ * - dll 路线：一条档案 = 一个设备守护进程驱动注册表驱动（档案 id = 驱动名，见 host/run.ts），
+ *   运行时设备 id = "dll:<档案 id>"，DLL 由守护进程按注册表自动加载（档案参数预留）；
+ * - ws 路线：一条档案 = 一条读卡器本地服务连接。
+ * 当前版本 ws 路线协议适配未接入：档案可管理，对应设备在测试页显示为「未接入」（missing）。
+ */
+export interface IcReaderDllProfile extends IcReaderProfileBase {
+  transport: 'dll'
+  /** DLL 参数（预留）：当前经守护进程驱动注册表自动探测加载，此处不消费 */
+  dll: { file?: string }
+}
+
+export interface IcReaderWsProfile extends IcReaderProfileBase {
+  transport: 'ws'
+  /** ws 连接参数 */
+  ws: { url: string }
+}
+
+export type IcReaderDeviceConfig = IcReaderDllProfile | IcReaderWsProfile
+
+/** iccard 域配置 = 设备档案列表（持久化 device-iccard.json 根对象 { devices: [...] }） */
+export type IccardConfig = IcReaderDeviceConfig[]
+
 /** M1 IC 卡读取参数：缺省出厂白键（A 键）读 1 扇区数据块 */
 export interface IcCardReadRequest {
   /** 扇区密钥（12 位 hex），缺省 FFFFFFFFFFFF 出厂白键 */

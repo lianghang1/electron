@@ -8,7 +8,7 @@ import { defineDomain, invoke, push } from '../../domain'
 export type TabMenuAction = 'reload' | 'clearCache' | 'clearSite' | 'close'
 
 /** 设备配置浮层窗的页签类型（与 ui 包 SystemSettingsDialog 的 SettingsTab 对齐） */
-export type DeviceConfigKind = 'scanner' | 'capture' | 'idcard' | 'signature'
+export type DeviceConfigKind = 'scanner' | 'capture' | 'idcard' | 'signature' | 'iccard'
 
 /** Tab 右键菜单：Shell 发起，浮层窗在 (x, y)（主窗内容区坐标）附近渲染菜单卡 */
 export interface TabContextMenu {

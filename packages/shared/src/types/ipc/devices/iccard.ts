@@ -1,4 +1,4 @@
-import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice } from '../../devices/iccard'
+import type { IccardConfig, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDeviceConfig, IdReaderDevice } from '../../devices/iccard'
 import { invoke } from '../../../domain'
 
 /**
@@ -31,4 +31,10 @@ export const iccardDomainDefs = {
    * 约束见 IcCardTextsWriteRequest；deviceId 缺省时自动选用第一个支持写卡且就绪的读卡器。
    */
   writeIcCardTexts: invoke<(req: IcCardTextsWriteRequest & { deviceId?: string }) => Promise<void>>(),
+  /** 读取域配置（ws 路线设备档案列表；ws 协议未接入，档案先行管理） */
+  getConfig: invoke<() => IccardConfig>(),
+  /** 按档案 id upsert 一条设备档案（非法入参抛 VALIDATION_FAILED），返回保存后全量列表 */
+  setConfig: invoke<(config: IcReaderDeviceConfig) => IccardConfig>(),
+  /** 按档案 id 删除一条设备档案（无对应档案返回 false） */
+  removeConfig: invoke<(id: string) => boolean>(),
 }

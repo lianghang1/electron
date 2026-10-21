@@ -1,52 +1,87 @@
-import type { IdcardConfig } from '@desktop/shared'
-import { computed, reactive, ref } from 'vue'
+import type { IdcardDeviceConfig } from '@desktop/shared'
+import type { ConfigDeviceStatus } from '../capture/use-capture-config'
+import { isWsUrl } from '@desktop/shared'
+import { computed, onScopeDispose, reactive, ref } from 'vue'
+
+/** 删除两步确认的自动复位时长：超时未确认视为放弃 */
+const REMOVE_CONFIRM_MS = 3000
 
 /**
- * 身份证读卡设置面板视图状态（与 use-scanner-config 同构的扁平化 reactive，
- * 状态归系统设置弹窗持有，面板只做展示与动作转发）。
+ * 身份证读卡设置面板视图状态（reactive 扁平化，状态归系统设置弹窗持有，面板只做展示与动作转发）。
+ * 档案制：ws/dll 双路线设备档案列表 + 选中编辑 + 保存/删除，未保存改动关闭即丢弃。
+ * 设备在线状态经 listReaders 联动（ws 档案探活服务连接，dll 档案经守护进程在位探测）。
  */
 export interface IdcardConfigView {
-  config: IdcardConfig
+  configs: IdcardDeviceConfig[]
+  selectedId: string
   loading: boolean
   saving: boolean
-  /** 保存成功提示（短暂展示后清除） */
+  /** 保存/删除成功提示（短暂展示后清除） */
   message: string
   error: string
-  /** 表单与最近一次保存值存在差异（未保存黄条依据） */
+  selected: IdcardDeviceConfig | undefined
+  /** 选中档案与最近一次保存值存在差异（未保存黄条依据） */
   dirty: boolean
+  /** 选中档案对应的设备状态（设备 id = "<transport>:<档案 id>"） */
+  statusOf: (config: IdcardDeviceConfig) => ConfigDeviceStatus
+  /** 删除两步确认武装中（按钮变「确认删除？」） */
+  confirmingRemove: boolean
   load: () => Promise<void>
+  select: (id: string) => void
+  /** 新增空白档案（本地入列未保存，填写后保存 upsert 落库） */
+  add: () => void
   save: () => Promise<void>
-}
-
-/** 未载入前的占位值（load 成功后整体覆盖；与 core 出厂缺省保持一致） */
-const EMPTY_CONFIG: IdcardConfig = {
-  wsUrl: 'ws://127.0.0.1:9000',
+  /** 两步确认删除：首次点击武装（超时自动复位），再次点击执行删除 */
+  requestRemove: () => void
 }
 
 export function useIdcardConfig(): IdcardConfigView {
-  const config = ref<IdcardConfig>({ ...EMPTY_CONFIG })
+  const configs = ref<IdcardDeviceConfig[]>([])
+  const selectedId = ref('')
   const loading = ref(false)
   const saving = ref(false)
   const message = ref('')
   const error = ref('')
   let messageTimer: ReturnType<typeof setTimeout> | null = null
 
-  /** 最近一次保存值快照（dirty 判定基准） */
-  const savedSnapshot = ref('')
+  const selected = computed(() => configs.value.find(c => c.id === selectedId.value))
 
-  function toSnapshot(value: IdcardConfig): string {
-    return JSON.stringify({ wsUrl: value.wsUrl })
+  /** 各档案最近一次保存值快照（dirty 判定基准，按档案 id 存 JSON） */
+  const savedSnapshots = ref(new Map<string, string>())
+
+  const dirty = computed(() => {
+    const config = selected.value
+    if (!config) { return false }
+    return savedSnapshots.value.get(config.id) !== JSON.stringify(config)
+  })
+
+  /** 档案 id → 设备状态（load 时经 listReaders 联动） */
+  const deviceStatus = ref(new Map<string, ConfigDeviceStatus>())
+
+  /** 档案对应设备的在线状态（档案新建未保存时无设备 → missing） */
+  function statusOf(config: IdcardDeviceConfig): ConfigDeviceStatus {
+    const key = `${config.transport}:${config.id}`
+    if (!deviceStatus.value.has(key)) { return 'missing' }
+    return deviceStatus.value.get(key) ?? 'missing'
   }
 
-  const dirty = computed(() => toSnapshot(config.value) !== savedSnapshot.value)
-
-  /** 载入当前配置（失败显错，保留占位值供编辑） */
+  /** 载入档案列表 + 设备在线状态（设备探测失败不阻断编辑） */
   async function load(): Promise<void> {
     loading.value = true
     error.value = ''
     try {
-      config.value = await window.desktop.idcard.getConfig()
-      savedSnapshot.value = toSnapshot(config.value)
+      configs.value = await window.desktop.idcard.getConfig()
+      savedSnapshots.value = new Map(configs.value.map(c => [c.id, JSON.stringify(c)]))
+      try {
+        const readers = await window.desktop.idcard.listReaders()
+        deviceStatus.value = new Map(readers.map(r => [r.id, r.status]))
+      }
+      catch {
+        deviceStatus.value = new Map()
+      }
+      if (!configs.value.some(c => c.id === selectedId.value)) {
+        selectedId.value = configs.value[0]?.id ?? ''
+      }
     }
     catch (err) {
       error.value = describeError(err, '配置载入失败')
@@ -56,17 +91,44 @@ export function useIdcardConfig(): IdcardConfigView {
     }
   }
 
-  /** 保存：补丁提交（ipc 层白名单收敛）→ 回读确认 */
+  function select(id: string): void {
+    selectedId.value = id
+    error.value = ''
+    resetRemoveConfirm()
+  }
+
+  /** 新增空白档案：id 本地生成（保存时随档案落库），服务地址留空待填 */
+  function add(): void {
+    const id = `reader-${Date.now().toString(36)}`
+    const blank: IdcardDeviceConfig = {
+      id,
+      displayName: '',
+      brand: '',
+      transport: 'ws',
+      ws: { url: '' },
+    }
+    configs.value = [...configs.value, blank]
+    savedSnapshots.value.delete(id)
+    selectedId.value = id
+    error.value = ''
+    resetRemoveConfirm()
+  }
+
   async function save(): Promise<void> {
-    if (!validate()) { return }
+    const config = selected.value
+    if (!config) { return }
+    const problem = validate(config)
+    if (problem) {
+      error.value = problem
+      return
+    }
     saving.value = true
     error.value = ''
     try {
-      // IPC 走 structured clone：必须传纯对象快照，Vue 响应式 Proxy 无法克隆
-      await window.desktop.idcard.patchConfig({ wsUrl: config.value.wsUrl.trim() })
-      config.value = await window.desktop.idcard.getConfig()
-      savedSnapshot.value = toSnapshot(config.value)
-      showMessage('已保存，读卡器在位状态按新地址重新探测')
+      await window.desktop.idcard.setConfig(snapshot(config))
+      savedSnapshots.value.set(config.id, JSON.stringify(config))
+      showMessage('已保存')
+      void refreshStatus()
     }
     catch (err) {
       error.value = describeError(err, '保存失败')
@@ -76,13 +138,62 @@ export function useIdcardConfig(): IdcardConfigView {
     }
   }
 
-  /** 保存前校验：非法值会被 ipc 白名单静默丢弃，与其静默不一致不如显式拦下 */
-  function validate(): boolean {
-    if (!/^wss?:\/\/.+/i.test(config.value.wsUrl.trim())) {
-      error.value = '服务地址必须是 ws:// 或 wss:// 开头的完整地址'
-      return false
+  async function requestRemoveInner(): Promise<void> {
+    const config = selected.value
+    if (!config) { return }
+    saving.value = true
+    error.value = ''
+    try {
+      const removed = await window.desktop.idcard.removeConfig(config.id)
+      configs.value = configs.value.filter(c => c.id !== config.id)
+      savedSnapshots.value.delete(config.id)
+      selectedId.value = configs.value[0]?.id ?? ''
+      showMessage(removed ? '已删除' : '未找到对应档案')
     }
-    return true
+    catch (err) {
+      error.value = describeError(err, '删除失败')
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
+  /** 删除两步确认：首次点击武装，超时未确认自动复位（免弹窗的轻量确认） */
+  const confirmingRemove = ref(false)
+  let removeTimer: ReturnType<typeof setTimeout> | null = null
+
+  function requestRemove(): void {
+    if (confirmingRemove.value) {
+      resetRemoveConfirm()
+      void requestRemoveInner()
+      return
+    }
+    confirmingRemove.value = true
+    removeTimer = setTimeout(() => {
+      confirmingRemove.value = false
+      removeTimer = null
+    }, REMOVE_CONFIRM_MS)
+  }
+
+  function resetRemoveConfirm(): void {
+    confirmingRemove.value = false
+    if (removeTimer) {
+      clearTimeout(removeTimer)
+      removeTimer = null
+    }
+  }
+
+  onScopeDispose(resetRemoveConfirm)
+
+  /** 保存后重拉设备状态（地址变更后探活结果随之刷新） */
+  async function refreshStatus(): Promise<void> {
+    try {
+      const readers = await window.desktop.idcard.listReaders()
+      deviceStatus.value = new Map(readers.map(r => [r.id, r.status]))
+    }
+    catch {
+      deviceStatus.value = new Map()
+    }
   }
 
   function showMessage(text: string): void {
@@ -94,7 +205,35 @@ export function useIdcardConfig(): IdcardConfigView {
     }, 2500)
   }
 
-  return reactive({ config, loading, saving, message, error, dirty, load, save })
+  return reactive({
+    configs,
+    selectedId,
+    loading,
+    saving,
+    message,
+    error,
+    selected,
+    dirty,
+    statusOf,
+    confirmingRemove,
+    load,
+    select,
+    add,
+    save,
+    requestRemove,
+  })
+}
+
+/** 保存前校验：与主进程 sanitize 同规则（必填缺失直接提示，不发无效请求） */
+function validate(config: IdcardDeviceConfig): string | null {
+  if (!config.displayName.trim()) { return '设备名称不能为空' }
+  if (config.transport === 'ws' && !isWsUrl(config.ws.url)) { return '服务地址不合法（须 ws:// 或 wss:// 前缀）' }
+  return null
+}
+
+/** IPC 走 structured clone：必须传纯对象快照，Vue 响应式 Proxy 无法克隆 */
+function snapshot(config: IdcardDeviceConfig): IdcardDeviceConfig {
+  return config.transport === 'ws' ? { ...config, ws: { ...config.ws } } : { ...config, dll: { ...config.dll } }
 }
 
 function describeError(err: unknown, fallback: string): string {

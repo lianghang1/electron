@@ -1,31 +1,76 @@
 <script setup lang="ts">
-import type { SignatureConfig } from '@desktop/shared'
 import type { SignatureConfigView } from './use-signature-config'
+import { computed } from 'vue'
+import DeviceProfileForm from '../devices/DeviceProfileForm.vue'
+import ProfileSelectBar from '../devices/ProfileSelectBar.vue'
+import { STATUS_META } from '../devices/status-meta'
 
-/** 签名屏设置面板：分组卡片布局，每行「标题 + 描述」居左、控件居右（与扫码枪面板同构） */
+/**
+ * 签名屏设置面板：档案制紧凑形态（选择条 + 单表单），与其他设备域统一。
+ * ws 档案 = CamSDK 服务连接；dll 档案 = 守护进程驱动（汉王签名板），DLL 自动加载、参数预留
+ */
 const props = defineProps<{ state: SignatureConfigView }>()
 
-const config = defineModel<SignatureConfig>('config', { required: true })
+/** 下拉选项：名称 + 状态（紧凑形态下状态并入选项文案） */
+const selectItems = computed(() =>
+  props.state.configs.map(config => ({
+    value: config.id,
+    label: [config.displayName || '（未命名设备）', STATUS_META[props.state.statusOf(config)].label].join(' · '),
+  })),
+)
 
-void props
+function onSave(): void {
+  void props.state.save()
+}
 </script>
 
 <template>
   <div class="sgn-body">
-    <section class="sgn-group">
-      <h4 class="sgn-group__title">
-        接入通道
-      </h4>
-      <div class="sgn-card">
-        <div class="sgn-row">
-          <div class="sgn-row__text">
-            <span class="sgn-row__label">本地服务地址（ws 路线）</span>
-            <span class="sgn-row__desc">CamSDK 本地服务（CamSDKServer）的 ws 地址；签名图/指纹图由 PadViewer 回推</span>
-          </div>
-          <input v-model="config.wsUrl" type="text" class="sgn-input sgn-input--wide" placeholder="ws://127.0.0.1:9000">
-        </div>
+    <ProfileSelectBar
+      :items="selectItems"
+      :model-value="state.selectedId"
+      :loading="state.loading"
+      :confirming-remove="state.confirmingRemove"
+      add-label="新增设备"
+      @update:model-value="state.select"
+      @add="state.add()"
+      @remove="state.requestRemove()"
+    />
+
+    <section v-if="state.selected" class="sgn-editor">
+      <div class="sgn-editor__head">
+        <span class="sgn-editor__name">{{ state.selected.displayName || '（未命名设备）' }}</span>
+        <span
+          class="sgn-badge"
+          :style="{ color: STATUS_META[state.statusOf(state.selected)].text, background: STATUS_META[state.statusOf(state.selected)].bg }"
+        >{{ STATUS_META[state.statusOf(state.selected)].label }}</span>
+        <span v-if="state.selected.transport === 'dll'" class="sgn-badge sgn-badge--dll">DLL 直连</span>
+        <span class="sgn-editor__id" :title="state.selected.id">ID：{{ state.selected.id }}</span>
+      </div>
+
+      <DeviceProfileForm
+        :config="state.selected"
+        name-placeholder="如：窗口签名屏"
+        brand-placeholder="如：CamSDK"
+        url-placeholder="ws://127.0.0.1:9000"
+        url-hint="CamSDKServer 本地服务地址；一条连接枚举该服务下全部签名屏，签名图/指纹图由设备回传"
+      />
+
+      <div v-if="state.dirty" class="sgn-note">
+        有未保存修改
       </div>
     </section>
+    <p v-else class="sgn-empty">
+      {{ state.loading ? '正在载入配置…' : '暂无设备档案，点击「新增设备」创建' }}
+    </p>
+
+    <div class="sgn-actions">
+      <button class="sgn-btn" :disabled="state.saving || state.loading || !state.selected" @click="onSave">
+        {{ state.saving ? '保存中…' : '保存' }}
+      </button>
+      <span v-if="state.message" class="sgn-actions__msg">{{ state.message }}</span>
+      <span v-if="state.error" class="sgn-actions__err">{{ state.error }}</span>
+    </div>
   </div>
 </template>
 
@@ -33,72 +78,117 @@ void props
 .sgn-body {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
+  min-height: 100%;
 }
 
-.sgn-group__title {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
-  color: #1f2328;
-}
-
-.sgn-card {
-  border: 1px solid #e6eaf0;
-  border-radius: 10px;
-  background: #fff;
-  overflow: hidden;
-}
-
-.sgn-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px;
-}
-
-.sgn-row__text {
+.sgn-editor {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  gap: 14px;
+  padding: 14px 16px 16px;
+  border: 1px solid #e6eaf0;
+  border-radius: 10px;
 }
 
-.sgn-row__label {
-  font-size: 13px;
-  line-height: 18px;
+.sgn-editor__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.sgn-editor__name {
+  font-size: 13.5px;
+  font-weight: 600;
   color: #1f2328;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sgn-row__desc {
+.sgn-editor__id {
+  margin-left: auto;
+  font-size: 11px;
+  color: #a5adb8;
+  flex-shrink: 0;
+}
+
+.sgn-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.sgn-note {
+  align-self: flex-start;
+  font-size: 11.5px;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+
+.sgn-badge--dll {
+  color: #475569;
+  background: #eef2f7;
+}
+
+.sgn-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: 1px dashed #e0e5ec;
+  border-radius: 10px;
   font-size: 12px;
-  line-height: 1.5;
-  color: #8a919c;
+  color: #a5adb8;
 }
 
-.sgn-input {
-  width: 120px;
-  height: 30px;
+.sgn-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sgn-actions__msg {
+  font-size: 11.5px;
+  color: #15803d;
+}
+
+.sgn-actions__err {
+  font-size: 11.5px;
+  color: #b42318;
+}
+
+.sgn-btn {
   border: 1px solid #d5dae1;
   border-radius: 8px;
-  padding: 0 10px;
-  font-size: 12px;
+  padding: 7px 18px;
+  font-size: 12.5px;
   font-family: inherit;
   color: #1f2328;
   background: #fff;
+  cursor: pointer;
   flex-shrink: 0;
-  transition: border-color 0.12s;
+  transition: background-color 0.12s, border-color 0.12s, opacity 0.12s;
 }
 
-.sgn-input--wide {
-  width: 220px;
-}
-
-.sgn-input:hover,
-.sgn-input:focus {
+.sgn-btn:hover:not(:disabled) {
   border-color: #0f766e;
-  outline: none;
+  color: #0f766e;
+}
+
+.sgn-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 </style>

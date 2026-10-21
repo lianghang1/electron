@@ -6,11 +6,36 @@
 
 export type SignDeviceTransport = 'dll' | 'stub' | 'ws'
 
-/** signature 域配置（单设备域根对象，持久化于 device-signature.json，缺省值出厂兜底） */
-export interface SignatureConfig {
-  /** ws 路线的 CamSDKServer 本地服务地址（dll/探测路线不经此配置） */
-  wsUrl: string
+/** 档案公共段：档案 id / 名称 / 厂商（signature 域 ws/dll 两路线共用） */
+interface SignProfileBase {
+  id: string
+  displayName: string
+  /** 厂商标识（面板展示用） */
+  brand: string
 }
+
+/**
+ * 设备档案（多设备档案制，与 capture/idcard 同构）：
+ * - ws 路线：一条档案 = 一条 CamSDKServer 本地服务连接（服务下全部签名屏经该连接枚举）；
+ * - dll 路线：一条档案 = 一个设备守护进程签名驱动（档案 id = 驱动名，见 host/run.ts），
+ *   运行时设备 id = "dll:<档案 id>"，DLL 由守护进程按注册表自动加载（档案参数预留）。
+ */
+export interface SignWsProfile extends SignProfileBase {
+  transport: 'ws'
+  /** ws 连接参数 */
+  ws: { url: string }
+}
+
+export interface SignDllProfile extends SignProfileBase {
+  transport: 'dll'
+  /** DLL 参数（预留）：当前经守护进程驱动注册表自动探测加载，此处不消费 */
+  dll: { file?: string }
+}
+
+export type SignDeviceConfig = SignWsProfile | SignDllProfile
+
+/** signature 域配置 = 设备档案列表（持久化 device-signature.json 根对象 { devices: [...] }） */
+export type SignatureConfig = SignDeviceConfig[]
 
 export interface SignDevice {
   /** "<transport>:<驱动名>"，如 "dll:hanvon"、"stub:pad"（约定与 idcard/capture 同构） */
@@ -44,6 +69,7 @@ export type SignErrorCode
     | 'SESSION_ACTIVE'
     | 'SESSION_NOT_ACTIVE'
     | 'PROTOCOL_PENDING'
+    | 'VALIDATION_FAILED'
     | 'UNKNOWN'
 
 /** 开始会话结果（失败以 IpcRemoteError 抛出，code 见 SignErrorCode） */

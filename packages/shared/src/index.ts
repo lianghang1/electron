@@ -31,21 +31,18 @@ export type { DesktopErrorCode, IpcErrorPayload } from './errors'
 /* ---------------- 展示工具（浮层 / 应用页共用） ---------------- */
 
 export { formatBytes } from './format'
+export { buildOverlayHash, OVERLAY_HASH, parseOverlayHash } from './overlay-contract'
 
 /* ---------------- 浮层窗契约与权限文案（OverlayWindow 独立原生窗 / 应用页共用） ---------------- */
 
-export { buildOverlayHash, OVERLAY_HASH, parseOverlayHash } from './overlay-contract'
 export type { OverlayWindowKind } from './overlay-contract'
 export { PERMISSION_LABELS, permissionLabel } from './permission-labels'
+export type { DesktopApi, DesktopEvents } from './types/api'
 
 /* ---------------- 域契约定义原语（defineDomain：契约定义即映射） ---------------- */
 
-export type { DesktopApi, DesktopEvents } from './types/api'
 export type { DesktopConfig } from './types/config'
 export type { AppContext, AppInstance, AppLifecycleState, CallerContext } from './types/context'
-
-/* ---------------- 配置与调用方上下文 ---------------- */
-
 export type {
   AdapterCaptureRequest,
   CaptureAdapter,
@@ -63,10 +60,13 @@ export type {
   CaptureTransport,
 } from './types/devices/capture'
 
+/* ---------------- 配置与调用方上下文 ---------------- */
+
+export type { IccardConfig, IcCardData, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDeviceConfig, IcReaderDllProfile, IcReaderWsProfile } from './types/devices/iccard'
+
 /* ---------------- 设备类型（idcard / iccard / scanner / capture / print / signature） ---------------- */
 
-export type { IcCardData, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest } from './types/devices/iccard'
-export type { IdcardConfig, IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from './types/devices/idcard'
+export type { IdcardConfig, IdCardData, IdcardDeviceConfig, IdcardDllProfile, IdcardWsProfile, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from './types/devices/idcard'
 export type {
   ChannelId,
   ChannelPreference,
@@ -87,41 +87,42 @@ export type {
   UnifiedPrinter,
   UrlPayload,
 } from './types/devices/print'
-export type { ScanErrorCode, ScannerChannelMode, ScannerConfig, ScannerLogFn, ScannerStatus, ScanOptions, ScanResult } from './types/devices/scanner'
-export type { SignatureConfig, SignDevice, SignDeviceTransport, SignErrorCode, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint } from './types/devices/signature'
+export type { ScanErrorCode, ScannerChannelMode, ScannerConfig, ScannerDeviceConfig, ScannerLogFn, ScannerStatus, ScanOptions, ScanResult } from './types/devices/scanner'
+export type { SignatureConfig, SignDevice, SignDeviceConfig, SignDeviceTransport, SignDllProfile, SignErrorCode, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint, SignWsProfile } from './types/devices/signature'
+export type { DownloadTask, DownloadTaskStatus } from './types/download'
 
 /* ---------------- 设备通道（idcard / iccard / print / scanner / capture / signature 域） ---------------- */
 
-export type { DownloadTask, DownloadTaskStatus } from './types/download'
-
 export { captureDomain, iccardDomain, idcardDomain, platformDomains, printDomain, scannerDomain } from './types/ipc'
+
+export type { DesktopInvoke, DesktopIpc } from './types/ipc'
 
 /* ---------------- 下载任务 ---------------- */
 
-export type { DesktopInvoke, DesktopIpc } from './types/ipc'
 export type { DeviceConfigKind, OverlaySyncState, TabContextMenu, TabMenuAction } from './types/ipc/overlay'
+export type { AppSource, DesktopAppManifest, RegisteredApp } from './types/manifest'
 
 /* ---------------- App 清单与来源（多 App 注册） ---------------- */
 
-export type { AppSource, DesktopAppManifest, RegisteredApp } from './types/manifest'
+export type { PlatformNotification } from './types/notification'
 
 /* ---------------- 平台通知（Shell 应用内 toast） ---------------- */
 
-export type { PlatformNotification } from './types/notification'
+export { PERMISSIONS } from './types/permission'
 
 /* ---------------- 运行时权限 ---------------- */
 
-export { PERMISSIONS } from './types/permission'
 export type { AppPermissionState, Permission, PermissionRequest } from './types/permission'
+export type { AppSecurityPolicy } from './types/security'
 
 /* ---------------- 安全策略 ---------------- */
 
-export type { AppSecurityPolicy } from './types/security'
+export type { DesktopTab, OpenTabOptions, WorkAreaRect } from './types/tab'
 
 /* ---------------- Tab 会话 ---------------- */
 
-export type { DesktopTab, OpenTabOptions, WorkAreaRect } from './types/tab'
+export type { AsarBundleManifest, AsarUpdateState, UpdateAsarSource, UpdateManifest, UpdateState } from './types/update'
 
 /* ---------------- 更新（整包 + asar 热更） ---------------- */
 
-export type { AsarBundleManifest, AsarUpdateState, UpdateAsarSource, UpdateManifest, UpdateState } from './types/update'
+export { isWsUrl } from './ws-url'

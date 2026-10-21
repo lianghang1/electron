@@ -199,33 +199,5 @@ $('#btn-sign-cancel').addEventListener('click', async () => {
   }
 })
 
-// ── ws 服务地址配置（device-signature.json 持久化，热生效无需重启） ──
-
-async function loadSignWsUrl() {
-  try {
-    $('#sign-ws-url').value = (await window.desktop.signature.getConfig()).wsUrl
-  }
-  catch (e) {
-    $('#sign-ws-url').placeholder = `配置读取失败（${e.code ?? 'UNKNOWN'}）`
-  }
-}
-
-$('#btn-sign-ws-save').addEventListener('click', async () => {
-  const url = $('#sign-ws-url').value.trim()
-  if (!/^wss?:\/\/.+/i.test(url)) {
-    toast('服务地址必须是 ws:// 或 wss:// 开头的完整地址', false)
-    return
-  }
-  try {
-    $('#sign-ws-url').value = (await window.desktop.signature.patchConfig({ wsUrl: url })).wsUrl
-    toast('服务地址已保存')
-    void refreshSignDevices()
-  }
-  catch (e) {
-    toast(`保存失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`, false)
-  }
-})
-
 registerRefresher(refreshSignDevices)
-void refreshSignDevices()
-void loadSignWsUrl()
+registerTab('signature', { once: refreshSignDevices, activate: refreshSignDevices })

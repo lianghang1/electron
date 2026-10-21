@@ -1,4 +1,4 @@
-import type { IdcardConfig } from '@desktop/shared'
+import type { IdcardConfig, IdcardDeviceConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { IdCardAdapter, IdCardData, IdReaderDevice } from './types'
@@ -6,12 +6,40 @@ import { createDeviceStore } from '../../storage/device-store'
 import { deviceLockKey, SerialLocks } from '../kernel/serial-lock'
 import { DllIdAdapter } from './adapters/dll-adapter'
 import { WsIdAdapter } from './adapters/ws-adapter'
+import { BUILT_IN_IDCARD_CONFIGS } from './configs'
 import { idCardError, toIdCardError } from './errors'
-import { CAMSDK_WS_READER } from './vendors/camsdk-ws'
 
-/** idcard 域配置出厂缺省（ws 服务地址可经 IPC 配置覆盖，持久化 device-idcard.json） */
-export const IDCARD_CONFIG_DEFAULTS: IdcardConfig = {
-  wsUrl: CAMSDK_WS_READER.url,
+/** 持久化根对象（electron-store 根必须为对象，数组经 devices 包一层）+ 旧版单值字段（迁移读） */
+interface StoredIdcardConfig {
+  devices?: IdcardDeviceConfig[]
+  /** 旧版单值形态：ws 服务地址（识别到即迁移为出厂档案 + 旧地址） */
+  wsUrl?: string
+}
+
+/** 档案深拷贝（出厂回注/读出 clone，避免共享内层对象被运行时误改） */
+function cloneProfile(p: IdcardDeviceConfig): IdcardDeviceConfig {
+  return p.transport === 'ws' ? { ...p, ws: { ...p.ws } } : { ...p, dll: { ...p.dll } }
+}
+
+/**
+ * 旧持久化迁移 + 出厂回注：
+ * - 旧版单值 { wsUrl }：地址保留迁入出厂 ws 档案（stored 无该档案时生效）；
+ * - 出厂档案按 id 补齐缺失项（内置设备始终可管理，删除仅当次运行生效），用户追加档案在后。
+ */
+function migrateConfig(raw: StoredIdcardConfig): IdcardDeviceConfig[] {
+  const stored = Array.isArray(raw.devices) ? raw.devices : []
+  const legacyUrl = typeof raw.wsUrl === 'string' && raw.wsUrl ? raw.wsUrl : undefined
+  const builtIns = BUILT_IN_IDCARD_CONFIGS.map(cloneProfile)
+  if (legacyUrl) {
+    for (const p of builtIns) {
+      if (p.transport === 'ws' && !stored.some(s => s.id === p.id)) {
+        p.ws.url = legacyUrl
+      }
+    }
+  }
+  return builtIns
+    .map(b => stored.find(s => s.id === b.id) ?? b)
+    .concat(stored.filter(s => !builtIns.some(b => b.id === s.id)))
 }
 
 /**
@@ -24,29 +52,45 @@ export class IdCardService {
   private readonly adapters: Map<string, IdCardAdapter>
   /** 同一读卡器同一时刻只能执行一次读卡（硬件限制），按锁 key（设备或 lockGroup）串行化 */
   private readonly locks = new SerialLocks()
-  /** 域配置（ws 服务地址；写穿 device-idcard.json，读侧内存直取） */
-  private config: IdcardConfig
-  private readonly configStore = createDeviceStore<IdcardConfig>('idcard', IDCARD_CONFIG_DEFAULTS)
+  /** 设备档案（ws/dll 双路线，见 configs.ts；写穿 device-idcard.json，读侧内存直取） */
+  private configs: IdcardConfig
+  private readonly configStore = createDeviceStore<StoredIdcardConfig>('idcard')
 
   constructor(resourcesRoot: string, host: DeviceHost, private readonly logger: Logger) {
-    this.config = this.configStore.load()
+    this.configs = migrateConfig(this.configStore.load())
     this.adapters = new Map<string, IdCardAdapter>([
-      // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程）
-      ['dll', new DllIdAdapter(host, resourcesRoot)],
-      // ws 路线主进程直连 CamSDKServer（纯 JSON 文本帧，无 native 依赖，无需守护进程）
-      ['ws', new WsIdAdapter(() => this.config.wsUrl)],
+      // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程），档案驱动枚举
+      ['dll', new DllIdAdapter(host, resourcesRoot, () => this.configs)],
+      // ws 路线主进程直连（纯 JSON 文本帧，无 native 依赖，无需守护进程），按档案多连接枚举
+      ['ws', new WsIdAdapter(() => this.configs)],
     ])
   }
 
   getConfig(): IdcardConfig {
-    return { ...this.config }
+    return this.configs.map(cloneProfile)
   }
 
-  /** 更新域配置（补丁合并；入参合法性由 IPC 层 sanitize，此层只负责写穿持久化） */
-  setConfig(patch: Partial<IdcardConfig>): IdcardConfig {
-    this.config = { ...this.config, ...patch }
-    this.configStore.save(this.config)
-    return { ...this.config }
+  /** 按档案 id upsert（入参合法性由 IPC 层 sanitize），写穿持久化 */
+  setConfig(next: IdcardDeviceConfig): IdcardConfig {
+    const configs = this.configs.some(p => p.id === next.id)
+      ? this.configs.map(p => (p.id === next.id ? next : p))
+      : [...this.configs, next]
+    return this.writeThrough(configs)
+  }
+
+  /** 按档案 id 删除；返回是否有删除动作 */
+  removeConfig(id: string): boolean {
+    if (!this.configs.some(p => p.id === id)) {
+      return false
+    }
+    this.writeThrough(this.configs.filter(p => p.id !== id))
+    return true
+  }
+
+  private writeThrough(configs: IdcardConfig): IdcardConfig {
+    this.configs = configs
+    this.configStore.save({ devices: this.getConfig() })
+    return this.getConfig()
   }
 
   async listReaders(): Promise<IdReaderDevice[]> {

@@ -1,19 +1,16 @@
 <script setup lang="ts">
 import type { CaptureDeviceConfig } from '@desktop/shared'
-import type { CaptureConfigView, ConfigDeviceStatus } from './use-capture-config'
-import UiScrollArea from '../scroll/UiScrollArea.vue'
+import type { CaptureConfigView } from './use-capture-config'
+import { computed } from 'vue'
+import ProfileSelectBar from '../devices/ProfileSelectBar.vue'
+import { STATUS_META } from '../devices/status-meta'
 import CaptureDeviceForm from './CaptureDeviceForm.vue'
 
-/** 拍摄设置面板：纯展示体，状态由系统设置弹窗传入（body 区，不含弹窗 chrome 与底部操作区） */
+/**
+ * 拍摄设置面板：纯展示体，状态由系统设置弹窗传入（body 区，不含弹窗 chrome 与底部操作区）。
+ * 紧凑形态：顶部档案选择条（下拉 + 新增/删除）+ 单表单编辑，与其他设备域统一
+ */
 const props = defineProps<{ state: CaptureConfigView }>()
-
-/** 状态徽标元数据：文案 + 软底色配色（列表与编辑区头部分层展示用） */
-const STATUS_META: Record<ConfigDeviceStatus, { label: string, text: string, bg: string }> = {
-  ready: { label: '就绪', text: '#15803d', bg: '#dcfce7' },
-  offline: { label: '离线', text: '#b45309', bg: '#fef3c7' },
-  unavailable: { label: '不可用', text: '#57606a', bg: '#eceff3' },
-  missing: { label: '未接入', text: '#8a919c', bg: '#f3f5f8' },
-}
 
 const TRANSPORT_LABEL: Record<string, string> = {
   ws: '高拍仪',
@@ -31,6 +28,21 @@ function isDefault(config: CaptureDeviceConfig): boolean {
   return props.state.defaultDeviceId === deviceIdOf(config)
 }
 
+/** 下拉选项：名称 + 状态 + 接入方式（紧凑形态下状态并入选项文案） */
+function optionLabel(config: CaptureDeviceConfig): string {
+  const parts = [
+    config.displayName || '（未命名设备）',
+    STATUS_META[props.state.statusOf(config)].label,
+    TRANSPORT_LABEL[config.transport] ?? config.transport,
+  ]
+  if (isDefault(config)) { parts.push('默认') }
+  return parts.join(' · ')
+}
+
+const selectItems = computed(() =>
+  props.state.configs.map(config => ({ value: config.id, label: optionLabel(config) })),
+)
+
 function onSnapTest(): void {
   void props.state.snapTest()
 }
@@ -45,31 +57,20 @@ function onSetDefault(): void {
 
 <template>
   <div class="cu-body">
-    <aside class="cu-list">
-      <UiScrollArea class="cu-list__scroll">
-        <button
-          v-for="config in state.configs"
-          :key="config.id"
-          class="cu-list__item"
-          :class="{ 'cu-list__item--active': config.id === state.selectedId }"
-          @click="state.select(config.id)"
-        >
-          <span class="cu-list__name">{{ config.displayName }}</span>
-          <span class="cu-list__meta">
-            <span
-              class="cu-badge"
-              :style="{ color: STATUS_META[state.statusOf(config)].text, background: STATUS_META[state.statusOf(config)].bg }"
-            >{{ STATUS_META[state.statusOf(config)].label }}</span>
-            <span v-if="isDefault(config)" class="cu-badge cu-badge--default">默认</span>
-            <span class="cu-tag">{{ TRANSPORT_LABEL[config.transport] ?? config.transport }}</span>
-          </span>
-        </button>
-      </UiScrollArea>
-    </aside>
+    <ProfileSelectBar
+      :items="selectItems"
+      :model-value="state.selectedId"
+      :loading="state.loading"
+      :confirming-remove="state.confirmingRemove"
+      add-label="新增设备"
+      @update:model-value="state.select"
+      @add="state.add()"
+      @remove="state.requestRemove()"
+    />
 
     <section v-if="state.selected" class="cu-editor">
       <div class="cu-editor__head">
-        <span class="cu-editor__name">{{ state.selected.displayName }}</span>
+        <span class="cu-editor__name">{{ state.selected.displayName || '（未命名设备）' }}</span>
         <span
           class="cu-badge"
           :style="{ color: STATUS_META[state.statusOf(state.selected)].text, background: STATUS_META[state.statusOf(state.selected)].bg }"
@@ -99,7 +100,7 @@ function onSetDefault(): void {
       </div>
     </section>
     <p v-else class="cu-empty">
-      {{ state.loading ? '正在载入配置…' : '暂无可用设备配置' }}
+      {{ state.loading ? '正在载入配置…' : '暂无设备档案，点击「新增设备」创建' }}
     </p>
   </div>
 </template>
@@ -107,110 +108,13 @@ function onSetDefault(): void {
 <style scoped>
 .cu-body {
   display: flex;
-  gap: 16px;
-  align-items: stretch;
+  flex-direction: column;
+  gap: 12px;
   /* 填满系统设置弹窗的统一内容区高度（不足留白，超高交给外层滚动） */
   min-height: 100%;
 }
 
-/* ---- 左列表 ---- */
-.cu-list {
-  width: 224px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-self: flex-start;
-  padding: 6px;
-  border: 1px solid #e6eaf0;
-  border-radius: 10px;
-  background: #fbfcfd;
-}
-
-.cu-list__scroll {
-  flex: 1;
-  min-height: 0;
-  max-height: 420px;
-}
-
-.cu-list__item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 100%;
-  border: none;
-  background: transparent;
-  padding: 8px 10px;
-  border-radius: 8px;
-  text-align: left;
-  cursor: pointer;
-  transition: background-color 0.12s;
-}
-
-.cu-list__item + .cu-list__item {
-  margin-top: 2px;
-}
-
-.cu-list__item:hover {
-  background: #f0f3f7;
-}
-
-.cu-list__item--active {
-  background: #d9efed;
-}
-
-.cu-list__item--active:hover {
-  background: #d9efed;
-}
-
-.cu-list__name {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: #1f2328;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 徽标行：状态 + 接入方式分层展示 */
-.cu-list__meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.cu-badge {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 7px;
-  border-radius: 999px;
-  font-size: 10.5px;
-  font-weight: 600;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-.cu-tag {
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 7px;
-  border-radius: 5px;
-  border: 1px solid #e3e8ee;
-  background: #fff;
-  font-size: 10.5px;
-  color: #57606a;
-  line-height: 1;
-  flex-shrink: 0;
-}
-
-/* 默认设备徽标（青色软底，与页签激活态同源） */
-.cu-badge--default {
-  color: #0f766e;
-  background: #d9efed;
-}
-
-/* ---- 右编辑区 ---- */
+/* ---- 编辑区 ---- */
 .cu-editor {
   flex: 1;
   min-width: 0;
@@ -312,5 +216,37 @@ function onSetDefault(): void {
   padding: 3px 10px;
   font-size: 11px;
   border-radius: 6px;
+}
+
+.cu-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.cu-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid #e3e8ee;
+  background: #fff;
+  font-size: 10.5px;
+  color: #57606a;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* 默认设备徽标（青色软底，与页签激活态同源） */
+.cu-badge--default {
+  color: #0f766e;
+  background: #d9efed;
 }
 </style>

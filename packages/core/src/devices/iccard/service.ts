@@ -1,11 +1,33 @@
+import type { IccardConfig, IcReaderDeviceConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { IcCardAdapter, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice } from './types'
 import { Buffer } from 'node:buffer'
 
+import { createDeviceStore } from '../../storage/device-store'
 import { deviceLockKey, SerialLocks } from '../kernel/serial-lock'
 import { DllIcAdapter } from './adapters/dll-adapter'
+import { BUILT_IN_ICCARD_CONFIGS } from './configs'
 import { icCardError, toIcCardError } from './errors'
+
+/** 持久化根对象（electron-store 根必须为对象，数组经 devices 包一层） */
+interface StoredIccardConfig {
+  devices?: IcReaderDeviceConfig[]
+}
+
+/** 档案深拷贝（出厂回注/读出 clone，避免共享内层对象被运行时误改） */
+function cloneProfile(p: IcReaderDeviceConfig): IcReaderDeviceConfig {
+  return p.transport === 'ws' ? { ...p, ws: { ...p.ws } } : { ...p, dll: { ...p.dll } }
+}
+
+/** 出厂回注：出厂档案按 id 补齐缺失项（内置设备始终可管理，删除仅当次运行生效），用户追加档案在后 */
+function migrateConfig(raw: StoredIccardConfig): IcReaderDeviceConfig[] {
+  const stored = Array.isArray(raw.devices) ? raw.devices : []
+  const builtIns = BUILT_IN_ICCARD_CONFIGS.map(cloneProfile)
+  return builtIns
+    .map(b => stored.find(s => s.id === b.id) ?? b)
+    .concat(stored.filter(s => !builtIns.some(b => b.id === s.id)))
+}
 
 /** M1 每扇区块数（数据块地址 = 扇区号 × 4 + 块内序号） */
 const SECTOR_BLOCKS = 4
@@ -53,12 +75,43 @@ export class IcCardService {
   private readonly adapters: Map<string, IcCardAdapter>
   /** 同一读卡器同一时刻只能执行一次读写（硬件限制），按锁 key（设备或 lockGroup）串行化 */
   private readonly locks = new SerialLocks()
+  /** 设备档案（ws/dll 双路线，见 configs.ts；写穿 device-iccard.json，读侧内存直取） */
+  private configs: IccardConfig
+  private readonly configStore = createDeviceStore<StoredIccardConfig>('iccard')
 
   constructor(resourcesRoot: string, host: DeviceHost, private readonly logger: Logger) {
+    this.configs = migrateConfig(this.configStore.load())
     this.adapters = new Map<string, IcCardAdapter>([
-      // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程）
-      ['dll', new DllIcAdapter(host, resourcesRoot)],
+      // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程），档案驱动枚举
+      ['dll', new DllIcAdapter(host, resourcesRoot, () => this.configs)],
     ])
+  }
+
+  getConfig(): IccardConfig {
+    return this.configs.map(cloneProfile)
+  }
+
+  /** 按档案 id upsert（入参合法性由 IPC 层 sanitize），写穿持久化 */
+  setConfig(next: IcReaderDeviceConfig): IccardConfig {
+    const configs = this.configs.some(p => p.id === next.id)
+      ? this.configs.map(p => (p.id === next.id ? next : p))
+      : [...this.configs, next]
+    return this.writeThrough(configs)
+  }
+
+  /** 按档案 id 删除；返回是否有删除动作 */
+  removeConfig(id: string): boolean {
+    if (!this.configs.some(p => p.id === id)) {
+      return false
+    }
+    this.writeThrough(this.configs.filter(p => p.id !== id))
+    return true
+  }
+
+  private writeThrough(configs: IccardConfig): IccardConfig {
+    this.configs = configs
+    this.configStore.save({ devices: this.getConfig() })
+    return this.getConfig()
   }
 
   async listReaders(): Promise<IdReaderDevice[]> {

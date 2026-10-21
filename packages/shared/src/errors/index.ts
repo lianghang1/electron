@@ -8,6 +8,7 @@ export type DesktopErrorCode
     | 'INVALID_ORIGIN'
     | 'STORAGE_ERROR'
     | 'IPC_ERROR'
+    | 'VALIDATION_FAILED'
 
 /**
  * 平台统一错误。跨 IPC 传递时序列化为 { code, message, details }，

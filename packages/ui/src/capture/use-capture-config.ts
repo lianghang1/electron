@@ -39,6 +39,8 @@ export interface CaptureConfigView {
   confirmingRemove: boolean
   load: () => Promise<void>
   select: (id: string) => void
+  /** 新增空白档案（本地入列未保存，填写后保存 upsert 落库） */
+  add: () => void
   save: () => Promise<void>
   remove: () => Promise<void>
   /** 两步确认删除：首次点击武装（超时自动复位），再次点击执行删除 */
@@ -114,6 +116,24 @@ export function useCaptureConfig(): CaptureConfigView {
   }
 
   function select(id: string): void {
+    selectedId.value = id
+    error.value = ''
+    snapThumb.value = ''
+    resetRemoveConfirm()
+  }
+
+  /** 新增空白档案：默认 ws 路线（最常用），id 本地生成（保存时随档案落库） */
+  function add(): void {
+    const id = `dev-${Date.now().toString(36)}`
+    const blank: CaptureDeviceConfig = {
+      id,
+      displayName: '',
+      brand: '',
+      transport: 'ws',
+      ws: { url: '' },
+    }
+    configs.value = [...configs.value, blank]
+    savedSnapshots.value.delete(id)
     selectedId.value = id
     error.value = ''
     snapThumb.value = ''
@@ -250,6 +270,7 @@ export function useCaptureConfig(): CaptureConfigView {
     confirmingRemove,
     load,
     select,
+    add,
     save,
     remove,
     requestRemove,

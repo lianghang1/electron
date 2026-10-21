@@ -30,14 +30,29 @@ export interface ScanOptions {
 /** 扫码接入通道：keyboard = 键盘仿真（本机直连枪），hid = 厂商本地服务 HID 通道（如 CamSDKServer） */
 export type ScannerChannelMode = 'keyboard' | 'hid'
 
-export interface ScannerConfig extends Required<Omit<ScanOptions, 'requirePrefix'>> {
+/**
+ * 扫码枪设备档案（多设备档案制）：一把枪一份接入参数。
+ * transport = keyboard 时节奏/结束键/前缀即该枪的识别参数；transport = hid 时经 hidUrl 连厂商本地服务。
+ */
+export interface ScannerDeviceConfig extends Required<ScanOptions> {
+  /** 档案 id（激活切换以 id 为准） */
+  id: string
+  displayName: string
+  /** 厂商标识（面板展示用） */
+  brand: string
+  transport: ScannerChannelMode
+  /** transport='hid' 时的厂商本地服务地址（keyboard 档案不填） */
+  hidUrl?: string
+}
+
+/** scanner 域配置（持久化 device-scanner.json 根对象，缺省值出厂兜底） */
+export interface ScannerConfig {
   /** 总开关：关闭后键盘事件不再进入缓冲器（扫码枪变普通键盘） */
   enabled: boolean
-  requirePrefix: boolean
-  /** 接入通道（缺省 keyboard；旧持久化经 electron-store defaults 兜底） */
-  mode: ScannerChannelMode
-  /** HID 通道的厂商本地服务地址（缺省 CamSDKServer ws://127.0.0.1:9000，经设置面板可改） */
-  hidUrl: string
+  /** 当前生效档案 id（决定接入通道与节奏参数；指向不存在档案时回落第一个档案） */
+  activeId: string
+  /** 设备档案列表 */
+  devices: ScannerDeviceConfig[]
 }
 
 /** 扫码通道运行状态（statusUpdated 推送，供测试页/诊断展示） */

@@ -14,7 +14,7 @@ import { handle } from './handle'
 const MENU_ACTIONS: readonly TabMenuAction[] = ['reload', 'clearCache', 'clearSite', 'close']
 
 /** 设备配置浮层类别白名单：契约类型只在编译层生效，渲染层运行时传值须经校验 */
-const CONFIG_KINDS: readonly DeviceConfigKind[] = ['scanner', 'capture', 'idcard', 'signature']
+const CONFIG_KINDS: readonly DeviceConfigKind[] = ['scanner', 'capture', 'idcard', 'signature', 'iccard']
 
 export interface OverlayIpcDeps {
   overlayService: OverlayWindowService

@@ -164,7 +164,6 @@ function renderPrinters() {
 async function refreshPrinters() {
   try {
     printers = await window.desktop.print.listPrinters()
-    console.log(printers)
   }
   catch (e) {
     toast(`读取打印机失败：${e.message}`, false)
@@ -336,12 +335,19 @@ function buildTestPageHtml({ printerName, docNo, date }) {
   </body></html>`
 }
 
-// ── 初始化 ──
-registerRefresher(refreshPrinters)
-registerRefresher(refreshJobs)
-void (async () => {
+// ── 页签接入：首次进入完整初始化，再次进入刷新打印机与任务 ──
+async function initPrintTab() {
   await refreshPrinters()
   switchKind('image')
   await refreshJobs()
-})()
+}
+
+async function refreshPrintTab() {
+  await refreshPrinters()
+  await refreshJobs()
+}
+
+registerRefresher(refreshPrinters)
+registerRefresher(refreshJobs)
+registerTab('print', { once: initPrintTab, activate: refreshPrintTab })
 

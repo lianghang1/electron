@@ -1,3 +1,4 @@
+import type { IccardConfig, IcReaderDeviceConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice } from './types'
@@ -19,6 +20,10 @@ export interface IcCardSystem {
   writeIc: (req: IcCardWriteRequest & { deviceId: string }) => Promise<void>
   /** 写 M1 IC 卡扇区字符串组（未占用数据块清零，整扇区同锁写入；与读同设备串行化） */
   writeIcTexts: (req: IcCardTextsWriteRequest & { deviceId: string }) => Promise<void>
+  /** 设备档案（ws 路线）管理：读全量 / 按档案 id upsert / 按 id 删除（IPC 层 sanitize 后落盘） */
+  getConfig: () => IccardConfig
+  setConfig: (next: IcReaderDeviceConfig) => IccardConfig
+  removeConfig: (id: string) => boolean
   destroy: () => void
 }
 
@@ -30,6 +35,9 @@ export function createIcCardSystem(options: IcCardSystemOptions): IcCardSystem {
     readIc: req => service.readIc(req),
     writeIc: req => service.writeIc(req),
     writeIcTexts: req => service.writeIcTexts(req),
+    getConfig: () => service.getConfig(),
+    setConfig: next => service.setConfig(next),
+    removeConfig: id => service.removeConfig(id),
     destroy: () => service.destroy(),
   }
 }

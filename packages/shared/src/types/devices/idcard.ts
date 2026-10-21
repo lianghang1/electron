@@ -7,11 +7,36 @@
 /** 读卡器接入方式（idcard/iccard 两域共用同一硬件描述形态） */
 export type IdReaderTransport = 'dll' | 'service' | 'stub' | 'ws'
 
-/** idcard 域配置（单设备域根对象，持久化于 device-idcard.json，缺省值出厂兜底） */
-export interface IdcardConfig {
-  /** ws 路线的 CamSDKServer 本地服务地址（dll 路线不经此配置） */
-  wsUrl: string
+/** 档案公共段：档案 id / 名称 / 厂商（idcard 域 ws/dll 两路线共用） */
+interface IdcardProfileBase {
+  id: string
+  displayName: string
+  /** 厂商标识（面板展示用） */
+  brand: string
 }
+
+/**
+ * 设备档案（多设备档案制，与 capture 同构）：
+ * - ws 路线：一条档案 = 一条 CamSDKServer 本地服务连接（服务下全部读卡器经该连接枚举）；
+ * - dll 路线：一条档案 = 一个设备守护进程驱动注册表驱动（档案 id = 驱动名，见 host/run.ts），
+ *   运行时设备 id = "dll:<档案 id>"，DLL 由守护进程按注册表自动加载（档案参数预留）。
+ */
+export interface IdcardWsProfile extends IdcardProfileBase {
+  transport: 'ws'
+  /** ws 连接参数 */
+  ws: { url: string }
+}
+
+export interface IdcardDllProfile extends IdcardProfileBase {
+  transport: 'dll'
+  /** DLL 参数（预留）：当前经守护进程驱动注册表自动探测加载，此处不消费 */
+  dll: { file?: string }
+}
+
+export type IdcardDeviceConfig = IdcardWsProfile | IdcardDllProfile
+
+/** idcard 域配置 = ws 路线设备档案列表（持久化 device-idcard.json 根对象 { devices: [...] }） */
+export type IdcardConfig = IdcardDeviceConfig[]
 
 /** 读卡器设备描述（idcard/iccard 域的 listReaders 共用；capabilities 标签按域声明） */
 export interface IdReaderDevice {

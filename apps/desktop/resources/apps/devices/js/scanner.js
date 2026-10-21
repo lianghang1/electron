@@ -1,5 +1,5 @@
 'use strict'
-/* 扫码域：扫码枪配置（键盘仿真 / 厂商 HID 通道）+ 模拟扫码 + scanReceived/statusUpdated 订阅 */
+/* 扫码域：模拟扫码与 scanReceived/statusUpdated 订阅；接入通道与节奏参数在系统设置弹窗配置 */
 
 let scanHistory = []
 /** 输入框为空时的模拟条码（带前缀，覆盖前缀命中链路） */
@@ -27,33 +27,6 @@ function pushScan(r) {
   renderScan()
 }
 
-/** 键盘仿真专属参数（节奏/码长/前缀过滤）在 HID 通道下失效，置灰防误配 */
-function syncScanModeUi() {
-  const hid = $('#scan-mode').value === 'hid'
-  for (const id of ['scan-timeout', 'scan-minlen', 'scan-endkey', 'scan-prefixes', 'scan-require-prefix']) {
-    $(`#${id}`).disabled = hid
-  }
-}
-
-$('#btn-scan-save').addEventListener('click', async () => {
-  const prefixes = $('#scan-prefixes').value.split(',').map(s => s.trim()).filter(Boolean)
-  try {
-    await window.desktop.scanner.setConfig({
-      enabled: $('#scan-enabled').checked,
-      mode: $('#scan-mode').value,
-      timeout: Number($('#scan-timeout').value),
-      minLength: Number($('#scan-minlen').value),
-      endKey: $('#scan-endkey').value,
-      prefixes,
-      requirePrefix: $('#scan-require-prefix').checked,
-    })
-    toast('扫码枪配置已保存')
-  }
-  catch (e) { toast(e.message, false) }
-})
-
-$('#scan-mode').addEventListener('change', syncScanModeUi)
-
 $('#btn-scan-sim').addEventListener('click', async () => {
   const code = $('#scan-code').value.trim() || SAMPLE_SCAN_CODE
   try {
@@ -73,18 +46,3 @@ window.desktop.events.on('scanner:scanReceived', pushScan)
 window.desktop.events.on('scanner:statusUpdated', (s) => {
   $('#scan-hid-status').textContent = s.mode !== 'hid' ? '' : `HID 通道：${s.connected ? `已连接${s.devSN ? `（${s.devSN}）` : ''}` : `不可用${s.note ? ` — ${s.note}` : ''}`}`
 })
-
-void (async () => {
-  try {
-    const cfg = await window.desktop.scanner.getConfig()
-    $('#scan-enabled').checked = cfg.enabled
-    $('#scan-mode').value = cfg.mode ?? 'keyboard'
-    $('#scan-timeout').value = cfg.timeout
-    $('#scan-minlen').value = cfg.minLength
-    $('#scan-endkey').value = cfg.endKey
-    $('#scan-prefixes').value = (cfg.prefixes ?? []).join(',')
-    $('#scan-require-prefix').checked = cfg.requirePrefix
-    syncScanModeUi()
-  }
-  catch (e) { toast(`读取扫码枪配置失败：${e.message}`, false) }
-})()

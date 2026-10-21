@@ -18,7 +18,8 @@ export interface ScannerSystem {
   /** 窗口接入：before-input-event 观察键盘（不消费，人工输入不受影响） */
   attachWindow: (win: BrowserWindow) => void
   getConfig: () => ScannerConfig
-  setConfig: (patch: Partial<ScannerConfig>) => ScannerConfig
+  /** 全量替换域配置（enabled/activeId/devices；入参合法性由 IPC 层 sanitize） */
+  setConfig: (next: ScannerConfig) => ScannerConfig
   /** 模拟一条扫码（诊断/演示：走与真枪完全相同的缓冲 → 广播链路） */
   simulate: (code: string) => ScanResult
   destroy: () => void
@@ -31,7 +32,7 @@ export function createScannerSystem(options: ScannerSystemOptions = {}): Scanner
   return {
     attachWindow: win => service.attachWindow(win),
     getConfig: () => service.getConfig(),
-    setConfig: patch => service.setConfig(patch),
+    setConfig: next => service.setConfig(next),
     simulate: code => service.simulate(code),
     destroy: () => service.destroy(),
   }

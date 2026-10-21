@@ -1,338 +1,209 @@
 <script setup lang="ts">
-import type { ScannerConfig } from '@desktop/shared'
 import type { ScannerConfigView } from './use-scanner-config'
-import { SwitchRoot, SwitchThumb } from 'reka-ui'
-import { ref } from 'vue'
+import { computed } from 'vue'
+import ProfileSelectBar from '../devices/ProfileSelectBar.vue'
+import ScannerDeviceForm from './ScannerDeviceForm.vue'
+import { deviceLabel } from './use-scanner-config'
 
-/** 扫码枪设置面板：分组卡片布局，每行「标题 + 描述」居左、控件居右 */
+/**
+ * 扫码枪设置面板：档案制紧凑形态（选择条 + 单表单），与其他设备域统一。
+ * 总开关与激活档案随保存一并全量提交；节奏参数/通道随档案走
+ */
 const props = defineProps<{ state: ScannerConfigView }>()
 
-/** 经具名模型就地编辑弹窗持有的配置草稿（深改随共享引用同步回弹窗） */
-const config = defineModel<ScannerConfig>('config', { required: true })
+const selectItems = computed(() =>
+  props.state.devices.map(device => ({ value: device.id, label: deviceLabel(device) })),
+)
 
-/** 前缀标签输入（回车添加） */
-const prefixInput = ref('')
-
-/** 模拟扫码测试码（默认带前缀，覆盖前缀命中链路） */
-const testCode = ref('PB:1234567890')
-
-function runTest(): void {
-  const code = testCode.value.trim() || 'PB:1234567890'
-  void props.state.simulate(code)
+function onActivate(): void {
+  const device = props.state.selected
+  if (!device) { return }
+  props.state.setActive(device.id)
 }
 
-function addPrefix(): void {
-  const value = prefixInput.value.trim()
-  prefixInput.value = ''
-  if (!value || config.value.prefixes.includes(value)) {
-    return
-  }
-  config.value.prefixes = [...config.value.prefixes, value]
+function onEnabledChange(event: Event): void {
+  props.state.setEnabled((event.target as HTMLInputElement).checked)
 }
 
-function removePrefix(prefix: string): void {
-  config.value.prefixes = config.value.prefixes.filter(p => p !== prefix)
+function onSave(): void {
+  void props.state.save()
 }
 </script>
 
 <template>
-  <div class="sc-body">
-    <section class="sc-group">
-      <h4 class="sc-group__title">
-        通用
-      </h4>
-      <div class="sc-card">
-        <div class="sc-row">
-          <div class="sc-row__text">
-            <span class="sc-row__label">启用扫码识别</span>
-            <span class="sc-row__desc">关闭后扫码枪作为普通键盘输入</span>
-          </div>
-          <SwitchRoot v-model="config.enabled" class="sc-switch">
-            <SwitchThumb class="sc-switch__thumb" />
-          </SwitchRoot>
-        </div>
-        <div class="sc-row">
-          <div class="sc-row__text">
-            <span class="sc-row__label">接入通道</span>
-            <span class="sc-row__desc">键盘仿真 = 本机直连枪；HID = CamSDK 本地服务监听条码枪</span>
-          </div>
-          <select v-model="config.mode" class="sc-input">
-            <option value="keyboard">
-              键盘仿真
-            </option>
-            <option value="hid">
-              厂商 HID
-            </option>
-          </select>
-        </div>
-        <div v-if="config.mode === 'hid'" class="sc-row">
-          <div class="sc-row__text">
-            <span class="sc-row__label">HID 服务地址</span>
-            <span class="sc-row__desc">CamSDK 本地服务（CamSDKServer）的 ws 地址</span>
-          </div>
-          <input v-model="config.hidUrl" type="text" class="sc-input sc-input--wide" placeholder="ws://127.0.0.1:9000">
-        </div>
-        <div class="sc-row">
-          <div class="sc-row__text">
-            <span class="sc-row__label">结束判定超时（ms）</span>
-            <span class="sc-row__desc">无后续按键多久判定一次缓冲结束（仅键盘仿真）</span>
-          </div>
-          <input v-model.number="config.timeout" type="number" min="1" class="sc-input" :disabled="config.mode === 'hid'">
-        </div>
-        <div class="sc-row">
-          <div class="sc-row__text">
-            <span class="sc-row__label">最小条码长度</span>
-            <span class="sc-row__desc">过滤人手误触</span>
-          </div>
-          <input v-model.number="config.minLength" type="number" min="0" class="sc-input">
-        </div>
-        <div class="sc-row">
-          <div class="sc-row__text">
-            <span class="sc-row__label">结束键</span>
-            <span class="sc-row__desc">扫码枪扫码后追加的按键（仅键盘仿真）</span>
-          </div>
-          <input v-model="config.endKey" type="text" class="sc-input" placeholder="Enter" :disabled="config.mode === 'hid'">
-        </div>
-        <div class="sc-row">
-          <div class="sc-row__text">
-            <span class="sc-row__label">强制前缀命中</span>
-            <span class="sc-row__desc">未命中前缀的输入不作为扫码结果</span>
-          </div>
-          <SwitchRoot v-model="config.requirePrefix" class="sc-switch">
-            <SwitchThumb class="sc-switch__thumb" />
-          </SwitchRoot>
-        </div>
-      </div>
-    </section>
+  <div class="scn-body">
+    <ProfileSelectBar
+      :items="selectItems"
+      :model-value="state.selectedId"
+      :loading="state.loading"
+      :confirming-remove="state.confirmingRemove"
+      add-label="新增设备"
+      @update:model-value="state.select"
+      @add="state.add()"
+      @remove="state.requestRemove()"
+    />
 
-    <section class="sc-group">
-      <h4 class="sc-group__title">
-        前缀列表
-      </h4>
-      <div class="sc-card">
-        <div class="sc-row sc-row--stack">
-          <div class="sc-row__text">
-            <span class="sc-row__label">条码前缀</span>
-            <span class="sc-row__desc">用前缀区分单据类型（如 PB:），命中后扫码结果带 prefix</span>
-          </div>
-          <div class="sc-tags">
-            <span v-for="p in config.prefixes" :key="p" class="sc-tag">
-              {{ p }}
-              <button class="sc-tag__del" title="删除" @click="removePrefix(p)">
-                ×
-              </button>
-            </span>
-            <input v-model="prefixInput" class="sc-tags__input" placeholder="输入前缀后回车添加" @keydown.enter.prevent="addPrefix">
-          </div>
-        </div>
+    <section v-if="state.selected" class="scn-editor">
+      <div class="scn-editor__head">
+        <span class="scn-editor__name">{{ state.selected.displayName || '（未命名设备）' }}</span>
+        <span class="scn-badge">{{ state.selected.transport === 'hid' ? 'HID 通道' : '键盘仿真' }}</span>
+        <label class="scn-switch">
+          <input
+            type="radio"
+            name="scn-active"
+            :checked="state.activeId === state.selected.id"
+            @change="onActivate"
+          >
+          <span>激活此设备</span>
+        </label>
       </div>
-    </section>
 
-    <section class="sc-group">
-      <h4 class="sc-group__title">
-        模拟扫码
-      </h4>
-      <div class="sc-card">
-        <div class="sc-row">
-          <div class="sc-row__text">
-            <span class="sc-row__label">模拟测试</span>
-            <span class="sc-row__desc">保存当前配置并模拟一次扫码（仅开发环境）</span>
-          </div>
-          <div class="sc-row__ctrl">
-            <input
-              v-model="testCode"
-              type="text"
-              class="sc-input sc-input--wide"
-              placeholder="PB:1234567890"
-              @keydown.enter.prevent="runTest"
-            >
-            <button class="sc-btn" :disabled="state.saving || state.testing || state.loading" @click="runTest">
-              {{ state.testing ? '测试中…' : '测试' }}
-            </button>
-          </div>
-        </div>
+      <ScannerDeviceForm :config="state.selected" />
+
+      <div v-if="state.dirty" class="scn-note">
+        有未保存修改
       </div>
     </section>
+    <p v-else class="scn-empty">
+      {{ state.loading ? '正在载入配置…' : '暂无设备档案，点击「新增设备」创建' }}
+    </p>
+
+    <div class="scn-footer">
+      <label class="scn-check">
+        <input type="checkbox" :checked="state.enabled" @change="onEnabledChange">
+        <span>启用扫码枪（关闭后等同普通键盘）</span>
+      </label>
+      <span class="scn-footer__hint">生效设备：{{ state.devices.find(d => d.id === state.activeId)?.displayName || '未选择' }}</span>
+    </div>
+
+    <div class="scn-actions">
+      <button class="scn-btn" :disabled="state.saving || state.loading || !state.selected" @click="onSave">
+        {{ state.saving ? '保存中…' : '保存' }}
+      </button>
+      <span v-if="state.message" class="scn-actions__msg">{{ state.message }}</span>
+      <span v-if="state.error" class="scn-actions__err">{{ state.error }}</span>
+    </div>
   </div>
 </template>
 
 <style scoped>
-.sc-body {
+.scn-body {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
+  min-height: 100%;
 }
 
-.sc-group__title {
-  margin: 0 0 8px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
-  color: #1f2328;
-}
-
-.sc-card {
+.scn-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 16px;
   border: 1px solid #e6eaf0;
   border-radius: 10px;
-  background: #fff;
+}
+
+.scn-editor__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.scn-editor__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #1f2328;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sc-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px;
-}
-
-.sc-row + .sc-row {
-  border-top: 1px solid #f0f2f5;
-}
-
-.sc-row--stack {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 8px;
-}
-
-.sc-row__text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.sc-row__label {
-  font-size: 13px;
-  line-height: 18px;
-  color: #1f2328;
-}
-
-.sc-row__desc {
-  font-size: 12px;
-  line-height: 1.5;
-  color: #8a919c;
-}
-
-.sc-row__ctrl {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.sc-input {
-  width: 120px;
-  height: 30px;
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-family: inherit;
-  color: #1f2328;
-  background: #fff;
-  flex-shrink: 0;
-  transition: border-color 0.12s;
-}
-
-.sc-input--wide {
-  width: 200px;
-}
-
-.sc-input:hover,
-.sc-input:focus {
-  border-color: #0f766e;
-  outline: none;
-}
-
-/* reka-ui Switch：轨道 + 滑块，选中态青玉色 */
-.sc-switch {
-  position: relative;
+.scn-badge {
   display: inline-flex;
   align-items: center;
-  width: 34px;
-  height: 20px;
-  padding: 0;
-  border: none;
+  height: 18px;
+  padding: 0 7px;
   border-radius: 999px;
-  background: #d5dae1;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+  color: #57606a;
+  background: #eceff3;
+}
+
+.scn-switch {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: #57606a;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background-color 0.15s;
 }
 
-.sc-switch[data-state='checked'] {
-  background: #0f766e;
-}
-
-.sc-switch__thumb {
-  display: block;
-  width: 16px;
-  height: 16px;
-  margin-left: 2px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgba(2, 8, 20, 0.2);
-  transition: transform 0.15s;
-}
-
-.sc-switch[data-state='checked'] .sc-switch__thumb {
-  transform: translateX(14px);
-}
-
-.sc-tags {
-  display: flex;
-  flex-wrap: wrap;
+.scn-check {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 4px 8px;
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  background: #fff;
-}
-
-.sc-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #ccfbf1;
-  color: #0f766e;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.sc-tag__del {
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: 14px;
-  height: 14px;
-  line-height: 14px;
   font-size: 12px;
-  color: #0f766e;
+  color: #1f2328;
   cursor: pointer;
 }
 
-.sc-tag__del:hover {
-  color: #dc2626;
+.scn-note {
+  align-self: flex-start;
+  font-size: 11.5px;
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 8px;
+  padding: 6px 10px;
 }
 
-.sc-tags__input {
+.scn-empty {
   flex: 1;
-  min-width: 140px;
-  border: none;
-  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  border: 1px dashed #e0e5ec;
+  border-radius: 10px;
   font-size: 12px;
-  font-family: inherit;
-  background: transparent;
-  color: #1f2328;
+  color: #a5adb8;
 }
 
-.sc-btn {
+.scn-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.scn-footer__hint {
+  margin-left: auto;
+  font-size: 11px;
+  color: #a5adb8;
+}
+
+.scn-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scn-actions__msg {
+  font-size: 11.5px;
+  color: #15803d;
+}
+
+.scn-actions__err {
+  font-size: 11.5px;
+  color: #b42318;
+}
+
+.scn-btn {
   border: 1px solid #d5dae1;
   border-radius: 8px;
   padding: 7px 18px;
@@ -345,12 +216,12 @@ function removePrefix(prefix: string): void {
   transition: background-color 0.12s, border-color 0.12s, opacity 0.12s;
 }
 
-.sc-btn:hover:not(:disabled) {
+.scn-btn:hover:not(:disabled) {
   border-color: #0f766e;
   color: #0f766e;
 }
 
-.sc-btn:disabled {
+.scn-btn:disabled {
   opacity: 0.5;
   cursor: default;
 }
