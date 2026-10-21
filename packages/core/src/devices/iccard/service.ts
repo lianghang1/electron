@@ -246,10 +246,10 @@ export class IcCardService {
     return { adapter, device }
   }
 
-  /** 失败留痕（设备 ID + 错误码，不含卡数据）后原样抛出 */
+  /** 失败留痕（设备 ID + 错误码 + 驱动阶段信息，不含卡数据）后原样抛出 */
   private logFailure(deviceId: string | undefined, err: unknown): unknown {
     const ce = toIcCardError(err)
-    this.logger.error(`IC 卡读写失败 ${deviceId ?? '(未指定)'}`, { code: ce.code, message: ce.message })
+    this.logger.error(`IC 卡读写失败 ${deviceId ?? '(未指定)'}`, { code: ce.code, message: ce.message, ...(ce.detail !== undefined ? { detail: ce.detail } : {}) })
     return err
   }
 

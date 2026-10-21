@@ -31,8 +31,16 @@ export function createHandle<Ipc extends Record<string, (...args: any[]) => any>
         return await (handler as (e: IpcMainInvokeEvent, ...a: unknown[]) => unknown)(event, ...args)
       }
       catch (error) {
-        handleLogger?.error(`ipc handler failed: ${channel}`, describeHandleError(error))
-        throw serializeHandleError(error)
+        const described = describeHandleError(error)
+        // 分级留痕：域类型化错误（自带 code 契约）为预期业务失败——抛错点（设备域等）已带上下文留痕、
+        // 渲染层按码分支，此处降为 debug（生产不落盘）防同一失败双份 error；无 code 契约的未知异常保持 error 兜底。
+        if (isDomainError(error)) {
+          handleLogger?.debug(`ipc handler failed: ${channel}`, described)
+        }
+        else {
+          handleLogger?.error(`ipc handler failed: ${channel}`, described)
+        }
+        throw serializeHandleError(described)
       }
     })
   }
@@ -44,6 +52,12 @@ export const handle = createHandle<DesktopInvoke>()
 /** runtime 日志根创建后挂接：IPC 异常统一进平台日志（scope: ipc） */
 export function attachHandleLogger(logger: Logger): void {
   handleLogger = logger
+}
+
+/** 域类型化错误识别：错误对象自带 code 契约且非裸 Error（Node 系统错误如 ENOENT name='Error'，仍按未知异常兜底） */
+function isDomainError(error: unknown): boolean {
+  const carrier = error as { name?: unknown, code?: unknown } | null
+  return typeof carrier?.code === 'string' && carrier.name !== 'Error'
 }
 
 /** 日志元数据：错误类名 + 错误码 + 消息 + 可序列化 detail（不进日志的敏感内容由各域自行保证） */
@@ -58,9 +72,8 @@ function describeHandleError(error: unknown): Record<string, unknown> {
   }
 }
 
-/** 跨 IPC 序列化：Electron 只传递 message 字符串，code/details 编码进 message 由渲染层还原 */
-function serializeHandleError(error: unknown): Error {
-  const described = describeHandleError(error)
+/** 跨 IPC 序列化（入参为 describeHandleError 产物）：Electron 只传递 message 字符串，code/details 编码进 message 由渲染层还原 */
+function serializeHandleError(described: Record<string, unknown>): Error {
   const payload: IpcErrorPayload = {
     name: String(described.name),
     code: String(described.code),

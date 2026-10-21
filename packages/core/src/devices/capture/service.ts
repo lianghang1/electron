@@ -280,7 +280,7 @@ export class CaptureService {
     }
     catch (err) {
       const ce = toCaptureError(err)
-      this.log('error', `采集异常 ${req?.deviceId ?? ''}: ${ce.message}`)
+      this.log('error', `采集异常 ${req?.deviceId ?? ''}: ${ce.message}`, { code: ce.code })
       throw ce
     }
   }

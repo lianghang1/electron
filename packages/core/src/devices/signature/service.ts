@@ -152,7 +152,7 @@ export class SignatureService {
     catch (err) {
       this.active = null
       const ce = toSignatureError(err)
-      this.log('error', '签名会话启动失败', { code: ce.code })
+      this.log('error', '签名会话启动失败', { code: ce.code, message: ce.message })
       throw ce
     }
   }
