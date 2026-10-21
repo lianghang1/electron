@@ -30,7 +30,11 @@ export interface CaptureCaps {
 }
 
 export interface CaptureRequest {
-  deviceId: string
+  /**
+   * 采集设备 id（"<transport>:<配置 id>"）。缺省时 Main 按域默认设备自动定位
+   * （系统设置指定的默认设备优先，回落第一个就绪设备），调用方无需感知设备 id
+   */
+  deviceId?: string
   format?: 'jpg' | 'png' | 'bmp'
   /** 分辨率序号（设备枚举 resolutionList 的索引；ws/camsdk 路线生效，缺省 0 = 设备默认） */
   resolutionNum?: number
@@ -126,7 +130,7 @@ export interface CaptureDeviceConfig {
   dll?: { file: string, functions?: Record<string, string> }
   /**
    * ws 路线：厂商本地 WebSocket 服务。
-   * protocol：'dianyipai'（点易拍 BaucheSDK 二进制帧，缺省）| 'camsdk'（华视 CamSDKServer JSON 帧）。
+   * protocol：'dianyipai'（点易拍 BaucheSDK 二进制帧，缺省）| 'camsdk'（CamSDKServer JSON 帧，华夏电通）。
    * camId：点易拍为摄像头编号，camsdk 下为 devNum。verified = 协议帧已验证（缺省视为已验证）。
    */
   ws?: { url: string, protocol?: 'dianyipai' | 'camsdk', camId?: number, width?: number, height?: number, verified?: boolean }

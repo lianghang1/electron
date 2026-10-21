@@ -10,7 +10,7 @@ import { getCaptureVendor } from '../vendors/registry'
 
 /**
  * WebSocket 本地服务适配器（厂商协议已模块化，本类只做路由与落盘）：
- * 帧编解码与会话语义在 vendors/（camsdk=华视 CamSDKServer JSON 帧、dianyipai=点易拍 BaucheSDK 二进制帧），
+ * 帧编解码与会话语义在 vendors/（camsdk=CamSDKServer JSON 帧、dianyipai=点易拍 BaucheSDK 二进制帧），
  * 由 config.ws.protocol 分发（缺省 dianyipai）。
  */
 export class WsAdapter implements CaptureAdapter {
@@ -34,24 +34,58 @@ export class WsAdapter implements CaptureAdapter {
           }
           // 协议未经验证的配置（verified: false）只探活不采集：声明 ready 会误导上层直接拍照
           const verified = p.ws!.verified !== false
+          const status = await this.assessStatus(p.ws!, { alive, verified })
           return {
             id: `ws:${p.id}`,
             displayName: p.displayName,
             brand: p.brand,
             transport: 'ws' as const,
-            status: alive ? (verified ? ('ready' as const) : ('unavailable' as const)) : ('offline' as const),
+            status: status.value,
             capabilities: { crop: true, desewarp: true, ...(p.capabilities ?? {}) },
             meta: {
               url: p.ws!.url,
-              note: !alive
-                ? await this.offlineNote(p.ws!)
-                : verified
-                  ? '本地服务运行中'
-                  : '服务在线，但该设备 ws 协议帧待真机实测，暂未适配采集',
+              note: status.note,
             },
           }
         }),
     )
+  }
+
+  /**
+   * 设备状态判定（ready 收紧：探活通过 ≠ 设备在位）：
+   * - 服务不通 → offline（含 camsdk 自愈失败的四态诊断）；
+   * - 协议未验证/未知协议 → unavailable（不伪装可用）；
+   * - 服务在线且厂商支持摄像头枚举 → 枚举 ≥1 台真机才 ready，0 台 = 设备未接（unavailable）；
+   *   枚举异常（会话占用等暂态）退回探活级 ready，不惩罚；
+   * - 厂商未实现枚举（如 dianyipai）→ 维持探活级 ready，能力缺失不惩罚。
+   */
+  private async assessStatus(
+    ws: NonNullable<CaptureDeviceConfig['ws']>,
+    ctx: { alive: boolean, verified: boolean },
+  ): Promise<{ value: 'ready' | 'offline' | 'unavailable', note: string }> {
+    if (!ctx.alive) {
+      return { value: 'offline', note: await this.offlineNote(ws) }
+    }
+    if (!ctx.verified) {
+      return { value: 'unavailable', note: '服务在线，但该设备 ws 协议帧待真机实测，暂未适配采集' }
+    }
+    const vendor = getCaptureVendor(ws.protocol)
+    if (!vendor) {
+      return { value: 'unavailable', note: `配置了未知的 ws 协议: ${String(ws.protocol)}` }
+    }
+    if (!vendor.listCameras) {
+      return { value: 'ready', note: '本地服务运行中' }
+    }
+    try {
+      const cameras = await vendor.listCameras(ws)
+      if (cameras.length > 0) {
+        return { value: 'ready', note: `本地服务运行中（${cameras.length} 台摄像头在位）` }
+      }
+      return { value: 'unavailable', note: '服务在线，但未检测到拍摄设备（确认高拍仪已连接并开机）' }
+    }
+    catch {
+      return { value: 'ready', note: '本地服务运行中（摄像头枚举失败，在位状态未知）' }
+    }
   }
 
   async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {

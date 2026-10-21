@@ -19,8 +19,6 @@ export const printDomainDefs = {
   removeJob: invoke<(jobId: string) => Promise<boolean>>(),
   /** 清空全部任务记录（连带删除归档 PDF），返回清除条数 */
   clearJobs: invoke<() => Promise<number>>(),
-  /** 渲染预览：模板 + 数据 + 纸张写法 → 完整 HTML（iframe 实时预览用，不送打） */
-  renderPreview: invoke<(input: { templateId: string, data: Record<string, unknown>, paper: string }) => Promise<string>>(),
   /** 重打：优先用 PDF 存档（版式一致），文件负载任务原样重提交 */
   reprint: invoke<(jobId: string) => Promise<PrintResult>>(),
 }
