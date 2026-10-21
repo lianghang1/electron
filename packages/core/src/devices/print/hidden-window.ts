@@ -111,11 +111,12 @@ export async function loadHtmlInto(win: BrowserWindow, html: string): Promise<Br
     // 等字体与全部图片就绪：base64 大图无网络加载但解码异步，did-finish-load 与
     // fonts.ready 均不等待解码，低端机大照片未解码完就打印会出白图
     await win.webContents.executeJavaScript(
+      // 片段以 + 号拼接后不含换行，语句间必须显式补分号（否则 ASI 失效直接语法错误）
       'new Promise(r => {'
       + ' const imgs = Array.from(document.images)'
-      + '   .map(img => img.complete ? Promise.resolve() : new Promise(d => { img.onload = img.onerror = d }))'
-      + ' const f = document.fonts ? document.fonts.ready : Promise.resolve()'
-      + ' Promise.all([...imgs, f]).then(() => requestAnimationFrame(() => setTimeout(r, 30)))'
+      + '   .map(img => img.complete ? Promise.resolve() : new Promise(d => { img.onload = img.onerror = d }));'
+      + ' const f = document.fonts ? document.fonts.ready : Promise.resolve();'
+      + ' Promise.all([...imgs, f]).then(() => requestAnimationFrame(() => setTimeout(r, 30)));'
       + ' })',
     )
   }
