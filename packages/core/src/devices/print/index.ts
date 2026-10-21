@@ -19,8 +19,6 @@ export interface PrintSystem {
   removeJob: (jobId: string) => Promise<boolean>
   /** 清空全部任务记录（连带删除归档 PDF），返回清除条数 */
   clearJobs: () => Promise<number>
-  /** 渲染预览：模板 + 数据 + 纸张写法 → 完整 HTML（iframe 实时预览用，不送打） */
-  renderPreview: (templateId: string, data: Record<string, unknown>, paper: string) => Promise<string>
   reprint: (jobId: string) => Promise<PrintResult>
   /** 启动清扫：删除超过保留期且无在册任务引用的归档 PDF，返回删除数（createPrintSystem 内自动执行一次） */
   cleanupArchive: () => Promise<number>
@@ -64,7 +62,6 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
     listJobs: async limit => service.listJobs(limit),
     removeJob: jobId => service.removeJob(jobId),
     clearJobs: () => service.clearJobs(),
-    renderPreview: async (templateId, data, paper) => service.renderPreview(templateId, data, paper),
     reprint: jobId => service.reprint(jobId),
     cleanupArchive: () => service.cleanupArchive(),
     destroy: () => windows.destroyAll(),

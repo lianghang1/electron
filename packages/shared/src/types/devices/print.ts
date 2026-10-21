@@ -7,11 +7,6 @@ export type ChannelId = 'system' | 'ipp'
 export type ChannelPreference = ChannelId | 'auto'
 
 /** 内容来源 —— 统一信封 */
-export interface TemplatePayload {
-  kind: 'template'
-  templateId: string
-  data: Record<string, unknown>
-}
 export interface FilePayload {
   kind: 'file'
   path: string
@@ -27,7 +22,7 @@ export interface HtmlPayload {
   kind: 'html'
   html: string
 }
-export type PrintPayload = TemplatePayload | FilePayload | UrlPayload | HtmlPayload
+export type PrintPayload = FilePayload | UrlPayload | HtmlPayload
 
 /** 纸张 —— 物理尺寸（mm），各通道自行翻译；heightMm = 0 表示连续卷纸（高度由纸卷决定） */
 export interface PaperSpec {

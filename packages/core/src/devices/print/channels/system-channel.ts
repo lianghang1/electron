@@ -119,7 +119,7 @@ export class SystemChannel implements PrintChannel {
         if (job.options.grayscale) { settings.push('monochrome') }
         if (job.options.duplex && job.options.duplex !== 'simplex') { settings.push(job.options.duplex) }
         if (job.options.landscape) { settings.push('landscape') }
-        const paperName = sumatraPaperName(job.paper)
+        const paperName = standardPaperName(job.paper)
         if (paperName) { settings.push(`paper=${paperName}`) }
         if (job.options.bin) { settings.push(`bin=${job.options.bin}`) }
         settings.push(job.options.scale ?? 'fit')
@@ -156,6 +156,8 @@ export class SystemChannel implements PrintChannel {
     const sides = lpSides(job.options.duplex)
     if (sides) { args.unshift('-o', `sides=${sides}`) }
     if (job.options.bin) { args.unshift('-o', `InputSlot=${job.options.bin}`) }
+    const media = lpMediaName(job.paper)
+    if (media) { args.unshift('-o', `media=${media}`) }
     if (job.options.scale === 'fit') { args.unshift('-o', 'fit-to-page') }
     for (const [k, v] of lpMarginOptions(job.options.margin)) { args.unshift('-o', `${k}=${v}`) }
     await withTimeout(runProcess('lp', args), 90000, 'SPOOL_FAILED', 'lp 送打超时（90s）')
@@ -230,8 +232,8 @@ function parsePageRanges(pages: string | undefined): Array<{ from: number, to: n
   return ranges.length > 0 ? ranges : null
 }
 
-/** 物理尺寸 → SumatraPDF paper= 标准名（仅 SumatraPDF 认识的标准系列；其他尺寸不传 paper=，交给 fit 缩放） */
-function sumatraPaperName(paper?: PaperSpec): string | null {
+/** 物理尺寸 → 标准纸型名（SumatraPDF paper= 与 CUPS media= 共用；其他尺寸返回 null 由调用方处理） */
+function standardPaperName(paper?: PaperSpec): string | null {
   if (!paper || paper.heightMm <= 0) { return null }
   switch (`${paper.widthMm}x${paper.heightMm}`) {
     case '210x297':
@@ -247,6 +249,12 @@ function sumatraPaperName(paper?: PaperSpec): string | null {
     default:
       return null
   }
+}
+
+/** PaperSpec → CUPS media=：标准尺寸用标准名，其余用 Custom.宽x高mm（连续纸不传，交驱动默认） */
+function lpMediaName(paper?: PaperSpec): string | null {
+  if (!paper || paper.heightMm <= 0) { return null }
+  return standardPaperName(paper) ?? `Custom.${paper.widthMm}x${paper.heightMm}mm`
 }
 
 /** 统一 duplex 语义 → CUPS sides 值 */

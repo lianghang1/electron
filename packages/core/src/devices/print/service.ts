@@ -1,4 +1,4 @@
-import type { JobStatus, PaperSpec, PrintLogFn, PrintOptions, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
+import type { JobStatus, PaperSpec, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter } from '@desktop/shared'
 import type { PreparedContent, PreparedJob } from './channels/channel-types'
 import type { PrintChannel } from './channels/print-channel'
 import type { HiddenWindowPool } from './hidden-window'
@@ -12,7 +12,7 @@ import { SystemChannel } from './channels/system-channel'
 import { printError, toPrintError } from './errors'
 import { JobStore } from './job-store'
 import { assertPaperSupported, resolvePaper } from './paper'
-import { IMAGE_MIME, renderImageViewerHtml, renderTemplateHtml } from './templates'
+import { IMAGE_MIME, renderImageViewerHtml } from './templates'
 import { downloadUrlContent } from './url-content'
 
 /**
@@ -134,11 +134,6 @@ export class PrintService {
     return this.jobs.clear()
   }
 
-  /** 渲染预览：模板 + 数据 + 纸张（字符串写法或物理尺寸）→ 完整 HTML（供渲染进程 iframe 实时预览，不送打） */
-  async renderPreview(templateId: string, data: Record<string, unknown>, paper: PrintOptions['paper']): Promise<string> {
-    return renderTemplateHtml(templateId, data, resolvePaper(paper))
-  }
-
   /** 统一打印机列表（系统 + 网络直连合并） */
   listPrinters(): Promise<UnifiedPrinter[]> {
     return this.registry.list()
@@ -152,7 +147,7 @@ export class PrintService {
     }
     const p = rec.request.payload
     const archived = rec.result?.archivedPdfPath
-    if ((p.kind === 'template' || p.kind === 'html') && archived && existsSync(archived)) {
+    if (p.kind === 'html' && archived && existsSync(archived)) {
       return this.submit({
         payload: { kind: 'file', path: archived },
         options: {
@@ -188,14 +183,10 @@ export class PrintService {
     }
   }
 
-  /** 内容归一：四种负载 → 通道可执行形态（HTML / PDF）。paper 为宽松解析结果（undefined = 交驱动默认纸张） */
+  /** 内容归一：三类负载（HTML/文件/URL）→ 通道可执行形态（HTML / PDF）。paper 为宽松解析结果（undefined = 交驱动默认纸张） */
   private async normalizeContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> {
     const p = req.payload
     switch (p.kind) {
-      case 'template': {
-        const html = await renderTemplateHtml(p.templateId, p.data, paper)
-        return { type: 'html', html }
-      }
       case 'html':
         return { type: 'html', html: p.html }
       case 'file': {
