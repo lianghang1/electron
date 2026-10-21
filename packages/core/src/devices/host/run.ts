@@ -118,26 +118,28 @@ function withCardSession<D extends { open: () => void, close: () => void }, R>(
 
 /**
  * offline note 增强：资源目录下存在「厂商名前缀」的相近目录时提示疑似打错
- * （如声明 devices/huashi/... 但发现 huashi1/ ——装机排查从盲猜变直接指路）
+ * （如声明 devices/idcard/huashi/... 但发现 idcard/huashi1/ ——装机排查从盲猜变直接指路）。
+ * 厂商段取平台段前一段（print 无厂商层时恰为域名，平台目录不会命中前缀）。
  */
 function typoHintOf(resourcesRoot: string, dllFile: string): string {
-  const vendor = dllFile.split('/')[1]
-  if (!vendor) {
+  const segments = dllFile.split('/')
+  const vendor = segments[segments.length - 2]
+  if (!vendor || segments.length < 4) {
     return ''
   }
-  const devicesDir = join(resourcesRoot, 'devices')
-  if (!existsSync(devicesDir)) {
+  const domainDir = join(resourcesRoot, 'devices', segments[1])
+  if (!existsSync(domainDir)) {
     return ''
   }
   let entries: string[]
   try {
-    entries = readdirSync(devicesDir, { withFileTypes: true }).map(entry => entry.name)
+    entries = readdirSync(domainDir, { withFileTypes: true }).map(entry => entry.name)
   }
   catch {
     return ''
   }
   const suspect = entries.find(name => name !== vendor && name.startsWith(vendor))
-  return suspect ? `；疑似目录名打错: ${suspect}/` : ''
+  return suspect ? `；疑似目录名打错: ${segments[1]}/${suspect}/` : ''
 }
 
 /**

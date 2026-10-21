@@ -19,11 +19,13 @@ describe('collectAssetDeclarations（代码内资源声明枚举）', () => {
     expect(origins).toContain('print SumatraPDF')
   })
 
-  it('全部声明符合 devices/<厂商>/<平台>/<文件> 四段格式', () => {
+  it('声明符合 devices/<域>/<厂商>/<平台>/<文件> 格式（print 无厂商层四段）', () => {
     for (const declaration of collectAssetDeclarations()) {
       const segments = declaration.file.split('/')
-      expect(segments, declaration.origin).toHaveLength(4)
       expect(segments[0], declaration.origin).toBe('devices')
+      expect([4, 5], declaration.origin).toContain(segments.length)
+      // 倒数第二段 = 平台目录（win64/linux-arm64…）
+      expect(segments.at(-2), declaration.origin).toMatch(/^(win64|linux-arm64)$/)
       for (const segment of segments) {
         expect(segment.length, declaration.origin).toBeGreaterThan(0)
       }
@@ -39,9 +41,16 @@ describe('auditDeviceAssets（仓库真实源对账）', () => {
     expect(result.orphans).toEqual([])
   })
 
-  it('源资产覆盖全部已声明厂商', () => {
-    const vendors = collectAssetSources(DEVICES_ROOT).map(s => s.vendor)
-    expect(vendors).toEqual(expect.arrayContaining(['huashi', 'kemi', 'decard', 'hanvon', 'print']))
+  it('源资产覆盖全部已声明厂商（域/厂商双键）', () => {
+    const targetRels = collectAssetSources(DEVICES_ROOT).map(s => s.targetRel)
+    expect(targetRels).toEqual(expect.arrayContaining([
+      'idcard/huashi',
+      'idcard/kemi',
+      'iccard/decard',
+      'capture/huashi',
+      'signature/hanvon',
+      'print',
+    ]))
   })
 })
 
@@ -53,7 +62,7 @@ describe('auditDeviceAssets（缺失与孤儿检出）', () => {
   })
 
   it('设备 SDK 缺失 → missing 区分「目录缺失」与「目录在但文件缺」', () => {
-    // huashi 目录在但空（文件缺失），其余厂商整目录缺失
+    // idcard/huashi 目录在但空（文件缺失），其余厂商整目录缺失
     mkdirSync(path.join(fakeRoot, 'idcard', 'vendors', 'huashi', 'assets', 'win64'), { recursive: true })
 
     const result = auditDeviceAssets(fakeRoot)
@@ -63,11 +72,11 @@ describe('auditDeviceAssets（缺失与孤儿检出）', () => {
     expect(missingOrigins).toContain('print SumatraPDF')
 
     const huashiMissing = result.missing.find(m => m.origin === 'idcard 驱动 huashi')
-    expect(huashiMissing?.file).toBe('devices/huashi/win64/Termb.dll')
-    expect(huashiMissing?.expected).toBe('源资产缺失: huashi/assets/win64/Termb.dll')
+    expect(huashiMissing?.file).toBe('devices/idcard/huashi/win64/Termb.dll')
+    expect(huashiMissing?.expected).toBe('源资产缺失: idcard/huashi/assets/win64/Termb.dll')
 
     const kemiMissing = result.missing.find(m => m.origin === 'idcard 驱动 kemi')
-    expect(kemiMissing?.expected).toBe('assets 源目录不存在: kemi/')
+    expect(kemiMissing?.expected).toBe('源资产不存在: idcard/kemi/win64/Termb.dll（核对域/厂商目录名）')
     expect(result.orphans).toEqual([])
   })
 
@@ -76,6 +85,17 @@ describe('auditDeviceAssets（缺失与孤儿检出）', () => {
     writeFileSync(path.join(fakeRoot, 'iccard', 'vendors', 'huashi1', 'assets', 'win64', 'Termb.dll'), '')
 
     const result = auditDeviceAssets(fakeRoot)
-    expect(result.orphans).toContain('huashi1')
+    expect(result.orphans).toContain('iccard/huashi1')
+  })
+
+  it('跨域同名厂商不互相污染：idcard/huashi 缺失不会因 capture/huashi 在位而误判通过', () => {
+    // capture 域 huashi SDK 在位、idcard 域 huashi 缺失（域键隔离的直接验证）
+    mkdirSync(path.join(fakeRoot, 'capture', 'vendors', 'huashi', 'assets', 'win64'), { recursive: true })
+    writeFileSync(path.join(fakeRoot, 'capture', 'vendors', 'huashi', 'assets', 'win64', 'Termb.dll'), '')
+
+    const result = auditDeviceAssets(fakeRoot)
+    const huashiMissing = result.missing.find(m => m.origin === 'idcard 驱动 huashi')
+    expect(huashiMissing).toBeDefined()
+    expect(huashiMissing?.expected).toBe('源资产缺失: idcard/huashi/assets/win64/Termb.dll')
   })
 })

@@ -24,7 +24,7 @@ export interface IcCardAdapter {
 export interface IcCardDriver {
   readonly brand: string
   readonly displayName: string
-  /** DLL 相对宿主资源根的出厂位置（如 devices/decard/win64/dcrf32.dll） */
+  /** DLL 相对宿主资源根的出厂位置（如 devices/iccard/decard/win64/dcrf32.dll） */
   readonly dllFile: string
   /** 同组设备互斥：驱动使用进程级全局资源时声明，service 据此合并设备锁 */
   readonly lockGroup?: string

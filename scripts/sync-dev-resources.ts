@@ -10,7 +10,9 @@ import { auditDeviceAssets, collectAssetSources } from '../packages/core/src/dev
  * resources/devices 是本脚本**覆盖式重建**的产物（源 → 应用，单向），postinstall 自动执行。
  *
  * 资产布局：assets 的父目录名 = 厂商名（分发目标目录名），assets 下按平台分目录
- * （win64/linux-arm64…），平台目录整体复制进产物——驱动声明路径为 devices/<厂商>/<平台>/<文件>。
+ * （win64/linux-arm64…），平台目录整体复制进产物——驱动声明路径为
+ * devices/<域>/<厂商>/<平台>/<文件>（print 无厂商层为 devices/print/<平台>/<文件>），
+ * 域 + 厂商双键命名空间隔离跨域同名厂商。
  *
  * 语义约定（曾有junction方案因"写入即回流根目录"的反直觉行为被否决）：
  * - 应用侧目录是再生成的产物，**不是**应用专属文件的位置——手工添加的文件会在下次同步时丢失
@@ -40,12 +42,12 @@ function countFiles(dir: string): number {
   return listFiles(dir).length
 }
 
-/** 期望产物文件集（<厂商>/<平台>/<文件>），extras 警告与孤儿判断的基准 */
+/** 期望产物文件集（<域>/<厂商>/<平台>/<文件>），extras 警告与孤儿判断的基准 */
 function expectedFiles(): Set<string> {
   const files = new Set<string>()
   for (const source of collectAssetSources(DEVICES_SRC)) {
     for (const rel of listFiles(source.dir)) {
-      files.add(`${source.vendor}/${rel}`)
+      files.add(`${source.targetRel}/${rel}`)
     }
   }
   return files
@@ -69,7 +71,7 @@ function auditOrThrow(): void {
 }
 
 /** 重建单个应用的 resources/devices（覆盖式：整体删除后从源复制） */
-function rebuildApp(app: string, sources: Array<{ vendor: string, dir: string }>, expected: Set<string>): void {
+function rebuildApp(app: string, sources: Array<{ targetRel: string, dir: string }>, expected: Set<string>): void {
   const target = path.join(APPS_DIR, app, 'resources', 'devices')
   mkdirSync(path.dirname(target), { recursive: true })
 
@@ -85,7 +87,7 @@ function rebuildApp(app: string, sources: Array<{ vendor: string, dir: string }>
 
   rmSync(target, { recursive: true, force: true })
   for (const source of sources) {
-    cpSync(source.dir, path.join(target, source.vendor), { recursive: true })
+    cpSync(source.dir, path.join(target, source.targetRel), { recursive: true })
   }
   console.log(`  + ${app}: resources/devices 已从源资产复制（${countFiles(target)} 个文件）`)
 }

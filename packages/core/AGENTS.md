@@ -21,7 +21,8 @@ devices/
 
 - 厂商 SDK 二进制（DLL/license/SumatraPDF）是驱动代码的随仓资产：放 `<域>/vendors/<厂商>/assets/<平台>/`
   （print 无厂商层，直接 `print/assets/<平台>/`），**assets 的父目录名 = 厂商名**，与驱动类同目录演进；
-- 驱动声明路径格式统一 `devices/<厂商>/<平台>/<文件>`（如 `devices/huashi/win64/Termb.dll`），
+- 驱动声明路径格式统一 `devices/<域>/<厂商>/<平台>/<文件>`（如 `devices/idcard/huashi/win64/Termb.dll`；
+  print 无厂商层为四段 `devices/print/<平台>/<文件>`），域 + 厂商双键命名空间隔离跨域同名厂商，
   相对宿主资源根（dev = `<应用根>/resources/`，打包 = `<resourcesPath>/resources/`）；
 - 各应用 `resources/devices/` 是 `scripts/sync-dev-resources.ts`（postinstall 自动跑）覆盖式重建的
   **生成物，禁止手放文件、gitignore**——同步前先跑 asset-audit 对账，目录名打错 / SDK 漏放 /
@@ -31,7 +32,7 @@ devices/
 
 ## 新厂商接入指南
 
-### WS 厂商（协议走 WebSocket，如华视 CamSDK / 点易拍）
+### WS 厂商（协议走 WebSocket，如 CamSDK / 点易拍）
 
 1. `kernel/channel/ws-channel.ts` 的 `withWsSession` 写会话逻辑（连接/超时/收尾内置），禁止手写 `new WebSocket` 生命周期；
 2. 厂商模块实现所在域的 Vendor 契约（如 `capture/vendors/vendor-types.ts` 的 `CaptureVendor`），
@@ -43,7 +44,7 @@ devices/
 1. idcard/iccard 形状：`idcard/vendors/`（身份证）/ `iccard/vendors/`（IC 卡）新增驱动类
    （纯 koffi 调用，参照 huashi/kemi/decard），`host/run.ts` 对应域驱动注册表（ID_DRIVERS/IC_DRIVERS）
    加一行；设备 capabilities 按域语义生成（idcard 域恒 'idcard'，iccard 域按写卡能力补 'iccard-write'）；
-   SDK 二进制放驱动类同目录 `assets/win64/`，dllFile 声明 `devices/<厂商>/win64/<DLL>`（asset-audit 强校验）；
+   SDK 二进制放驱动类同目录 `assets/win64/`，dllFile 声明 `devices/<域>/<厂商>/win64/<DLL>`（asset-audit 强校验）；
 2. capture/signature 形状：厂商协议档案放对应域 `vendors/`，在 `host/run.ts` 域方法表补方法；
 3. 全部 koffi 调用必须在守护进程域方法内执行（`DeviceHost.request`），主进程/适配器零 native 依赖；
 4. 调用约定与结构体出参：cdecl/stdcall 以厂商文档为准；koffi 结构体指针解码不可用，

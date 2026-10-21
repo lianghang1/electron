@@ -20,7 +20,7 @@ export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
     displayName: '华视 CVR-100（DLL SDK）',
     transport: 'dll',
     dll: {
-      file: 'devices/huashi/win64/Termb.dll',
+      file: 'devices/capture/huashi/win64/Termb.dll',
       functions: {
         Init: 'int __stdcall InitComm(int iPort)',
         ReadCard: 'int __stdcall ReadBaseMsg(unsigned char *pmsg, unsigned int *len)',
@@ -29,11 +29,11 @@ export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
     capabilities: { ocr: true },
   },
   {
-    id: 'huashi-camsdk',
-    brand: '华视',
-    displayName: '华视高拍仪（本地服务）',
+    id: 'camsdk',
+    brand: 'CamSDK',
+    displayName: 'CamSDK 高拍仪（本地服务 9000）',
     transport: 'ws',
-    // 华视 CamSDKServer（高拍仪 SDK 常驻服务）JSON 协议：
+    // CamSDKServer（华夏电通「华夏扫描中间件」常驻服务，多厂商高拍仪经白名单接入）JSON 协议：
     // GetCameraInfo / OpenCamera / GetCameraVideoBuff / CameraCapture(base64) / CloseCamera
     // camId = devNum：0 为高拍仪主摄像头（Document Scanner），服务端另有副摄与内置摄像头
     ws: { url: 'ws://127.0.0.1:9000', protocol: 'camsdk', camId: 0 },

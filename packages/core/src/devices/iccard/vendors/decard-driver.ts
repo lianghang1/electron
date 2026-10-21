@@ -9,7 +9,7 @@ import { icCardError } from '../errors'
 /**
  * 德卡 IC 卡读卡器驱动（dcrf32.dll，Mifare Classic 全系列通用 API，返回码 0 = 成功）。
  *
- * DLL（resources/devices/decard/win64/dcrf32.dll，x64；USB 通讯依赖须与 DLL 同目录放置 libusb-1.0.dll）。
+ * DLL（resources/devices/iccard/decard/win64/dcrf32.dll，x64；USB 通讯依赖须与 DLL 同目录放置 libusb-1.0.dll）。
  * 端口约定（dcrf32.h）：0-99 = 串口，100-199 = USB（100 = 第一个 USB 设备），<0 = 打开失败。
  *   dc_init(port, baud)          打开设备 → 句柄
  *        ↓
@@ -61,7 +61,7 @@ export class DecardDriver implements IcCardDriver {
   readonly brand = '德卡'
   readonly displayName = '德卡 IC 卡读卡器（USB）'
   /** DLL 相对宿主资源根的出厂位置 */
-  readonly dllFile = 'devices/decard/win64/dcrf32.dll'
+  readonly dllFile = 'devices/iccard/decard/win64/dcrf32.dll'
   /** 端口号：100-199 = USB（100 = 第一个 USB 设备），0-99 = 串口（USB 路线波特率被忽略） */
   readonly port = 100
   readonly baud = 115200
