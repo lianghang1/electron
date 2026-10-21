@@ -1,4 +1,4 @@
-import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureDialogRequest, CaptureRequest, CaptureResult } from '../../devices/capture'
+import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides, CaptureDialogRequest, CaptureRequest, CaptureResult } from '../../devices/capture'
 import { invoke, push } from '../../../domain'
 
 /**
@@ -16,8 +16,8 @@ import { invoke, push } from '../../../domain'
  * 前者纯程序化无 UI、恒单张；后者开原生浮层窗、占用全局互斥会话、可多拍/取消（返回数组），
  * 专属参数（format… vs title/maxCount…）与专属错误（DEVICE_BUSY）互斥。
  *
- * 设备配置（CaptureDeviceConfig）与 scanner.getConfig/setConfig 同构：读全量、写一条；
- * 多设备域配置为每设备一份的列表（按 id 整条 upsert），单设备域为全局一份（patch 合并）。
+ * 设备配置（CaptureDeviceConfig）清单由代码出厂预设锁死，界面仅提交白名单覆盖
+ * （CaptureDeviceOverrides：名称/连接参数），多设备域配置为每设备一份的列表。
  *
  * saveDataUrl 仅为 UVC 路线配套：图片数据在渲染层抽帧（getUserMedia dataURL），
  * 落盘须经 Main 的 fs；ws/SDK 路线 Main 直接收字节自行落盘，不走该通道。
@@ -29,12 +29,10 @@ export const captureDomainDefs = {
   // ---- 设备发现与配置 ----
   /** 设备列表：各适配器上报后合并（含连通性探测状态） */
   listDevices: invoke<() => Promise<CaptureDevice[]>>(),
-  /** 设备配置列表（出厂 + 运行时编辑） */
+  /** 设备配置列表（出厂预设 + 现场白名单覆盖合并后的全量档案，只读视图） */
   getConfig: invoke<() => Promise<CaptureDeviceConfig[]>>(),
-  /** 运行时编辑设备配置（按 id 整条 upsert，热重建适配器） */
-  setConfig: invoke<(config: CaptureDeviceConfig) => void>(),
-  /** 删除设备配置（按 id；无此 id 返回 false），热重建适配器 */
-  removeConfig: invoke<(id: string) => Promise<boolean>>(),
+  /** 现场白名单覆盖（按档案 id 提交名称/连接参数；清单与技术字段代码锁死，热重建适配器） */
+  setConfig: invoke<(id: string, overrides: CaptureDeviceOverrides) => void>(),
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo；不占用摄像头） */
   listCameras: invoke<(deviceId: string) => Promise<CaptureCameraInfo[]>>(),
   /** 域默认设备 id（系统设置指定；业务调用 deviceId 缺省时优先使用，就绪才生效） */

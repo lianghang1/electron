@@ -1,4 +1,4 @@
-import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import type { DeviceHost } from '../host/device-host'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
@@ -15,10 +15,10 @@ export interface CaptureServiceOptions {
   resourcesRoot: string
   /** 设备守护进程（DLL 探测的 koffi 调用崩溃隔离在 host 进程） */
   host: DeviceHost
-  /** 初始设备配置（持久化回注；不传 = 出厂配置） */
-  initialConfigs?: CaptureDeviceConfig[]
-  /** 运行时编辑持久化（未注入则编辑仅内存生效） */
-  persist?: (configs: CaptureDeviceConfig[]) => void
+  /** 现场白名单覆盖（历史持久化回注；不传 = 出厂档案原样） */
+  initialOverrides?: CaptureDeviceOverrides[]
+  /** 运行时编辑持久化（白名单覆盖形状；未注入则编辑仅内存生效） */
+  persist?: (overrides: CaptureDeviceOverrides[]) => void
   /** 结构化日志注入（采集日志不含图片内容） */
   logger?: CaptureLogFn
   /** 采集图片默认保存目录（绝对路径） */
@@ -27,6 +27,82 @@ export interface CaptureServiceOptions {
   getDefaultDeviceId?: () => string | undefined
   /** 域默认设备 id 持久化写（undefined = 清除） */
   setDefaultDeviceId?: (id: string | undefined) => void
+}
+
+/** 档案 → 白名单覆盖（持久化只写现场可调字段，技术字段永远随代码出厂） */
+function overridesOf(p: CaptureDeviceConfig): CaptureDeviceOverrides {
+  return {
+    id: p.id,
+    displayName: p.displayName,
+    ...(p.ws
+      ? {
+          ws: {
+            url: p.ws.url,
+            camId: p.ws.camId,
+            width: p.ws.width,
+            height: p.ws.height,
+            ...(p.ws.wake ? { wake: { command: p.ws.wake.command } } : {}),
+          },
+        }
+      : {}),
+    ...(p.service
+      ? { service: { baseUrl: p.service.baseUrl, listPath: p.service.listPath, capturePath: p.service.capturePath } }
+      : {}),
+  }
+}
+
+/** 白名单字段就地覆盖（仅非空字段生效；历史整条持久化按同名字段读取，旧 dll 段等自然忽略） */
+function applyOverrides(profile: CaptureDeviceConfig, s: CaptureDeviceOverrides): void {
+  if (typeof s.displayName === 'string' && s.displayName.trim()) {
+    profile.displayName = s.displayName
+  }
+  if (profile.ws && s.ws) {
+    if (typeof s.ws.url === 'string' && s.ws.url.trim()) {
+      profile.ws.url = s.ws.url
+    }
+    if (typeof s.ws.camId === 'number' && s.ws.camId >= 0) {
+      profile.ws.camId = s.ws.camId
+    }
+    if (typeof s.ws.width === 'number' && s.ws.width > 0) {
+      profile.ws.width = s.ws.width
+    }
+    if (typeof s.ws.height === 'number' && s.ws.height > 0) {
+      profile.ws.height = s.ws.height
+    }
+    // wake 段提交即整体重设：空命令 = 清除拉起命令（回落发现式策略）
+    if (s.ws.wake !== undefined) {
+      const command = typeof s.ws.wake.command === 'string' ? s.ws.wake.command.trim() : ''
+      profile.ws.wake = command ? { command } : undefined
+    }
+  }
+  if (profile.service && s.service) {
+    if (typeof s.service.baseUrl === 'string' && s.service.baseUrl.trim()) {
+      profile.service.baseUrl = s.service.baseUrl
+    }
+    if (typeof s.service.listPath === 'string' && s.service.listPath.trim()) {
+      profile.service.listPath = s.service.listPath
+    }
+    if (typeof s.service.capturePath === 'string' && s.service.capturePath.trim()) {
+      profile.service.capturePath = s.service.capturePath
+    }
+  }
+}
+
+/**
+ * 历史持久化合并 + 白名单提取：以出厂整条为基准，stored 同 id 仅提取白名单字段
+ * （名称/连接参数）覆盖——代码修改任何技术字段（品牌/协议/能力/DLL）立即生效，
+ * 本地旧数据不再整体压住出厂值。清单完全由代码预设决定。
+ */
+function migrateCaptureConfigs(overrides?: CaptureDeviceOverrides[]): CaptureDeviceConfig[] {
+  const stored = Array.isArray(overrides) ? overrides : []
+  return BUILT_IN_CAPTURE_CONFIGS.map((b) => {
+    const profile = structuredClone(b)
+    const s = stored.find(x => x.id === b.id)
+    if (s) {
+      applyOverrides(profile, s)
+    }
+    return profile
+  })
 }
 
 /**
@@ -43,7 +119,7 @@ export class CaptureService {
   private readonly logger: CaptureLogFn
   /** 采集图片默认保存目录（绝对路径） */
   private readonly defaultSaveDir: string
-  private readonly persist?: (configs: CaptureDeviceConfig[]) => void
+  private readonly persist?: (overrides: CaptureDeviceOverrides[]) => void
   private readonly getDefaultDeviceId?: () => string | undefined
   private readonly setDefaultDeviceId?: (id: string | undefined) => void
   private readonly resourcesRoot: string
@@ -57,7 +133,7 @@ export class CaptureService {
     this.setDefaultDeviceId = options.setDefaultDeviceId
     this.resourcesRoot = options.resourcesRoot
     this.host = options.host
-    this.configs = options.initialConfigs ?? BUILT_IN_CAPTURE_CONFIGS
+    this.configs = migrateCaptureConfigs(options.initialOverrides)
     this.adapters = this.buildAdapters()
   }
 
@@ -73,30 +149,22 @@ export class CaptureService {
     return new Map<string, CaptureAdapter>(adapters)
   }
 
-  /** 运行时编辑设备配置：按 id 整条 upsert → 持久化 → 热重建适配器（地址/端口变更即时生效） */
-  setConfig(config: CaptureDeviceConfig): void {
-    if (!config?.id || !config.transport) {
-      throw toCaptureError(captureError('VALIDATION_FAILED', '设备配置缺少 id 或 transport'))
+  /** 运行时现场白名单覆盖：档案 id 必须为出厂预设项；覆盖 → 持久化白名单 → 热重建适配器 */
+  setConfig(id: string, overrides: CaptureDeviceOverrides): void {
+    if (!this.configs.some(p => p.id === id)) {
+      throw captureError('VALIDATION_FAILED', `设备档案不存在: ${id}`)
     }
-    const list = this.configs.slice()
-    const i = list.findIndex(p => p.id === config.id)
-    if (i >= 0) { list[i] = config }
-    else { list.push(config) }
+    const list = this.configs.map((p) => {
+      if (p.id !== id) {
+        return p
+      }
+      const next = structuredClone(p)
+      applyOverrides(next, overrides)
+      return next
+    })
     this.configs = list
-    this.persist?.(list)
+    this.persist?.(list.map(overridesOf))
     this.adapters = this.buildAdapters()
-  }
-
-  /** 删除设备配置：无此 id 返回 false；删除后热重建适配器 */
-  removeConfig(id: string): boolean {
-    const list = this.configs.filter(p => p.id !== id)
-    if (list.length === this.configs.length) {
-      return false
-    }
-    this.configs = list
-    this.persist?.(list)
-    this.adapters = this.buildAdapters()
-    return true
   }
 
   getConfigs(): CaptureDeviceConfig[] {

@@ -239,8 +239,11 @@ registerDomainMethods('print', {
 
 // ── capture 域：DLL 路线探测（koffi 可用性 + DLL 就位收敛进守护进程，主进程零 native 依赖） ──
 
+/** dll-adapter 发送的档案载荷：dll 段由 core 内部 DLL 注册表回填（档案本体不含，守护进程只认该形状） */
+type DaemonCaptureProfile = CaptureDeviceConfig & { dll?: { file: string, functions?: Record<string, string> } }
+
 /** DLL 域配置探测：平台不支持/koffi 缺失 → unavailable；DLL 缺席 → offline；就位 → ready（待厂商档案后真正可用） */
-function listCaptureDevices(resourcesRoot: string, profiles: CaptureDeviceConfig[]): CaptureDevice[] {
+function listCaptureDevices(resourcesRoot: string, profiles: DaemonCaptureProfile[]): CaptureDevice[] {
   const native = nativeAvailability()
   return profiles.flatMap((p) => {
     const dll = p.dll
@@ -280,7 +283,7 @@ function listCaptureDevices(resourcesRoot: string, profiles: CaptureDeviceConfig
 
 registerDomainMethods('capture', {
   'capture.listDevices': (payload) => {
-    const { resourcesRoot, profiles } = payload as { resourcesRoot: string, profiles: CaptureDeviceConfig[] }
+    const { resourcesRoot, profiles } = payload as { resourcesRoot: string, profiles: DaemonCaptureProfile[] }
     return listCaptureDevices(resourcesRoot, profiles)
   },
 })

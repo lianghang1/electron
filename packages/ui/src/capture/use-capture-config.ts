@@ -1,24 +1,14 @@
-import type { CaptureDevice, CaptureDeviceConfig } from '@desktop/shared'
-import { computed, onScopeDispose, reactive, ref } from 'vue'
-
-/** 配置面板可选接入方式（uvc=本机摄像头无需配置、stub=内置测试，不进管理界面） */
-export const CONFIG_TRANSPORTS: { value: CaptureDeviceConfig['transport'], label: string }[] = [
-  { value: 'ws', label: '高拍仪（WebSocket）' },
-  { value: 'dll', label: 'SDK 直连（DLL）' },
-  { value: 'service', label: '服务接入（HTTP）' },
-  { value: 'wia', label: '扫描仪（WIA）' },
-]
+import type { CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides } from '@desktop/shared'
+import { isWsUrl } from '@desktop/shared'
+import { computed, reactive, ref } from 'vue'
 
 /** 设备状态展示序（用于列表状态点配色） */
 export type ConfigDeviceStatus = CaptureDevice['status'] | 'missing'
 
-/** 删除两步确认的自动复位时长：超时未确认视为放弃 */
-const REMOVE_CONFIRM_MS = 3000
-
 /**
  * 拍摄设置面板视图状态（reactive 扁平化，经 props 传入面板直接绑定，
  * 状态归系统设置弹窗持有，面板只做展示与动作转发）。
- * 列表 + 选中编辑 + 保存/删除，未保存改动关闭即丢弃。
+ * 档案清单由代码出厂预设锁死：选择 + 选中编辑白名单字段 + 保存，未保存改动关闭即丢弃。
  */
 export interface CaptureConfigView {
   configs: CaptureDeviceConfig[]
@@ -27,7 +17,7 @@ export interface CaptureConfigView {
   defaultDeviceId: string
   loading: boolean
   saving: boolean
-  /** 保存/删除成功提示（短暂展示后清除） */
+  /** 保存成功提示（短暂展示后清除） */
   message: string
   error: string
   selected: CaptureDeviceConfig | undefined
@@ -35,16 +25,9 @@ export interface CaptureConfigView {
   dirty: boolean
   /** 选中配置对应的统一设备状态（设备 id = "<transport>:<配置 id>"） */
   statusOf: (config: CaptureDeviceConfig) => ConfigDeviceStatus
-  /** 删除两步确认武装中（按钮变「确认删除？」） */
-  confirmingRemove: boolean
   load: () => Promise<void>
   select: (id: string) => void
-  /** 新增空白档案（本地入列未保存，填写后保存 upsert 落库） */
-  add: () => void
   save: () => Promise<void>
-  remove: () => Promise<void>
-  /** 两步确认删除：首次点击武装（超时自动复位），再次点击执行删除 */
-  requestRemove: () => void
   /** 设为/取消域默认设备（设为当前选中配置对应的设备；取消传 undefined） */
   setDefault: (deviceId: string | undefined) => Promise<void>
   /** 试拍测试进行中标记 */
@@ -119,25 +102,6 @@ export function useCaptureConfig(): CaptureConfigView {
     selectedId.value = id
     error.value = ''
     snapThumb.value = ''
-    resetRemoveConfirm()
-  }
-
-  /** 新增空白档案：默认 ws 路线（最常用），id 本地生成（保存时随档案落库） */
-  function add(): void {
-    const id = `dev-${Date.now().toString(36)}`
-    const blank: CaptureDeviceConfig = {
-      id,
-      displayName: '',
-      brand: '',
-      transport: 'ws',
-      ws: { url: '' },
-    }
-    configs.value = [...configs.value, blank]
-    savedSnapshots.value.delete(id)
-    selectedId.value = id
-    error.value = ''
-    snapThumb.value = ''
-    resetRemoveConfirm()
   }
 
   async function save(): Promise<void> {
@@ -151,32 +115,12 @@ export function useCaptureConfig(): CaptureConfigView {
     saving.value = true
     error.value = ''
     try {
-      await window.desktop.capture.setConfig(snapshot(config))
+      await window.desktop.capture.setConfig(config.id, snapshotOverrides(config))
       savedSnapshots.value.set(config.id, JSON.stringify(config))
       showMessage('已保存')
     }
     catch (err) {
       error.value = describeError(err, '保存失败')
-    }
-    finally {
-      saving.value = false
-    }
-  }
-
-  async function remove(): Promise<void> {
-    const config = selected.value
-    if (!config) { return }
-    saving.value = true
-    error.value = ''
-    try {
-      const removed = await window.desktop.capture.removeConfig(config.id)
-      configs.value = configs.value.filter(c => c.id !== config.id)
-      savedSnapshots.value.delete(config.id)
-      selectedId.value = configs.value[0]?.id ?? ''
-      showMessage(removed ? '已删除' : '未找到对应配置')
-    }
-    catch (err) {
-      error.value = describeError(err, '删除失败')
     }
     finally {
       saving.value = false
@@ -199,33 +143,6 @@ export function useCaptureConfig(): CaptureConfigView {
       saving.value = false
     }
   }
-
-  /** 删除两步确认：首次点击武装，超时未确认自动复位（免弹窗的轻量确认） */
-  const confirmingRemove = ref(false)
-  let removeTimer: ReturnType<typeof setTimeout> | null = null
-
-  function requestRemove(): void {
-    if (confirmingRemove.value) {
-      resetRemoveConfirm()
-      void remove()
-      return
-    }
-    confirmingRemove.value = true
-    removeTimer = setTimeout(() => {
-      confirmingRemove.value = false
-      removeTimer = null
-    }, REMOVE_CONFIRM_MS)
-  }
-
-  function resetRemoveConfirm(): void {
-    confirmingRemove.value = false
-    if (removeTimer) {
-      clearTimeout(removeTimer)
-      removeTimer = null
-    }
-  }
-
-  onScopeDispose(resetRemoveConfirm)
 
   /** 试拍测试：先保存当前配置（未保存参数不生效），再按 "<transport>:<配置 id>" 采集一张 */
   async function snapTest(): Promise<void> {
@@ -267,13 +184,9 @@ export function useCaptureConfig(): CaptureConfigView {
     selected,
     dirty,
     statusOf,
-    confirmingRemove,
     load,
     select,
-    add,
     save,
-    remove,
-    requestRemove,
     setDefault,
     snapping,
     snapThumb,
@@ -281,31 +194,36 @@ export function useCaptureConfig(): CaptureConfigView {
   })
 }
 
-/** 保存前校验：transport 对应的必填连接参数 */
+/** 配置 → 现场白名单覆盖（名称 + 连接参数；wake 显式提交，空命令 = 清除拉起命令回落发现式策略） */
+function snapshotOverrides(config: CaptureDeviceConfig): CaptureDeviceOverrides {
+  return {
+    displayName: config.displayName,
+    ...(config.ws
+      ? {
+          ws: {
+            url: config.ws.url,
+            camId: config.ws.camId,
+            width: config.ws.width,
+            height: config.ws.height,
+            wake: { command: config.ws.wake?.command ?? '' },
+          },
+        }
+      : {}),
+    ...(config.service
+      ? { service: { baseUrl: config.service.baseUrl, listPath: config.service.listPath, capturePath: config.service.capturePath } }
+      : {}),
+  }
+}
+
+/** 保存前校验：白名单字段的必填连接参数（清单与技术字段由代码出厂预设锁死，无需校验） */
 function validate(config: CaptureDeviceConfig): string | null {
   if (!config.displayName.trim()) { return '设备名称不能为空' }
-  if (config.transport === 'ws' && !config.ws?.url.trim()) { return '高拍仪必须填写 WebSocket 地址' }
-  if (config.transport === 'dll' && !config.dll?.file.trim()) { return 'SDK 直连必须填写 DLL 路径' }
-  if (config.transport === 'service') {
-    if (!config.service?.baseUrl.trim()) { return '服务接入必须填写服务地址' }
+  if (config.transport === 'ws' && config.ws && !isWsUrl(config.ws.url)) { return '高拍仪服务地址不合法（须 ws:// 或 wss:// 前缀）' }
+  if (config.transport === 'service' && config.service) {
+    if (!config.service.baseUrl.trim()) { return '服务接入必须填写服务地址' }
     if (!config.service.capturePath.trim()) { return '服务接入必须填写采集路径' }
   }
   return null
-}
-
-/** IPC 走 structured clone：必须传纯对象快照，Vue 响应式 Proxy 无法克隆 */
-function snapshot(config: CaptureDeviceConfig): CaptureDeviceConfig {
-  return {
-    ...config,
-    dll: config.dll
-      ? { ...config.dll, functions: config.dll.functions ? { ...config.dll.functions } : undefined }
-      : undefined,
-    ws: config.ws ? { ...config.ws } : undefined,
-    service: config.service
-      ? { ...config.service, extraHeaders: config.service.extraHeaders ? { ...config.service.extraHeaders } : undefined }
-      : undefined,
-    capabilities: config.capabilities ? { ...config.capabilities } : undefined,
-  }
 }
 
 function describeError(err: unknown, fallback: string): string {

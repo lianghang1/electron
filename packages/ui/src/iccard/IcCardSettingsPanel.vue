@@ -31,11 +31,7 @@ function onSave(): void {
       :items="selectItems"
       :model-value="state.selectedId"
       :loading="state.loading"
-      :confirming-remove="state.confirmingRemove"
-      add-label="新增设备"
       @update:model-value="state.select"
-      @add="state.add()"
-      @remove="state.requestRemove()"
     />
 
     <section v-if="state.selected" class="icc-editor">
@@ -52,7 +48,6 @@ function onSave(): void {
       <DeviceProfileForm
         :config="state.selected"
         name-placeholder="如：发卡器（窗口）"
-        brand-placeholder="如：德卡"
         url-placeholder="ws://127.0.0.1:9000"
         url-hint="ws 路线协议适配未接入：档案可先行录入，接入后自动生效"
       />
@@ -62,7 +57,7 @@ function onSave(): void {
       </div>
     </section>
     <p v-else class="icc-empty">
-      {{ state.loading ? '正在载入配置…' : '暂无设备档案，点击「新增设备」创建' }}
+      {{ state.loading ? '正在载入配置…' : '暂无设备档案（清单由代码出厂预设）' }}
     </p>
 
     <div class="icc-actions">

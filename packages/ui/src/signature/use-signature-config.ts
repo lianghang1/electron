@@ -1,14 +1,11 @@
-import type { SignDeviceConfig } from '@desktop/shared'
+import type { SignatureDeviceOverrides, SignDeviceConfig } from '@desktop/shared'
 import type { ConfigDeviceStatus } from '../capture/use-capture-config'
 import { isWsUrl } from '@desktop/shared'
-import { computed, onScopeDispose, reactive, ref } from 'vue'
-
-/** 删除两步确认的自动复位时长：超时未确认视为放弃 */
-const REMOVE_CONFIRM_MS = 3000
+import { computed, reactive, ref } from 'vue'
 
 /**
  * 签名屏设置面板视图状态（reactive 扁平化，状态归系统设置弹窗持有，面板只做展示与动作转发）。
- * 档案制：ws/dll 双路线设备档案列表 + 选中编辑 + 保存/删除，未保存改动关闭即丢弃。
+ * 档案制：ws/dll 双路线设备档案列表（清单由代码出厂预设锁死）+ 选中编辑 + 保存，未保存改动关闭即丢弃。
  * 设备在线状态经 listDevices 联动（ws 档案探活服务连接，dll 档案经守护进程在位探测）。
  */
 export interface SignatureConfigView {
@@ -16,7 +13,7 @@ export interface SignatureConfigView {
   selectedId: string
   loading: boolean
   saving: boolean
-  /** 保存/删除成功提示（短暂展示后清除） */
+  /** 保存成功提示（短暂展示后清除） */
   message: string
   error: string
   selected: SignDeviceConfig | undefined
@@ -24,15 +21,9 @@ export interface SignatureConfigView {
   dirty: boolean
   /** 选中档案对应的设备状态（设备 id = "<transport>:<档案 id>"） */
   statusOf: (config: SignDeviceConfig) => ConfigDeviceStatus
-  /** 删除两步确认武装中（按钮变「确认删除？」） */
-  confirmingRemove: boolean
   load: () => Promise<void>
   select: (id: string) => void
-  /** 新增空白档案（本地入列未保存，填写后保存 upsert 落库） */
-  add: () => void
   save: () => Promise<void>
-  /** 两步确认删除：首次点击武装（超时自动复位），再次点击执行删除 */
-  requestRemove: () => void
 }
 
 export function useSignatureConfig(): SignatureConfigView {
@@ -55,7 +46,7 @@ export function useSignatureConfig(): SignatureConfigView {
     return savedSnapshots.value.get(config.id) !== JSON.stringify(config)
   })
 
-  /** 档案对应设备的在线状态（档案新建未保存时无设备 → missing） */
+  /** 档案对应设备的在线状态 */
   const deviceStatus = ref(new Map<string, ConfigDeviceStatus>())
 
   function statusOf(config: SignDeviceConfig): ConfigDeviceStatus {
@@ -93,24 +84,6 @@ export function useSignatureConfig(): SignatureConfigView {
   function select(id: string): void {
     selectedId.value = id
     error.value = ''
-    resetRemoveConfirm()
-  }
-
-  /** 新增空白档案：id 本地生成（保存时随档案落库），服务地址留空待填 */
-  function add(): void {
-    const id = `pad-${Date.now().toString(36)}`
-    const blank: SignDeviceConfig = {
-      id,
-      displayName: '',
-      brand: '',
-      transport: 'ws',
-      ws: { url: '' },
-    }
-    configs.value = [...configs.value, blank]
-    savedSnapshots.value.delete(id)
-    selectedId.value = id
-    error.value = ''
-    resetRemoveConfirm()
   }
 
   async function save(): Promise<void> {
@@ -124,7 +97,7 @@ export function useSignatureConfig(): SignatureConfigView {
     saving.value = true
     error.value = ''
     try {
-      await window.desktop.signature.setConfig(snapshot(config))
+      await window.desktop.signature.setConfig(config.id, snapshotOverrides(config))
       savedSnapshots.value.set(config.id, JSON.stringify(config))
       showMessage('已保存')
       void refreshStatus()
@@ -136,53 +109,6 @@ export function useSignatureConfig(): SignatureConfigView {
       saving.value = false
     }
   }
-
-  async function removeInner(): Promise<void> {
-    const config = selected.value
-    if (!config) { return }
-    saving.value = true
-    error.value = ''
-    try {
-      const removed = await window.desktop.signature.removeConfig(config.id)
-      configs.value = configs.value.filter(c => c.id !== config.id)
-      savedSnapshots.value.delete(config.id)
-      selectedId.value = configs.value[0]?.id ?? ''
-      showMessage(removed ? '已删除' : '未找到对应档案')
-    }
-    catch (err) {
-      error.value = describeError(err, '删除失败')
-    }
-    finally {
-      saving.value = false
-    }
-  }
-
-  /** 删除两步确认：首次点击武装，超时未确认自动复位（免弹窗的轻量确认） */
-  const confirmingRemove = ref(false)
-  let removeTimer: ReturnType<typeof setTimeout> | null = null
-
-  function requestRemove(): void {
-    if (confirmingRemove.value) {
-      resetRemoveConfirm()
-      void removeInner()
-      return
-    }
-    confirmingRemove.value = true
-    removeTimer = setTimeout(() => {
-      confirmingRemove.value = false
-      removeTimer = null
-    }, REMOVE_CONFIRM_MS)
-  }
-
-  function resetRemoveConfirm(): void {
-    confirmingRemove.value = false
-    if (removeTimer) {
-      clearTimeout(removeTimer)
-      removeTimer = null
-    }
-  }
-
-  onScopeDispose(resetRemoveConfirm)
 
   /** 保存后重拉设备状态（地址变更后探活结果随之刷新） */
   async function refreshStatus(): Promise<void> {
@@ -214,25 +140,25 @@ export function useSignatureConfig(): SignatureConfigView {
     selected,
     dirty,
     statusOf,
-    confirmingRemove,
     load,
     select,
-    add,
     save,
-    requestRemove,
   })
+}
+
+/** 档案 → 现场白名单覆盖（名称/ws 地址；清单与技术字段由代码出厂预设锁死） */
+function snapshotOverrides(config: SignDeviceConfig): SignatureDeviceOverrides {
+  return {
+    displayName: config.displayName,
+    ...(config.transport === 'ws' && config.ws ? { ws: { url: config.ws.url } } : {}),
+  }
 }
 
 /** 保存前校验：与主进程 sanitize 同规则（必填缺失直接提示，不发无效请求） */
 function validate(config: SignDeviceConfig): string | null {
   if (!config.displayName.trim()) { return '设备名称不能为空' }
-  if (config.transport === 'ws' && !isWsUrl(config.ws.url)) { return '服务地址不合法（须 ws:// 或 wss:// 前缀）' }
+  if (config.transport === 'ws' && config.ws && !isWsUrl(config.ws.url)) { return '服务地址不合法（须 ws:// 或 wss:// 前缀）' }
   return null
-}
-
-/** IPC 走 structured clone：必须传纯对象快照，Vue 响应式 Proxy 无法克隆 */
-function snapshot(config: SignDeviceConfig): SignDeviceConfig {
-  return config.transport === 'ws' ? { ...config, ws: { ...config.ws } } : { ...config, dll: { ...config.dll } }
 }
 
 function describeError(err: unknown, fallback: string): string {

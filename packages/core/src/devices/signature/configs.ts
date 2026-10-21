@@ -19,6 +19,5 @@ export const BUILT_IN_SIGNATURE_CONFIGS: SignDeviceConfig[] = [
     brand: '汉王',
     displayName: '汉王签名板（DLL 直连）',
     transport: 'dll',
-    dll: {},
   },
 ]

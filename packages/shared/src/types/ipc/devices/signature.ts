@@ -1,4 +1,4 @@
-import type { SignatureConfig, SignDevice, SignDeviceConfig, SignSessionResult, SignStartResult, SignStrokePoint } from '../../devices/signature'
+import type { SignatureConfig, SignatureDeviceOverrides, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from '../../devices/signature'
 import { invoke, push } from '../../../domain'
 
 /**
@@ -20,10 +20,8 @@ export const signatureDomainDefs = {
   cancelSign: invoke<() => Promise<void>>(),
   /** 笔迹采样点实时推送（仅推给发起会话的窗口） */
   strokeReceived: push<[point: SignStrokePoint]>(),
-  /** 读取域配置（ws 路线设备档案列表） */
+  /** 读取域配置（ws 路线设备档案全量，只读视图；清单由代码出厂预设锁死） */
   getConfig: invoke<() => SignatureConfig>(),
-  /** 按档案 id upsert 一条设备档案（非法入参抛 VALIDATION_FAILED），返回保存后全量列表 */
-  setConfig: invoke<(config: SignDeviceConfig) => SignatureConfig>(),
-  /** 按档案 id 删除一条设备档案（无对应档案返回 false） */
-  removeConfig: invoke<(id: string) => boolean>(),
+  /** 按档案 id 提交白名单覆盖（名称/ws 地址；非法入参抛 VALIDATION_FAILED），返回保存后全量列表 */
+  setConfig: invoke<(id: string, overrides: SignatureDeviceOverrides) => SignatureConfig>(),
 }

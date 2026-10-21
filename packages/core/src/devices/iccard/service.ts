@@ -1,4 +1,4 @@
-import type { IccardConfig, IcReaderDeviceConfig } from '@desktop/shared'
+import type { IccardConfig, IccardDeviceOverrides, IcReaderDeviceConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { IcCardAdapter, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice } from './types'
@@ -10,23 +10,47 @@ import { DllIcAdapter } from './adapters/dll-adapter'
 import { BUILT_IN_ICCARD_CONFIGS } from './configs'
 import { icCardError, toIcCardError } from './errors'
 
-/** 持久化根对象（electron-store 根必须为对象，数组经 devices 包一层） */
+/**
+ * 持久化根对象（electron-store 根必须为对象，数组经 devices 包一层）。
+ * devices 现为白名单覆盖（仅现场可调字段）；历史版本存过整条档案，
+ * 白名单提取按同名字段读取，多余字段（旧 dll 段等）自然忽略。
+ */
 interface StoredIccardConfig {
-  devices?: IcReaderDeviceConfig[]
+  devices?: IccardDeviceOverrides[]
 }
 
-/** 档案深拷贝（出厂回注/读出 clone，避免共享内层对象被运行时误改） */
+/** 档案深拷贝（出厂合并/读出 clone，避免共享内层对象被运行时误改） */
 function cloneProfile(p: IcReaderDeviceConfig): IcReaderDeviceConfig {
-  return p.transport === 'ws' ? { ...p, ws: { ...p.ws } } : { ...p, dll: { ...p.dll } }
+  return p.transport === 'ws' ? { ...p, ws: { ...p.ws } } : { ...p }
 }
 
-/** 出厂回注：出厂档案按 id 补齐缺失项（内置设备始终可管理，删除仅当次运行生效），用户追加档案在后 */
+/** 档案 → 白名单覆盖（持久化只写现场可调字段，技术字段永远随代码出厂） */
+function overridesOf(p: IcReaderDeviceConfig): IccardDeviceOverrides {
+  return p.transport === 'ws'
+    ? { id: p.id, displayName: p.displayName, ws: { url: p.ws.url } }
+    : { id: p.id, displayName: p.displayName }
+}
+
+/**
+ * 历史持久化合并 + 白名单提取：以出厂整条为基准，stored 同 id 仅提取白名单字段
+ * （displayName / ws.url）覆盖——代码修改任何技术字段（品牌/接入方式/驱动）立即生效，
+ * 本地旧数据不再整体压住出厂值。清单完全由代码预设决定（不回注用户追加档案）。
+ */
 function migrateConfig(raw: StoredIccardConfig): IcReaderDeviceConfig[] {
   const stored = Array.isArray(raw.devices) ? raw.devices : []
-  const builtIns = BUILT_IN_ICCARD_CONFIGS.map(cloneProfile)
-  return builtIns
-    .map(b => stored.find(s => s.id === b.id) ?? b)
-    .concat(stored.filter(s => !builtIns.some(b => b.id === s.id)))
+  return BUILT_IN_ICCARD_CONFIGS.map((b) => {
+    const profile = cloneProfile(b)
+    const s = stored.find(x => x.id === b.id)
+    if (s) {
+      if (typeof s.displayName === 'string' && s.displayName.trim()) {
+        profile.displayName = s.displayName
+      }
+      if (profile.transport === 'ws' && typeof s.ws?.url === 'string' && s.ws.url.trim()) {
+        profile.ws.url = s.ws.url
+      }
+    }
+    return profile
+  })
 }
 
 /** M1 每扇区块数（数据块地址 = 扇区号 × 4 + 块内序号） */
@@ -91,26 +115,30 @@ export class IcCardService {
     return this.configs.map(cloneProfile)
   }
 
-  /** 按档案 id upsert（入参合法性由 IPC 层 sanitize），写穿持久化 */
-  setConfig(next: IcReaderDeviceConfig): IccardConfig {
-    const configs = this.configs.some(p => p.id === next.id)
-      ? this.configs.map(p => (p.id === next.id ? next : p))
-      : [...this.configs, next]
-    return this.writeThrough(configs)
-  }
-
-  /** 按档案 id 删除；返回是否有删除动作 */
-  removeConfig(id: string): boolean {
+  /** 现场白名单覆盖（档案 id 必须为出厂预设项；入参合法性由 IPC 层 sanitize），写穿持久化 */
+  setConfig(id: string, overrides: IccardDeviceOverrides): IccardConfig {
     if (!this.configs.some(p => p.id === id)) {
-      return false
+      throw icCardError('VALIDATION_FAILED', `设备档案不存在: ${id}`)
     }
-    this.writeThrough(this.configs.filter(p => p.id !== id))
-    return true
+    const merged = this.configs.map((p) => {
+      if (p.id !== id) {
+        return p
+      }
+      const next = cloneProfile(p)
+      if (typeof overrides.displayName === 'string' && overrides.displayName.trim()) {
+        next.displayName = overrides.displayName
+      }
+      if (next.transport === 'ws' && typeof overrides.ws?.url === 'string' && overrides.ws.url.trim()) {
+        next.ws.url = overrides.ws.url
+      }
+      return next
+    })
+    return this.writeThrough(merged)
   }
 
   private writeThrough(configs: IccardConfig): IccardConfig {
     this.configs = configs
-    this.configStore.save({ devices: this.getConfig() })
+    this.configStore.save({ devices: configs.map(overridesOf) })
     return this.getConfig()
   }
 

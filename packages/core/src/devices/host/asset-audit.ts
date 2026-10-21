@@ -1,6 +1,6 @@
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { BUILT_IN_CAPTURE_CONFIGS } from '../capture/configs'
+import { CAPTURE_DLL_BINARIES } from '../capture/configs'
 import { SUMATRA_PDF_FILE } from '../print/sumatra'
 import { HANVON_DLL_FILE } from '../signature/vendors/hanvon'
 import { IC_DRIVERS, ID_DRIVERS } from './run'
@@ -40,7 +40,7 @@ export interface AssetSource {
   targetRel: string
 }
 
-/** 枚举全部代码内资源声明：idcard/iccard 驱动注册表 + capture 协议档案 + signature/print 常量 */
+/** 枚举全部代码内资源声明：idcard/iccard 驱动注册表 + capture DLL 注册表 + signature/print 常量 */
 export function collectAssetDeclarations(): AssetDeclaration[] {
   const declarations: AssetDeclaration[] = []
   for (const [name, Ctor] of Object.entries(ID_DRIVERS)) {
@@ -49,10 +49,8 @@ export function collectAssetDeclarations(): AssetDeclaration[] {
   for (const [name, Ctor] of Object.entries(IC_DRIVERS)) {
     declarations.push({ origin: `iccard 驱动 ${name}`, file: new Ctor('').dllFile })
   }
-  for (const config of BUILT_IN_CAPTURE_CONFIGS) {
-    if (config.transport === 'dll' && config.dll) {
-      declarations.push({ origin: `capture 档案 ${config.id}`, file: config.dll.file })
-    }
+  for (const [id, binary] of Object.entries(CAPTURE_DLL_BINARIES)) {
+    declarations.push({ origin: `capture 档案 ${id}`, file: binary.file })
   }
   declarations.push({ origin: 'signature 汉王', file: HANVON_DLL_FILE })
   declarations.push({ origin: 'print SumatraPDF', file: SUMATRA_PDF_FILE })

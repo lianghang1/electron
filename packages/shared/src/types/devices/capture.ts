@@ -120,20 +120,20 @@ export interface CaptureDialogSession {
   maxCount?: number
 }
 
-/** 设备接入配置（transport + 连接参数）—— 出厂值见 core BUILT_IN_CAPTURE_CONFIGS，运行时编辑持久化 userData */
+/** 设备接入配置（代码出厂预设锁死清单与全部技术字段；现场仅白名单字段可调，见 CaptureDeviceOverrides） */
 export interface CaptureDeviceConfig {
   id: string
   brand: string
   displayName: string
   transport: CaptureTransport
-  /** dll 路线：DLL 路径（asar 外）+ koffi 函数签名（拿到厂商 .h 后填写） */
-  dll?: { file: string, functions?: Record<string, string> }
   /**
    * ws 路线：厂商本地 WebSocket 服务。
    * protocol：'dianyipai'（点易拍 BaucheSDK 二进制帧，缺省）| 'camsdk'（CamSDKServer JSON 帧，华夏电通）。
    * camId：点易拍为摄像头编号，camsdk 下为 devNum。verified = 协议帧已验证（缺省视为已验证）。
+   * wake：探活失败后的拉起方式。command = 现场覆盖命令（按平台 shell 解释，最高优先级）；
+   * 缺省走内置发现式策略（按 brand 匹配厂商计划任务/服务/systemd unit）。
    */
-  ws?: { url: string, protocol?: 'dianyipai' | 'camsdk', camId?: number, width?: number, height?: number, verified?: boolean }
+  ws?: { url: string, protocol?: 'dianyipai' | 'camsdk', camId?: number, width?: number, height?: number, verified?: boolean, wake?: { command?: string } }
   /** service 路线：厂商本地 HTTP 服务模板 */
   service?: {
     baseUrl: string
@@ -145,6 +145,24 @@ export interface CaptureDeviceConfig {
     extraHeaders?: Record<string, string>
   }
   capabilities?: CaptureCaps
+}
+
+/** DLL 二进制描述（koffi 相对资源根路径 + 函数签名；core 内部注册表持有，传输给守护进程用） */
+export interface CaptureDllBinary {
+  file: string
+  functions?: Record<string, string>
+}
+
+/**
+ * 现场可调白名单（持久化与界面提交的唯一形状）：名称 + 连接参数。
+ * 档案清单、品牌、接入方式、协议、能力、DLL 均由代码出厂预设锁死，本地存储仅覆盖白名单字段。
+ */
+export interface CaptureDeviceOverrides {
+  /** 档案锚点：持久化列表按 id 与出厂档案对位；IPC 提交时由通道参数携带，字段内可缺省 */
+  id?: string
+  displayName?: string
+  ws?: { url?: string, camId?: number, width?: number, height?: number, wake?: { command?: string } }
+  service?: { baseUrl?: string, listPath?: string, capturePath?: string }
 }
 
 /** 采集适配器统一接口 —— 新接入方式 = 实现本接口并注册。失败统一抛 CaptureError（code 见 CaptureErrorCode） */

@@ -1,4 +1,4 @@
-import type { IdcardConfig, IdcardDeviceConfig } from '@desktop/shared'
+import type { IdcardConfig, IdcardDeviceOverrides } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { IdCardData, IdReaderDevice } from './types'
@@ -16,10 +16,9 @@ export interface IdCardSystem {
   listReaders: () => Promise<IdReaderDevice[]>
   /** 读身份证（寻卡认证读取全程锁定）；失败抛 IdCardError */
   read: (req: { deviceId: string }) => Promise<IdCardData>
-  /** 设备档案（ws 路线）管理：读全量 / 按档案 id upsert / 按 id 删除（IPC 层 sanitize 后落盘） */
+  /** 设备档案（ws/dll 双路线）管理：读全量 / 按档案 id 白名单覆盖（IPC 层 sanitize 后落盘） */
   getConfig: () => IdcardConfig
-  setConfig: (next: IdcardDeviceConfig) => IdcardConfig
-  removeConfig: (id: string) => boolean
+  setConfig: (id: string, overrides: IdcardDeviceOverrides) => IdcardConfig
   destroy: () => void
 }
 
@@ -30,8 +29,7 @@ export function createIdCardSystem(options: IdCardSystemOptions): IdCardSystem {
     listReaders: () => service.listReaders(),
     read: req => service.read(req),
     getConfig: () => service.getConfig(),
-    setConfig: next => service.setConfig(next),
-    removeConfig: id => service.removeConfig(id),
+    setConfig: (id, overrides) => service.setConfig(id, overrides),
     destroy: () => service.destroy(),
   }
 }

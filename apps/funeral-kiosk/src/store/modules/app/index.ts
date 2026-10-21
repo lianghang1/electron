@@ -1,4 +1,4 @@
-import type { ScannerConfig, ScannerDeviceConfig } from '@desktop/shared'
+import type { ScannerConfig, ScannerDeviceOverrides } from '@desktop/shared'
 import type { AppConfig, DeviceConfig, DeviceData } from './types'
 import { encryptWithAES, parseJson } from '@desktop/utils'
 import { defineStore } from 'pinia'
@@ -44,12 +44,16 @@ async function setAppConfigData(data: AppConfig): Promise<void> {
   await window.desktop.storage.set({ key: APP_CONFIG_KEY, value: toPlainData(data) })
 }
 
-/** 扫码枪节奏参数补丁：档案制下落到当前激活档案（读当前配置 → 合并 → 全量提交） */
-async function setScannerConfigData(data: Partial<ScannerDeviceConfig>): Promise<ScannerConfig> {
+/** 扫码枪节奏参数补丁：落到当前激活档案的白名单覆盖（域级开关/激活指向保持现状） */
+async function setScannerConfigData(data: ScannerDeviceOverrides): Promise<ScannerConfig> {
   const current = await window.desktop.scanner.getConfig()
   const activeId = current.devices.some(d => d.id === current.activeId) ? current.activeId : current.devices[0]?.id ?? ''
-  const devices = current.devices.map(d => (d.id === activeId ? { ...d, ...toPlainData(data) } : d))
-  return await window.desktop.scanner.setConfig({ ...current, activeId, devices })
+  return await window.desktop.scanner.setConfig({
+    enabled: current.enabled,
+    activeId,
+    deviceId: activeId,
+    overrides: toPlainData(data),
+  })
 }
 
 async function applyAppConfigData(): Promise<AppConfig | undefined> {

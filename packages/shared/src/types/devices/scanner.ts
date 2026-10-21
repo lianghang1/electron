@@ -33,6 +33,7 @@ export type ScannerChannelMode = 'keyboard' | 'hid'
 /**
  * 扫码枪设备档案（多设备档案制）：一把枪一份接入参数。
  * transport = keyboard 时节奏/结束键/前缀即该枪的识别参数；transport = hid 时经 hidUrl 连厂商本地服务。
+ * 档案清单与技术字段（品牌/通道）由代码出厂预设锁死，现场仅白名单字段可调（见 ScannerDeviceOverrides）。
  */
 export interface ScannerDeviceConfig extends Required<ScanOptions> {
   /** 档案 id（激活切换以 id 为准） */
@@ -45,7 +46,23 @@ export interface ScannerDeviceConfig extends Required<ScanOptions> {
   hidUrl?: string
 }
 
-/** scanner 域配置（持久化 device-scanner.json 根对象，缺省值出厂兜底） */
+/**
+ * 现场可调白名单（持久化与界面提交的唯一形状）：名称 + 节奏参数 + HID 服务地址。
+ * 档案清单、品牌、通道由代码出厂预设锁死，本地存储仅覆盖白名单字段。
+ */
+export interface ScannerDeviceOverrides {
+  /** 档案锚点：持久化列表按 id 与出厂档案对位；IPC 提交时由通道参数携带，字段内可缺省 */
+  id?: string
+  displayName?: string
+  timeout?: number
+  minLength?: number
+  endKey?: string
+  prefixes?: string[]
+  requirePrefix?: boolean
+  hidUrl?: string
+}
+
+/** scanner 域配置（只读视图：出厂预设 + 现场白名单覆盖合并后的全量档案） */
 export interface ScannerConfig {
   /** 总开关：关闭后键盘事件不再进入缓冲器（扫码枪变普通键盘） */
   enabled: boolean
@@ -53,6 +70,22 @@ export interface ScannerConfig {
   activeId: string
   /** 设备档案列表 */
   devices: ScannerDeviceConfig[]
+}
+
+/** scanner 域持久化形状：域级开关 + 激活指向 + 档案白名单覆盖列表（档案清单代码锁死） */
+export interface ScannerOverrides {
+  enabled: boolean
+  activeId: string
+  devices: ScannerDeviceOverrides[]
+}
+
+/** scanner 域配置提交（IPC 入参）：域级开关/激活指向 + 单档案白名单覆盖 */
+export interface ScannerSetInput {
+  enabled: boolean
+  activeId: string
+  /** 待覆盖的档案 id（必须为出厂预设项） */
+  deviceId: string
+  overrides: ScannerDeviceOverrides
 }
 
 /** 扫码通道运行状态（statusUpdated 推送，供测试页/诊断展示） */

@@ -28,13 +28,13 @@ export class WsAdapter implements CaptureAdapter {
         .map(async (p) => {
           const { host, port } = parseWsUrl(p.ws!.url)
           let alive = await tcpProbe(host, port)
-          // 探活失败先尝试自动拉起厂商服务（camsdk 自愈），仍不通再走离线提示
+          // 探活失败先尝试自动拉起厂商服务（camsdk 发现式自愈），仍不通再走离线提示
           if (!alive && p.ws!.protocol === 'camsdk') {
-            alive = await ensureCamSdkService(p.ws!.url)
+            alive = await ensureCamSdkService({ url: p.ws!.url, brand: p.brand, command: p.ws!.wake?.command })
           }
           // 协议未经验证的配置（verified: false）只探活不采集：声明 ready 会误导上层直接拍照
           const verified = p.ws!.verified !== false
-          const status = await this.assessStatus(p.ws!, { alive, verified })
+          const status = await this.assessStatus(p.ws!, { alive, verified, brand: p.brand })
           return {
             id: `ws:${p.id}`,
             displayName: p.displayName,
@@ -61,10 +61,10 @@ export class WsAdapter implements CaptureAdapter {
    */
   private async assessStatus(
     ws: NonNullable<CaptureDeviceConfig['ws']>,
-    ctx: { alive: boolean, verified: boolean },
+    ctx: { alive: boolean, verified: boolean, brand: string },
   ): Promise<{ value: 'ready' | 'offline' | 'unavailable', note: string }> {
     if (!ctx.alive) {
-      return { value: 'offline', note: await this.offlineNote(ws) }
+      return { value: 'offline', note: await this.offlineNote(ctx.brand, ws) }
     }
     if (!ctx.verified) {
       return { value: 'unavailable', note: '服务在线，但该设备 ws 协议帧待真机实测，暂未适配采集' }
@@ -145,10 +145,10 @@ export class WsAdapter implements CaptureAdapter {
     const { host, port } = parseWsUrl(ws.url)
     let reachable = await tcpProbe(host, port)
     if (!reachable && ws.protocol === 'camsdk') {
-      reachable = await ensureCamSdkService(ws.url)
+      reachable = await ensureCamSdkService({ url: ws.url, brand: config.brand, command: ws.wake?.command })
     }
     if (!reachable) {
-      throw captureError('DEVICE_OFFLINE', await this.offlineNote(ws), { url: ws.url })
+      throw captureError('DEVICE_OFFLINE', await this.offlineNote(config.brand, ws), { url: ws.url })
     }
     return fn(vendor, ws)
   }
@@ -162,10 +162,10 @@ export class WsAdapter implements CaptureAdapter {
     return vendor
   }
 
-  /** 自动拉起失败后的离线提示：camsdk 协议附带 Windows 服务四态诊断，诊断不可用回落默认文案 */
-  private async offlineNote(ws: NonNullable<CaptureDeviceConfig['ws']>): Promise<string> {
+  /** 自动拉起失败后的离线提示：camsdk 协议附带发现式四态诊断，诊断不可用回落默认文案 */
+  private async offlineNote(brand: string, ws: NonNullable<CaptureDeviceConfig['ws']>): Promise<string> {
     if (ws.protocol === 'camsdk') {
-      const diagnosed = await diagnoseCamSdkService(ws.url)
+      const diagnosed = await diagnoseCamSdkService({ url: ws.url, brand, command: ws.wake?.command })
       if (diagnosed) {
         return diagnosed
       }

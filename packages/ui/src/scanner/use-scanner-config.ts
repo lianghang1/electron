@@ -1,21 +1,18 @@
-import type { ScannerConfig, ScannerDeviceConfig } from '@desktop/shared'
+import type { ScannerConfig, ScannerDeviceConfig, ScannerDeviceOverrides, ScannerSetInput } from '@desktop/shared'
 import { isWsUrl } from '@desktop/shared'
-import { computed, onScopeDispose, reactive, ref } from 'vue'
-
-/** 删除两步确认的自动复位时长：超时未确认视为放弃 */
-const REMOVE_CONFIRM_MS = 3000
+import { computed, reactive, ref } from 'vue'
 
 /**
  * 扫码枪设置面板视图状态（reactive 扁平化，状态归系统设置弹窗持有，面板只做展示与动作转发）。
- * 档案制：域配置 = 总开关 + 激活档案 + 档案列表；面板编辑「选中档案」+ 总开关 + 激活指向，
- * 保存为全量提交（scanner:setConfig 整体替换）。未保存改动关闭即丢弃。
+ * 档案制：域配置 = 总开关 + 激活档案 + 档案列表（清单由代码出厂预设锁死）；面板编辑「选中档案」
+ * 的白名单字段 + 总开关 + 激活指向，保存为一次提交（域级状态 + 单档案覆盖）。未保存改动关闭即丢弃。
  */
 export interface ScannerConfigView {
   /** 总开关：关闭后扫码枪等同普通键盘 */
   enabled: boolean
   /** 当前生效档案 id（决定接入通道与节奏参数） */
   activeId: string
-  /** 档案列表（含未保存的新增项） */
+  /** 档案列表（出厂预设 + 现场覆盖合并后的全量档案，只读清单） */
   devices: ScannerDeviceConfig[]
   /** 面板当前编辑的档案 id */
   selectedId: string
@@ -24,22 +21,16 @@ export interface ScannerConfigView {
   dirty: boolean
   loading: boolean
   saving: boolean
-  /** 保存/删除成功提示（短暂展示后清除） */
+  /** 保存成功提示（短暂展示后清除） */
   message: string
   error: string
-  /** 删除两步确认武装中（按钮变「确认删除？」） */
-  confirmingRemove: boolean
   load: () => Promise<void>
   select: (id: string) => void
-  /** 切换当前生效档案（编辑态，随保存全量提交落库） */
+  /** 切换当前生效档案（编辑态，随保存提交） */
   setActive: (id: string) => void
-  /** 切换总开关（编辑态，随保存全量提交落库） */
+  /** 切换总开关（编辑态，随保存提交） */
   setEnabled: (value: boolean) => void
-  /** 新增空白档案（本地入列未保存，填写后保存全量落库） */
-  add: () => void
   save: () => Promise<void>
-  /** 两步确认删除：首次点击武装（超时自动复位），再次点击执行删除 */
-  requestRemove: () => void
 }
 
 export function useScannerConfig(): ScannerConfigView {
@@ -60,7 +51,7 @@ export function useScannerConfig(): ScannerConfigView {
 
   const dirty = computed(() => savedSnapshot.value !== JSON.stringify(currentConfig()))
 
-  /** 当前编辑态组装成的域配置（保存即提交该对象） */
+  /** 当前编辑态组装成的域配置快照（dirty 判定基准，保存时仅提交白名单覆盖） */
   function currentConfig(): ScannerConfig {
     return { enabled: enabled.value, activeId: activeId.value, devices: devices.value.map(cloneDevice) }
   }
@@ -93,7 +84,6 @@ export function useScannerConfig(): ScannerConfigView {
   function select(id: string): void {
     selectedId.value = id
     error.value = ''
-    resetRemoveConfirm()
   }
 
   function setActive(id: string): void {
@@ -102,26 +92,6 @@ export function useScannerConfig(): ScannerConfigView {
 
   function setEnabled(value: boolean): void {
     enabled.value = value
-  }
-
-  /** 新增空白档案：键盘仿真路线（最常见），节奏参数给出可用缺省 */
-  function add(): void {
-    const id = `gun-${Date.now().toString(36)}`
-    const blank: ScannerDeviceConfig = {
-      id,
-      displayName: '',
-      brand: '',
-      transport: 'keyboard',
-      timeout: 100,
-      minLength: 4,
-      endKey: 'Enter',
-      prefixes: [],
-      requirePrefix: false,
-    }
-    devices.value = [...devices.value, blank]
-    selectedId.value = id
-    error.value = ''
-    resetRemoveConfirm()
   }
 
   async function save(): Promise<void> {
@@ -135,7 +105,13 @@ export function useScannerConfig(): ScannerConfigView {
     saving.value = true
     error.value = ''
     try {
-      const saved = await window.desktop.scanner.setConfig(currentConfig())
+      const input: ScannerSetInput = {
+        enabled: enabled.value,
+        activeId: activeId.value,
+        deviceId: device.id,
+        overrides: overridesOf(device),
+      }
+      const saved = await window.desktop.scanner.setConfig(input)
       enabled.value = saved.enabled
       activeId.value = saved.activeId
       devices.value = saved.devices.map(cloneDevice)
@@ -152,60 +128,6 @@ export function useScannerConfig(): ScannerConfigView {
       saving.value = false
     }
   }
-
-  async function removeInner(): Promise<void> {
-    const device = selected.value
-    if (!device) { return }
-    saving.value = true
-    error.value = ''
-    try {
-      const next = devices.value.filter(d => d.id !== device.id)
-      const saved = await window.desktop.scanner.setConfig({
-        enabled: enabled.value,
-        activeId: activeId.value === device.id ? next[0]?.id ?? '' : activeId.value,
-        devices: next,
-      })
-      enabled.value = saved.enabled
-      activeId.value = saved.activeId
-      devices.value = saved.devices.map(cloneDevice)
-      savedSnapshot.value = JSON.stringify(currentConfig())
-      selectedId.value = devices.value[0]?.id ?? ''
-      showMessage('已删除')
-    }
-    catch (err) {
-      error.value = describeError(err, '删除失败')
-    }
-    finally {
-      saving.value = false
-    }
-  }
-
-  /** 删除两步确认：首次点击武装，超时未确认自动复位（免弹窗的轻量确认） */
-  const confirmingRemove = ref(false)
-  let removeTimer: ReturnType<typeof setTimeout> | null = null
-
-  function requestRemove(): void {
-    if (confirmingRemove.value) {
-      resetRemoveConfirm()
-      void removeInner()
-      return
-    }
-    confirmingRemove.value = true
-    removeTimer = setTimeout(() => {
-      confirmingRemove.value = false
-      removeTimer = null
-    }, REMOVE_CONFIRM_MS)
-  }
-
-  function resetRemoveConfirm(): void {
-    confirmingRemove.value = false
-    if (removeTimer) {
-      clearTimeout(removeTimer)
-      removeTimer = null
-    }
-  }
-
-  onScopeDispose(resetRemoveConfirm)
 
   function showMessage(text: string): void {
     message.value = text
@@ -227,14 +149,11 @@ export function useScannerConfig(): ScannerConfigView {
     saving,
     message,
     error,
-    confirmingRemove,
     load,
     select,
     setActive,
     setEnabled,
-    add,
     save,
-    requestRemove,
   })
 }
 
@@ -245,10 +164,23 @@ export function deviceLabel(device: ScannerDeviceConfig): string {
   return `${device.displayName || '（未命名设备）'} · ${CHANNEL_LABEL[device.transport]}`
 }
 
+/** 档案 → 现场白名单覆盖（名称/节奏参数/HID 地址；品牌与通道由代码出厂预设锁死） */
+function overridesOf(device: ScannerDeviceConfig): ScannerDeviceOverrides {
+  return {
+    displayName: device.displayName,
+    timeout: device.timeout,
+    minLength: device.minLength,
+    endKey: device.endKey,
+    prefixes: [...device.prefixes],
+    requirePrefix: device.requirePrefix,
+    ...(device.transport === 'hid' && device.hidUrl ? { hidUrl: device.hidUrl } : {}),
+  }
+}
+
 /** 保存前校验：与主进程 sanitize 同规则（必填缺失直接提示，不发无效请求） */
 function validate(device: ScannerDeviceConfig): string | null {
   if (!device.displayName.trim()) { return '设备名称不能为空' }
-  if (device.transport === 'hid' && !isWsUrl(device.hidUrl)) { return 'HID 服务地址不合法（须 ws:// 或 wss:// 前缀）' }
+  if (device.transport === 'hid' && !(device.hidUrl && isWsUrl(device.hidUrl))) { return 'HID 服务地址不合法（须 ws:// 或 wss:// 前缀）' }
   if (!(device.timeout > 0)) { return '字符间隔上限须大于 0' }
   if (!(device.minLength >= 0)) { return '最小码长不能为负' }
   if (!device.endKey.trim()) { return '结束键不能为空' }

@@ -50,9 +50,11 @@ export type {
   CaptureCaps,
   CaptureDevice,
   CaptureDeviceConfig,
+  CaptureDeviceOverrides,
   CaptureDialogClosedReason,
   CaptureDialogRequest,
   CaptureDialogSession,
+  CaptureDllBinary,
   CaptureErrorCode,
   CaptureLogFn,
   CaptureRequest,
@@ -62,11 +64,11 @@ export type {
 
 /* ---------------- 配置与调用方上下文 ---------------- */
 
-export type { IccardConfig, IcCardData, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDeviceConfig, IcReaderDllProfile, IcReaderWsProfile } from './types/devices/iccard'
+export type { IccardConfig, IcCardData, IccardDeviceOverrides, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDeviceConfig, IcReaderDllProfile, IcReaderWsProfile } from './types/devices/iccard'
 
 /* ---------------- 设备类型（idcard / iccard / scanner / capture / print / signature） ---------------- */
 
-export type { IdcardConfig, IdCardData, IdcardDeviceConfig, IdcardDllProfile, IdcardWsProfile, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from './types/devices/idcard'
+export type { IdcardConfig, IdCardData, IdcardDeviceConfig, IdcardDeviceOverrides, IdcardDllProfile, IdcardWsProfile, IdReaderDevice, IdReaderErrorCode, IdReaderTransport } from './types/devices/idcard'
 export type {
   ChannelId,
   ChannelPreference,
@@ -87,8 +89,8 @@ export type {
   UnifiedPrinter,
   UrlPayload,
 } from './types/devices/print'
-export type { ScanErrorCode, ScannerChannelMode, ScannerConfig, ScannerDeviceConfig, ScannerLogFn, ScannerStatus, ScanOptions, ScanResult } from './types/devices/scanner'
-export type { SignatureConfig, SignDevice, SignDeviceConfig, SignDeviceTransport, SignDllProfile, SignErrorCode, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint, SignWsProfile } from './types/devices/signature'
+export type { ScanErrorCode, ScannerChannelMode, ScannerConfig, ScannerDeviceConfig, ScannerDeviceOverrides, ScannerLogFn, ScannerOverrides, ScannerSetInput, ScannerStatus, ScanOptions, ScanResult } from './types/devices/scanner'
+export type { SignatureConfig, SignatureDeviceOverrides, SignDevice, SignDeviceConfig, SignDeviceTransport, SignDllProfile, SignErrorCode, SignSessionResult, SignStartResult, SignStroke, SignStrokePoint, SignWsProfile } from './types/devices/signature'
 export type { DownloadTask, DownloadTaskStatus } from './types/download'
 
 /* ---------------- 设备通道（idcard / iccard / print / scanner / capture / signature 域） ---------------- */

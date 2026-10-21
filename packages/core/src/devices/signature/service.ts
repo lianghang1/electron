@@ -1,4 +1,4 @@
-import type { SignatureConfig, SignDeviceConfig } from '@desktop/shared'
+import type { SignatureConfig, SignatureDeviceOverrides, SignDeviceConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
@@ -9,37 +9,53 @@ import { WsSignAdapter } from './adapters/ws-adapter'
 import { BUILT_IN_SIGNATURE_CONFIGS } from './configs'
 import { signatureError, toSignatureError } from './errors'
 
-/** 持久化根对象（electron-store 根必须为对象，数组经 devices 包一层）+ 旧版单值字段（迁移读） */
+/**
+ * 持久化根对象（electron-store 根必须为对象，数组经 devices 包一层）。
+ * devices 现为白名单覆盖（仅现场可调字段）；历史版本存过整条档案，
+ * 白名单提取按同名字段读取，多余字段（旧 dll 段等）自然忽略。
+ */
 interface StoredSignatureConfig {
-  devices?: SignDeviceConfig[]
+  devices?: SignatureDeviceOverrides[]
   /** 旧版单值形态：ws 服务地址（识别到即迁移为出厂档案 + 旧地址） */
   wsUrl?: string
 }
 
-/** 档案深拷贝（出厂回注/读出 clone，避免共享内层对象被运行时误改） */
+/** 档案深拷贝（出厂合并/读出 clone，避免共享内层对象被运行时误改） */
 function cloneProfile(p: SignDeviceConfig): SignDeviceConfig {
-  return p.transport === 'ws' ? { ...p, ws: { ...p.ws } } : { ...p, dll: { ...p.dll } }
+  return p.transport === 'ws' ? { ...p, ws: { ...p.ws } } : { ...p }
+}
+
+/** 档案 → 白名单覆盖（持久化只写现场可调字段，技术字段永远随代码出厂） */
+function overridesOf(p: SignDeviceConfig): SignatureDeviceOverrides {
+  return p.transport === 'ws'
+    ? { id: p.id, displayName: p.displayName, ws: { url: p.ws.url } }
+    : { id: p.id, displayName: p.displayName }
 }
 
 /**
- * 旧持久化迁移 + 出厂回注：
- * - 旧版单值 { wsUrl }：地址保留迁入出厂 ws 档案（stored 无该档案时生效）；
- * - 出厂档案按 id 补齐缺失项（内置设备始终可管理，删除仅当次运行生效），用户追加档案在后。
+ * 历史持久化合并 + 白名单提取：以出厂整条为基准，stored 同 id 仅提取白名单字段
+ * （displayName / ws.url）覆盖——代码修改任何技术字段（品牌/接入方式/驱动）立即生效，
+ * 本地旧数据不再整体压住出厂值。清单完全由代码预设决定（不回注用户追加档案）。
  */
 function migrateConfig(raw: StoredSignatureConfig): SignDeviceConfig[] {
   const stored = Array.isArray(raw.devices) ? raw.devices : []
   const legacyUrl = typeof raw.wsUrl === 'string' && raw.wsUrl ? raw.wsUrl : undefined
-  const builtIns = BUILT_IN_SIGNATURE_CONFIGS.map(cloneProfile)
-  if (legacyUrl) {
-    for (const p of builtIns) {
-      if (p.transport === 'ws' && !stored.some(s => s.id === p.id)) {
-        p.ws.url = legacyUrl
+  return BUILT_IN_SIGNATURE_CONFIGS.map((b) => {
+    const profile = cloneProfile(b)
+    const s = stored.find(x => x.id === b.id)
+    if (s) {
+      if (typeof s.displayName === 'string' && s.displayName.trim()) {
+        profile.displayName = s.displayName
+      }
+      if (profile.transport === 'ws' && typeof s.ws?.url === 'string' && s.ws.url.trim()) {
+        profile.ws.url = s.ws.url
       }
     }
-  }
-  return builtIns
-    .map(b => stored.find(s => s.id === b.id) ?? b)
-    .concat(stored.filter(s => !builtIns.some(b => b.id === s.id)))
+    else if (legacyUrl && profile.transport === 'ws') {
+      profile.ws.url = legacyUrl
+    }
+    return profile
+  })
 }
 
 /**
@@ -70,26 +86,30 @@ export class SignatureService {
     return this.configs.map(cloneProfile)
   }
 
-  /** 按档案 id upsert（入参合法性由 IPC 层 sanitize），写穿持久化 */
-  setConfig(next: SignDeviceConfig): SignatureConfig {
-    const configs = this.configs.some(p => p.id === next.id)
-      ? this.configs.map(p => (p.id === next.id ? next : p))
-      : [...this.configs, next]
-    return this.writeThrough(configs)
-  }
-
-  /** 按档案 id 删除；返回是否有删除动作 */
-  removeConfig(id: string): boolean {
+  /** 现场白名单覆盖（档案 id 必须为出厂预设项；入参合法性由 IPC 层 sanitize），写穿持久化 */
+  setConfig(id: string, overrides: SignatureDeviceOverrides): SignatureConfig {
     if (!this.configs.some(p => p.id === id)) {
-      return false
+      throw signatureError('VALIDATION_FAILED', `设备档案不存在: ${id}`)
     }
-    this.writeThrough(this.configs.filter(p => p.id !== id))
-    return true
+    const merged = this.configs.map((p) => {
+      if (p.id !== id) {
+        return p
+      }
+      const next = cloneProfile(p)
+      if (typeof overrides.displayName === 'string' && overrides.displayName.trim()) {
+        next.displayName = overrides.displayName
+      }
+      if (next.transport === 'ws' && typeof overrides.ws?.url === 'string' && overrides.ws.url.trim()) {
+        next.ws.url = overrides.ws.url
+      }
+      return next
+    })
+    return this.writeThrough(merged)
   }
 
   private writeThrough(configs: SignatureConfig): SignatureConfig {
     this.configs = configs
-    this.configStore.save({ devices: this.getConfig() })
+    this.configStore.save({ devices: configs.map(overridesOf) })
     return this.getConfig()
   }
 

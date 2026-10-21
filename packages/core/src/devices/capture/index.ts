@@ -1,4 +1,4 @@
-import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
+import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides, CaptureLogFn, CaptureRequest, CaptureResult } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import { CaptureService } from './service'
@@ -8,9 +8,7 @@ export { BUILT_IN_CAPTURE_CONFIGS } from './configs'
 export interface CaptureSystem {
   listDevices: () => Promise<CaptureDevice[]>
   getConfigs: () => Promise<CaptureDeviceConfig[]>
-  setConfig: (config: CaptureDeviceConfig) => void
-  /** 删除设备配置：无此 id 返回 false，删除后热重建适配器 */
-  removeConfig: (id: string) => boolean
+  setConfig: (id: string, overrides: CaptureDeviceOverrides) => void
   /** 域默认设备 id（未配置返回 undefined） */
   getDefaultDevice: () => string | undefined
   /** 设置域默认设备（undefined = 清除，回落自动定位） */
@@ -36,10 +34,10 @@ export interface CaptureSystemOptions {
   resourcesRoot: string
   /** 设备守护进程（DLL 探测的 koffi 调用崩溃隔离在 host 进程，主进程零 native 依赖） */
   host: DeviceHost
-  /** 初始设备配置（持久化回注；不传 = 出厂配置） */
-  initialConfigs?: CaptureDeviceConfig[]
-  /** 运行时编辑持久化（未注入则编辑仅内存生效） */
-  persist?: (configs: CaptureDeviceConfig[]) => void
+  /** 现场白名单覆盖（历史持久化回注；不传 = 出厂档案原样） */
+  initialOverrides?: CaptureDeviceOverrides[]
+  /** 运行时编辑持久化（白名单覆盖形状；未注入则编辑仅内存生效） */
+  persist?: (overrides: CaptureDeviceOverrides[]) => void
   /** 域默认设备 id 持久化读（未注入 = 无默认设备能力） */
   getDefaultDeviceId?: () => string | undefined
   /** 域默认设备 id 持久化写（undefined = 清除） */
@@ -57,8 +55,7 @@ export function createCaptureSystem(options: CaptureSystemOptions): CaptureSyste
   return {
     listDevices: () => service.listDevices(),
     getConfigs: async () => service.getConfigs(),
-    setConfig: config => service.setConfig(config),
-    removeConfig: id => service.removeConfig(id),
+    setConfig: (id, overrides) => service.setConfig(id, overrides),
     getDefaultDevice: () => service.getDefaultDevice(),
     setDefaultDevice: id => service.setDefaultDevice(id),
     resolveDefaultDevice: () => service.resolveDefaultDevice(),

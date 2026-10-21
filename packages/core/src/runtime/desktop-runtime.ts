@@ -1,4 +1,4 @@
-import type { AppSource, CaptureDeviceConfig, DesktopAppManifest } from '@desktop/shared'
+import type { AppSource, CaptureDeviceOverrides, DesktopAppManifest } from '@desktop/shared'
 import type { CaptureSystem } from '../devices/capture'
 import type { IcCardSystem } from '../devices/iccard'
 import type { IdCardSystem } from '../devices/idcard'
@@ -25,7 +25,7 @@ import { createIcCardSystem } from '../devices/iccard'
 import { createIdCardSystem } from '../devices/idcard'
 import { createPrintSystem } from '../devices/print'
 import { SUMATRA_PDF_FILE } from '../devices/print/sumatra'
-import { createScannerSystem, SCANNER_DEFAULTS } from '../devices/scanner'
+import { createScannerSystem, SCANNER_OVERRIDES_DEFAULTS } from '../devices/scanner'
 import { createSignatureSystem } from '../devices/signature'
 import { DownloadService } from '../download/download-service'
 import { EventBus } from '../event/event-bus'
@@ -291,22 +291,22 @@ export class DesktopRuntime {
     })
 
     // 扫码枪：配置持久化 + 键盘观察接入所有窗口（before-input-event，全局生效）
-    const scannerStore = createDeviceStore('scanner', SCANNER_DEFAULTS)
+    const scannerStore = createDeviceStore('scanner', SCANNER_OVERRIDES_DEFAULTS)
     this.scannerSystem = createScannerSystem({
-      initialConfig: scannerStore.load(),
-      persist: config => scannerStore.save(config),
+      initialOverrides: scannerStore.load(),
+      persist: overrides => scannerStore.save(overrides),
       logger: this.logger.scope('device:scanner'),
     })
     app.on('browser-window-created', (_, win) => this.scannerSystem?.attachWindow(win))
 
     // 图像采集：设备配置持久化，图片落统一根目录 files/capture/
     // 默认设备与配置同文件同事务（save 整体替换，persist 时须带上既有 defaultDeviceId）
-    const captureStore = createDeviceStore<{ defaultDeviceId?: string, devices?: CaptureDeviceConfig[] }>('capture-configs')
+    const captureStore = createDeviceStore<{ defaultDeviceId?: string, devices?: CaptureDeviceOverrides[] }>('capture-configs')
     this.captureSystem = createCaptureSystem({
       resourcesRoot,
       host: this.deviceHost,
-      initialConfigs: captureStore.load().devices,
-      persist: configs => captureStore.save({ defaultDeviceId: captureStore.load().defaultDeviceId, devices: configs }),
+      initialOverrides: captureStore.load().devices,
+      persist: overrides => captureStore.save({ defaultDeviceId: captureStore.load().defaultDeviceId, devices: overrides }),
       getDefaultDeviceId: () => captureStore.load().defaultDeviceId,
       setDefaultDeviceId: (id) => {
         // devices 部分读 store 既有值（service 每次编辑均 persist，两侧始终一致），避免依赖异步接口

@@ -1,7 +1,7 @@
 import type { IdCardData } from '@desktop/shared'
 import type { IdCardSystem } from '../devices/idcard'
 import { idCardError } from '../devices/idcard/errors'
-import { sanitizeProfile } from './device-profile'
+import { sanitizeOverrides } from './device-profile'
 import { handle } from './handle'
 
 export interface IdcardIpcDeps {
@@ -18,9 +18,8 @@ export function registerIdcardIpc(deps: IdcardIpcDeps): void {
   handle('idcard:listReaders', () => requireSystem(deps.idcard).listReaders())
   handle('idcard:readIdCard', (_e, req) => readIdCard(deps.idcard, req))
   handle('idcard:getConfig', () => requireSystem(deps.idcard).getConfig())
-  // 档案制配置管理：整条 upsert / 按 id 删除（与 capture 同构）
-  handle('idcard:setConfig', (_e, config) => requireSystem(deps.idcard).setConfig(sanitizeProfile(config, idCardError)))
-  handle('idcard:removeConfig', (_e, id) => requireSystem(deps.idcard).removeConfig(String(id)))
+  // 档案制配置管理：按档案 id 提交白名单覆盖（清单与技术字段代码锁死）
+  handle('idcard:setConfig', (_e, id, overrides) => requireSystem(deps.idcard).setConfig(String(id), sanitizeOverrides(overrides, idCardError)))
 }
 
 /** 系统未装配即拒绝（bootstrap 未配置 devices 属配置错误，渲染层按码提示） */

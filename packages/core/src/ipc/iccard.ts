@@ -1,7 +1,7 @@
 import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest } from '@desktop/shared'
 import type { IcCardSystem } from '../devices/iccard'
 import { icCardError } from '../devices/iccard/errors'
-import { sanitizeProfile } from './device-profile'
+import { sanitizeOverrides } from './device-profile'
 import { handle } from './handle'
 
 export interface IccardIpcDeps {
@@ -19,10 +19,9 @@ export function registerIccardIpc(deps: IccardIpcDeps): void {
   handle('iccard:readIcCard', (_e, req) => readIcCard(deps.iccard, req))
   handle('iccard:writeIcCard', (_e, req) => writeIcCard(deps.iccard, req))
   handle('iccard:writeIcCardTexts', (_e, req) => writeIcCardTexts(deps.iccard, req))
-  // 档案制配置管理：整条 upsert / 按 id 删除（ws 路线协议未接入，档案先行管理）
+  // 档案制配置管理：按档案 id 提交白名单覆盖（ws 路线协议未接入，档案先行管理）
   handle('iccard:getConfig', () => requireSystem(deps.iccard).getConfig())
-  handle('iccard:setConfig', (_e, config) => requireSystem(deps.iccard).setConfig(sanitizeProfile(config, icCardError)))
-  handle('iccard:removeConfig', (_e, id) => requireSystem(deps.iccard).removeConfig(String(id)))
+  handle('iccard:setConfig', (_e, id, overrides) => requireSystem(deps.iccard).setConfig(String(id), sanitizeOverrides(overrides, icCardError)))
 }
 
 /** 系统未装配即拒绝（bootstrap 未配置 devices 属配置错误，渲染层按码提示） */

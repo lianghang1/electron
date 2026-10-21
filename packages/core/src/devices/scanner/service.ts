@@ -1,6 +1,6 @@
-import type { ScannerConfig, ScannerDeviceConfig, ScannerLogFn, ScannerStatus, ScanOptions, ScanResult } from '@desktop/shared'
+import type { ScannerConfig, ScannerDeviceConfig, ScannerDeviceOverrides, ScannerLogFn, ScannerOverrides, ScannerSetInput, ScannerStatus, ScanOptions, ScanResult } from '@desktop/shared'
 import type { BrowserWindow } from 'electron'
-import { scannerDomain } from '@desktop/shared'
+import { DesktopError, scannerDomain } from '@desktop/shared'
 import { webContents } from 'electron'
 import { HID_SERVICE_URL, HidScanner } from './hid-scanner'
 import { KeyboardScanner } from './keyboard-scanner'
@@ -22,6 +22,13 @@ export const SCANNER_DEFAULTS: ScannerConfig = {
   ],
 }
 
+/** 白名单覆盖缺省（持久化 store 默认值；档案本体见 SCANNER_DEFAULTS，清单由代码预设） */
+export const SCANNER_OVERRIDES_DEFAULTS: ScannerOverrides = {
+  enabled: true,
+  activeId: SCANNER_DEFAULTS.activeId,
+  devices: [],
+}
+
 /** 旧版单值配置（v1 根对象直存节奏参数 + mode/hidUrl），识别后迁移为档案制 */
 interface LegacyScannerConfig extends Required<ScanOptions> {
   enabled: boolean
@@ -29,32 +36,89 @@ interface LegacyScannerConfig extends Required<ScanOptions> {
   hidUrl: string
 }
 
-/** 旧持久化迁移：单值节奏参数 → keyboard/hid 双档案，激活档案按旧 mode 指向 */
-function migrateConfig(raw: LegacyScannerConfig | ScannerConfig): ScannerConfig {
-  if ('devices' in raw && Array.isArray(raw.devices)) {
-    return raw as ScannerConfig
+/** 白名单字段就地覆盖（仅提供且合法的字段生效；旧整条持久化按同名字段读取，brand/transport 等自然忽略） */
+function applyOverrides(profile: ScannerDeviceConfig, s: ScannerDeviceOverrides): void {
+  if (typeof s.displayName === 'string' && s.displayName.trim()) {
+    profile.displayName = s.displayName
   }
-  const legacy = raw as LegacyScannerConfig
-  const pace = {
-    timeout: legacy.timeout ?? PACE_DEFAULTS.timeout,
-    minLength: legacy.minLength ?? PACE_DEFAULTS.minLength,
-    endKey: legacy.endKey ?? PACE_DEFAULTS.endKey,
-    prefixes: Array.isArray(legacy.prefixes) ? legacy.prefixes : PACE_DEFAULTS.prefixes,
-    requirePrefix: legacy.requirePrefix ?? PACE_DEFAULTS.requirePrefix,
+  if (typeof s.timeout === 'number' && s.timeout > 0) {
+    profile.timeout = s.timeout
   }
-  const devices: ScannerDeviceConfig[] = [
-    { ...pace, id: 'keyboard-local', displayName: '本机键盘仿真枪', brand: '通用', transport: 'keyboard' },
-    { ...pace, id: 'camsdk-hid', displayName: 'CamSDK HID 通道（本地服务 9000）', brand: 'CamSDK', transport: 'hid', hidUrl: legacy.hidUrl ?? HID_SERVICE_URL },
-  ]
-  return { enabled: legacy.enabled ?? true, activeId: legacy.mode === 'hid' ? 'camsdk-hid' : 'keyboard-local', devices }
+  if (typeof s.minLength === 'number' && s.minLength >= 0) {
+    profile.minLength = s.minLength
+  }
+  if (typeof s.endKey === 'string' && s.endKey.trim()) {
+    profile.endKey = s.endKey
+  }
+  if (Array.isArray(s.prefixes) && s.prefixes.every(x => typeof x === 'string')) {
+    profile.prefixes = [...s.prefixes]
+  }
+  if (typeof s.requirePrefix === 'boolean') {
+    profile.requirePrefix = s.requirePrefix
+  }
+  if (profile.transport === 'hid' && typeof s.hidUrl === 'string' && s.hidUrl.trim()) {
+    profile.hidUrl = s.hidUrl.trim()
+  }
+}
+
+/** 档案 → 白名单覆盖（持久化只写现场可调字段，品牌/通道永远随代码出厂） */
+function overridesOf(profile: ScannerDeviceConfig): ScannerDeviceOverrides {
+  return {
+    id: profile.id,
+    displayName: profile.displayName,
+    timeout: profile.timeout,
+    minLength: profile.minLength,
+    endKey: profile.endKey,
+    prefixes: [...profile.prefixes],
+    requirePrefix: profile.requirePrefix,
+    ...(profile.transport === 'hid' && profile.hidUrl ? { hidUrl: profile.hidUrl } : {}),
+  }
+}
+
+/**
+ * 历史持久化合并 + 白名单提取：以出厂档案为基准，stored 同 id 仅提取白名单字段
+ * （名称/节奏参数/HID 地址）覆盖——代码修改技术字段（品牌/通道）立即生效，
+ * 本地旧数据不再整体压住出厂值；不在出厂清单内的档案忽略（清单完全由代码预设决定）。
+ * 旧 v1 单值配置（无 devices 数组）：节奏参数落到全部档案、HID 地址落到 hid 档案、激活按旧 mode 指向。
+ */
+function migrateScannerConfig(stored?: ScannerOverrides): ScannerConfig {
+  const base = structuredClone(SCANNER_DEFAULTS)
+  const raw = stored && typeof stored === 'object' ? stored as ScannerOverrides & Record<string, unknown> : undefined
+  const storedDevices = Array.isArray(raw?.devices) ? raw.devices : []
+  const legacy = raw && !Array.isArray(raw.devices) ? raw as unknown as LegacyScannerConfig : undefined
+  const legacyPace: ScannerDeviceOverrides | undefined = legacy
+    ? {
+        timeout: legacy.timeout,
+        minLength: legacy.minLength,
+        endKey: legacy.endKey,
+        prefixes: Array.isArray(legacy.prefixes) ? [...legacy.prefixes] : undefined,
+        requirePrefix: legacy.requirePrefix,
+      }
+    : undefined
+  const devices = base.devices.map((profile) => {
+    const s = storedDevices.find(x => x && x.id === profile.id)
+    if (s) {
+      applyOverrides(profile, s)
+    }
+    else if (legacyPace) {
+      applyOverrides(profile, { ...legacyPace, ...(profile.transport === 'hid' && legacy?.hidUrl ? { hidUrl: legacy.hidUrl } : {}) })
+    }
+    return profile
+  })
+  const enabled = raw?.enabled !== false
+  const wantedActive = typeof raw?.activeId === 'string' && raw.activeId
+    ? raw.activeId
+    : legacy?.mode === 'hid' ? 'camsdk-hid' : undefined
+  const activeId = wantedActive && devices.some(d => d.id === wantedActive) ? wantedActive : base.activeId
+  return { enabled, activeId, devices }
 }
 
 export interface ScannerSystem {
   /** 窗口接入：before-input-event 观察键盘（不消费，人工输入不受影响），结果广播到所有窗口 */
   attachWindow: (win: BrowserWindow) => void
   getConfig: () => ScannerConfig
-  /** 全量替换域配置（enabled/activeId/devices；入参合法性由 IPC 层 sanitize），写穿持久化 */
-  setConfig: (next: ScannerConfig) => ScannerConfig
+  /** 提交域级开关/激活指向 + 单档案白名单覆盖（档案 id 必须为出厂预设项），写穿持久化 */
+  setConfig: (input: ScannerSetInput) => ScannerConfig
   /** 模拟一条扫码（诊断/演示：走与真枪完全相同的缓冲 → 广播链路） */
   simulate: (code: string) => ScanResult
   destroy: () => void
@@ -78,12 +142,12 @@ export class ScanService {
   private readonly logger: ScannerLogFn
 
   constructor(
-    private readonly initialConfig: ScannerConfig = SCANNER_DEFAULTS,
-    private readonly persist?: (config: ScannerConfig) => void,
+    initialOverrides: ScannerOverrides = { enabled: true, activeId: SCANNER_DEFAULTS.activeId, devices: [] },
+    private readonly persist?: (config: ScannerOverrides) => void,
     logger: ScannerLogFn = () => {},
   ) {
     this.logger = logger
-    this.config = migrateConfig(initialConfig)
+    this.config = migrateScannerConfig(initialOverrides)
     this.scanner = this.buildScanner()
     // 启动即按激活档案接管通道（键盘仿真与 HID 通道互斥，由激活档案 transport 决定）
     this.syncHid()
@@ -124,12 +188,26 @@ export class ScanService {
     }
   }
 
-  setConfig(next: ScannerConfig): ScannerConfig {
-    this.config = { ...next, devices: next.devices.map(d => ({ ...d, prefixes: [...d.prefixes] })) }
+  /** 运行时现场白名单覆盖：域级开关/激活指向 + 单档案覆盖（档案 id 必须为出厂预设项），写穿持久化 */
+  setConfig(input: ScannerSetInput): ScannerConfig {
+    const profile = this.config.devices.find(d => d.id === input.deviceId)
+    if (!profile) {
+      throw new DesktopError('VALIDATION_FAILED', `扫码枪档案不存在: ${input.deviceId}`)
+    }
+    applyOverrides(profile, input.overrides ?? {})
+    this.config.enabled = input.enabled !== false
+    if (this.config.devices.some(d => d.id === input.activeId)) {
+      this.config.activeId = input.activeId
+    }
     this.scanner = this.buildScanner()
     this.syncHid()
-    this.persist?.(this.getConfig())
+    this.persist?.(this.storedConfig())
     return this.getConfig()
+  }
+
+  /** 持久化形状：域级开关 + 激活指向 + 档案白名单覆盖（技术字段永远随代码出厂） */
+  private storedConfig(): ScannerOverrides {
+    return { enabled: this.config.enabled, activeId: this.config.activeId, devices: this.config.devices.map(overridesOf) }
   }
 
   simulate(code: string): ScanResult {

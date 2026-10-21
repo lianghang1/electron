@@ -12,6 +12,5 @@ export const BUILT_IN_ICCARD_CONFIGS: IcReaderDeviceConfig[] = [
     brand: '德卡',
     displayName: '德卡 IC 卡读卡器（DLL 直连）',
     transport: 'dll',
-    dll: {},
   },
 ]

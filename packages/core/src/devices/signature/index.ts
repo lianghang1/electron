@@ -1,4 +1,4 @@
-import type { SignatureConfig, SignDeviceConfig } from '@desktop/shared'
+import type { SignatureConfig, SignatureDeviceOverrides } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
@@ -20,10 +20,9 @@ export interface SignatureSystem {
   stop: () => Promise<SignSessionResult>
   clear: () => Promise<void>
   cancel: () => Promise<void>
-  /** 设备档案（ws 路线）管理：读全量 / 按档案 id upsert / 按 id 删除（IPC 层 sanitize 后落盘） */
+  /** 设备档案（ws/dll 双路线）管理：读全量 / 按档案 id 白名单覆盖（IPC 层 sanitize 后落盘） */
   getConfig: () => SignatureConfig
-  setConfig: (next: SignDeviceConfig) => SignatureConfig
-  removeConfig: (id: string) => boolean
+  setConfig: (id: string, overrides: SignatureDeviceOverrides) => SignatureConfig
   destroy: () => void
 }
 
@@ -37,8 +36,7 @@ export function createSignatureSystem(options: SignatureSystemOptions): Signatur
     clear: () => service.clear(),
     cancel: () => service.cancel(),
     getConfig: () => service.getConfig(),
-    setConfig: next => service.setConfig(next),
-    removeConfig: id => service.removeConfig(id),
+    setConfig: (id, overrides) => service.setConfig(id, overrides),
     destroy: () => service.destroy(),
   }
 }

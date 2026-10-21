@@ -1,24 +1,18 @@
 <script setup lang="ts">
 /**
- * 设备档案选择条（设备设置面板统一紧凑形态的头部行）：
- * 「设备下拉 + 新增 + 删除」单行，替代平铺设备列表（面板空间敏感）。
- * 下拉选项 label 由调用方组装（名称 + 状态/通道后缀）；删除经两步确认（confirming 由调用方武装）。
+ * 设备档案选择条（设备设置面板统一紧凑形态的头部行）。
+ * 档案清单由代码出厂预设锁死，本组件仅承担「选择」，不提供新增/删除入口。
+ * 下拉选项 label 由调用方组装（名称 + 状态/通道后缀）。
  */
 const props = defineProps<{
   items: { value: string, label: string }[]
   modelValue: string
   loading?: boolean
   disabled?: boolean
-  /** 删除两步确认武装中（按钮变「确认删除？」） */
-  confirmingRemove?: boolean
-  removeDisabled?: boolean
-  addLabel?: string
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
-  'add': []
-  'remove': []
 }>()
 
 function onSelect(event: Event): void {
@@ -41,17 +35,6 @@ function onSelect(event: Event): void {
         {{ item.label }}
       </option>
     </select>
-    <button class="psb-btn" type="button" :disabled="disabled || loading" @click="emit('add')">
-      {{ addLabel ?? '新增设备' }}
-    </button>
-    <button
-      class="psb-btn psb-btn--danger"
-      type="button"
-      :disabled="disabled || loading || !modelValue || removeDisabled"
-      @click="emit('remove')"
-    >
-      {{ confirmingRemove ? '确认删除？' : '删除' }}
-    </button>
   </div>
 </template>
 
@@ -81,38 +64,5 @@ function onSelect(event: Event): void {
 .psb-select:focus {
   border-color: #0f766e;
   outline: none;
-}
-
-.psb-btn {
-  flex-shrink: 0;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  background: #fff;
-  color: #1f2328;
-  font-size: 12px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-  white-space: nowrap;
-}
-
-.psb-btn:hover:not(:disabled) {
-  background: #f3f5f8;
-}
-
-.psb-btn:disabled {
-  opacity: 0.45;
-  cursor: default;
-}
-
-.psb-btn--danger {
-  color: #b42318;
-}
-
-.psb-btn--danger:hover:not(:disabled) {
-  background: #fef3f2;
-  border-color: #f4c7c3;
 }
 </style>

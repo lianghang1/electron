@@ -3,15 +3,11 @@ import type { ScannerDeviceConfig } from '@desktop/shared'
 import { computed } from 'vue'
 
 /**
- * 扫码枪档案编辑表单：通道选择 + 节奏参数（随档案走）。
+ * 扫码枪档案编辑表单：名称 + 节奏参数（随档案走）。
  * 经具名模型就地编辑面板持有的档案草稿，参照 CaptureDeviceForm 模式。
+ * 档案清单与技术字段（品牌/通道）由代码出厂预设锁死，通道在编辑头徽标展示。
  */
 const config = defineModel<ScannerDeviceConfig>('config', { required: true })
-
-const CHANNEL_OPTIONS: { value: ScannerDeviceConfig['transport'], label: string }[] = [
-  { value: 'keyboard', label: '键盘仿真（本机直连枪）' },
-  { value: 'hid', label: 'HID 通道（厂商本地服务）' },
-]
 
 /** 前缀列表 ↔ 逗号分隔文本（数组不能直接 v-model） */
 const prefixesText = computed({
@@ -28,18 +24,10 @@ const prefixesText = computed({
       <span class="sdf-field__label">设备名称</span>
       <input v-model="config.displayName" type="text" class="sdf-input" placeholder="如：窗口扫码枪">
     </label>
-    <label class="sdf-field">
-      <span class="sdf-field__label">厂商</span>
-      <input v-model="config.brand" type="text" class="sdf-input" placeholder="如：通用">
-    </label>
-    <label class="sdf-field">
-      <span class="sdf-field__label">接入通道</span>
-      <select v-model="config.transport" class="sdf-input">
-        <option v-for="option in CHANNEL_OPTIONS" :key="option.value" :value="option.value">
-          {{ option.label }}
-        </option>
-      </select>
-    </label>
+    <div class="sdf-field">
+      <span class="sdf-field__label">厂商（出厂预设）</span>
+      <span class="sdf-static">{{ config.brand || '—' }}</span>
+    </div>
     <label v-if="config.transport === 'hid'" class="sdf-field sdf-field--wide">
       <span class="sdf-field__label">HID 服务地址（ws）</span>
       <input v-model="config.hidUrl" type="text" class="sdf-input sdf-input--mono" placeholder="ws://127.0.0.1:9000">
@@ -95,6 +83,18 @@ const prefixesText = computed({
 .sdf-field__label {
   font-size: 11.5px;
   color: #57606a;
+}
+
+.sdf-static {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px dashed #e3e8ee;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #57606a;
+  background: #f6f8fa;
 }
 
 .sdf-input {

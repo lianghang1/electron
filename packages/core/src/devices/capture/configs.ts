@@ -1,9 +1,8 @@
-import type { CaptureDeviceConfig } from '@desktop/shared'
+import type { CaptureDeviceConfig, CaptureDllBinary } from '@desktop/shared'
 
 /**
- * 出厂设备配置（代码即配置，单一数据源）。
- * 运行时编辑（UI setConfig）写入 userData 持久化（core 经 electron-store，启动时回注 initialConfigs）。
- * dll.file 相对宿主资源根（resourcesRoot）；运行时编辑可填绝对路径。
+ * 出厂设备档案（代码即配置，单一数据源；清单与全部技术字段锁死，运行时仅白名单字段可调）。
+ * 运行时现场调整（UI setConfig）只提交白名单覆盖并写穿 userData（启动时按白名单合并，见 service）。
  */
 export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
   {
@@ -19,13 +18,6 @@ export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
     brand: '华视',
     displayName: '华视 CVR-100（DLL SDK）',
     transport: 'dll',
-    dll: {
-      file: 'devices/capture/huashi/win64/Termb.dll',
-      functions: {
-        Init: 'int __stdcall InitComm(int iPort)',
-        ReadCard: 'int __stdcall ReadBaseMsg(unsigned char *pmsg, unsigned int *len)',
-      },
-    },
     capabilities: { ocr: true },
   },
   {
@@ -40,3 +32,19 @@ export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
     capabilities: { crop: true, desewarp: true, maxDpi: 300 },
   },
 ]
+
+/**
+ * DLL 二进制注册表（档案 id → koffi 相对资源根路径与函数签名）。
+ * DLL 是代码资产而非现场参数：不进档案类型、不进持久化、不在界面编辑——
+ * 发送给守护进程时按档案 id 组装回 dll 段（守护进程方法表形状不变）。
+ * dll.file 相对宿主资源根（resourcesRoot）。
+ */
+export const CAPTURE_DLL_BINARIES: Record<string, CaptureDllBinary> = {
+  'huashi-cvr100': {
+    file: 'devices/capture/huashi/win64/Termb.dll',
+    functions: {
+      Init: 'int __stdcall InitComm(int iPort)',
+      ReadCard: 'int __stdcall ReadBaseMsg(unsigned char *pmsg, unsigned int *len)',
+    },
+  },
+}

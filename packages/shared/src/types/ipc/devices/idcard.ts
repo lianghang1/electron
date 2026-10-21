@@ -1,4 +1,4 @@
-import type { IdcardConfig, IdCardData, IdcardDeviceConfig, IdReaderDevice } from '../../devices/idcard'
+import type { IdcardConfig, IdCardData, IdcardDeviceOverrides, IdReaderDevice } from '../../devices/idcard'
 import { invoke } from '../../../domain'
 
 /**
@@ -18,10 +18,8 @@ export const idcardDomainDefs = {
    * deviceId 缺省时平台自动选用第一个就绪的阅读器。
    */
   readIdCard: invoke<(req?: { deviceId?: string }) => Promise<IdCardData>>(),
-  /** 读取域配置（ws 路线设备档案列表） */
+  /** 读取域配置（ws/dll 双路线设备档案全量，只读视图） */
   getConfig: invoke<() => IdcardConfig>(),
-  /** 按档案 id upsert 一条设备档案（非法入参抛 VALIDATION_FAILED），返回保存后全量列表 */
-  setConfig: invoke<(config: IdcardDeviceConfig) => IdcardConfig>(),
-  /** 按档案 id 删除一条设备档案（无对应档案返回 false） */
-  removeConfig: invoke<(id: string) => boolean>(),
+  /** 按档案 id 提交白名单覆盖（名称/ws 地址；非法入参抛 VALIDATION_FAILED），返回保存后全量列表 */
+  setConfig: invoke<(id: string, overrides: IdcardDeviceOverrides) => IdcardConfig>(),
 }

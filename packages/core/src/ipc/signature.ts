@@ -2,7 +2,7 @@ import type { SignStartResult, SignStrokePoint } from '@desktop/shared'
 import type { WebContents } from 'electron'
 import type { SignatureSystem } from '../devices/signature'
 import { signatureError } from '../devices/signature/errors'
-import { sanitizeProfile } from './device-profile'
+import { sanitizeOverrides } from './device-profile'
 import { handle } from './handle'
 
 export interface SignatureIpcDeps {
@@ -29,9 +29,8 @@ export function registerSignatureIpc(deps: SignatureIpcDeps): void {
   handle('signature:clearSign', () => requireSystem(deps.signature).clear())
   handle('signature:cancelSign', () => requireSystem(deps.signature).cancel())
   handle('signature:getConfig', () => requireSystem(deps.signature).getConfig())
-  // 档案制配置管理：整条 upsert / 按 id 删除（与 capture 同构）
-  handle('signature:setConfig', (_e, config) => requireSystem(deps.signature).setConfig(sanitizeProfile(config, signatureError)))
-  handle('signature:removeConfig', (_e, id) => requireSystem(deps.signature).removeConfig(String(id)))
+  // 档案制配置管理：按档案 id 提交白名单覆盖（清单与技术字段代码锁死）
+  handle('signature:setConfig', (_e, id, overrides) => requireSystem(deps.signature).setConfig(String(id), sanitizeOverrides(overrides, signatureError)))
 }
 
 /** 开始会话：笔迹推送回调绑定发起方窗口（窗口销毁后静默丢弃，由 stopSign 正常回收） */

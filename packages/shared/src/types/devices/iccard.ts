@@ -25,8 +25,6 @@ interface IcReaderProfileBase {
  */
 export interface IcReaderDllProfile extends IcReaderProfileBase {
   transport: 'dll'
-  /** DLL 参数（预留）：当前经守护进程驱动注册表自动探测加载，此处不消费 */
-  dll: { file?: string }
 }
 
 export interface IcReaderWsProfile extends IcReaderProfileBase {
@@ -36,6 +34,17 @@ export interface IcReaderWsProfile extends IcReaderProfileBase {
 }
 
 export type IcReaderDeviceConfig = IcReaderDllProfile | IcReaderWsProfile
+
+/**
+ * 现场可调白名单（持久化与界面提交的唯一形状）：名称 + ws 地址。
+ * 档案清单与全部技术字段（品牌/接入方式/驱动）由代码出厂预设锁死，本地存储仅覆盖白名单字段。
+ */
+export interface IccardDeviceOverrides {
+  /** 档案锚点：持久化列表按 id 与出厂档案对位；IPC 提交时由通道参数携带，字段内可缺省 */
+  id?: string
+  displayName?: string
+  ws?: { url?: string }
+}
 
 /** iccard 域配置 = 设备档案列表（持久化 device-iccard.json 根对象 { devices: [...] }） */
 export type IccardConfig = IcReaderDeviceConfig[]

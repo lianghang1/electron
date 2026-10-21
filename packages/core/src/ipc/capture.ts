@@ -5,7 +5,8 @@ import type { CaptureSystem } from '../devices/capture'
 import type { CaptureDialogSessionService } from '../devices/capture/dialog-session'
 import type { OverlayWindowService } from '../window/overlay-window'
 import type { CallerResolver } from './caller-context'
-import { DesktopError } from '@desktop/shared'
+import { captureError } from '../devices/capture/errors'
+import { sanitizeCaptureOverrides } from './device-profile'
 import { handle } from './handle'
 
 export interface CaptureIpcDeps {
@@ -29,13 +30,7 @@ export interface CaptureIpcDeps {
 export function registerCaptureIpc(deps: CaptureIpcDeps): void {
   handle('capture:listDevices', () => deps.capture.listDevices())
   handle('capture:getConfig', () => deps.capture.getConfigs())
-  handle('capture:setConfig', (_e, config) => deps.capture.setConfig(config))
-  handle('capture:removeConfig', async (_e, id) => {
-    if (typeof id !== 'string' || !id.trim()) {
-      throw new DesktopError('IPC_ERROR', 'invalid capture config id')
-    }
-    return deps.capture.removeConfig(id)
-  })
+  handle('capture:setConfig', (_e, id, overrides) => deps.capture.setConfig(String(id), sanitizeCaptureOverrides(overrides, captureError)))
   handle('capture:getDefaultDevice', () => Promise.resolve(deps.capture.getDefaultDevice()))
   handle('capture:setDefaultDevice', (_e, id) => deps.capture.setDefaultDevice(typeof id === 'string' && id.trim() ? id.trim() : undefined))
   handle('capture:snap', (_e, req) => deps.capture.capture(sanitizeCaptureRequest(req)))

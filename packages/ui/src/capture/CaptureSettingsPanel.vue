@@ -61,11 +61,7 @@ function onSetDefault(): void {
       :items="selectItems"
       :model-value="state.selectedId"
       :loading="state.loading"
-      :confirming-remove="state.confirmingRemove"
-      add-label="新增设备"
       @update:model-value="state.select"
-      @add="state.add()"
-      @remove="state.requestRemove()"
     />
 
     <section v-if="state.selected" class="cu-editor">
@@ -100,7 +96,7 @@ function onSetDefault(): void {
       </div>
     </section>
     <p v-else class="cu-empty">
-      {{ state.loading ? '正在载入配置…' : '暂无设备档案，点击「新增设备」创建' }}
+      {{ state.loading ? '正在载入配置…' : '暂无设备档案（清单由代码出厂预设）' }}
     </p>
   </div>
 </template>

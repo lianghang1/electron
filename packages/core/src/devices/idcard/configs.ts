@@ -19,13 +19,11 @@ export const BUILT_IN_IDCARD_CONFIGS: IdcardDeviceConfig[] = [
     brand: '华视',
     displayName: '华视身份证阅读器（DLL 直连）',
     transport: 'dll',
-    dll: {},
   },
   {
     id: 'kemi',
     brand: '科密',
     displayName: '科密身份证阅读器（DLL 直连）',
     transport: 'dll',
-    dll: {},
   },
 ]
