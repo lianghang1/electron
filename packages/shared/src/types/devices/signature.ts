@@ -4,7 +4,13 @@
  * 交互形态不同（会话式实时推送 vs 一次性读取）。
  */
 
-export type SignDeviceTransport = 'dll' | 'stub'
+export type SignDeviceTransport = 'dll' | 'stub' | 'ws'
+
+/** signature 域配置（单设备域根对象，持久化于 device-signature.json，缺省值出厂兜底） */
+export interface SignatureConfig {
+  /** ws 路线的 CamSDKServer 本地服务地址（dll/探测路线不经此配置） */
+  wsUrl: string
+}
 
 export interface SignDevice {
   /** "<transport>:<驱动名>"，如 "dll:hanvon"、"stub:pad"（约定与 idcard/capture 同构） */
@@ -49,12 +55,19 @@ export interface SignStartResult {
   meta?: Record<string, unknown>
 }
 
-/** 结束会话结果：完整笔迹点集，签名图由渲染层 canvas/SVG 自绘（设备侧不产位图）；失败以 IpcRemoteError 抛出 */
+/**
+ * 结束会话结果：完整笔迹点集，签名图由渲染层 canvas/SVG 自绘（设备侧不产位图）；失败以 IpcRemoteError 抛出。
+ * 例外：ws 厂商（CamSDK 签名屏 PadViewer）为设备侧产位图模式——strokes 恒空，位图经下方字段交付。
+ */
 export interface SignSessionResult {
   /** 笔画数（0 = 未书写） */
   strokeCount: number
   strokes: SignStroke[]
   width: number
   height: number
+  /** 设备侧产位图模式（ws 厂商）：签名图 dataURL；笔迹点模式恒无 */
+  signImageDataUrl?: string
+  /** 设备侧指纹图 dataURL（CamSDK 签字&指纹一体流程返回时存在） */
+  fingerImageDataUrl?: string
   meta?: Record<string, unknown>
 }

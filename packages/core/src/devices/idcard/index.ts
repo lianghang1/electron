@@ -1,3 +1,4 @@
+import type { IdcardConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { IdCardData, IdReaderDevice } from './types'
@@ -15,6 +16,9 @@ export interface IdCardSystem {
   listReaders: () => Promise<IdReaderDevice[]>
   /** 读身份证（寻卡认证读取全程锁定）；失败抛 IdCardError */
   read: (req: { deviceId: string }) => Promise<IdCardData>
+  /** 域配置（ws 服务地址）读取与补丁更新（IPC 层 sanitize 后落盘） */
+  getConfig: () => IdcardConfig
+  setConfig: (patch: Partial<IdcardConfig>) => IdcardConfig
   destroy: () => void
 }
 
@@ -24,6 +28,8 @@ export function createIdCardSystem(options: IdCardSystemOptions): IdCardSystem {
   return {
     listReaders: () => service.listReaders(),
     read: req => service.read(req),
+    getConfig: () => service.getConfig(),
+    setConfig: patch => service.setConfig(patch),
     destroy: () => service.destroy(),
   }
 }

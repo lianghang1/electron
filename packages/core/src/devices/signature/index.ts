@@ -1,3 +1,4 @@
+import type { SignatureConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
@@ -19,6 +20,9 @@ export interface SignatureSystem {
   stop: () => Promise<SignSessionResult>
   clear: () => Promise<void>
   cancel: () => Promise<void>
+  /** 域配置（ws 服务地址）读取与补丁更新（IPC 层 sanitize 后落盘） */
+  getConfig: () => SignatureConfig
+  setConfig: (patch: Partial<SignatureConfig>) => SignatureConfig
   destroy: () => void
 }
 
@@ -31,6 +35,8 @@ export function createSignatureSystem(options: SignatureSystemOptions): Signatur
     stop: () => service.stop(),
     clear: () => service.clear(),
     cancel: () => service.cancel(),
+    getConfig: () => service.getConfig(),
+    setConfig: patch => service.setConfig(patch),
     destroy: () => service.destroy(),
   }
 }

@@ -6,11 +6,12 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { requireKoffi } from '../../kernel/koffi'
 import { idCardError } from '../errors'
+import { normalizeCardDate } from './card-date'
 
 /**
  * 华视电子身份证阅读器驱动（深圳华视 SDK V7.1.8，函数以《身份证阅读器SDK使用手册.doc》为准）。
  *
- * DLL（resources/devices/huashi/win64/）：
+ * DLL（resources/devices/idcard/huashi/win64/）：
  *   Termb.dll      主 API 动态库（入口）
  *   sdtapi.dll     安全模块通讯库
  *   WltRS.dll      照片解码库（SDK 运行时自行加载，本驱动不直接调用）
@@ -59,12 +60,6 @@ const FIELD_FNS: Array<[keyof IdCardData, string]> = [
 /** 契约日期字段（统一格式 YYYY-MM-DD，见 IdCardData） */
 const DATE_KEYS: ReadonlySet<string> = new Set(['birthDate', 'validFrom', 'validTo'])
 
-/** 设备原始日期串（YYYYMMDD / YYYY.MM.DD 等）→ 契约统一格式 YYYY-MM-DD；"长期" 等非日期原样返回 */
-function normalizeDate(raw: string): string {
-  const digits = raw.replace(/\D/g, '')
-  return digits.length === 8 ? `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}` : raw.trim()
-}
-
 /**
  * 华视驱动 —— "一个厂商 = 一个驱动类"：身份/DLL 位置/端口/行为全部内聚于此（实现 IdCardDriver）。
  * 新增厂商 = vendors/ 加一个同类驱动 + host/run.ts 驱动注册表加一行。
@@ -74,7 +69,7 @@ export class HuashiDriver implements IdCardDriver {
   readonly brand: string = '华视'
   readonly displayName: string = '华视 CVR-100 证卡读卡器（USB）'
   /** DLL 相对宿主资源根的出厂位置 */
-  readonly dllFile: string = 'devices/huashi/win64/Termb.dll'
+  readonly dllFile: string = 'devices/idcard/huashi/win64/Termb.dll'
   /** 1001-1016 = USB；1-16 = 串口 */
   readonly port = 1001
   /** 进程级全局资源互斥：华视系 SDK 靠 chdir 找相邻资源，dll:huashi 与 dll:kemi 不得并发 open（科密子类继承同组） */
@@ -164,7 +159,7 @@ export class HuashiDriver implements IdCardDriver {
     const data = {} as IdCardData
     for (const [key, fnName] of FIELD_FNS) {
       const value = this.readUtf16(this.fns[fnName])
-      data[key] = DATE_KEYS.has(key) ? normalizeDate(value) : value
+      data[key] = DATE_KEYS.has(key) ? normalizeCardDate(value) : value
     }
     data.photoDataUrl = this.readPhotoB64()
     return data

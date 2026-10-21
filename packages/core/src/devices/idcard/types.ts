@@ -20,7 +20,7 @@ export interface IdCardAdapter {
 export interface IdCardDriver {
   readonly brand: string
   readonly displayName: string
-  /** DLL 相对宿主资源根的出厂位置（如 devices/huashi/win64/Termb.dll） */
+  /** DLL 相对宿主资源根的出厂位置（如 devices/idcard/huashi/win64/Termb.dll） */
   readonly dllFile: string
   /** 同组设备互斥：驱动使用进程级全局资源（如 chdir 切 cwd）时声明，service 据此合并设备锁 */
   readonly lockGroup?: string

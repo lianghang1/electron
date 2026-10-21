@@ -27,10 +27,28 @@ export interface ScanOptions {
   requirePrefix?: boolean
 }
 
+/** 扫码接入通道：keyboard = 键盘仿真（本机直连枪），hid = 厂商本地服务 HID 通道（如 CamSDKServer） */
+export type ScannerChannelMode = 'keyboard' | 'hid'
+
 export interface ScannerConfig extends Required<Omit<ScanOptions, 'requirePrefix'>> {
   /** 总开关：关闭后键盘事件不再进入缓冲器（扫码枪变普通键盘） */
   enabled: boolean
   requirePrefix: boolean
+  /** 接入通道（缺省 keyboard；旧持久化经 electron-store defaults 兜底） */
+  mode: ScannerChannelMode
+  /** HID 通道的厂商本地服务地址（缺省 CamSDKServer ws://127.0.0.1:9000，经设置面板可改） */
+  hidUrl: string
+}
+
+/** 扫码通道运行状态（statusUpdated 推送，供测试页/诊断展示） */
+export interface ScannerStatus {
+  mode: ScannerChannelMode
+  /** HID 通道：与本地服务的连接是否就绪（keyboard 模式恒 true） */
+  connected: boolean
+  /** HID 通道：条码枪设备 SN（开启扫描 ACK 时上报） */
+  devSN?: string
+  /** 不可用原因等提示 */
+  note?: string
 }
 
 export type ScannerLogFn = (

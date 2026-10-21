@@ -5,7 +5,13 @@
  */
 
 /** 读卡器接入方式（idcard/iccard 两域共用同一硬件描述形态） */
-export type IdReaderTransport = 'dll' | 'service' | 'stub'
+export type IdReaderTransport = 'dll' | 'service' | 'stub' | 'ws'
+
+/** idcard 域配置（单设备域根对象，持久化于 device-idcard.json，缺省值出厂兜底） */
+export interface IdcardConfig {
+  /** ws 路线的 CamSDKServer 本地服务地址（dll 路线不经此配置） */
+  wsUrl: string
+}
 
 /** 读卡器设备描述（idcard/iccard 域的 listReaders 共用；capabilities 标签按域声明） */
 export interface IdReaderDevice {

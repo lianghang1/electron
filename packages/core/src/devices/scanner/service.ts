@@ -1,7 +1,8 @@
-import type { ScannerConfig, ScannerLogFn, ScanResult } from '@desktop/shared'
+import type { ScannerConfig, ScannerLogFn, ScannerStatus, ScanResult } from '@desktop/shared'
 import type { BrowserWindow } from 'electron'
 import { scannerDomain } from '@desktop/shared'
 import { webContents } from 'electron'
+import { HID_SERVICE_URL, HidScanner } from './hid-scanner'
 import { KeyboardScanner } from './keyboard-scanner'
 
 /** 扫码枪出厂默认（单一数据源；运行时修改经 persist 写 userData） */
@@ -12,6 +13,8 @@ export const SCANNER_DEFAULTS: ScannerConfig = {
   endKey: 'Enter',
   prefixes: [],
   requirePrefix: false,
+  mode: 'keyboard',
+  hidUrl: HID_SERVICE_URL,
 }
 
 export interface ScannerSystem {
@@ -33,6 +36,10 @@ export interface ScannerSystem {
 export class ScanService {
   private config: ScannerConfig
   private scanner: KeyboardScanner
+  /** HID 通道（mode='hid' 且总开关开启时持有，键盘仿真缓冲器互不冲突） */
+  private hid: HidScanner | null = null
+  /** 当前 HID 通道使用的服务地址（url 变更时重建通道） */
+  private hidUrl: string | null = null
   private lastScan: ScanResult | null = null
   private readonly logger: ScannerLogFn
 
@@ -44,6 +51,8 @@ export class ScanService {
     this.logger = logger
     this.config = { ...initialConfig }
     this.scanner = this.buildScanner()
+    // 启动即按配置接管 HID 通道（键盘仿真与 HID 通道互斥，由 mode 决定）
+    this.syncHid()
   }
 
   private buildScanner(): KeyboardScanner {
@@ -52,7 +61,8 @@ export class ScanService {
 
   attachWindow(win: BrowserWindow): void {
     win.webContents.on('before-input-event', (_event, input) => {
-      if (!this.config.enabled) { return }
+      // 仅键盘仿真通道观察按键；HID 通道条码由厂商服务推送，键盘事件与人工输入完全无关
+      if (!this.config.enabled || this.config.mode !== 'keyboard') { return }
       if (input.type !== 'keyDown') { return }
       this.scanner.addKey(input.key)
     })
@@ -75,16 +85,51 @@ export class ScanService {
   setConfig(patch: Partial<ScannerConfig>): ScannerConfig {
     this.config = { ...this.config, ...patch }
     this.scanner = this.buildScanner()
+    this.syncHid()
     this.persist?.(this.config)
     return { ...this.config }
   }
 
   simulate(code: string): ScanResult {
-    this.scanner.processComplete(code)
+    // 诊断注入走当前通道的过滤链（HID/键盘同规则），与真枪链路一致
+    const target = this.hid ?? this.scanner
+    target.processComplete(code)
     return this.lastScan ?? { code, prefix: null, rawCode: code, timestamp: Date.now() }
   }
 
   destroy(): void {
     this.scanner.reset()
+    this.hid?.stop()
+    this.hid = null
+  }
+
+  /** 按配置同步 HID 通道：开启条件 = 总开关开 且 mode='hid'；服务地址变更时重建（重建/关闭通道并推送状态） */
+  private syncHid(): void {
+    const wanted = this.config.enabled && this.config.mode === 'hid'
+    if (wanted && (!this.hid || this.hidUrl !== this.config.hidUrl)) {
+      this.hid?.stop()
+      this.hidUrl = this.config.hidUrl
+      this.hid = new HidScanner(
+        this.config.hidUrl,
+        new KeyboardScanner(this.config, result => this.broadcast(result)),
+        result => this.broadcast(result),
+        status => this.pushStatus(status),
+      )
+      this.hid.start()
+      this.logger('info', `扫码通道切换为 HID（${this.config.hidUrl}）`)
+      return
+    }
+    if (!wanted && this.hid) {
+      this.hid.stop()
+      this.hid = null
+      this.pushStatus({ mode: this.config.mode, connected: true })
+      this.logger('info', `扫码通道切换为 ${this.config.mode}`)
+    }
+  }
+
+  private pushStatus(status: ScannerStatus): void {
+    for (const wc of webContents.getAllWebContents()) {
+      if (!wc.isDestroyed()) { wc.send(scannerDomain.channels.statusUpdated, status) }
+    }
   }
 }

@@ -1,9 +1,18 @@
+import type { IdcardConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { IdCardAdapter, IdCardData, IdReaderDevice } from './types'
+import { createDeviceStore } from '../../storage/device-store'
 import { deviceLockKey, SerialLocks } from '../kernel/serial-lock'
 import { DllIdAdapter } from './adapters/dll-adapter'
+import { WsIdAdapter } from './adapters/ws-adapter'
 import { idCardError, toIdCardError } from './errors'
+import { CAMSDK_WS_READER } from './vendors/camsdk-ws'
+
+/** idcard 域配置出厂缺省（ws 服务地址可经 IPC 配置覆盖，持久化 device-idcard.json） */
+export const IDCARD_CONFIG_DEFAULTS: IdcardConfig = {
+  wsUrl: CAMSDK_WS_READER.url,
+}
 
 /**
  * IdCardService = 身份证阅读域统一 API（与 print/capture/iccard 同构）。
@@ -15,12 +24,29 @@ export class IdCardService {
   private readonly adapters: Map<string, IdCardAdapter>
   /** 同一读卡器同一时刻只能执行一次读卡（硬件限制），按锁 key（设备或 lockGroup）串行化 */
   private readonly locks = new SerialLocks()
+  /** 域配置（ws 服务地址；写穿 device-idcard.json，读侧内存直取） */
+  private config: IdcardConfig
+  private readonly configStore = createDeviceStore<IdcardConfig>('idcard', IDCARD_CONFIG_DEFAULTS)
 
   constructor(resourcesRoot: string, host: DeviceHost, private readonly logger: Logger) {
+    this.config = this.configStore.load()
     this.adapters = new Map<string, IdCardAdapter>([
       // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程）
       ['dll', new DllIdAdapter(host, resourcesRoot)],
+      // ws 路线主进程直连 CamSDKServer（纯 JSON 文本帧，无 native 依赖，无需守护进程）
+      ['ws', new WsIdAdapter(() => this.config.wsUrl)],
     ])
+  }
+
+  getConfig(): IdcardConfig {
+    return { ...this.config }
+  }
+
+  /** 更新域配置（补丁合并；入参合法性由 IPC 层 sanitize，此层只负责写穿持久化） */
+  setConfig(patch: Partial<IdcardConfig>): IdcardConfig {
+    this.config = { ...this.config, ...patch }
+    this.configStore.save(this.config)
+    return { ...this.config }
   }
 
   async listReaders(): Promise<IdReaderDevice[]> {

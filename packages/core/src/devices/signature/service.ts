@@ -1,9 +1,18 @@
+import type { SignatureConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
 import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
 
+import { createDeviceStore } from '../../storage/device-store'
 import { DllSignAdapter } from './adapters/dll-adapter'
+import { WsSignAdapter } from './adapters/ws-adapter'
 import { signatureError, toSignatureError } from './errors'
+import { CAMSDK_WS_PAD } from './vendors/camsdk-pad'
+
+/** signature 域配置出厂缺省（ws 服务地址可经 IPC 配置覆盖，持久化 device-signature.json） */
+export const SIGNATURE_CONFIG_DEFAULTS: SignatureConfig = {
+  wsUrl: CAMSDK_WS_PAD.url,
+}
 
 /**
  * SignatureService = 手写签名域统一 API（与 IdCardService 同构的归一化层）。
@@ -15,11 +24,28 @@ export class SignatureService {
   private readonly adapters: Map<string, SignAdapter>
   /** 活动会话：设备 ID + 发起方的笔迹推送回调 */
   private active: { deviceId: string, onStroke: (point: SignStrokePoint) => void } | null = null
+  /** 域配置（ws 服务地址；写穿 device-signature.json，读侧内存直取） */
+  private config: SignatureConfig
+  private readonly configStore = createDeviceStore<SignatureConfig>('signature', SIGNATURE_CONFIG_DEFAULTS)
 
   constructor(host: DeviceHost, resourcesRoot: string, private readonly logger: Logger) {
+    this.config = this.configStore.load()
     this.adapters = new Map<string, SignAdapter>([
       ['dll', new DllSignAdapter(host, resourcesRoot)],
+      // ws 路线主进程直连 CamSDKServer（签名屏 PadViewer4，设备侧产位图）
+      ['ws', new WsSignAdapter(() => this.config.wsUrl)],
     ])
+  }
+
+  getConfig(): SignatureConfig {
+    return { ...this.config }
+  }
+
+  /** 更新域配置（补丁合并；入参合法性由 IPC 层 sanitize，此层只负责写穿持久化） */
+  setConfig(patch: Partial<SignatureConfig>): SignatureConfig {
+    this.config = { ...this.config, ...patch }
+    this.configStore.save(this.config)
+    return { ...this.config }
   }
 
   async listDevices(): Promise<SignDevice[]> {

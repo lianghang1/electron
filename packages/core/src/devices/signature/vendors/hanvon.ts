@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** 汉王签名屏 DLL 出厂位置（相对宿主资源根，x64，来源：飞信 v2 随包 DLL） */
-export const HANVON_DLL_FILE = 'devices/hanvon/win64/SPTabletSign.dll'
+export const HANVON_DLL_FILE = 'devices/signature/hanvon/win64/SPTabletSign.dll'
 
 /**
  * 汉王 DLL 就位探测（在设备守护进程内执行）。
