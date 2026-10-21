@@ -174,6 +174,7 @@ onBeforeUnmount(() => {
             {{ session.title }}
           </h3>
           <span v-if="maxCount > 1" class="cu-dialog__count">{{ countLabel }}</span>
+          <span v-else-if="results.length" class="cu-dialog__count">已拍</span>
         </div>
         <p class="cu-dialog__sub">
           来自 {{ session.appName }} · 完成后结果回传页面

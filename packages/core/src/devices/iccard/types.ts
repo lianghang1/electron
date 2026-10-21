@@ -1,16 +1,16 @@
-import type { IcCardData, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice, IdReaderTransport } from '@desktop/shared'
+import type { IcCardData, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice, IdReaderTransport } from '@desktop/shared'
 
-export type { IcCardData, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice, IdReaderTransport }
+export type { IcCardData, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice, IdReaderTransport }
 
 /** 读卡适配器统一接口（IC 卡域）—— 新接入方式 = 实现本接口。失败抛 IcCardError（code 见 IcCardErrorCode） */
 export interface IcCardAdapter {
   readonly transport: IdReaderTransport
   /** 仅枚举具备 IC 卡能力的读卡器（capabilities 区分是否支持写卡） */
-  listReaders: () => Promise<IdReaderDevice[]>
+  listReaders: () => Promise<IcReaderDevice[]>
   /** 读 M1 IC 卡（寻卡 → 防碰撞 → 选卡 → 密钥认证 → 读块） */
-  readIc: (device: IdReaderDevice, req: IcCardReadRequest) => Promise<IcCardData>
+  readIc: (device: IcReaderDevice, req: IcCardReadRequest) => Promise<IcCardData>
   /** 写 M1 IC 卡单块（驱动未声明该能力时抛 ADAPTER_UNAVAILABLE） */
-  writeIc: (device: IdReaderDevice, req: IcCardWriteRequest) => Promise<void>
+  writeIc: (device: IcReaderDevice, req: IcCardWriteRequest) => Promise<void>
   destroy?: () => void
 }
 

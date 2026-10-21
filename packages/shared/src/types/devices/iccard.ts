@@ -2,11 +2,15 @@
  * iccard 域统一契约 —— M1 IC 卡读卡器（Mifare Classic 读/写）。
  * 与 idcard（身份证）平级的独立原子域：卡型、操作语义（读写 vs 只读 PII）、
  * 合规约束（业务数据 vs 证件敏感信息）均不同，禁止合并。
- * 读卡器硬件描述（IdReaderDevice/IdReaderTransport）与 idcard 域共用。
+ * 读卡器硬件描述与 idcard 域共用同一结构（同一批读卡器硬件，capabilities 区分卡能力），
+ * iccard 域以 IcReaderDevice 语义别名引用，避免身份证域命名出现在本域契约中。
  */
 import type { IdReaderDevice, IdReaderTransport } from './idcard'
 
-export type { IdReaderDevice, IdReaderTransport }
+/** 读卡器硬件描述（= idcard 域 IdReaderDevice，结构共用） */
+export type IcReaderDevice = IdReaderDevice
+
+export type { IdReaderTransport }
 
 /** 档案公共段：档案 id / 名称 / 厂商（iccard 域 ws/dll 两路线共用） */
 interface IcReaderProfileBase {

@@ -1,6 +1,6 @@
 import type { IcReaderDeviceConfig } from '@desktop/shared'
 import type { DeviceHost } from '../../host/device-host'
-import type { IcCardAdapter, IcCardData, IcCardReadRequest, IcCardWriteRequest, IdReaderDevice } from '../types'
+import type { IcCardAdapter, IcCardData, IcCardReadRequest, IcCardWriteRequest, IcReaderDevice } from '../types'
 
 /**
  * DLL 路线适配器（主进程侧守护进程 proxy，IC 卡域）：
@@ -19,10 +19,10 @@ export class DllIcAdapter implements IcCardAdapter {
     private readonly getProfiles: () => IcReaderDeviceConfig[],
   ) {}
 
-  async listReaders(): Promise<IdReaderDevice[]> {
+  async listReaders(): Promise<IcReaderDevice[]> {
     const profiles = this.getProfiles().filter(p => p.transport === 'dll')
     const daemonDevices = await this.host
-      .request<IdReaderDevice[]>('iccard.listReaders', { resourcesRoot: this.resourcesRoot })
+      .request<IcReaderDevice[]>('iccard.listReaders', { resourcesRoot: this.resourcesRoot })
       .catch(() => [])
     return profiles.map((profile) => {
       const found = daemonDevices.find(d => d.id === `dll:${profile.id}`)
@@ -41,16 +41,16 @@ export class DllIcAdapter implements IcCardAdapter {
     })
   }
 
-  async readIc(device: IdReaderDevice, req: IcCardReadRequest): Promise<IcCardData> {
+  async readIc(device: IcReaderDevice, req: IcCardReadRequest): Promise<IcCardData> {
     return this.host.request<IcCardData>('iccard.readIc', { ...this.payloadOf(device), req })
   }
 
-  async writeIc(device: IdReaderDevice, req: IcCardWriteRequest): Promise<void> {
+  async writeIc(device: IcReaderDevice, req: IcCardWriteRequest): Promise<void> {
     await this.host.request<void>('iccard.writeIc', { ...this.payloadOf(device), req })
   }
 
   /** 设备 ID 约定（全系统同构）：<transport>:<驱动名> */
-  private payloadOf(device: IdReaderDevice): { resourcesRoot: string, driverName: string } {
+  private payloadOf(device: IcReaderDevice): { resourcesRoot: string, driverName: string } {
     return { resourcesRoot: this.resourcesRoot, driverName: device.id.slice(this.transport.length + 1) }
   }
 }

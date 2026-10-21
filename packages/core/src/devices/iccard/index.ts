@@ -1,7 +1,7 @@
 import type { IccardConfig, IccardDeviceOverrides } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
-import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice } from './types'
+import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice } from './types'
 import { IcCardService } from './service'
 
 export interface IcCardSystemOptions {
@@ -13,7 +13,7 @@ export interface IcCardSystemOptions {
 }
 
 export interface IcCardSystem {
-  listReaders: () => Promise<IdReaderDevice[]>
+  listReaders: () => Promise<IcReaderDevice[]>
   /** 读 M1 IC 卡一个扇区（返回原始块数据 + 字符串组 texts，与 writeIcTexts 互逆；与读同设备串行化） */
   readIc: (req: IcCardReadRequest & { deviceId: string }) => Promise<IcCardReadResult>
   /** 写 M1 IC 卡单块（覆盖写，驱动强制拒绝密钥控制块/厂商块；与读同设备串行化） */

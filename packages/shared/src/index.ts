@@ -64,7 +64,7 @@ export type {
 
 /* ---------------- 配置与调用方上下文 ---------------- */
 
-export type { IccardConfig, IcCardData, IccardDeviceOverrides, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDeviceConfig, IcReaderDllProfile, IcReaderWsProfile } from './types/devices/iccard'
+export type { IccardConfig, IcCardData, IccardDeviceOverrides, IcCardErrorCode, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice, IcReaderDeviceConfig, IcReaderDllProfile, IcReaderWsProfile } from './types/devices/iccard'
 
 /* ---------------- 设备类型（idcard / iccard / scanner / capture / print / signature） ---------------- */
 

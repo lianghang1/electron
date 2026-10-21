@@ -66,9 +66,11 @@ function onOpenChange(value: boolean): void {
     <DialogPortal>
       <DialogOverlay class="ud-mask" />
       <DialogContent
-        class="ud-stage" @escape-key-down="onEscape"
+        class="ud-stage"
+        @escape-key-down="onEscape"
         @pointer-down-outside="onOutside"
         @interact-outside.prevent
+        @open-auto-focus.prevent
       >
         <div class="ud-card" :style="cardStyle">
           <DialogTitle v-if="!title" class="ud-sr-title">

@@ -294,8 +294,7 @@ watch(() => [store.toasts, store.downloads], () => {
   color: #0f766e;
 }
 
-.ov-dl__close,
-.ov-toast__close {
+.ov-dl__close {
   position: absolute;
   top: 6px;
   right: 6px;
@@ -311,11 +310,15 @@ watch(() => [store.toasts, store.downloads], () => {
   transition: color 0.12s;
 }
 
-.ov-dl__close:hover,
-.ov-toast__close:hover {
+.ov-dl__close:hover {
   color: #1f2328;
 }
+</style>
 
+<!-- 全局块（非 scoped）：ToastRoot/ToastViewport 经 reka 组件链（Presence/Transition 多级）渲染，
+     元素不继承本组件的 data-v 属性，scoped 选择器匹配不上（表现为通知卡无背景/圆角/阴影）；
+     与 AppTooltip.vue 的 dt- 处理同款，ov- 前缀已命名空间化，无污染风险 -->
+<style>
 /* ---- 通知 toast（reka Toast）---- */
 .ov-panel__toasts {
   flex: none;
@@ -376,5 +379,25 @@ watch(() => [store.toasts, store.downloads], () => {
   font-size: 11.5px;
   line-height: 1.5;
   color: #57606a;
+}
+
+.ov-toast__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #8a919c;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+  transition: color 0.12s;
+}
+
+.ov-toast__close:hover {
+  color: #1f2328;
 }
 </style>

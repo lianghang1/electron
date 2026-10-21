@@ -1,4 +1,4 @@
-import type { IccardConfig, IccardDeviceOverrides, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice } from '../../devices/iccard'
+import type { IccardConfig, IccardDeviceOverrides, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice } from '../../devices/iccard'
 import { invoke } from '../../../domain'
 
 /**
@@ -11,7 +11,7 @@ import { invoke } from '../../../domain'
  */
 export const iccardDomainDefs = {
   /** 列出 IC 卡读卡器（仅具备 IC 卡能力的读卡器，capabilities 区分是否支持写卡） */
-  listReaders: invoke<() => Promise<IdReaderDevice[]>>(),
+  listReaders: invoke<() => Promise<IcReaderDevice[]>>(),
   /**
    * 读 M1 IC 卡一个扇区（寻卡 → 防碰撞 → 选卡 → 密钥认证 → 读块）。
    * 返回原始块数据 + 字符串组 texts（数据块按 0x00 截断解码为 UTF-8、尾部空块不返回，

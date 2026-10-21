@@ -18,10 +18,6 @@ const selectItems = computed(() =>
     label: [config.displayName || '（未命名设备）', STATUS_META[props.state.statusOf(config)].label].join(' · '),
   })),
 )
-
-function onSave(): void {
-  void props.state.save()
-}
 </script>
 
 <template>
@@ -50,22 +46,10 @@ function onSave(): void {
         url-placeholder="ws://127.0.0.1:9000"
         url-hint="CamSDKServer 本地服务地址；一条连接枚举该服务下全部签名屏，签名图/指纹图由设备回传"
       />
-
-      <div v-if="state.dirty" class="sgn-note">
-        有未保存修改
-      </div>
     </section>
     <p v-else class="sgn-empty">
       {{ state.loading ? '正在载入配置…' : '暂无设备档案（清单由代码出厂预设）' }}
     </p>
-
-    <div class="sgn-actions">
-      <button class="sgn-btn" :disabled="state.saving || state.loading || !state.selected" @click="onSave">
-        {{ state.saving ? '保存中…' : '保存' }}
-      </button>
-      <span v-if="state.message" class="sgn-actions__msg">{{ state.message }}</span>
-      <span v-if="state.error" class="sgn-actions__err">{{ state.error }}</span>
-    </div>
   </div>
 </template>
 
@@ -122,15 +106,6 @@ function onSave(): void {
   flex-shrink: 0;
 }
 
-.sgn-note {
-  align-self: flex-start;
-  font-size: 11.5px;
-  color: #92400e;
-  background: #fef3c7;
-  border-radius: 8px;
-  padding: 6px 10px;
-}
-
 .sgn-badge--dll {
   color: #475569;
   background: #eef2f7;
@@ -146,44 +121,5 @@ function onSave(): void {
   border-radius: 10px;
   font-size: 12px;
   color: #a5adb8;
-}
-
-.sgn-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.sgn-actions__msg {
-  font-size: 11.5px;
-  color: #15803d;
-}
-
-.sgn-actions__err {
-  font-size: 11.5px;
-  color: #b42318;
-}
-
-.sgn-btn {
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  padding: 7px 18px;
-  font-size: 12.5px;
-  font-family: inherit;
-  color: #1f2328;
-  background: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color 0.12s, border-color 0.12s, opacity 0.12s;
-}
-
-.sgn-btn:hover:not(:disabled) {
-  border-color: #0f766e;
-  color: #0f766e;
-}
-
-.sgn-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>

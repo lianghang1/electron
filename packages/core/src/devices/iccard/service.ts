@@ -1,7 +1,7 @@
 import type { IccardConfig, IccardDeviceOverrides, IcReaderDeviceConfig } from '@desktop/shared'
 import type { Logger } from '../../logger/logger'
 import type { DeviceHost } from '../host/device-host'
-import type { IcCardAdapter, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IdReaderDevice } from './types'
+import type { IcCardAdapter, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice } from './types'
 import { Buffer } from 'node:buffer'
 
 import { createDeviceStore } from '../../storage/device-store'
@@ -142,7 +142,7 @@ export class IcCardService {
     return this.getConfig()
   }
 
-  async listReaders(): Promise<IdReaderDevice[]> {
+  async listReaders(): Promise<IcReaderDevice[]> {
     const groups = await Promise.all([...this.adapters.values()].map(a => a.listReaders().catch(() => [])))
     return groups.flat()
   }
@@ -223,7 +223,7 @@ export class IcCardService {
   }
 
   /** 设备定位与状态校验（读写共用前置）：写卡能力在写路径单独校验（capabilities 以 listReaders 为准） */
-  private async locate(deviceId: string | undefined): Promise<{ adapter: IcCardAdapter, device: IdReaderDevice }> {
+  private async locate(deviceId: string | undefined): Promise<{ adapter: IcCardAdapter, device: IcReaderDevice }> {
     if (!deviceId) {
       throw icCardError('VALIDATION_FAILED', '缺少 deviceId')
     }

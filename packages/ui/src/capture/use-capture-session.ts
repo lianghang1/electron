@@ -40,7 +40,7 @@ export interface CaptureSessionUi {
   results: Ref<CaptureResult[]>
   /** 可拍摄张数（会话 maxCount，缺省 1） */
   maxCount: ComputedRef<number>
-  /** 已拍满（达到 maxCount，拍摄按钮应禁用） */
+  /** 已拍满（仅多张模式生效：达到 maxCount 禁拍；maxCount=1 为替换模式不限制拍摄） */
   full: ComputedRef<boolean>
   /** 可确认回传（至少拍了一张） */
   canConfirm: ComputedRef<boolean>
@@ -84,7 +84,8 @@ export function useCaptureSession(
   const results = ref<CaptureResult[]>([])
   const error = ref('')
   const maxCount = computed(() => session.maxCount && session.maxCount >= 1 ? session.maxCount : 1)
-  const full = computed(() => results.value.length >= maxCount.value)
+  // maxCount=1 为替换模式：拍摄始终可用，新拍覆盖前一张；>1 拍满禁拍
+  const full = computed(() => maxCount.value > 1 && results.value.length >= maxCount.value)
   const canConfirm = computed(() => results.value.length > 0)
   let frameUnsub: (() => void) | null = null
 

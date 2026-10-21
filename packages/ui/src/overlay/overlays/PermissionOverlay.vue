@@ -79,6 +79,7 @@ function onDialogEscape(event: KeyboardEvent): void {
       @escape-key-down="onDialogEscape"
       @pointer-down-outside="keepDialogOpen"
       @interact-outside="keepDialogOpen"
+      @open-auto-focus.prevent
     >
       <div
         v-if="store.currentRequest && store.overlayVisible"

@@ -1,11 +1,13 @@
 import type { ScannerConfig, ScannerDeviceConfig, ScannerDeviceOverrides, ScannerSetInput } from '@desktop/shared'
 import { isWsUrl } from '@desktop/shared'
 import { computed, reactive, ref } from 'vue'
+import { useAutoSave } from '../devices/use-auto-save'
 
 /**
  * 扫码枪设置面板视图状态（reactive 扁平化，状态归系统设置弹窗持有，面板只做展示与动作转发）。
  * 档案制：域配置 = 总开关 + 激活档案 + 档案列表（清单由代码出厂预设锁死）；面板编辑「选中档案」
- * 的白名单字段 + 总开关 + 激活指向，保存为一次提交（域级状态 + 单档案覆盖）。未保存改动关闭即丢弃。
+ * 的白名单字段 + 总开关 + 激活指向，改动防抖自动保存为一次提交（域级状态 + 单档案覆盖；
+ * 切换设备前冲刷待存改动，非法草稿不落库仅提示，关闭弹窗丢弃非法改动）。
  */
 export interface ScannerConfigView {
   /** 总开关：关闭后扫码枪等同普通键盘 */
@@ -17,7 +19,7 @@ export interface ScannerConfigView {
   /** 面板当前编辑的档案 id */
   selectedId: string
   selected: ScannerDeviceConfig | undefined
-  /** 总开关/激活指向/选中档案与最近一次保存值存在差异（未保存黄条依据） */
+  /** 总开关/激活指向/选中档案与最近一次保存值存在差异（自动保存判定基准） */
   dirty: boolean
   loading: boolean
   saving: boolean
@@ -51,6 +53,14 @@ export function useScannerConfig(): ScannerConfigView {
 
   const dirty = computed(() => savedSnapshot.value !== JSON.stringify(currentConfig()))
 
+  /** 改动防抖自动保存（save 为函数声明提升可用；切换设备经 select 冲刷） */
+  const autosave = useAutoSave({
+    source: [enabled, activeId, selected],
+    dirty: () => dirty.value,
+    saving: () => saving.value,
+    save,
+  })
+
   /** 当前编辑态组装成的域配置快照（dirty 判定基准，保存时仅提交白名单覆盖） */
   function currentConfig(): ScannerConfig {
     return { enabled: enabled.value, activeId: activeId.value, devices: devices.value.map(cloneDevice) }
@@ -82,6 +92,7 @@ export function useScannerConfig(): ScannerConfigView {
   }
 
   function select(id: string): void {
+    autosave.flush()
     selectedId.value = id
     error.value = ''
   }

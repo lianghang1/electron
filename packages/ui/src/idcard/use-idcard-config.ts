@@ -2,10 +2,12 @@ import type { IdcardDeviceConfig, IdcardDeviceOverrides } from '@desktop/shared'
 import type { ConfigDeviceStatus } from '../capture/use-capture-config'
 import { isWsUrl } from '@desktop/shared'
 import { computed, reactive, ref } from 'vue'
+import { useAutoSave } from '../devices/use-auto-save'
 
 /**
  * 身份证读卡设置面板视图状态（reactive 扁平化，状态归系统设置弹窗持有，面板只做展示与动作转发）。
- * 档案制：ws/dll 双路线设备档案列表（清单由代码出厂预设锁死）+ 选中编辑 + 保存，未保存改动关闭即丢弃。
+ * 档案制：ws/dll 双路线设备档案列表（清单由代码出厂预设锁死）+ 选中编辑，改动防抖自动保存
+ * （切换设备前冲刷待存改动，非法草稿不落库仅提示，关闭弹窗丢弃非法改动）。
  * 设备在线状态经 listReaders 联动（ws 档案探活服务连接，dll 档案经守护进程在位探测）。
  */
 export interface IdcardConfigView {
@@ -17,7 +19,7 @@ export interface IdcardConfigView {
   message: string
   error: string
   selected: IdcardDeviceConfig | undefined
-  /** 选中档案与最近一次保存值存在差异（未保存黄条依据） */
+  /** 选中档案与最近一次保存值存在差异（自动保存判定基准） */
   dirty: boolean
   /** 选中档案对应的设备状态（设备 id = "<transport>:<档案 id>"） */
   statusOf: (config: IdcardDeviceConfig) => ConfigDeviceStatus
@@ -44,6 +46,14 @@ export function useIdcardConfig(): IdcardConfigView {
     const config = selected.value
     if (!config) { return false }
     return savedSnapshots.value.get(config.id) !== JSON.stringify(config)
+  })
+
+  /** 改动防抖自动保存（save 为函数声明提升可用；切换设备经 select 冲刷） */
+  const autosave = useAutoSave({
+    source: selected,
+    dirty: () => dirty.value,
+    saving: () => saving.value,
+    save,
   })
 
   /** 档案 id → 设备状态（load 时经 listReaders 联动） */
@@ -83,6 +93,7 @@ export function useIdcardConfig(): IdcardConfigView {
   }
 
   function select(id: string): void {
+    autosave.flush()
     selectedId.value = id
     error.value = ''
   }

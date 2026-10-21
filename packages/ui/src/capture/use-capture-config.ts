@@ -1,6 +1,7 @@
 import type { CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides } from '@desktop/shared'
 import { isWsUrl } from '@desktop/shared'
 import { computed, reactive, ref } from 'vue'
+import { useAutoSave } from '../devices/use-auto-save'
 
 /** 设备状态展示序（用于列表状态点配色） */
 export type ConfigDeviceStatus = CaptureDevice['status'] | 'missing'
@@ -8,7 +9,8 @@ export type ConfigDeviceStatus = CaptureDevice['status'] | 'missing'
 /**
  * 拍摄设置面板视图状态（reactive 扁平化，经 props 传入面板直接绑定，
  * 状态归系统设置弹窗持有，面板只做展示与动作转发）。
- * 档案清单由代码出厂预设锁死：选择 + 选中编辑白名单字段 + 保存，未保存改动关闭即丢弃。
+ * 档案清单由代码出厂预设锁死：选择 + 选中编辑白名单字段，改动防抖自动保存
+ * （切换设备前冲刷待存改动，非法草稿不落库仅提示，关闭弹窗丢弃非法改动）。
  */
 export interface CaptureConfigView {
   configs: CaptureDeviceConfig[]
@@ -21,7 +23,7 @@ export interface CaptureConfigView {
   message: string
   error: string
   selected: CaptureDeviceConfig | undefined
-  /** 选中配置与最近一次保存值存在差异（未保存黄条依据） */
+  /** 选中配置与最近一次保存值存在差异（自动保存判定基准） */
   dirty: boolean
   /** 选中配置对应的统一设备状态（设备 id = "<transport>:<配置 id>"） */
   statusOf: (config: CaptureDeviceConfig) => ConfigDeviceStatus
@@ -62,6 +64,14 @@ export function useCaptureConfig(): CaptureConfigView {
     return savedSnapshots.value.get(config.id) !== JSON.stringify(config)
   })
 
+  /** 改动防抖自动保存（save 为函数声明提升可用；切换设备经 select 冲刷） */
+  const autosave = useAutoSave({
+    source: selected,
+    dirty: () => dirty.value,
+    saving: () => saving.value,
+    save,
+  })
+
   function statusOf(config: CaptureDeviceConfig): ConfigDeviceStatus {
     const device = devices.value.find(d => d.id === `${config.transport}:${config.id}`)
     return device?.status ?? 'missing'
@@ -99,6 +109,7 @@ export function useCaptureConfig(): CaptureConfigView {
   }
 
   function select(id: string): void {
+    autosave.flush()
     selectedId.value = id
     error.value = ''
     snapThumb.value = ''

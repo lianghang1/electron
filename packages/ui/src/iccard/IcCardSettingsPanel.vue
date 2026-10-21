@@ -19,10 +19,6 @@ const selectItems = computed(() =>
     label: [config.displayName || '（未命名设备）', STATUS_META[props.state.statusOf(config)].label].join(' · '),
   })),
 )
-
-function onSave(): void {
-  void props.state.save()
-}
 </script>
 
 <template>
@@ -51,22 +47,10 @@ function onSave(): void {
         url-placeholder="ws://127.0.0.1:9000"
         url-hint="ws 路线协议适配未接入：档案可先行录入，接入后自动生效"
       />
-
-      <div v-if="state.dirty" class="icc-note">
-        有未保存修改
-      </div>
     </section>
     <p v-else class="icc-empty">
       {{ state.loading ? '正在载入配置…' : '暂无设备档案（清单由代码出厂预设）' }}
     </p>
-
-    <div class="icc-actions">
-      <button class="icc-btn" :disabled="state.saving || state.loading || !state.selected" @click="onSave">
-        {{ state.saving ? '保存中…' : '保存' }}
-      </button>
-      <span v-if="state.message" class="icc-actions__msg">{{ state.message }}</span>
-      <span v-if="state.error" class="icc-actions__err">{{ state.error }}</span>
-    </div>
   </div>
 </template>
 
@@ -128,15 +112,6 @@ function onSave(): void {
   background: #eef2f7;
 }
 
-.icc-note {
-  align-self: flex-start;
-  font-size: 11.5px;
-  color: #92400e;
-  background: #fef3c7;
-  border-radius: 8px;
-  padding: 6px 10px;
-}
-
 .icc-empty {
   flex: 1;
   display: flex;
@@ -147,44 +122,5 @@ function onSave(): void {
   border-radius: 10px;
   font-size: 12px;
   color: #a5adb8;
-}
-
-.icc-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.icc-actions__msg {
-  font-size: 11.5px;
-  color: #15803d;
-}
-
-.icc-actions__err {
-  font-size: 11.5px;
-  color: #b42318;
-}
-
-.icc-btn {
-  border: 1px solid #d5dae1;
-  border-radius: 8px;
-  padding: 7px 18px;
-  font-size: 12.5px;
-  font-family: inherit;
-  color: #1f2328;
-  background: #fff;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color 0.12s, border-color 0.12s, opacity 0.12s;
-}
-
-.icc-btn:hover:not(:disabled) {
-  border-color: #0f766e;
-  color: #0f766e;
-}
-
-.icc-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
 }
 </style>
