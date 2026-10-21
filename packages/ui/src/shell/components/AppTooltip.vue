@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { TooltipContent, TooltipPortal, TooltipProvider, TooltipRoot, TooltipTrigger } from 'reka-ui'
-import { withDefaults } from 'vue'
 
 /**
  * Shell 悬停提示：reka-ui Tooltip 原语封装（延迟显示、键盘聚焦可用、ESC 关闭），
