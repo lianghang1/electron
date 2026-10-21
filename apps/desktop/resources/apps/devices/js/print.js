@@ -1,82 +1,33 @@
 'use strict'
-/* 打印域：统一信封提交（8 种内容类型）+ 版式 + 渲染预览 + 打印机/任务管理 */
+/* 打印域：统一信封提交（图片/PDF/链接/HTML 四种内容）+ 版式选项 + 打印机/任务管理 */
 
 const KINDS = {
-  receipt80: { templateId: 'receipt-default', sampleKey: 'receipt', paper: '80', paperWidth: 80 },
-  receipt58: { templateId: 'receipt-default', sampleKey: 'receipt', paper: '58', paperWidth: 58 },
-  document: { templateId: 'document-default', sampleKey: 'document', paper: 'a4', paperWidth: 210, docLike: true },
-  label: { templateId: 'label-default', sampleKey: 'label', paper: '40x30', paperWidth: 40 },
   image: { payload: 'file', paper: 'a4', paperWidth: 210, docLike: true },
   pdf: { payload: 'file', paper: 'a4', paperWidth: 210, docLike: true },
   pdfurl: { payload: 'url', paper: 'a4', paperWidth: 210, docLike: true },
   html: { payload: 'html', paper: 'a4', paperWidth: 210, docLike: true },
 }
 
-const SAMPLES = {
-  receipt: {
-    shopName: '黑猫咖啡·旗舰店',
-    shopSub: '客如云来 · 一饮而尽',
-    orderNo: 'SO-20260925-001',
-    time: '2026-09-25 10:30:00',
-    cashier: '小王',
-    items: [
-      { name: '拿铁（大杯/热）', qty: 2, price: '28.00', amount: '56.00' },
-      { name: '燕麦曲奇', qty: 1, price: '15.00', amount: '15.00' },
-    ],
-    total: '71.00',
-    payMethod: '微信支付',
-    qrData: 'https://example.com/order/SO-1',
-    footer: '谢谢惠顾，欢迎再次光临',
-  },
-  label: { title: '仓库物料标签', code: 'SKU-2026-0925', spec: '500ml × 24', date: '2026-09-25' },
-  document: {
-    title: '技术服务合同',
-    docNo: 'HT-2026-0925',
-    paragraphs: [{ text: '甲方委托乙方进行桌面应用打印模块的技术开发工作，双方经友好协商达成以下条款。' }],
-    partyA: '甲方科技有限公司',
-    partyB: '乙方软件工作室',
-    signDate: '2026年9月25日',
-  },
-}
-
 let printers = []
 let jobs = []
-let currentKind = 'receipt80'
+let currentKind = 'image'
 
-// ── 内容类型切换：联动数据区 / 版式 / 预览按钮 / 默认纸型 ──
+// ── 内容类型切换：联动数据区 / 版式 / 默认纸型 ──
 function switchKind(k) {
   currentKind = k
   const kind = KINDS[k]
   document.querySelectorAll('.kind-btn').forEach(b => b.classList.toggle('active', b.dataset.kind === k))
-  $('#data-template').hidden = !kind.templateId
   $('#data-html').hidden = kind.payload !== 'html'
   $('#data-file').hidden = kind.payload !== 'file'
   $('#data-url').hidden = kind.payload !== 'url'
   $('#layout-grid').hidden = !kind.docLike
   $('#pdf-extra-grid').hidden = currentKind !== 'pdf' && currentKind !== 'pdfurl'
-  $('#btn-preview').hidden = !kind.templateId
   // 尽量选中宽度匹配的驱动表单（如 80mm 小票切到 80 宽纸型），匹配不上保持当前选择
   if (kind.paperWidth != null) {
     const hit = [...$('#opt-paper').options].find(o => !o.disabled && o.value.startsWith(`custom:${kind.paperWidth}x`))
     if (hit) $('#opt-paper').value = hit.value
   }
   syncPaperOptions()
-  if (kind.templateId) loadSample()
-}
-
-function loadSample() {
-  const kind = KINDS[currentKind]
-  if (kind.sampleKey) $('#tpl-data').value = JSON.stringify(SAMPLES[kind.sampleKey], null, 2)
-}
-
-function markJsonValid() {
-  try {
-    JSON.parse($('#tpl-data').value)
-    $('#tpl-data').style.borderColor = ''
-  }
-  catch {
-    $('#tpl-data').style.borderColor = 'var(--err)'
-  }
 }
 
 // ── 选项 → PrintRequest 组装 ──
@@ -89,10 +40,7 @@ function buildPayload() {
     const fileType = $('#opt-file-type').value
     return { kind: 'url', url: $('#file-url').value.trim(), ...(fileType ? { fileType } : {}) }
   }
-  if (kind.payload === 'html') {
-    return { kind: 'html', html: $('#html-data').value }
-  }
-  return { kind: 'template', templateId: kind.templateId, data: JSON.parse($('#tpl-data').value) }
+  return { kind: 'html', html: $('#html-data').value }
 }
 
 function buildMargin() {
@@ -137,21 +85,16 @@ function buildOptions() {
 
 async function submitPrint() {
   const kind = KINDS[currentKind]
-  if (kind.templateId) {
-    try {
-      JSON.parse($('#tpl-data').value)
-    }
-    catch {
-      toast('模板数据不是合法 JSON', false)
-      return
-    }
-  }
   if (kind.payload === 'file' && !$('#file-path').value.trim()) {
     toast('请先填写文件绝对路径', false)
     return
   }
   if (kind.payload === 'url' && !$('#file-url').value.trim()) {
     toast('请先填写 PDF 链接', false)
+    return
+  }
+  if (kind.payload === 'html' && !$('#html-data').value.trim()) {
+    toast('请先填写 HTML 内容', false)
     return
   }
   $('#print-result').textContent = '提交中…'
@@ -167,27 +110,6 @@ async function submitPrint() {
   catch (e) {
     $('#print-result').textContent = `失败：${e.message ?? '未知错误'}`
     toast(`打印失败：${e.message ?? '未知错误'}`, false)
-  }
-}
-
-async function renderPreview() {
-  const kind = KINDS[currentKind]
-  if (!kind.templateId) return
-  let data
-  try {
-    data = JSON.parse($('#tpl-data').value)
-  }
-  catch {
-    toast('模板数据不是合法 JSON', false)
-    return
-  }
-  try {
-    const html = await window.desktop.print.renderPreview({ templateId: kind.templateId, data, paper: parsePaperValue($('#opt-paper').value) || kind.paper })
-    $('#preview-wrap').hidden = false
-    $('#preview-frame').srcdoc = html
-  }
-  catch (e) {
-    toast(`预览失败：${e.message}`, false)
   }
 }
 
@@ -330,8 +252,6 @@ $('#kind-grid').addEventListener('click', (e) => {
   const k = e.target.dataset?.kind
   if (k) switchKind(k)
 })
-$('#btn-load-sample').addEventListener('click', loadSample)
-$('#tpl-data').addEventListener('input', markJsonValid)
 $('#opt-margin').addEventListener('change', () => {
   $('#margin-custom').hidden = $('#opt-margin').value !== 'custom'
 })
@@ -340,7 +260,6 @@ $('#opt-silent').addEventListener('change', () => {
   $('#silent-warn').hidden = $('#opt-silent').checked
 })
 $('#btn-print').addEventListener('click', () => void submitPrint())
-$('#btn-preview').addEventListener('click', () => void renderPreview())
 
 $('#printer-list').addEventListener('click', async (e) => {
   const id = e.target.dataset?.print
@@ -350,19 +269,12 @@ $('#printer-list').addEventListener('click', async (e) => {
   try {
     const r = await window.desktop.print.submit({
       payload: {
-        kind: 'template',
-        templateId: 'document-default',
-        data: {
-          title: '打印机测试页',
+        kind: 'html',
+        html: buildTestPageHtml({
+          printerName: p.displayName,
           docNo: `TEST-${Date.now().toString(36).toUpperCase()}`,
-          partyA: 'DeviceHub 统一外设服务',
-          partyB: p.displayName,
-          signDate: new Date().toLocaleDateString(),
-          paragraphs: [
-            { text: `本页用于验证打印机「${p.displayName}」的通道与纸张设置。` },
-            { text: '内容完整清晰即表示设备工作正常。' },
-          ],
-        },
+          date: new Date().toLocaleString(),
+        }),
       },
       options: { paper: 'a4', copies: 1, silent: true, printerId: p.id, jobName: `测试页 · ${p.displayName}` },
     })
@@ -405,12 +317,31 @@ $('#btn-clear-jobs').addEventListener('click', async () => {
   catch (e) { toast(e.message, false) }
 })
 
+// ── 测试页 HTML（原模板通道删除后改为内联静态页）──
+function buildTestPageHtml({ printerName, docNo, date }) {
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' })[c])
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+    body { font-family: "Microsoft YaHei", sans-serif; margin: 48px; color: #222; }
+    h1 { font-size: 22px; margin: 0 0 4px; } .meta { color: #666; font-size: 12px; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    td { border: 1px solid #ccc; padding: 8px 10px; } .swatch { height: 34px; }
+  </style></head><body>
+    <h1>打印机测试页</h1>
+    <div class="meta">编号 ${esc(docNo)} · 目标 ${esc(printerName)} · ${esc(date)}</div>
+    <table>
+      <tr><td style="width:30%">黑白文本</td><td>内容完整清晰即表示通道与纸张设置正常。</td></tr>
+      <tr><td>灰阶色块</td><td class="swatch" style="background:linear-gradient(90deg,#000,#fff)"></td></tr>
+      <tr><td>彩色色块</td><td class="swatch" style="background:linear-gradient(90deg,#e33,#3a5,#36c)"></td></tr>
+    </table>
+  </body></html>`
+}
+
 // ── 初始化 ──
 registerRefresher(refreshPrinters)
 registerRefresher(refreshJobs)
 void (async () => {
   await refreshPrinters()
-  switchKind('receipt80')
+  switchKind('image')
   await refreshJobs()
 })()
 

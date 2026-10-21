@@ -1,6 +1,6 @@
 'use strict'
 /* 采集域 · 设备配置：跟随所选采集设备联动；ws 配置可编辑服务地址与摄像头
- * （华视 camsdk 用名称下拉 = GetCameraInfo 枚举，点易拍保留编号），保存即热重建适配器 */
+ * （camsdk 用名称下拉 = GetCameraInfo 枚举，点易拍保留编号），保存即热重建适配器 */
 
 let capConfigs = []
 /** 摄像头枚举缓存（deviceId → 列表/null）：配置下拉与分辨率下拉共用，避免重复连服务 */

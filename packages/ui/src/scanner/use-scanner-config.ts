@@ -30,6 +30,8 @@ const EMPTY_CONFIG: ScannerConfig = {
   endKey: 'Enter',
   prefixes: [],
   requirePrefix: false,
+  mode: 'keyboard',
+  hidUrl: 'ws://127.0.0.1:9000',
 }
 
 export function useScannerConfig(): ScannerConfigView {
@@ -53,6 +55,8 @@ export function useScannerConfig(): ScannerConfigView {
       endKey: value.endKey,
       prefixes: value.prefixes,
       requirePrefix: value.requirePrefix,
+      mode: value.mode,
+      hidUrl: value.hidUrl,
     })
   }
 
@@ -88,6 +92,8 @@ export function useScannerConfig(): ScannerConfigView {
         endKey: config.value.endKey,
         prefixes: [...config.value.prefixes],
         requirePrefix: config.value.requirePrefix,
+        mode: config.value.mode,
+        hidUrl: config.value.hidUrl.trim(),
       })
       config.value = await window.desktop.scanner.getConfig()
       savedSnapshot.value = toSnapshot(config.value)
@@ -118,6 +124,10 @@ export function useScannerConfig(): ScannerConfigView {
     }
     if (config.value.requirePrefix && config.value.prefixes.length === 0) {
       error.value = '强制前缀命中需至少配置一个前缀'
+      return false
+    }
+    if (!/^wss?:\/\/.+/i.test(config.value.hidUrl.trim())) {
+      error.value = 'HID 服务地址必须是 ws:// 或 wss:// 开头的完整地址'
       return false
     }
     return true

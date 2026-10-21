@@ -102,7 +102,7 @@
   .data-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
   button.link { border: none; background: transparent; color: var(--accent); font-size: 11px; cursor: pointer; padding: 0; }
   button.link:hover { color: var(--accent-hover); }
-  #preview-frame { width: 100%; height: 360px; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-top: 6px; }
+
 
   /* 证卡读取 */
   .id-body { display: flex; gap: 16px; padding: 14px; align-items: flex-start; }
@@ -160,23 +160,12 @@
     </div>
     <div class="panel padded">
       <div class="kind-grid" id="kind-grid">
-        <button class="kind-btn active" data-kind="receipt80">小票 80mm</button>
-        <button class="kind-btn" data-kind="receipt58">小票 58mm</button>
-        <button class="kind-btn" data-kind="document">A4 文档</button>
-        <button class="kind-btn" data-kind="label">标签</button>
-        <button class="kind-btn" data-kind="image">图片文件</button>
+        <button class="kind-btn active" data-kind="image">图片文件</button>
         <button class="kind-btn" data-kind="pdf">PDF 文件</button>
         <button class="kind-btn" data-kind="pdfurl">PDF 链接</button>
         <button class="kind-btn" data-kind="html">HTML</button>
       </div>
 
-      <div class="data-block" id="data-template">
-        <div class="data-head">
-          <span class="hint">模板数据（JSON）</span>
-          <button class="link" id="btn-load-sample">载入示例</button>
-        </div>
-        <textarea id="tpl-data" class="input mono" rows="7" spellcheck="false"></textarea>
-      </div>
       <div class="data-block" id="data-html" hidden>
         <div class="hint" style="margin-bottom: 6px;">HTML 内容（走系统队列排版输出）</div>
         <textarea id="html-data" class="input mono" rows="4" spellcheck="false"></textarea>
@@ -268,15 +257,10 @@
 
       <div class="form-grid" style="margin-top: 12px; align-items: center;">
         <button class="btn" id="btn-print">打印</button>
-        <button class="btn ghost" id="btn-preview" hidden>渲染预览</button>
         <label class="check"><input type="checkbox" id="opt-grayscale"> 黑白</label>
         <label class="check"><input type="checkbox" id="opt-silent" checked> 静默</label>
         <span class="hint" id="silent-warn" hidden>提交后将弹出系统打印对话框</span>
         <span class="hint" id="print-result"></span>
-      </div>
-      <div id="preview-wrap" hidden style="margin-top: 12px;">
-        <div class="hint">渲染预览（模板 + 数据 + 纸张 → HTML，不送打）</div>
-        <iframe id="preview-frame" title="打印预览"></iframe>
       </div>
     </div>
 
@@ -300,6 +284,9 @@
       <span class="section-label">身份证阅读</span>
       <select class="input" id="id-reader" style="min-width: 260px;"><option value="">检测读卡器中…</option></select>
       <span class="spacer"></span>
+      <input class="input" id="id-ws-url" type="text" style="width: 200px;" placeholder="ws://127.0.0.1:9000" title="本地服务（ws 路线）地址">
+      <button class="btn ghost" id="btn-id-ws-save">存地址</button>
+      <button class="btn ghost" id="btn-id-config">配置</button>
       <button class="btn danger-ghost" id="btn-id-clear">清空</button>
       <span class="hint">打开 → 认证 → 读取 → 关闭全程锁定；PII 用完即弃不入日志</span>
     </div>
@@ -482,8 +469,15 @@
       <div class="form-grid">
         <div class="field">
           <label class="check"><input type="checkbox" id="scan-enabled"> 启用扫码枪</label>
-          <span class="hint">总开关：关闭后按键不再进入条码缓冲，扫码枪退化为普通键盘</span>
+          <span class="hint">总开关：关闭后键盘仿真不再进缓冲、HID 通道断开</span>
         </div>
+        <label class="field"><span>接入通道</span>
+          <select class="input" id="scan-mode">
+            <option value="keyboard">键盘仿真（本机直连枪）</option>
+            <option value="hid">厂商 HID（CamSDK 本地服务）</option>
+          </select>
+          <span class="hint">HID 通道由 CamSDKServer 监听条码枪，结果经同一广播链路交付</span>
+        </label>
         <label class="field"><span>结束超时 (ms)</span><input class="input" id="scan-timeout" type="number" min="10" step="10" style="width: 90px;"><span class="hint">两次按键间隔超过该时长即判定一条码结束</span></label>
         <label class="field"><span>最小码长</span><input class="input" id="scan-minlen" type="number" min="1" style="width: 70px;"><span class="hint">短于该长度的连击输入按误触过滤</span></label>
         <label class="field"><span>结束键</span>
@@ -506,6 +500,7 @@
     <div class="toolbar">
       <span class="section-label">模拟扫码</span>
       <span class="hint">与真枪走完全相同的缓冲 → 广播链路</span>
+      <span class="hint" id="scan-hid-status"></span>
     </div>
     <div class="panel padded">
       <div class="form-grid">
@@ -528,6 +523,9 @@
       <span class="section-label">签名设备</span>
       <select class="input" id="sign-device" style="min-width: 260px;"><option value="">检测签名设备中…</option></select>
       <span class="spacer"></span>
+      <input class="input" id="sign-ws-url" type="text" style="width: 200px;" placeholder="ws://127.0.0.1:9000" title="本地服务（ws 路线）地址">
+      <button class="btn ghost" id="btn-sign-ws-save">存地址</button>
+      <button class="btn ghost" id="btn-sign-config">配置</button>
       <span class="hint" id="sign-status">开始会话后笔迹点实时推送，本页 canvas 自绘（汉王回调协议待实测，见设备备注）</span>
     </div>
     <div class="cap-wrap">

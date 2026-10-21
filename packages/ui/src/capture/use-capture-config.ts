@@ -23,6 +23,8 @@ const REMOVE_CONFIRM_MS = 3000
 export interface CaptureConfigView {
   configs: CaptureDeviceConfig[]
   selectedId: string
+  /** 域默认设备统一 id（空串 = 未设置，业务调用回落自动定位） */
+  defaultDeviceId: string
   loading: boolean
   saving: boolean
   /** 保存/删除成功提示（短暂展示后清除） */
@@ -41,6 +43,8 @@ export interface CaptureConfigView {
   remove: () => Promise<void>
   /** 两步确认删除：首次点击武装（超时自动复位），再次点击执行删除 */
   requestRemove: () => void
+  /** 设为/取消域默认设备（设为当前选中配置对应的设备；取消传 undefined） */
+  setDefault: (deviceId: string | undefined) => Promise<void>
   /** 试拍测试进行中标记 */
   snapping: boolean
   /** 试拍结果缩略图（空串 = 暂无结果/设备未返回缩略图） */
@@ -53,6 +57,7 @@ export function useCaptureConfig(): CaptureConfigView {
   const configs = ref<CaptureDeviceConfig[]>([])
   const devices = ref<CaptureDevice[]>([])
   const selectedId = ref('')
+  const defaultDeviceId = ref('')
   const loading = ref(false)
   const saving = ref(false)
   const message = ref('')
@@ -77,13 +82,19 @@ export function useCaptureConfig(): CaptureConfigView {
     return device?.status ?? 'missing'
   }
 
-  /** 载入配置列表 + 设备在线状态（设备探测失败不阻断编辑） */
+  /** 载入配置列表 + 默认设备 + 设备在线状态（设备探测失败不阻断编辑） */
   async function load(): Promise<void> {
     loading.value = true
     error.value = ''
     try {
       configs.value = await window.desktop.capture.getConfig()
       savedSnapshots.value = new Map(configs.value.map(c => [c.id, JSON.stringify(c)]))
+      try {
+        defaultDeviceId.value = (await window.desktop.capture.getDefaultDevice()) ?? ''
+      }
+      catch {
+        defaultDeviceId.value = ''
+      }
       try {
         devices.value = await window.desktop.capture.listDevices()
       }
@@ -152,6 +163,23 @@ export function useCaptureConfig(): CaptureConfigView {
     }
   }
 
+  /** 设为/取消域默认设备：立即生效（不随配置保存），成功后更新本地状态 */
+  async function setDefault(deviceId: string | undefined): Promise<void> {
+    saving.value = true
+    error.value = ''
+    try {
+      await window.desktop.capture.setDefaultDevice(deviceId)
+      defaultDeviceId.value = deviceId ?? ''
+      showMessage(deviceId ? '已设为默认设备' : '已取消默认设备')
+    }
+    catch (err) {
+      error.value = describeError(err, '设置默认设备失败')
+    }
+    finally {
+      saving.value = false
+    }
+  }
+
   /** 删除两步确认：首次点击武装，超时未确认自动复位（免弹窗的轻量确认） */
   const confirmingRemove = ref(false)
   let removeTimer: ReturnType<typeof setTimeout> | null = null
@@ -211,6 +239,7 @@ export function useCaptureConfig(): CaptureConfigView {
   return reactive({
     configs,
     selectedId,
+    defaultDeviceId,
     loading,
     saving,
     message,
@@ -224,6 +253,7 @@ export function useCaptureConfig(): CaptureConfigView {
     save,
     remove,
     requestRemove,
+    setDefault,
     snapping,
     snapThumb,
     snapTest,

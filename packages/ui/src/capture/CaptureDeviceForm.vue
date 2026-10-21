@@ -16,7 +16,7 @@ const transportOptions = CONFIG_TRANSPORTS.map(t => ({ value: t.value, label: t.
 const protocolOptions = [
   { value: 'default', label: '默认' },
   { value: 'dianyipai', label: '点易拍（二进制帧）' },
-  { value: 'camsdk', label: '华视 CamSDK（JSON）' },
+  { value: 'camsdk', label: 'CamSDK（JSON）' },
 ]
 const methodOptions = [
   { value: 'GET', label: 'GET' },

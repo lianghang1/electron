@@ -7,8 +7,8 @@ import { defineDomain, invoke, push } from '../../domain'
 /** 菜单项动作：菜单窗回传后由 Main 直接执行对应 service（Shell 无需中转） */
 export type TabMenuAction = 'reload' | 'clearCache' | 'clearSite' | 'close'
 
-/** 设备配置浮层类别：设备测试页（业务 tab）经桥发起，浮层窗承载对应配置弹窗 */
-export type DeviceConfigKind = 'scanner' | 'capture'
+/** 设备配置浮层窗的页签类型（与 ui 包 SystemSettingsDialog 的 SettingsTab 对齐） */
+export type DeviceConfigKind = 'scanner' | 'capture' | 'idcard' | 'signature'
 
 /** Tab 右键菜单：Shell 发起，浮层窗在 (x, y)（主窗内容区坐标）附近渲染菜单卡 */
 export interface TabContextMenu {

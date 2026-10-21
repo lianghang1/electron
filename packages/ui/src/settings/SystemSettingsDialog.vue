@@ -5,12 +5,15 @@ import UiButton from '../button/UiButton.vue'
 import CaptureSettingsPanel from '../capture/CaptureSettingsPanel.vue'
 import { useCaptureConfig } from '../capture/use-capture-config'
 import UiDialog from '../dialog/UiDialog.vue'
+import IdCardSettingsPanel from '../idcard/IdCardSettingsPanel.vue'
+import { useIdcardConfig } from '../idcard/use-idcard-config'
 import ScannerSettingsPanel from '../scanner/ScannerSettingsPanel.vue'
 import { useScannerConfig } from '../scanner/use-scanner-config'
 import UiScrollArea from '../scroll/UiScrollArea.vue'
-
-/** 页签 id：与 overlay 的 DeviceConfigKind 字面量对齐（'scanner' | 'capture'），新增页签同步扩展 */
-type SettingsTab = 'scanner' | 'capture'
+import SignatureSettingsPanel from '../signature/SignatureSettingsPanel.vue'
+import { useSignatureConfig } from '../signature/use-signature-config'
+/** 页签 id：与 overlay 的 DeviceConfigKind 字面量对齐（'scanner' | 'capture' | 'idcard' | 'signature'），新增页签同步扩展 */
+type SettingsTab = 'scanner' | 'capture' | 'idcard' | 'signature'
 
 /**
  * 系统设置弹窗：左分组导航 + 右滚动内容区（参照主流设置页：分组竖导航 + 堆叠表单面板）。
@@ -28,6 +31,8 @@ const NAV_GROUPS: { label: string, items: { id: SettingsTab, label: string }[] }
     items: [
       { id: 'scanner', label: '扫码枪' },
       { id: 'capture', label: '拍摄' },
+      { id: 'idcard', label: '身份证读卡' },
+      { id: 'signature', label: '签名屏' },
     ],
   },
 ]
@@ -37,9 +42,19 @@ const activeTab = ref<string>(props.initialTab ?? 'scanner')
 
 const scanner = useScannerConfig()
 const capture = useCaptureConfig()
+const idcard = useIdcardConfig()
+const signature = useSignatureConfig()
+
+/** 各页签的未保存标记与操作区状态（footer/feedback 按页签取用） */
+const TAB_STATES = {
+  scanner,
+  capture,
+  idcard,
+  signature,
+} as const
 
 /** 当前页签存在未保存更改（内容区顶部黄条提示，不阻断操作） */
-const activeDirty = computed(() => (activeTab.value === 'scanner' ? scanner.dirty : capture.dirty))
+const activeDirty = computed(() => TAB_STATES[activeTab.value as SettingsTab]?.dirty ?? false)
 
 /** 右侧内容滚动区：切换页签复位滚动位置 */
 const paneRef = ref<InstanceType<typeof UiScrollArea> | null>(null)
@@ -51,6 +66,8 @@ watch(activeTab, () => {
 onMounted(() => {
   void scanner.load()
   void capture.load()
+  void idcard.load()
+  void signature.load()
 })
 </script>
 
@@ -87,25 +104,28 @@ onMounted(() => {
           <div class="ss-pane__inner">
             <ScannerSettingsPanel v-show="activeTab === 'scanner'" v-model:config="scanner.config" :state="scanner" />
             <CaptureSettingsPanel v-show="activeTab === 'capture'" :state="capture" />
+            <IdCardSettingsPanel v-show="activeTab === 'idcard'" v-model:config="idcard.config" :state="idcard" />
+            <SignatureSettingsPanel v-show="activeTab === 'signature'" v-model:config="signature.config" :state="signature" />
           </div>
         </UiScrollArea>
       </div>
     </div>
 
     <template #feedback>
-      <span v-if="activeTab === 'scanner' && scanner.message" class="ss-feedback-ok">{{ scanner.message }}</span>
-      <span v-else-if="activeTab === 'scanner' && scanner.error" class="ss-feedback-err">{{ scanner.error }}</span>
-      <span v-else-if="activeTab === 'capture' && capture.message" class="ss-feedback-ok">{{ capture.message }}</span>
-      <span v-else-if="activeTab === 'capture' && capture.error" class="ss-feedback-err">{{ capture.error }}</span>
+      <template v-for="tab in ['scanner', 'capture', 'idcard', 'signature'] as const" :key="tab">
+        <span v-if="activeTab === tab && TAB_STATES[tab].message" class="ss-feedback-ok">{{ TAB_STATES[tab].message }}</span>
+        <span v-else-if="activeTab === tab && TAB_STATES[tab].error" class="ss-feedback-err">{{ TAB_STATES[tab].error }}</span>
+      </template>
     </template>
     <template #footer>
+      <!-- 扫码枪/身份证/签名屏 = 纯保存型表单；拍摄页额外带设备档案删除 -->
       <UiButton
-        v-if="activeTab === 'scanner'"
+        v-if="activeTab !== 'capture'"
         variant="primary"
-        :disabled="scanner.saving || scanner.loading"
-        @click="scanner.save()"
+        :disabled="TAB_STATES[activeTab as SettingsTab].saving || TAB_STATES[activeTab as SettingsTab].loading"
+        @click="TAB_STATES[activeTab as SettingsTab].save()"
       >
-        {{ scanner.saving ? '保存中…' : '保存' }}
+        {{ TAB_STATES[activeTab as SettingsTab].saving ? '保存中…' : '保存' }}
       </UiButton>
       <template v-else>
         <UiButton

@@ -53,10 +53,31 @@ function removePrefix(prefix: string): void {
         </div>
         <div class="sc-row">
           <div class="sc-row__text">
-            <span class="sc-row__label">结束判定超时（ms）</span>
-            <span class="sc-row__desc">无后续按键多久判定一次缓冲结束</span>
+            <span class="sc-row__label">接入通道</span>
+            <span class="sc-row__desc">键盘仿真 = 本机直连枪；HID = CamSDK 本地服务监听条码枪</span>
           </div>
-          <input v-model.number="config.timeout" type="number" min="1" class="sc-input">
+          <select v-model="config.mode" class="sc-input">
+            <option value="keyboard">
+              键盘仿真
+            </option>
+            <option value="hid">
+              厂商 HID
+            </option>
+          </select>
+        </div>
+        <div v-if="config.mode === 'hid'" class="sc-row">
+          <div class="sc-row__text">
+            <span class="sc-row__label">HID 服务地址</span>
+            <span class="sc-row__desc">CamSDK 本地服务（CamSDKServer）的 ws 地址</span>
+          </div>
+          <input v-model="config.hidUrl" type="text" class="sc-input sc-input--wide" placeholder="ws://127.0.0.1:9000">
+        </div>
+        <div class="sc-row">
+          <div class="sc-row__text">
+            <span class="sc-row__label">结束判定超时（ms）</span>
+            <span class="sc-row__desc">无后续按键多久判定一次缓冲结束（仅键盘仿真）</span>
+          </div>
+          <input v-model.number="config.timeout" type="number" min="1" class="sc-input" :disabled="config.mode === 'hid'">
         </div>
         <div class="sc-row">
           <div class="sc-row__text">
@@ -68,9 +89,9 @@ function removePrefix(prefix: string): void {
         <div class="sc-row">
           <div class="sc-row__text">
             <span class="sc-row__label">结束键</span>
-            <span class="sc-row__desc">扫码枪扫码后追加的按键</span>
+            <span class="sc-row__desc">扫码枪扫码后追加的按键（仅键盘仿真）</span>
           </div>
-          <input v-model="config.endKey" type="text" class="sc-input" placeholder="Enter">
+          <input v-model="config.endKey" type="text" class="sc-input" placeholder="Enter" :disabled="config.mode === 'hid'">
         </div>
         <div class="sc-row">
           <div class="sc-row__text">

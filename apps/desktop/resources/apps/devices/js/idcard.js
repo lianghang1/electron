@@ -11,7 +11,7 @@ const ID_FIELDS = [
   ['issuer', '签发机关'],
 ]
 
-const ID_TRANSPORT_LABEL = { dll: 'SDK 直连' }
+const ID_TRANSPORT_LABEL = { dll: 'SDK 直连', ws: '本地服务' }
 
 /** 最近一次枚举的身份证阅读器列表 */
 let idReaders = []
@@ -94,6 +94,33 @@ async function readIdCard() {
 $('#btn-id-read').addEventListener('click', () => void readIdCard())
 $('#id-reader').addEventListener('change', syncIdSections)
 
+// ── ws 服务地址配置（device-idcard.json 持久化，热生效无需重启） ──
+
+async function loadIdWsUrl() {
+  try {
+    $('#id-ws-url').value = (await window.desktop.idcard.getConfig()).wsUrl
+  }
+  catch (e) {
+    $('#id-ws-url').placeholder = `配置读取失败（${e.code ?? 'UNKNOWN'}）`
+  }
+}
+
+$('#btn-id-ws-save').addEventListener('click', async () => {
+  const url = $('#id-ws-url').value.trim()
+  if (!/^wss?:\/\/.+/i.test(url)) {
+    toast('服务地址必须是 ws:// 或 wss:// 开头的完整地址', false)
+    return
+  }
+  try {
+    $('#id-ws-url').value = (await window.desktop.idcard.patchConfig({ wsUrl: url })).wsUrl
+    toast('服务地址已保存')
+    void refreshIdReaders()
+  }
+  catch (e) {
+    toast(`保存失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`, false)
+  }
+})
+
 // ── 清空（页面级按钮）：本文件清身份证区，IC 卡区由 iccard.js 自清 ──
 
 $('#btn-id-clear').addEventListener('click', () => {
@@ -106,3 +133,4 @@ $('#btn-id-clear').addEventListener('click', () => {
 
 registerRefresher(refreshIdReaders)
 void refreshIdReaders()
+void loadIdWsUrl()

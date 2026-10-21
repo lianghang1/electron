@@ -15,7 +15,7 @@ let wsPreviewOn = false
 
 function capIsUvc() { return $('#cap-device').value.startsWith(UVC_PREFIX) }
 
-/** 当前所选设备类型：uvc（本机摄像头）/ camsdk（华视 WS 高拍仪）/ other（SDK 直连或未加载档案） */
+/** 当前所选设备类型：uvc（本机摄像头）/ camsdk（CamSDK WS 高拍仪）/ other（SDK 直连或未加载档案） */
 function capKind() {
   if (capIsUvc()) return 'uvc'
   const p = capSelectedConfig()

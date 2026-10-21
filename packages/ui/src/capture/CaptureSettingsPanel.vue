@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CaptureDeviceConfig } from '@desktop/shared'
 import type { CaptureConfigView, ConfigDeviceStatus } from './use-capture-config'
 import UiScrollArea from '../scroll/UiScrollArea.vue'
 import CaptureDeviceForm from './CaptureDeviceForm.vue'
@@ -21,8 +22,24 @@ const TRANSPORT_LABEL: Record<string, string> = {
   wia: '扫描仪',
 }
 
+/** 配置对应统一设备 id（与 Main 侧 "<transport>:<配置 id>" 约定同构） */
+function deviceIdOf(config: CaptureDeviceConfig): string {
+  return `${config.transport}:${config.id}`
+}
+
+function isDefault(config: CaptureDeviceConfig): boolean {
+  return props.state.defaultDeviceId === deviceIdOf(config)
+}
+
 function onSnapTest(): void {
   void props.state.snapTest()
+}
+
+/** 设为/取消默认（作用于当前选中设备，取消 = 传 undefined） */
+function onSetDefault(): void {
+  const config = props.state.selected
+  if (!config) { return }
+  void props.state.setDefault(isDefault(config) ? undefined : deviceIdOf(config))
 }
 </script>
 
@@ -43,6 +60,7 @@ function onSnapTest(): void {
               class="cu-badge"
               :style="{ color: STATUS_META[state.statusOf(config)].text, background: STATUS_META[state.statusOf(config)].bg }"
             >{{ STATUS_META[state.statusOf(config)].label }}</span>
+            <span v-if="isDefault(config)" class="cu-badge cu-badge--default">默认</span>
             <span class="cu-tag">{{ TRANSPORT_LABEL[config.transport] ?? config.transport }}</span>
           </span>
         </button>
@@ -56,7 +74,15 @@ function onSnapTest(): void {
           class="cu-badge"
           :style="{ color: STATUS_META[state.statusOf(state.selected)].text, background: STATUS_META[state.statusOf(state.selected)].bg }"
         >{{ STATUS_META[state.statusOf(state.selected)].label }}</span>
+        <span v-if="isDefault(state.selected)" class="cu-badge cu-badge--default">默认</span>
         <span class="cu-tag">{{ TRANSPORT_LABEL[state.selected.transport] ?? state.selected.transport }}</span>
+        <button
+          class="cu-btn cu-btn--mini"
+          :disabled="state.saving || state.loading"
+          @click="onSetDefault"
+        >
+          {{ isDefault(state.selected) ? '取消默认' : '设为默认' }}
+        </button>
         <span class="cu-editor__id" :title="state.selected.id">ID：{{ state.selected.id }}</span>
       </div>
       <CaptureDeviceForm :config="state.selected" />
@@ -178,6 +204,12 @@ function onSnapTest(): void {
   flex-shrink: 0;
 }
 
+/* 默认设备徽标（青色软底，与页签激活态同源） */
+.cu-badge--default {
+  color: #0f766e;
+  background: #d9efed;
+}
+
 /* ---- 右编辑区 ---- */
 .cu-editor {
   flex: 1;
@@ -273,5 +305,12 @@ function onSnapTest(): void {
 .cu-btn:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* 编辑区头部的内联小号操作钮（设为/取消默认） */
+.cu-btn--mini {
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 6px;
 }
 </style>
