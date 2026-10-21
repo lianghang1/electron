@@ -45,7 +45,13 @@ export class CaptureDialogSessionService {
   constructor(private readonly deps: CaptureDialogSessionDeps) {}
 
   /** 打开浮层：全局互斥；返回的 Promise 在会话收尾时交付（确认=结果，取消=空数组，其余=reject） */
-  open(req: CaptureDialogRequest, origin: CaptureDialogOrigin): Promise<CaptureResult[]> {
+  async open(req: CaptureDialogRequest, origin: CaptureDialogOrigin): Promise<CaptureResult[]> {
+    if (this.session) {
+      throw captureError('DEVICE_BUSY', '拍摄浮层已打开，请先完成或关闭当前拍摄')
+    }
+    // 显式预选优先；缺省按域默认设备自动定位（就绪才注入，否则浮层内自选兜底）
+    const preselect = req.deviceId?.trim() || await this.deps.capture.resolveDefaultDevice()
+    // 解析默认设备存在异步窗口，落位前复检互斥（并发 open 只放行一个）
     if (this.session) {
       throw captureError('DEVICE_BUSY', '拍摄浮层已打开，请先完成或关闭当前拍摄')
     }
@@ -54,7 +60,7 @@ export class CaptureDialogSessionService {
       title: req.title?.trim() || '拍摄',
       appId: origin.appId,
       appName: origin.appName,
-      deviceId: req.deviceId || undefined,
+      deviceId: preselect || undefined,
       deviceLabel: req.deviceLabel || undefined,
       resolutionNum: req.resolutionNum,
       format: req.format,

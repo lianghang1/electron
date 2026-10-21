@@ -5,7 +5,7 @@ import { captureError } from '../errors'
 import { checkCamSdkFrame, frameImage, parseCamSdkFrame, sendCamSdk } from './camsdk-protocol'
 
 /**
- * 华视 CamSDKServer 常驻预览会话（协议同 camsdk-protocol.ts，时序参考官方 Demo
+ * CamSDKServer 常驻预览会话（协议同 camsdk-protocol.ts，时序参考官方 Demo
  * samples/www/JS/camera/idFace.js）：
  *   预览：OpenCamera(devNum, mediaNum:0, resolutionNum, fps) → SetCameraImageInfo(cropType:1)
  *         → GetCameraVideoBuff(enable:true) → 持续推送带 imgBase64Str 的预览帧
@@ -62,7 +62,7 @@ export class CamSdkPreviewSession implements CapturePreviewSession {
       }
 
       timer = setTimeout(
-        () => settle(captureError('DEVICE_OFFLINE', `华视高拍仪开启预览超时（${this.cfg.url}）`)),
+        () => settle(captureError('DEVICE_OFFLINE', `CamSDK 高拍仪开启预览超时（${this.cfg.url}）`)),
         10000,
       )
 
@@ -99,17 +99,17 @@ export class CamSdkPreviewSession implements CapturePreviewSession {
           this.onCaptureResponse(msg)
         }
       }
-      ws.onerror = () => settle(captureError('DEVICE_OFFLINE', `华视 CamSDKServer 连接失败: ${this.cfg.url}`))
+      ws.onerror = () => settle(captureError('DEVICE_OFFLINE', `CamSDKServer 连接失败: ${this.cfg.url}`))
       ws.onclose = () => {
         if (!settled) {
-          settle(captureError('DEVICE_OFFLINE', '华视 CamSDKServer 连接在预览建立前关闭'))
+          settle(captureError('DEVICE_OFFLINE', 'CamSDKServer 连接在预览建立前关闭'))
           return
         }
         // 已建立的会话掉线：终结在途拍照，会话作废（调用方据此可提示重开）
         this.closed = true
         this.ws = null
         if (this.capturing) {
-          this.terminateCapture(captureError('DEVICE_OFFLINE', '华视 CamSDKServer 连接在拍照完成前关闭'))
+          this.terminateCapture(captureError('DEVICE_OFFLINE', 'CamSDKServer 连接在拍照完成前关闭'))
         }
       }
     })
@@ -119,11 +119,11 @@ export class CamSdkPreviewSession implements CapturePreviewSession {
   capture(): Promise<string> {
     return new Promise((resolve, reject) => {
       if (this.closed || !this.ws) {
-        reject(captureError('CAPTURE_FAILED', '华视高拍仪预览未开启，请先开启预览'))
+        reject(captureError('CAPTURE_FAILED', 'CamSDK 高拍仪预览未开启，请先开启预览'))
         return
       }
       if (this.capturing) {
-        reject(captureError('CAPTURE_FAILED', '华视高拍仪正在拍照中，请稍候'))
+        reject(captureError('CAPTURE_FAILED', 'CamSDK 高拍仪正在拍照中，请稍候'))
         return
       }
       const ws = this.ws
@@ -132,13 +132,13 @@ export class CamSdkPreviewSession implements CapturePreviewSession {
       this.captureTimer = setTimeout(() => {
         this.capturing = false
         this.captureSettle = null
-        reject(captureError('CAPTURE_FAILED', '华视高拍仪拍照超时'))
+        reject(captureError('CAPTURE_FAILED', 'CamSDK 高拍仪拍照超时'))
       }, 12000)
       try {
         sendCamSdk(ws, this.cfg.camId ?? 0, { func: 'CameraCapture', mode: 'base64' })
       }
       catch (err) {
-        this.terminateCapture(captureError('DEVICE_OFFLINE', `华视高拍仪拍照指令发送失败：${String(err)}`))
+        this.terminateCapture(captureError('DEVICE_OFFLINE', `CamSDK 高拍仪拍照指令发送失败：${String(err)}`))
       }
     })
   }
@@ -180,7 +180,7 @@ export class CamSdkPreviewSession implements CapturePreviewSession {
     const settleFn = this.captureSettle
     this.captureSettle = null
     if (msg.result !== 0) {
-      settleFn?.(captureError('CAPTURE_FAILED', `华视高拍仪拍照失败（result=${String(msg.result)}）：${String(msg.errorMsg ?? '未知错误')}`))
+      settleFn?.(captureError('CAPTURE_FAILED', `CamSDK 高拍仪拍照失败（result=${String(msg.result)}）：${String(msg.errorMsg ?? '未知错误')}`))
       return
     }
     const base64 = frameImage(msg)
@@ -188,7 +188,7 @@ export class CamSdkPreviewSession implements CapturePreviewSession {
       settleFn?.(undefined, base64)
     }
     else {
-      settleFn?.(captureError('CAPTURE_FAILED', '华视高拍仪拍照成功但未返回图片数据'))
+      settleFn?.(captureError('CAPTURE_FAILED', 'CamSDK 高拍仪拍照成功但未返回图片数据'))
     }
   }
 

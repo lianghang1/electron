@@ -2,8 +2,8 @@ import type { WsLike } from '../../kernel/channel/ws-channel'
 import { captureError } from '../errors'
 
 /**
- * 华视 CamSDKServer JSON 协议层（ws://127.0.0.1:9000，SDK 安装后常驻 Windows 服务）。
- * 协议参考官方 Demo（华视 CamSDK 安装目录下 samples/www/JS/camera/camera.js）：
+ * CamSDKServer JSON 协议层（ws://127.0.0.1:9000，华夏电通「华夏扫描中间件」SDK 安装后常驻 Windows 服务）。
+ * 协议参考官方 Demo（CamSDK 安装目录下 samples/www/JS/camera/camera.js）：
  *   帧格式：纯 JSON 文本帧；响应统一 { func, reqId, result, errorMsg }，result=0 成功、9=设备使用中。
  * 数据红线：imgBase64/imgBase64Str 为画面与拍摄内容，不写日志。
  */
@@ -64,7 +64,7 @@ export function sendCamSdk(ws: WsLike, devNum: number, obj: Record<string, unkno
  */
 export function checkCamSdkFrame(msg: CamSdkFrame, fail: (err: Error) => void): boolean {
   if (msg.result !== 0 && !(msg.func === 'OpenCamera' && msg.result === 9)) {
-    fail(captureError('CAPTURE_FAILED', `华视高拍仪 ${msg.func} 失败（result=${String(msg.result)}）：${String(msg.errorMsg ?? '未知错误')}`))
+    fail(captureError('CAPTURE_FAILED', `CamSDK 高拍仪 ${msg.func} 失败（result=${String(msg.result)}）：${String(msg.errorMsg ?? '未知错误')}`))
     return false
   }
   return true

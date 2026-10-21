@@ -258,7 +258,7 @@ export class DesktopRuntime {
   /**
    * 设备系统装配：资源根统一经 resolveResourcePath 解析（缺省 resources/ —— dev 为
    * <应用根>/resources，打包为 <resourcesPath>/resources），DLL 与外置 exe 均相对它寻址
-   * （idcard/capture/signature 的 devices/<brand>/<平台>/、print 的 devices/print/<平台>/）。
+   * （idcard/capture/signature 的 devices/<域>/<brand>/<平台>/、print 的 devices/print/<平台>/）。
    * 运行时编辑持久化由 electron-store 托管（userData），capture 的存储缺键时回落出厂档案
    * （不设 defaults，避免空值覆盖）。
    */
@@ -300,12 +300,18 @@ export class DesktopRuntime {
     app.on('browser-window-created', (_, win) => this.scannerSystem?.attachWindow(win))
 
     // 图像采集：设备配置持久化，图片落统一根目录 files/capture/
-    const captureStore = createDeviceStore<{ devices?: CaptureDeviceConfig[] }>('capture-configs')
+    // 默认设备与配置同文件同事务（save 整体替换，persist 时须带上既有 defaultDeviceId）
+    const captureStore = createDeviceStore<{ defaultDeviceId?: string, devices?: CaptureDeviceConfig[] }>('capture-configs')
     this.captureSystem = createCaptureSystem({
       resourcesRoot,
       host: this.deviceHost,
       initialConfigs: captureStore.load().devices,
-      persist: configs => captureStore.save({ devices: configs }),
+      persist: configs => captureStore.save({ defaultDeviceId: captureStore.load().defaultDeviceId, devices: configs }),
+      getDefaultDeviceId: () => captureStore.load().defaultDeviceId,
+      setDefaultDeviceId: (id) => {
+        // devices 部分读 store 既有值（service 每次编辑均 persist，两侧始终一致），避免依赖异步接口
+        captureStore.save({ defaultDeviceId: id, devices: captureStore.load().devices ?? [] })
+      },
       defaultSaveDir: this.options.devices?.capture?.saveDir ?? join(filesDir(), 'capture'),
       logger: this.logger.scope('device:capture'),
     })

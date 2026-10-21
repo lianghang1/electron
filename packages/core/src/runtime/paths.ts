@@ -7,7 +7,7 @@ import { app } from 'electron'
  * 所有设备模块共用，禁止再各自拼 resourcesPath / getAppPath。
  *
  * 相对路径以应用为基准原样拼接：
- *   开发: <应用根>/<file>         如 resources/devices/huashi/win64/Termb.dll
+ *   开发: <应用根>/<file>         如 resources/devices/idcard/huashi/win64/Termb.dll
  *   打包: <resourcesPath>/<file>  需 extraResources: { from: 'resources', to: 'resources' }
  */
 export function resolveResourcePath(file: string): string {

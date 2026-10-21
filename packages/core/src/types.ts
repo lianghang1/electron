@@ -36,7 +36,7 @@ export interface WindowOverrides {
     /**
      * SDK 资源根（厂商 DLL 与外置 exe 的共同基准目录）：缺省 resources/ ——
      * dev 为 <应用根>/resources，打包为 <resourcesPath>/resources。
-     * DLL 位置如 devices/huashi/win64/Termb.dll，外置 exe 如 devices/print/win64/SumatraPDF.exe。
+     * DLL 位置如 devices/idcard/huashi/win64/Termb.dll，外置 exe 如 devices/print/win64/SumatraPDF.exe。
      */
     resourcesRoot?: string
     /** 摄像采集（capture 域） */

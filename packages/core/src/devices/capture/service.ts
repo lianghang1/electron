@@ -23,6 +23,10 @@ export interface CaptureServiceOptions {
   logger?: CaptureLogFn
   /** 采集图片默认保存目录（绝对路径） */
   defaultSaveDir: string
+  /** 域默认设备 id 持久化读（未注入 = 无默认设备能力，自动定位仅回落第一个就绪设备） */
+  getDefaultDeviceId?: () => string | undefined
+  /** 域默认设备 id 持久化写（undefined = 清除） */
+  setDefaultDeviceId?: (id: string | undefined) => void
 }
 
 /**
@@ -40,6 +44,8 @@ export class CaptureService {
   /** 采集图片默认保存目录（绝对路径） */
   private readonly defaultSaveDir: string
   private readonly persist?: (configs: CaptureDeviceConfig[]) => void
+  private readonly getDefaultDeviceId?: () => string | undefined
+  private readonly setDefaultDeviceId?: (id: string | undefined) => void
   private readonly resourcesRoot: string
   private readonly host: DeviceHost
 
@@ -47,6 +53,8 @@ export class CaptureService {
     this.logger = options.logger ?? (() => {})
     this.defaultSaveDir = path.resolve(options.defaultSaveDir)
     this.persist = options.persist
+    this.getDefaultDeviceId = options.getDefaultDeviceId
+    this.setDefaultDeviceId = options.setDefaultDeviceId
     this.resourcesRoot = options.resourcesRoot
     this.host = options.host
     this.configs = options.initialConfigs ?? BUILT_IN_CAPTURE_CONFIGS
@@ -95,6 +103,35 @@ export class CaptureService {
     return this.configs.slice()
   }
 
+  /** 读取域默认设备 id（未配置返回 undefined） */
+  getDefaultDevice(): string | undefined {
+    return this.getDefaultDeviceId?.()
+  }
+
+  /** 设置域默认设备（undefined = 清除；id 惰性校验——不存在的 id 在定位时自然回落） */
+  setDefaultDevice(id: string | undefined): void {
+    const normalized = typeof id === 'string' && id.trim() ? id.trim() : undefined
+    this.setDefaultDeviceId?.(normalized)
+  }
+
+  /**
+   * 默认设备解析：配置的默认设备且处于就绪状态才返回其 id，否则 undefined
+   * （调用方回落「第一个就绪设备」或自选）。探测异常静默回落，不影响调用链。
+   */
+  async resolveDefaultDevice(): Promise<string | undefined> {
+    const preferred = this.getDefaultDeviceId?.()
+    if (!preferred) {
+      return undefined
+    }
+    try {
+      const device = (await this.listDevices()).find(d => d.id === preferred)
+      return device?.status === 'ready' ? preferred : undefined
+    }
+    catch {
+      return undefined
+    }
+  }
+
   /** 设备列表：各适配器上报后按 transport 合并 */
   async listDevices(): Promise<CaptureDevice[]> {
     const groups = await Promise.all([...this.adapters.values()].map(a => a.listDevices().catch(() => [])))
@@ -141,18 +178,20 @@ export class CaptureService {
   /** 采集：路由到设备所属适配器执行；同一设备串行化（硬件一次一格）。失败抛 CaptureError */
   async capture(req: CaptureRequest): Promise<CaptureResult> {
     try {
-      if (!req?.deviceId) {
-        throw captureError('VALIDATION_FAILED', '缺少 deviceId')
+      // 显式 deviceId 优先；缺省按域默认设备自动定位（就绪才生效），仍无则显式报错
+      const deviceId = req?.deviceId || await this.resolveDefaultDevice()
+      if (!deviceId) {
+        throw captureError('VALIDATION_FAILED', '缺少 deviceId 且无就绪的默认设备')
       }
-      const transport = req.deviceId.split(':')[0]
+      const transport = deviceId.split(':')[0]
       const adapter = this.adapters.get(transport)
       if (!adapter) {
         throw captureError('ADAPTER_UNAVAILABLE', `未知接入方式: ${transport}`)
       }
       const devices = await adapter.listDevices()
-      const device = devices.find(d => d.id === req.deviceId)
+      const device = devices.find(d => d.id === deviceId)
       if (!device) {
-        throw captureError('DEVICE_NOT_FOUND', `未找到设备: ${req.deviceId}`)
+        throw captureError('DEVICE_NOT_FOUND', `未找到设备: ${deviceId}`)
       }
       if (device.status === 'offline') {
         throw captureError('DEVICE_OFFLINE', `设备离线: ${device.displayName}`)
@@ -160,12 +199,12 @@ export class CaptureService {
       if (device.status === 'unavailable') {
         throw captureError('ADAPTER_UNAVAILABLE', `设备适配器不可用: ${String(device.meta.note ?? transport)}`)
       }
-      const prev = this.locks.get(req.deviceId) ?? Promise.resolve()
+      const prev = this.locks.get(deviceId) ?? Promise.resolve()
       // 保存目录是平台内部事务：恒注入统一根目录 files/capture/，渲染层不可指定（防任意路径写文件）
-      const reqWithDir: AdapterCaptureRequest = { ...req, saveDir: this.defaultSaveDir }
+      const reqWithDir: AdapterCaptureRequest = { ...req, deviceId, saveDir: this.defaultSaveDir }
       // 链上已 catch（登记锁不吞结果），单分支即可
       const task = prev.then(() => adapter.capture(reqWithDir, device))
-      this.locks.set(req.deviceId, task.catch(() => undefined))
+      this.locks.set(deviceId, task.catch(() => undefined))
       this.log('info', `开始采集 ${device.displayName}`, { deviceId: device.id, transport })
       const result = await task
       this.log('info', `采集完成 ${device.displayName}`, { deviceId: device.id })

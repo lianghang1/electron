@@ -3,6 +3,7 @@ import type { ScannerSystem } from '../devices/scanner'
 import { DesktopError } from '@desktop/shared'
 import { is } from '@electron-toolkit/utils'
 import { handle } from './handle'
+import { isWsUrl } from './ws-url'
 
 export interface ScannerIpcDeps {
   /** 扫码枪系统（bootstrap 装配，恒创建） */
@@ -35,5 +36,7 @@ function sanitizeConfigPatch(patch: Partial<ScannerConfig> | undefined): Partial
   if (typeof input.endKey === 'string' && input.endKey.length > 0) { out.endKey = input.endKey }
   if (Array.isArray(input.prefixes) && input.prefixes.every(item => typeof item === 'string')) { out.prefixes = input.prefixes }
   if (typeof input.requirePrefix === 'boolean') { out.requirePrefix = input.requirePrefix }
+  if (input.mode === 'keyboard' || input.mode === 'hid') { out.mode = input.mode }
+  if (isWsUrl(input.hidUrl)) { out.hidUrl = input.hidUrl }
   return out
 }

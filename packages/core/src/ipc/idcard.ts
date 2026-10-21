@@ -1,7 +1,8 @@
-import type { IdCardData } from '@desktop/shared'
+import type { IdcardConfig, IdCardData } from '@desktop/shared'
 import type { IdCardSystem } from '../devices/idcard'
 import { idCardError } from '../devices/idcard/errors'
 import { handle } from './handle'
+import { isWsUrl } from './ws-url'
 
 export interface IdcardIpcDeps {
   /** 身份证阅读系统（bootstrap 装配）；未装配时调用以 ADAPTER_UNAVAILABLE 拒绝 */
@@ -16,6 +17,17 @@ export interface IdcardIpcDeps {
 export function registerIdcardIpc(deps: IdcardIpcDeps): void {
   handle('idcard:listReaders', () => requireSystem(deps.idcard).listReaders())
   handle('idcard:readIdCard', (_e, req) => readIdCard(deps.idcard, req))
+  handle('idcard:getConfig', () => requireSystem(deps.idcard).getConfig())
+  handle('idcard:patchConfig', (_e, patch) => requireSystem(deps.idcard).setConfig(sanitizeConfig(patch)))
+}
+
+/** 配置补丁入参收敛：ws 服务地址仅接受 ws://|wss:// 前缀，非法值丢弃（不污染持久化 store） */
+function sanitizeConfig(patch: Partial<IdcardConfig> | undefined): Partial<IdcardConfig> {
+  const out: Partial<IdcardConfig> = {}
+  if (isWsUrl(patch?.wsUrl)) {
+    out.wsUrl = patch.wsUrl.trim()
+  }
+  return out
 }
 
 /** 系统未装配即拒绝（bootstrap 未配置 devices 属配置错误，渲染层按码提示） */

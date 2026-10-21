@@ -36,6 +36,8 @@ export function registerCaptureIpc(deps: CaptureIpcDeps): void {
     }
     return deps.capture.removeConfig(id)
   })
+  handle('capture:getDefaultDevice', () => Promise.resolve(deps.capture.getDefaultDevice()))
+  handle('capture:setDefaultDevice', (_e, id) => deps.capture.setDefaultDevice(typeof id === 'string' && id.trim() ? id.trim() : undefined))
   handle('capture:snap', (_e, req) => deps.capture.capture(sanitizeCaptureRequest(req)))
   handle('capture:saveDataUrl', (_e, input) => deps.capture.saveDataUrl(input.dataUrl, input.ext))
   handle('capture:startPreview', (e, input) => deps.capture.startPreview(input.deviceId, (base64) => {
@@ -92,16 +94,16 @@ function sanitizeDialogRequest(req: CaptureDialogRequest | undefined): CaptureDi
   }
 }
 
-/** capture 通道入参收敛：白名单重建，保存目录等平台内部字段即使传入也被丢弃 */
+/** capture 通道入参收敛：白名单重建，保存目录等平台内部字段即使传入也被丢弃（deviceId 允许缺省走自动定位） */
 function sanitizeCaptureRequest(req: CaptureRequest | undefined): CaptureRequest {
-  const input = req ?? { deviceId: '' }
-  const pickString = (value: unknown): string => {
-    if (typeof value !== 'string' || !value.trim()) { return '' }
+  const input = req ?? {}
+  const pickOptionalString = (value: unknown): string | undefined => {
+    if (typeof value !== 'string' || !value.trim()) { return undefined }
     return value.trim()
   }
   const resolutionNum = Number(input.resolutionNum)
   return {
-    deviceId: pickString(input.deviceId),
+    deviceId: pickOptionalString(input.deviceId),
     resolutionNum: Number.isInteger(resolutionNum) && resolutionNum >= 0 ? resolutionNum : undefined,
     format: input.format === 'png' || input.format === 'bmp' ? input.format : input.format === 'jpg' ? 'jpg' : undefined,
   }

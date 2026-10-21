@@ -1,4 +1,4 @@
-import type { SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from '../../devices/signature'
+import type { SignatureConfig, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from '../../devices/signature'
 import { invoke, push } from '../../../domain'
 
 /**
@@ -20,4 +20,8 @@ export const signatureDomainDefs = {
   cancelSign: invoke<() => Promise<void>>(),
   /** 笔迹采样点实时推送（仅推给发起会话的窗口） */
   strokeReceived: push<[point: SignStrokePoint]>(),
+  /** 读取域配置（ws 服务地址等；请求-响应） */
+  getConfig: invoke<() => SignatureConfig>(),
+  /** 更新域配置（补丁合并，非法字段丢弃） */
+  patchConfig: invoke<(patch: Partial<SignatureConfig>) => SignatureConfig>(),
 }

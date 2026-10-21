@@ -1,4 +1,4 @@
-import type { IdCardData, IdReaderDevice } from '../../devices/idcard'
+import type { IdcardConfig, IdCardData, IdReaderDevice } from '../../devices/idcard'
 import { invoke } from '../../../domain'
 
 /**
@@ -18,4 +18,8 @@ export const idcardDomainDefs = {
    * deviceId 缺省时平台自动选用第一个就绪的阅读器。
    */
   readIdCard: invoke<(req?: { deviceId?: string }) => Promise<IdCardData>>(),
+  /** 读取域配置（ws 服务地址等；请求-响应） */
+  getConfig: invoke<() => IdcardConfig>(),
+  /** 更新域配置（补丁合并，非法字段丢弃） */
+  patchConfig: invoke<(patch: Partial<IdcardConfig>) => IdcardConfig>(),
 }

@@ -37,9 +37,13 @@ export const captureDomainDefs = {
   removeConfig: invoke<(id: string) => Promise<boolean>>(),
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo；不占用摄像头） */
   listCameras: invoke<(deviceId: string) => Promise<CaptureCameraInfo[]>>(),
+  /** 域默认设备 id（系统设置指定；业务调用 deviceId 缺省时优先使用，就绪才生效） */
+  getDefaultDevice: invoke<() => Promise<string | undefined>>(),
+  /** 设置域默认设备（undefined = 清除，回落自动定位）；id 需为已注册设备的统一 id */
+  setDefaultDevice: invoke<(id: string | undefined) => void>(),
 
   // ---- 无头直拍（无 UI，程序化采集一张） ----
-  /** 采集一张：deviceId 路由到对应适配器；同一设备串行化；该设备预览开启时走会话内拍照 */
+  /** 采集一张：deviceId 缺省时按默认设备自动定位；同一设备串行化；该设备预览开启时走会话内拍照 */
   snap: invoke<(req: CaptureRequest) => Promise<CaptureResult>>(),
   /** UVC 路线（渲染层 getUserMedia）拍到的 dataURL 落盘为图片文件，返回绝对路径 */
   saveDataUrl: invoke<(input: { dataUrl: string, ext?: 'jpg' | 'png' }) => Promise<string>>(),

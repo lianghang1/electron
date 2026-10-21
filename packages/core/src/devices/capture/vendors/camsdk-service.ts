@@ -5,7 +5,7 @@ import { parseWsUrl, tcpProbe } from '../../kernel/channel/ws-channel'
 
 const execFileAsync = promisify(execFile)
 
-/** 华视 CamSDKServer 的 Windows 服务注册名（SDK 安装包固定，非进程名） */
+/** CamSDKServer 的 Windows 服务注册名（SDK 安装包固定，非进程名） */
 export const CAMSDK_SERVICE_NAME = 'CamSDKServer'
 
 /** sc query STATE 字段的判定值（其余非运行态统一按已停止处理） */
@@ -161,7 +161,7 @@ export async function ensureCamSdkService(url: string): Promise<boolean> {
 }
 
 /**
- * 华视服务四态诊断：探活失败时区分「未注册（未安装）/ 自启被禁 / 未运行 / 运行中但端口不通」。
+ * CamSDK 服务四态诊断：探活失败时区分「未注册（未安装）/ 自启被禁 / 未运行 / 运行中但端口不通」。
  * 仅 Windows 有 sc；非 Windows 或诊断本身失败返回 null，调用方维持原始提示（诊断不掩盖探活事实）。
  */
 export async function diagnoseCamSdkService(url: string): Promise<string | null> {
@@ -174,7 +174,7 @@ export async function diagnoseCamSdkService(url: string): Promise<string | null>
       return null
     }
     if (state === 'missing') {
-      return `${CAMSDK_SERVICE_NAME} 服务未注册（华视 SDK 服务端未安装）`
+      return `${CAMSDK_SERVICE_NAME} 服务未注册（CamSDK 服务端未安装）`
     }
     if (state === 'stopped') {
       const startType = await resolveStartType()

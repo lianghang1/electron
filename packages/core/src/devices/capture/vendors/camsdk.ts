@@ -6,7 +6,7 @@ import { CamSdkPreviewSession } from './camsdk-preview'
 import { checkCamSdkFrame, frameImage, parseCamSdkFrame, sendCamSdk } from './camsdk-protocol'
 
 /**
- * 华视 CamSDK 厂商模块（CaptureVendor）。
+ * CamSDK 厂商模块（CaptureVendor）。CamSDK = 华夏电通「华夏扫描中间件」，多厂商高拍仪经白名单接入。
  * 采集序列：OpenCamera → GetCameraVideoBuff(enable) 首帧 → SetCameraImageInfo → CameraCapture(base64) → CloseCamera；
  * 枚举序列：GetCameraInfo → devInfo（funcType 1=文档 2=人像）。常驻预览见 camsdk-preview.ts。
  */
@@ -27,9 +27,9 @@ function captureOnce(endpoint: WsEndpoint, req: { resolutionNum?: number }): Pro
   let previewArrived = false
   return withWsSession<string>(endpoint.url, {
     timeoutMs: 12000,
-    onTimeout: () => captureError('CAPTURE_FAILED', `华视高拍仪采集超时（${endpoint.url}）`),
-    onConnectError: url => captureError('DEVICE_OFFLINE', `华视 CamSDKServer 连接失败: ${url}（确认已安装华视高拍仪 SDK 且服务运行中）`),
-    onClosedEarly: () => captureError('DEVICE_OFFLINE', '华视 CamSDKServer 连接在采集完成前关闭'),
+    onTimeout: () => captureError('CAPTURE_FAILED', `CamSDK 高拍仪采集超时（${endpoint.url}）`),
+    onConnectError: url => captureError('DEVICE_OFFLINE', `CamSDKServer 连接失败: ${url}（确认已安装CamSDK 高拍仪 SDK 且服务运行中）`),
+    onClosedEarly: () => captureError('DEVICE_OFFLINE', 'CamSDKServer 连接在采集完成前关闭'),
     run: (ws) => {
       sendCamSdk(ws, devNum, { func: 'OpenCamera', mediaNum: 0, resolutionNum: req.resolutionNum ?? 0, fps: 5 })
       sendCamSdk(ws, devNum, { func: 'GetCameraVideoBuff', enable: true })
@@ -65,7 +65,7 @@ function captureOnce(endpoint: WsEndpoint, req: { resolutionNum?: number }): Pro
         }
         const base64 = frameImage(msg)
         if (!base64) {
-          settle(captureError('CAPTURE_FAILED', '华视高拍仪拍照成功但未返回图片数据'))
+          settle(captureError('CAPTURE_FAILED', 'CamSDK 高拍仪拍照成功但未返回图片数据'))
           return
         }
         sendCamSdk(ws, devNum, { func: 'CloseCamera', devNum })
@@ -79,9 +79,9 @@ function captureOnce(endpoint: WsEndpoint, req: { resolutionNum?: number }): Pro
 function listCameras(endpoint: WsEndpoint): Promise<CaptureCameraInfo[]> {
   return withWsSession<CaptureCameraInfo[]>(endpoint.url, {
     timeoutMs: 6000,
-    onTimeout: () => captureError('DEVICE_OFFLINE', `华视 CamSDKServer 枚举超时（${endpoint.url}）`),
-    onConnectError: url => captureError('DEVICE_OFFLINE', `华视 CamSDKServer 连接失败: ${url}`),
-    onClosedEarly: () => captureError('DEVICE_OFFLINE', '华视 CamSDKServer 连接在枚举完成前关闭'),
+    onTimeout: () => captureError('DEVICE_OFFLINE', `CamSDKServer 枚举超时（${endpoint.url}）`),
+    onConnectError: url => captureError('DEVICE_OFFLINE', `CamSDKServer 连接失败: ${url}`),
+    onClosedEarly: () => captureError('DEVICE_OFFLINE', 'CamSDKServer 连接在枚举完成前关闭'),
     run: (ws) => {
       ws.send(JSON.stringify({ func: 'GetCameraInfo', reqId: String(Date.now()) }))
     },
@@ -91,7 +91,7 @@ function listCameras(endpoint: WsEndpoint): Promise<CaptureCameraInfo[]> {
         return
       }
       if (msg.result !== 0) {
-        settle(captureError('CAPTURE_FAILED', `华视高拍仪枚举失败（result=${String(msg.result)}）：${String(msg.errorMsg ?? '未知错误')}`))
+        settle(captureError('CAPTURE_FAILED', `CamSDK 高拍仪枚举失败（result=${String(msg.result)}）：${String(msg.errorMsg ?? '未知错误')}`))
         return
       }
       settle(undefined, (msg.devInfo ?? []).map(toCameraInfo))
