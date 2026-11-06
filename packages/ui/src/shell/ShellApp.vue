@@ -11,6 +11,7 @@ import { Settings, Plus, Minus, Square, X, LayoutGrid } from 'lucide-vue-next'
 import { desktop } from '@shell/bridge/client'
 import { resolveEmbeddedRoute } from '../apps/registry'
 import HomePage from '../apps/pages/HomePage.vue'
+import SettingsDialog from './SettingsDialog.vue'
 
 /** 工作台 tab：embedded 路由页或视图实例（packaged/remote） */
 interface ShellTab {
@@ -35,6 +36,7 @@ const activeKey = ref(HOME.key)
 const railHover = ref<string | null>(null)
 const appList = ref<AppSummary[]>([])
 const showAppLauncher = ref(false)
+const showSettings = ref(false)
 const contentEl = ref<HTMLElement | null>(null)
 
 const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value) ?? HOME)
@@ -144,7 +146,7 @@ onBeforeUnmount(() => {
             <Plus :size="14" />
           </button>
         </div>
-        <button class="ctrl flex size-8 items-center justify-center" style="color: var(--dt-text-2); border-radius: var(--dt-radius)">
+        <button class="ctrl flex size-8 items-center justify-center" style="color: var(--dt-text-2); border-radius: var(--dt-radius)" @click="showSettings = true">
           <Settings :size="15" />
         </button>
         <div class="mx-1 h-4 w-px" style="background: var(--dt-line)" />
@@ -230,6 +232,9 @@ onBeforeUnmount(() => {
           暂无应用——flavor.json 的 apps 清单为空
         </p>
       </div>
+
+      <!-- 统一设置（schema 驱动面板） -->
+      <SettingsDialog v-model:open="showSettings" />
     </div>
   </div>
 </template>

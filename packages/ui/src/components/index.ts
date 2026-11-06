@@ -1,0 +1,5 @@
+export { default as DtButton } from './DtButton.vue'
+export { default as DtDialog } from './DtDialog.vue'
+export { default as DtTooltip } from './DtTooltip.vue'
+export { default as DtSwitch } from './DtSwitch.vue'
+export { default as DtInput } from './DtInput.vue'

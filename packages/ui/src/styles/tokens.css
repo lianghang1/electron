@@ -22,6 +22,7 @@
   /* 强调与语义 */
   --dt-accent: #3b82f6;
   --dt-accent-soft: rgba(59, 130, 246, 0.14);
+  --dt-hover: rgba(148, 163, 199, 0.14);
   --dt-ok: #22c55e;
   --dt-warn: #f59e0b;
   --dt-danger: #ef4444;
@@ -56,4 +57,5 @@
   --dt-text-1: #e6edf3;
   --dt-text-2: #8b949e;
   --dt-text-3: #6e7681;
+  --dt-hover: rgba(139, 148, 158, 0.18);
 }
