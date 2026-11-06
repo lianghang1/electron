@@ -1,0 +1,23 @@
+{
+  "name": "@shell/devices",
+  "type": "module",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "description": "设备网关：kernel→adapters→vendors→host 四层（自 core 平移，逻辑未动）",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shell/kernel": "workspace:*",
+    "@shell/shared": "workspace:*",
+    "electron": "catalog:",
+    "koffi": "catalog:",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

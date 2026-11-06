@@ -1,0 +1,8 @@
+{
+  "id": "kiosk",
+  "name": "殡葬自助终端",
+  "mode": "kiosk",
+  "apps": [],
+  "branding": { "accent": "#3b82f6" },
+  "update": { "allowedOrigins": [] }
+}

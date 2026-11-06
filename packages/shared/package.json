@@ -1,17 +1,25 @@
 {
-  "name": "@desktop/shared",
+  "name": "@shell/shared",
   "type": "module",
-  "version": "0.1.0",
+  "version": "2.0.0-alpha.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./manifest": "./src/manifest.ts",
+    "./capability": "./src/capability.ts",
+    "./settings": "./src/settings.ts",
+    "./events": "./src/events.ts",
+    "./domain": "./src/domain.ts"
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }

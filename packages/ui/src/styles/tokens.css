@@ -1,0 +1,59 @@
+/*
+ * dt-* 设计令牌：全仓库唯一颜色/字号/间距/圆角来源。
+ * 视觉基调（按 2026-11 参考稿定版）：浅色玻璃、浮动圆角窗口、
+ * 顶部 tab 条（彩色应用图标）、左侧圆角图标栏（可折叠）。
+ * 纪律：页面禁裸写颜色/字号/圆角，只准消费本文件的变量。
+ */
+@import 'tailwindcss';
+
+:root {
+  /* 表面三层：页面底 → 窗口玻璃 → 悬浮件 */
+  --dt-page: #dfe7f6;
+  --dt-glass: rgba(240, 245, 253, 0.86);
+  --dt-surface: #ffffff;
+  --dt-surface-hover: #f2f6fd;
+  --dt-line: rgba(148, 163, 199, 0.28);
+
+  /* 文字 */
+  --dt-text-1: #1c2433;
+  --dt-text-2: #5b6879;
+  --dt-text-3: #97a1b5;
+
+  /* 强调与语义 */
+  --dt-accent: #3b82f6;
+  --dt-accent-soft: rgba(59, 130, 246, 0.14);
+  --dt-ok: #22c55e;
+  --dt-warn: #f59e0b;
+  --dt-danger: #ef4444;
+
+  /* 几何 */
+  --dt-radius-window: 14px;
+  --dt-radius: 10px;
+  --dt-radius-icon: 12px;
+
+  /* 字号（5 档封顶） */
+  --dt-font-title: 15px;
+  --dt-font-base: 13px;
+  --dt-font-caption: 11px;
+
+  /* 布局骨架 */
+  --dt-titlebar-h: 44px;
+  --dt-rail-w: 64px;
+  --dt-rail-w-expanded: 92px;
+  --dt-icon-size: 40px;
+
+  /* 玻璃效果 */
+  --dt-blur: blur(20px) saturate(1.4);
+}
+
+/* 深色主题（kiosk 夜间可选，值待 M3 定） */
+:root[data-theme='dark'] {
+  --dt-page: #0d1117;
+  --dt-glass: rgba(22, 27, 34, 0.86);
+  --dt-surface: #161b22;
+  --dt-surface-hover: #21262d;
+  --dt-line: rgba(139, 148, 158, 0.25);
+  --dt-text-1: #e6edf3;
+  --dt-text-2: #8b949e;
+  --dt-text-3: #6e7681;
+}

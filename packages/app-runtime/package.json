@@ -1,0 +1,21 @@
+{
+  "name": "@shell/app-runtime",
+  "type": "module",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shell/kernel": "workspace:*",
+    "@shell/shared": "workspace:*",
+    "@shell/window": "workspace:*",
+    "electron": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

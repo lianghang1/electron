@@ -1,0 +1,21 @@
+{
+  "name": "@shell/kernel",
+  "type": "module",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./logger": "./src/logger/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@shell/shared": "workspace:*",
+    "electron-log": "^5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

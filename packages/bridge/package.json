@@ -1,0 +1,18 @@
+{
+  "name": "@shell/bridge",
+  "type": "module",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "description": "渲染层唯一门面：preload contextBridge 单文件集中（可审计）+ 渲染层类型化客户端",
+  "exports": {
+    "./preload": "./src/preload.ts",
+    "./client": "./src/client.ts"
+  },
+  "dependencies": {
+    "@shell/shared": "workspace:*",
+    "electron": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

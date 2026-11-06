@@ -1,5 +1,5 @@
 {
-  "name": "@desktop/config",
+  "name": "@shell/config",
   "type": "module",
   "version": "0.2.0",
   "private": true,

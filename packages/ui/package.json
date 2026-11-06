@@ -1,22 +1,26 @@
 {
-  "name": "@desktop/ui",
+  "name": "@shell/ui",
   "type": "module",
-  "version": "0.1.0",
+  "version": "2.0.0-alpha.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles/tokens.css"
   },
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
   "scripts": {
     "typecheck": "vue-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@desktop/shared": "workspace:*",
-    "reka-ui": "^2.10.5",
+    "@shell/app-runtime": "workspace:*",
+    "@shell/bridge": "workspace:*",
+    "@shell/shared": "workspace:*",
+    "lucide-vue-next": "catalog:",
+    "reka-ui": "catalog:",
     "vue": "catalog:"
   },
   "devDependencies": {
+    "@vitejs/plugin-vue": "catalog:",
+    "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "vue-tsc": "catalog:"
   }

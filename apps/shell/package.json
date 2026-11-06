@@ -1,0 +1,42 @@
+{
+  "name": "@app/shell",
+  "type": "module",
+  "version": "2.0.0-alpha.0",
+  "private": true,
+  "description": "壳平台唯一 Electron 入口：main.ts 只调组合根",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
+    "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
+    "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
+    "build": "pnpm run typecheck && electron-vite build",
+    "build:win": "pnpm run build && electron-builder --win",
+    "build:mac": "pnpm run build && electron-builder --mac",
+    "build:linux": "pnpm run build && electron-builder --linux"
+  },
+  "dependencies": {
+    "@shell/app-runtime": "workspace:*",
+    "@shell/bridge": "workspace:*",
+    "@shell/devices": "workspace:*",
+    "@shell/kernel": "workspace:*",
+    "@shell/shared": "workspace:*",
+    "@shell/ui": "workspace:*",
+    "@shell/update": "workspace:*",
+    "@shell/window": "workspace:*",
+    "electron": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@types/node": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "electron-builder": "catalog:",
+    "electron-vite": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vue": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}

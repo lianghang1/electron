@@ -1,32 +1,27 @@
 {
-  "name": "electron-monorepo",
-  "version": "1.0.0",
+  "name": "shell-platform",
+  "version": "2.0.0-alpha.0",
   "private": true,
-  "description": "",
+  "description": "壳平台 v2：一套壳 × N 产品形态（flavor）",
   "engines": {
-    "node": "^22.22.2 || ^24.15.0 || >=26.0.0"
+    "node": "^24.15.0 || >=26.0.0"
   },
   "scripts": {
-    "dev": "pnpm --filter @app/desktop dev",
-    "build": "pnpm --filter @app/desktop build",
-    "build:win": "pnpm --filter @app/desktop build:win",
+    "dev": "pnpm --filter @app/shell dev",
+    "build": "pnpm --filter @app/shell build",
+    "build:win": "pnpm --filter @app/shell build:win",
+    "build:mac": "pnpm --filter @app/shell build:mac",
+    "build:linux": "pnpm --filter @app/shell build:linux",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "gen:brand": "tsx resources/brand/generate.ts",
-    "gen:app": "tsx scripts/generate-app.ts",
-    "hotfix": "tsx scripts/pack-hotfix.ts",
-    "sync:resources": "tsx scripts/sync-dev-resources.ts",
-    "postinstall": "tsx scripts/sync-dev-resources.ts",
-    "test": "pnpm --filter @desktop/core test",
+    "test": "pnpm --filter @shell/devices test",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
-    "@desktop/config": "workspace:*",
-    "adm-zip": "^0.5.16",
+    "@shell/config": "workspace:*",
     "eslint": "catalog:",
     "tsx": "catalog:",
-    "typescript": "catalog:",
-    "ws": "^8.22.0"
+    "typescript": "catalog:"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

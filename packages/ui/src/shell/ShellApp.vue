@@ -1,257 +1,134 @@
 <script setup lang="ts">
-import type { DesktopTab, WorkAreaRect } from '@desktop/shared'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import AppLauncher from './components/AppLauncher.vue'
-import CommandPalette from './components/CommandPalette.vue'
-import TopBar from './components/TopBar.vue'
-import UpdateBar from './components/UpdateBar.vue'
-import { useApps } from './composables/use-apps'
-import { useTabs } from './composables/use-tabs'
-import { useTheme } from './composables/use-theme'
+/**
+ * ShellApp：工作台主体（标题栏 tab 条 + 左图标栏 + 内容容器）。
+ * 参考稿布局：44px 自绘标题栏（tabs + 设置 + 窗口控制）/ 64px 图标栏 / 圆角内容区。
+ * M3 填充完整交互；当前为结构骨架 + 玻璃主题底。
+ */
+import { ref } from 'vue'
+import { Settings, Plus, Minus, Square, X } from 'lucide-vue-next'
+import { desktop } from '@shell/bridge/client'
 
-// Shell 自包含样式：dt-* 设计令牌随主题换肤（:root[data-theme]，见 use-theme）
-import './styles/reset.css'
-import './styles/transition.css'
-import './styles/tokens.css'
-
-const { apps, hostName } = useApps()
-const { tabs, open, close, activate } = useTabs()
-const { theme, toggle: toggleTheme } = useTheme()
-
-const maximized = ref(false)
-const viewport = ref<HTMLElement | null>(null)
-
-const activeTab = computed(() => tabs.value.find(tab => tab.active))
-
-/** 资源型 App 不进左侧导航与应用中心（启动直开的嵌入网页，非用户手动发起的入口） */
-const launchableApps = computed(() => apps.value.filter(app => app.manifest.kind !== 'resource'))
-
-/** 资源模式：激活 Tab 是资源型 App 时隐藏左侧导航与应用中心（头部保留固定 Tab 条），Web 铺满窗口 */
-const resourceMode = computed(() => {
-  const tab = activeTab.value
-  if (!tab) { return false }
-  return apps.value.some(app => app.manifest.id === tab.appId && app.manifest.kind === 'resource')
-})
-
-// ---- 窗口控制（顶栏自绘按钮，titleBarStyle: hidden 后为唯一入口） ----
-async function minimize(): Promise<void> {
-  await window.desktop.window.minimize()
+interface ShellTab {
+  id: string
+  title: string
+  iconColor: string
 }
 
-async function toggleMaximize(): Promise<void> {
-  if (maximized.value) { await window.desktop.window.restore() }
-  else { await window.desktop.window.maximize() }
+const tabs = ref<ShellTab[]>([
+  { id: 'home', title: '首页', iconColor: '#3b82f6' },
+])
+const activeTabId = ref('home')
+const railHover = ref<string | null>(null)
+
+function closeTab(id: string) {
+  tabs.value = tabs.value.filter(t => t.id !== id)
+  if (activeTabId.value === id && tabs.value.length > 0)
+    activeTabId.value = tabs.value[0]!.id
 }
-
-async function closeWindow(): Promise<void> {
-  await window.desktop.window.close()
-}
-
-/** 应用中心：原生浮层窗承载（DOM 无法盖过 WebContentsView），重复调用仅聚焦 */
-function openAppCenter(): void {
-  void window.desktop.overlay.openAppCenter()
-}
-
-// ---- Tab 右键菜单：交由原生浮层窗渲染（页面内容保持可见），坐标为内容区 DIP ----
-function openTabContextMenu(tab: DesktopTab, x: number, y: number): void {
-  void window.desktop.overlay.openMenu({ tabId: tab.id, appId: tab.appId, x, y })
-}
-
-/** 资源模式页面操作入口：顶栏按钮唤出与 Tab 右键同一菜单（刷新/清缓存/清站点数据） */
-function openPageMenu(x: number, y: number): void {
-  const tab = activeTab.value
-  if (!tab) { return }
-  void window.desktop.overlay.openMenu({ tabId: tab.id, appId: tab.appId, x, y })
-}
-
-// ---- Web App 容器区域：布局变化实时同步给 Main（WebContentsView 跟随定位） ----
-function syncWorkArea(): void {
-  const el = viewport.value
-  if (!el) { return }
-  // 窗口隐藏/最小化时测量值塌缩不可信（如 28x0），跳过上报；恢复可见时由 visibilitychange 补报
-  if (document.visibilityState !== 'visible') { return }
-  const rect = el.getBoundingClientRect()
-  const area: WorkAreaRect = {
-    x: Math.round(rect.left),
-    y: Math.round(rect.top),
-    width: Math.round(rect.width),
-    height: Math.round(rect.height),
-  }
-  void window.desktop.tabs.setWorkArea(area)
-}
-
-/** 窗口从隐藏/最小化恢复后 ResizeObserver 不一定再触发，恢复可见需补报一次 */
-function onVisibilityChange(): void {
-  if (document.visibilityState === 'visible') { syncWorkArea() }
-}
-
-let resizeObserver: ResizeObserver | null = null
-let unsubMaximized: (() => void) | null = null
-
-onMounted(() => {
-  resizeObserver = new ResizeObserver(syncWorkArea)
-  if (viewport.value) { resizeObserver.observe(viewport.value) }
-  document.addEventListener('visibilitychange', onVisibilityChange)
-
-  unsubMaximized = window.desktop.events.on('window:maximizedChanged', (value) => {
-    maximized.value = value
-  })
-  void window.desktop.window.isMaximized().then((value) => {
-    maximized.value = value
-  })
-})
-
-onBeforeUnmount(() => {
-  resizeObserver?.disconnect()
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-  unsubMaximized?.()
-})
 </script>
 
 <template>
-  <div class="dt-shell">
-    <!-- 单层顶栏：品牌（宿主名）/ 应用中心 / 标签 / 主题 / 窗口控制合一；
-         资源模式降级为「品牌 + 窗口控制」（单资源）或「品牌 + 固定 Tab 条 + 窗口控制」（多资源） -->
-    <TopBar
-      :tabs="tabs"
-      :maximized="maximized"
-      :theme="theme"
-      :resource="resourceMode"
-      :host-name="hostName"
-      @activate="activate"
-      @close="close"
-      @context-menu="openTabContextMenu"
-      @page-menu="openPageMenu"
-      @toggle-theme="toggleTheme"
-      @toggle-center="openAppCenter"
-      @minimize="minimize"
-      @toggle-maximize="toggleMaximize"
-      @close-window="closeWindow"
-    />
-    <div class="dt-body">
-      <AppLauncher v-if="!resourceMode" :apps="launchableApps" :tabs="tabs" @open="open" />
-      <main class="dt-main">
-        <!-- 内容区：即 WebContentsView 对位区域（矩形语义经 getBoundingClientRect 上报） -->
-        <div ref="viewport" class="dt-canvas">
-          <div v-if="tabs.length === 0" class="dt-empty">
-            <p class="dt-empty__title">
-              打开一个应用开始工作
-            </p>
-            <p class="dt-empty__desc">
-              从左侧导航或应用中心进入，Ctrl+K 唤起命令面板
-            </p>
+  <div class="shell h-screen w-screen overflow-hidden" style="background: var(--dt-page)">
+    <div class="shell-window flex h-full w-full flex-col" style="background: var(--dt-glass); backdrop-filter: var(--dt-blur); border-radius: var(--dt-radius-window)">
+      <!-- 标题栏：tab 条 + 设置 + 窗口控制 -->
+      <header
+        class="flex items-center gap-2 px-3"
+        style="height: var(--dt-titlebar-h); border-bottom: 1px solid var(--dt-line)"
+      >
+        <div class="titlebar-drag flex min-w-0 flex-1 items-center gap-1">
+          <div
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="tab flex h-8 cursor-default items-center gap-2 px-3"
+            :class="{ 'tab-active': tab.id === activeTabId }"
+            style="border-radius: var(--dt-radius); font-size: var(--dt-font-base)"
+            @click="activeTabId = tab.id"
+          >
+            <span class="size-2.5 rounded-md" :style="{ background: tab.iconColor }" />
+            <span style="color: var(--dt-text-1)">{{ tab.title }}</span>
+            <button class="tab-close ml-1 opacity-40 hover:opacity-100" @click.stop="closeTab(tab.id)">
+              <X :size="12" />
+            </button>
           </div>
-          <div v-else-if="activeTab?.isLoading" class="dt-loading">
-            <svg class="dt-loading__spinner" viewBox="0 0 24 24" width="28" height="28">
-              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="44" />
-            </svg>
-            <p class="dt-loading__text">
-              正在加载「{{ activeTab?.title }}」…
-            </p>
-          </div>
+          <button class="new-tab flex size-8 items-center justify-center" style="border-radius: var(--dt-radius); color: var(--dt-text-2)">
+            <Plus :size="14" />
+          </button>
         </div>
-        <UpdateBar />
-      </main>
+        <button class="ctrl flex size-8 items-center justify-center" style="color: var(--dt-text-2); border-radius: var(--dt-radius)">
+          <Settings :size="15" />
+        </button>
+        <div class="mx-1 h-4 w-px" style="background: var(--dt-line)" />
+        <div class="flex items-center">
+          <button class="ctrl flex h-8 w-11 items-center justify-center" style="color: var(--dt-text-2)" @click="desktop().window.minimize()">
+            <Minus :size="13" />
+          </button>
+          <button class="ctrl flex h-8 w-11 items-center justify-center" style="color: var(--dt-text-2)" @click="desktop().window.toggleMaximize()">
+            <Square :size="11" />
+          </button>
+          <button class="ctrl flex h-8 w-11 items-center justify-center hover:bg-[#ef4444] hover:text-white" style="border-radius: 0 var(--dt-radius) 0 0" @click="desktop().window.close()">
+            <X :size="13" />
+          </button>
+        </div>
+      </header>
+
+      <div class="flex min-h-0 flex-1">
+        <!-- 左图标栏（折叠形态：纯图标 + tooltip） -->
+        <nav
+          class="flex flex-col items-center gap-1.5 py-3"
+          style="width: var(--dt-rail-w); border-right: 1px solid var(--dt-line)"
+        >
+          <div
+            v-for="tab in tabs"
+            :key="tab.id"
+            class="relative"
+            @mouseenter="railHover = tab.id"
+            @mouseleave="railHover = null"
+          >
+            <button
+              class="rail-icon flex items-center justify-center"
+              :class="{ 'rail-icon-active': tab.id === activeTabId }"
+              :style="{ width: 'var(--dt-icon-size)', height: 'var(--dt-icon-size)', borderRadius: 'var(--dt-radius-icon)', background: tab.iconColor }"
+              @click="activeTabId = tab.id"
+            />
+            <span
+              v-if="railHover === tab.id"
+              class="tooltip absolute left-full z-50 ml-2 whitespace-nowrap px-2.5 py-1.5"
+              style="background: #1c2433; color: #fff; font-size: var(--dt-font-caption); border-radius: 8px"
+            >{{ tab.title }}</span>
+          </div>
+          <button
+            class="rail-icon flex items-center justify-center"
+            :style="{ width: 'var(--dt-icon-size)', height: 'var(--dt-icon-size)', borderRadius: 'var(--dt-radius-icon)', border: '1px dashed var(--dt-line)', color: 'var(--dt-text-3)' }"
+          >
+            <Plus :size="16" />
+          </button>
+        </nav>
+
+        <!-- 内容容器：embedded 路由 / app:// 视图挂载点（M2 接 AppRuntime） -->
+        <main class="min-w-0 flex-1 p-2">
+          <div
+            class="flex h-full w-full items-center justify-center"
+            style="background: var(--dt-surface); border-radius: var(--dt-radius); color: var(--dt-text-3); font-size: var(--dt-font-base)"
+          >
+            Shell v2 · 工作台就绪（M2 接入 AppRuntime 内容视图）
+          </div>
+        </main>
+      </div>
     </div>
-    <CommandPalette
-      :apps="launchableApps"
-      :tabs="tabs"
-      @open-app="open"
-      @activate-tab="activate"
-      @toggle-theme="toggleTheme"
-      @toggle-center="openAppCenter"
-    />
   </div>
 </template>
 
 <style scoped>
-.dt-shell {
-  position: relative;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--dt-bg);
-  color: var(--dt-text);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    'PingFang SC',
-    sans-serif;
-  transition: background var(--dt-dur-slow) var(--dt-ease);
+.shell-window {
+  box-shadow: 0 24px 80px rgb(15 30 70 / 0.18), 0 0 0 1px var(--dt-line);
 }
-
-/* 平面布局：侧栏（带右边框）+ 内容区（白底），无间隙无投影 */
-.dt-body {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  min-width: 0;
-}
-
-.dt-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--dt-surface);
-}
-
-/* 内容区：WebContentsView 以矩形对位（DOM 与原生视图同底色，无边角缝隙） */
-.dt-canvas {
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--dt-surface);
-  transition: background var(--dt-dur-slow) var(--dt-ease);
-}
-
-.dt-empty {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-.dt-empty__title {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--dt-text-3);
-  margin: 0 0 6px;
-}
-.dt-empty__desc {
-  font-size: 12px;
-  color: var(--dt-text-3);
-  opacity: 0.7;
-  margin: 0;
-}
-
-/* 加载骨架：视图区居中 spinner（Main 侧 dom-ready 前视图零尺寸，骨架屏可见） */
-.dt-loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-}
-.dt-loading__spinner {
-  color: var(--dt-brand);
-  animation: dt-loading-spin 0.9s linear infinite;
-}
-.dt-loading__text {
-  margin: 0;
-  font-size: 13px;
-  color: var(--dt-text-3);
-}
-@keyframes dt-loading-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+.tab { transition: background 0.12s ease; }
+.tab:hover { background: var(--dt-surface-hover); }
+.tab-active { background: var(--dt-surface); box-shadow: 0 1px 6px rgb(15 30 70 / 0.08); }
+.ctrl:hover { background: var(--dt-surface-hover); }
+.rail-icon { transition: transform 0.12s ease, box-shadow 0.12s ease; }
+.rail-icon:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgb(15 30 70 / 0.16); }
+.rail-icon-active { outline: 2px solid var(--dt-accent); outline-offset: 2px; }
+.titlebar-drag { -webkit-app-region: drag; }
+.titlebar-drag button, .tab { -webkit-app-region: no-drag; }
 </style>
