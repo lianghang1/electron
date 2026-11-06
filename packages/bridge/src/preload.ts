@@ -15,9 +15,11 @@ const desktop = {
 
   /** 平台事件订阅（事件名与载荷契约见 @shell/shared events） */
   onEvent: (event: string, handler: (payload: unknown) => void) => {
+    // 通道映射：扫码内容由 ScanService 直推 webContents（旧通道名），对渲染层统一为事件名
+    const channel = event === 'scanner.scanned' ? 'scanner:scanReceived' : `event:${event}`
     const listener = (_e: Electron.IpcRendererEvent, payload: unknown) => handler(payload)
-    ipcRenderer.on(`event:${event}`, listener)
-    return () => ipcRenderer.removeListener(`event:${event}`, listener)
+    ipcRenderer.on(channel, listener)
+    return () => ipcRenderer.removeListener(channel, listener)
   },
 
   /** 应用运行时：打开 / 关闭 / 激活 / 清单 */

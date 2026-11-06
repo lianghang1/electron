@@ -12,8 +12,9 @@ import {
   registerAppScheme,
 } from '@shell/app-runtime'
 import { DomainRouteError, createDeviceGateway, createDomainRouter } from '@shell/devices'
-import { createKernel, type KernelSystem } from '@shell/kernel'
+import { createKernel } from '@shell/kernel'
 import { createRootLogger } from '@shell/kernel/logger'
+import { configDir, filesDir } from '@shell/kernel/storage'
 import { flavorManifestSchema } from '@shell/shared'
 import { WindowSystem } from '@shell/window'
 import { UpdateCenter } from '@shell/update'
@@ -44,18 +45,25 @@ async function main(): Promise<void> {
   const flavor = loadFlavor()
 
   const windows = new WindowSystem(flavor, join(__dirname, '../renderer'))
+  const kernel = createKernel(flavor, [windows, new UpdateCenter([])])
+  windows.bindEvents(kernel.ctx.events)
+
   const devices = createDeviceGateway({
     logger,
+    events: kernel.ctx.events,
     hostEntryPath: join(__dirname, 'device-host.js'),
     resourcesRoot: join(process.resourcesPath ?? app.getAppPath(), 'devices'),
+    paths: { storageRoot: configDir(), filesRoot: filesDir() },
   })
 
-  const kernel = createKernel(flavor, [
-    devices as unknown as KernelSystem,
-    windows,
-    new UpdateCenter([]),
-  ])
-  windows.bindEvents(kernel.ctx.events)
+  // 设备系统并入内核生命周期：start = 守护进程预热（打 t2），stop = 全域 dispose
+  void kernel.register({
+    name: 'devices',
+    start: () => devices.warmup(() => {
+      kernel.ctx.marks.t2DeviceHostReady = Date.now()
+    }),
+    stop: () => devices.dispose(),
+  })
 
   // 应用运行时：openers 在此装配（铁律一），AppService 只认 SPI
   const appsRoot = join(app.getAppPath(), 'resources/apps')
@@ -147,12 +155,9 @@ async function main(): Promise<void> {
   // 应用 dist 分区协议：主 Session 注册（packaged 形态）
   registerAppProtocol(session.defaultSession, appsRoot)
 
-  // 设备守护进程预热：冷启动成本移出首次设备操作，就绪即打 t2
-  void devices.warmup(() => {
-    kernel.ctx.marks.t2DeviceHostReady = Date.now()
-  })
-
   windows.createShellWindow()
+  // 扫码枪键盘观察挂到工作台窗口
+  devices.attachShellWindow(windows.shellWindow!)
   kernel.ctx.marks.t3WindowShown = Date.now()
 }
 

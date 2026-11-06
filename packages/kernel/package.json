@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./logger": "./src/logger/index.ts",
-    "./settings": "./src/settings/index.ts"
+    "./settings": "./src/settings/index.ts",
+    "./storage": "./src/storage/app-paths.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

@@ -17,6 +17,10 @@ export interface PlatformEvents {
   // 窗口
   'window.created': { profile: string, id: number }
   'window.closed': { id: number }
+  // 设备数据流（gateway 适配层把回调转为广播）
+  'scanner.scanned': { code: string }
+  'signature.stroke': { point: unknown }
+  'capture.frame': { deviceId: string, frame: unknown }
   // 崩溃与自愈
   'crash.renderer-gone': { windowId: number, reason: string, restartCount: number }
   'watchdog.recovery-mode': { reason: string }

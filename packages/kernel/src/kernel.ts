@@ -24,6 +24,8 @@ export interface KernelSystem extends Startable {
  */
 export interface PlatformKernel {
   ctx: KernelContext
+  /** 注册后补系统：kernel 已启动则立即拉起，否则并入启动序（组合根解耦创建时序用） */
+  register(system: KernelSystem): Promise<void>
   start(): Promise<void>
   stop(): Promise<void>
 }
@@ -32,13 +34,26 @@ export function createKernel(flavor: FlavorManifest, systems: KernelSystem[] = [
   const ctx: KernelContext = { flavor, events: new EventBus(), marks: createLaunchMarks() }
 
   const started: KernelSystem[] = []
+  let bootCompleted = false
+
+  async function startOne(system: KernelSystem): Promise<void> {
+    await system.start()
+    started.push(system)
+  }
 
   async function start(): Promise<void> {
-    for (const system of systems) {
-      await system.start()
-      started.push(system)
-    }
+    for (const system of systems)
+      await startOne(system)
+    bootCompleted = true
     ctx.marks.t1KernelReady = Date.now()
+  }
+
+  async function register(system: KernelSystem): Promise<void> {
+    if (bootCompleted) {
+      await startOne(system)
+      return
+    }
+    systems.push(system)
   }
 
   async function stop(): Promise<void> {
@@ -46,5 +61,5 @@ export function createKernel(flavor: FlavorManifest, systems: KernelSystem[] = [
       await system.stop().catch(() => {})
   }
 
-  return { ctx, start, stop }
+  return { ctx, register, start, stop }
 }
