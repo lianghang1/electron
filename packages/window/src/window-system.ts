@@ -63,7 +63,49 @@ export class WindowSystem implements Startable, ViewHost {
     win.once('ready-to-show', () => win.show())
     this.track(win)
     this.shellWindowId = win.id
+    if (this.flavor.mode === 'kiosk')
+      this.installKioskWatchdog(win)
     return win
+  }
+
+  /**
+   * Kiosk 看门狗：渲染进程异常退出 → 退避重启（1s/2s/3s）；连续 3 次进恢复模式
+   * （加载自检页而非无限重启循环——断电重启必落在可交互状态的变体）。
+   * 稳定运行 60s 后计数归零。
+   */
+  private kioskRestarts = 0
+  private kioskStableTimer?: NodeJS.Timeout
+
+  private installKioskWatchdog(win: BrowserWindow): void {
+    win.webContents.on('render-process-gone', (_event, details) => {
+      this.events?.emit('crash.renderer-gone', { windowId: win.id, reason: details.reason, restartCount: this.kioskRestarts })
+
+      if (this.kioskRestarts >= 3) {
+        this.events?.emit('watchdog.recovery-mode', { reason: `renderer gone x${this.kioskRestarts}: ${details.reason}` })
+        const devUrl = process.env.ELECTRON_RENDERER_URL
+        const recovery = devUrl ? `${devUrl}/#/recovery` : undefined
+        if (recovery)
+          void win.loadURL(recovery)
+        else
+          void win.loadFile(join(this.rendererDir, 'index.html'), { hash: '/recovery' })
+        return
+      }
+
+      this.kioskRestarts++
+      const delayMs = this.kioskRestarts * 1000
+      setTimeout(() => {
+        app.relaunch()
+        app.exit(0)
+      }, delayMs)
+    })
+
+    // 稳定运行计时：60s 无崩溃即归零退避计数
+    win.webContents.once('did-finish-load', () => {
+      this.kioskStableTimer?.refresh()
+      this.kioskStableTimer = setTimeout(() => {
+        this.kioskRestarts = 0
+      }, 60_000)
+    })
   }
 
   /** 工作台主窗（视图挂载与托盘重建都用它） */

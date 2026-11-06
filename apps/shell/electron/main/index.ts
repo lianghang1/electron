@@ -1,5 +1,5 @@
 import type { DomainCallContext } from '@shell/shared'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
 import { app, ipcMain, session } from 'electron'
@@ -16,8 +16,9 @@ import { createKernel } from '@shell/kernel'
 import { createRootLogger } from '@shell/kernel/logger'
 import { configDir, filesDir } from '@shell/kernel/storage'
 import { flavorManifestSchema } from '@shell/shared'
-import { WindowSystem } from '@shell/window'
+import { WindowSystem, TraySystem } from '@shell/window'
 import { DistHotChannel, AsarHotChannel, FullPackageChannel, UpdateCenter, finalizeAsarUpdate, installScheduled } from '@shell/update'
+import { applySettingsSideEffects } from '@shell/kernel/settings'
 import { registerSettingsIpc } from '@shell/kernel/settings'
 
 /**
@@ -34,8 +35,12 @@ finalizeAsarUpdate(process.resourcesPath ?? '.')
 registerAppScheme()
 
 function loadFlavor() {
-  // --flavor=<id> 指向 apps/flavors/<id>/flavor.json；缺省 cemetery。
-  // dev：appPath=apps/shell，flavor 在仓库内；打包：flavor.json 由构建注入 resources（M6）。
+  // 打包：构建期把 flavor.json 注入 resources/（见 electron-builder.yml extraResources）；
+  // dev：--flavor=<id> 指向仓库 apps/flavors/<id>/flavor.json，缺省 cemetery。
+  const packaged = join(process.resourcesPath ?? '', 'flavor.json')
+  if (existsSync(packaged)) {
+    return flavorManifestSchema.parse(JSON.parse(readFileSync(packaged, 'utf-8')) as unknown)
+  }
   const flavorArg = process.argv.find(a => a.startsWith('--flavor='))
   const flavorId = flavorArg?.split('=')[1] ?? 'cemetery'
   const flavorPath = join(app.getAppPath(), '../../apps/flavors', flavorId, 'flavor.json')
@@ -44,7 +49,13 @@ function loadFlavor() {
   return flavorManifestSchema.parse(raw)
 }
 
+// 单实例锁：kiosk 自愈 relaunch 与重复启动都汇到唯一实例
+if (!app.requestSingleInstanceLock())
+  app.quit()
+
 async function main(): Promise<void> {
+  // 持久化设置的启动副作用（开机自启可能被安装器重置，启动即纠正）
+  applySettingsSideEffects()
   const flavor = loadFlavor()
 
   const windows = new WindowSystem(flavor, join(__dirname, '../renderer'))
@@ -81,6 +92,22 @@ async function main(): Promise<void> {
     }),
     stop: () => devices.dispose(),
   })
+
+  // 托盘（kiosk 全屏形态不创建——现场不该有逃逸入口）
+  if (flavor.mode === 'desktop') {
+    void kernel.register(new TraySystem(
+      kernel.ctx.events,
+      () => {
+        const win = windows.shellWindow
+        if (win) {
+          if (win.isMinimized())
+            win.restore()
+          win.show()
+          win.focus()
+        }
+      },
+    ))
+  }
 
   // 应用运行时：openers 在此装配（铁律一），AppService 只认 SPI
   const appsRoot = join(app.getAppPath(), 'resources/apps')
