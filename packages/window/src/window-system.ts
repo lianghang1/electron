@@ -1,6 +1,7 @@
 import type { FlavorManifest } from '@shell/shared'
+import type { EventBus } from '@shell/kernel'
 import type { Startable } from '@shell/kernel'
-import { BrowserWindow, app } from 'electron'
+import { BrowserWindow, app, ipcMain } from 'electron'
 import { join } from 'node:path'
 import { overlayBase, shellBase } from './presets'
 import { createDesktopMode, createKioskMode } from './modes'
@@ -69,6 +70,35 @@ export class WindowSystem implements Startable {
 
   get(id: number): BrowserWindow | undefined {
     return this.windows.get(id)
+  }
+
+  /** 自绘标题栏的窗口控制通道：动作只作用于发起方自己的窗口（按 sender 定位，天然多窗安全） */
+  registerWindowControls(): void {
+    ipcMain.handle('window:minimize', (event) => {
+      BrowserWindow.fromWebContents(event.sender)?.minimize()
+    })
+    ipcMain.handle('window:toggle-maximize', (event) => {
+      const win = BrowserWindow.fromWebContents(event.sender)
+      if (!win)
+        return
+      if (win.isMaximized())
+        win.unmaximize()
+      else
+        win.maximize()
+    })
+    ipcMain.handle('window:close', (event) => {
+      BrowserWindow.fromWebContents(event.sender)?.close()
+    })
+  }
+
+  /** 平台事件广播：EventBus 全量事件转发给所有存活窗口的渲染层（渲染层经 bridge.onEvent 订阅） */
+  attachEventBroadcast(events: EventBus): void {
+    events.onAny((name, payload) => {
+      for (const win of this.windows.values()) {
+        if (!win.isDestroyed())
+          win.webContents.send(`event:${name}`, payload)
+      }
+    })
   }
 
   private createOverlay(kind: string): BrowserWindow {

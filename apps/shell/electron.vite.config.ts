@@ -8,7 +8,11 @@ export default defineConfig({
   main: {
     build: {
       rollupOptions: {
-        input: { index: fileURLToPath(new URL('./electron/main/index.ts', import.meta.url)) },
+        input: {
+          index: fileURLToPath(new URL('./electron/main/index.ts', import.meta.url)),
+          // 守护进程独立 bundle：utilityProcess fork 目标（DeviceHost.entryPath 指向它）
+          'device-host': fileURLToPath(new URL('../../packages/devices/src/host/entry.ts', import.meta.url)),
+        },
       },
     },
   },

@@ -1,6 +1,6 @@
 import type { CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSession, CaptureResult } from '@shell/shared'
 import type { WebContents } from 'electron'
-import type { OverlayWindowService } from '../../window/overlay-window'
+import type { CaptureOverlayHost } from './overlay-host'
 import type { CaptureSystem } from './index'
 import { DesktopError } from '@shell/shared'
 import { captureError } from './errors'
@@ -19,7 +19,7 @@ export interface CaptureDialogOrigin {
 export interface CaptureDialogSessionDeps {
   /** 采集系统（SDK 拍摄走统一采集 API，UVC 抽帧走落盘通道） */
   capture: CaptureSystem
-  overlay: OverlayWindowService
+  overlay: CaptureOverlayHost
 }
 
 /** openCaptureDialog 的结果交付句柄：浮层结束时兑现发起页的 invoke Promise */
