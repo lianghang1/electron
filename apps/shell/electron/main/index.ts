@@ -17,7 +17,7 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { configDir, filesDir } from '@shell/kernel/storage'
 import { flavorManifestSchema } from '@shell/shared'
 import { WindowSystem } from '@shell/window'
-import { UpdateCenter } from '@shell/update'
+import { DistHotChannel, AsarHotChannel, FullPackageChannel, UpdateCenter, finalizeAsarUpdate, installScheduled } from '@shell/update'
 import { registerSettingsIpc } from '@shell/kernel/settings'
 
 /**
@@ -26,6 +26,9 @@ import { registerSettingsIpc } from '@shell/kernel/settings'
  */
 
 const logger = createRootLogger()
+
+// asar 热更落盘切换（三段状态机 finalize）：必须早于任何模块加载 app.asar 内容
+finalizeAsarUpdate(process.resourcesPath ?? '.')
 
 // app:// 协议的特权声明必须在 app ready 前（Electron 时序硬约束）
 registerAppScheme()
@@ -45,7 +48,21 @@ async function main(): Promise<void> {
   const flavor = loadFlavor()
 
   const windows = new WindowSystem(flavor, join(__dirname, '../renderer'))
-  const kernel = createKernel(flavor, [windows, new UpdateCenter([])])
+  const kernel = createKernel(flavor, [windows])
+
+  // 更新中心：三通道按 flavor.update 配置装配（无 manifestUrl 的通道不注册）
+  const updateManifestUrl = flavor.update.manifestUrl ?? ''
+  if (updateManifestUrl) {
+    void kernel.register(new UpdateCenter({
+      channels: [
+        new DistHotChannel({ appsRoot: join(app.getAppPath(), 'resources/apps'), manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
+        new AsarHotChannel({ resourcesDir: process.resourcesPath ?? '.', manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
+        new FullPackageChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
+      ],
+      events: kernel.ctx.events,
+      deviceId: `${flavor.id}-${process.platform}`,
+    }))
+  }
   windows.bindEvents(kernel.ctx.events)
 
   const devices = createDeviceGateway({
@@ -159,6 +176,9 @@ async function main(): Promise<void> {
   // 扫码枪键盘观察挂到工作台窗口
   devices.attachShellWindow(windows.shellWindow!)
   kernel.ctx.marks.t3WindowShown = Date.now()
+
+  // 整包更新排程：退出前拉起静默安装器
+  app.on('before-quit', () => installScheduled())
 }
 
 void app.whenReady().then(() => main())

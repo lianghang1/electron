@@ -1,2 +1,6 @@
-export { UpdateCenter, isGreylisted } from './update-center'
-export type { UpdateChannel, UpdatePlan, ApplyResult, VersionMatrix } from './update-center'
+export { UpdateCenter } from './update-center'
+export { isGreylisted } from './greylist'
+export type { UpdateChannel, UpdatePlan, ApplyResult, VersionMatrix, UpdateCenterOptions } from './update-center'
+export { DistHotChannel } from './channels/dist-hot'
+export { AsarHotChannel, finalizeAsarUpdate } from './channels/asar-hot'
+export { FullPackageChannel, installScheduled } from './channels/full-package'

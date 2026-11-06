@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@shell/kernel": "workspace:*",
-    "@shell/shared": "workspace:*"
+    "@shell/shared": "workspace:*",
+    "extract-zip": "^2.0.1"
   },
   "devDependencies": {
     "typescript": "catalog:"
