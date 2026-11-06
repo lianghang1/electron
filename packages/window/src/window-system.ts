@@ -1,26 +1,41 @@
 import type { FlavorManifest } from '@shell/shared'
-import type { EventBus } from '@shell/kernel'
-import type { Startable } from '@shell/kernel'
-import { BrowserWindow, app, ipcMain } from 'electron'
+import type { EventBus, Startable } from '@shell/kernel'
+import type { ViewHost, ViewSpec } from '@shell/app-runtime'
+import { BrowserWindow, WebContentsView, app, ipcMain } from 'electron'
 import { join } from 'node:path'
-import { overlayBase, shellBase } from './presets'
+import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
 import { createDesktopMode, createKioskMode } from './modes'
 
 /**
  * WindowSystem：全仓库唯一 new BrowserWindow 的地方（铁律一）。
  * 对外只暴露目的命名 API——读调用处即读产品动作（铁律二）。
+ * 同时实现 ViewHost SPI：packaged/remote 应用的 WebContentsView 容器。
  */
-export class WindowSystem implements Startable {
+export class WindowSystem implements Startable, ViewHost {
   readonly name = 'window'
   private windows = new Map<number, BrowserWindow>()
+  private shellWindowId?: number
+  /** 视图容器：instanceId → WebContentsView（隐藏态挂载） */
+  private views = new Map<string, Electron.WebContentsView>()
+  private activeViewId?: string
+  private contentRect = { x: 0, y: 0, width: 0, height: 0 }
+  private events?: EventBus
 
   constructor(
     private readonly flavor: FlavorManifest,
     private readonly rendererDir: string,
   ) {}
 
+  /** 注入事件总线（组合根在 createKernel 之后调用；崩溃事件经它广播） */
+  bindEvents(events: EventBus): void {
+    this.events = events
+  }
+
   async start(): Promise<void> {}
   async stop(): Promise<void> {
+    for (const view of this.views.values())
+      this.removeView(view)
+    this.views.clear()
     for (const win of this.windows.values())
       win.destroy()
     this.windows.clear()
@@ -29,8 +44,10 @@ export class WindowSystem implements Startable {
   /** 工作台主窗：tab 条 + 左导航的产品主体 */
   createShellWindow(): BrowserWindow {
     const mode = this.flavor.mode === 'kiosk' ? createKioskMode() : createDesktopMode()
+    // 浮层/视图体系需要 Windows 停止合成补偿
     const win = new BrowserWindow({
       ...shellBase,
+      ...win32OcclusionSwitch,
       width: 1280,
       height: 800,
     })
@@ -45,7 +62,13 @@ export class WindowSystem implements Startable {
 
     win.once('ready-to-show', () => win.show())
     this.track(win)
+    this.shellWindowId = win.id
     return win
+  }
+
+  /** 工作台主窗（视图挂载与托盘重建都用它） */
+  get shellWindow(): BrowserWindow | undefined {
+    return this.shellWindowId ? this.windows.get(this.shellWindowId) : undefined
   }
 
   /** 拍摄浮窗 */
@@ -121,4 +144,111 @@ export class WindowSystem implements Startable {
     if (this.windows.size === 1)
       app.on('window-all-closed', () => app.quit())
   }
+
+  // ── ViewHost SPI（packaged/remote 应用视图容器）────────────────
+
+  create(spec: ViewSpec): unknown {
+    const win = this.shellWindow
+    if (!win)
+      throw new Error('[window] shell window not created yet')
+
+    const view = new WebContentsView({
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: spec.preload ? false : true,
+        preload: spec.preload,
+        partition: spec.partition,
+      },
+    })
+    this.views.set(spec.instanceId, view)
+    win.contentView.addChildView(view)
+    view.setVisible(false)
+
+    const { webContents } = view
+    void webContents.loadURL(spec.url)
+
+    // origin 白名单强制：导航出白名单即拦截回退
+    webContents.on('will-navigate', (event, url) => {
+      if (!this.isOriginAllowed(url, spec.allowedOrigins))
+        event.preventDefault()
+    })
+    webContents.setWindowOpenHandler(({ url }) => {
+      return { action: this.isOriginAllowed(url, spec.allowedOrigins) ? 'allow' : 'deny' }
+    })
+    // 权限请求（摄像头/麦克风等）默认拒绝——kiosk 场景由设备域承接，不经页面授权
+    webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => {
+      callback(false)
+    })
+    // 崩溃自愈：Chrome 式 Tab 恢复（渲染层感知后按退避策略重开实例）
+    webContents.on('render-process-gone', (_event, details) => {
+      this.events?.emit('crash.renderer-gone', {
+        windowId: win.id,
+        reason: details.reason,
+        restartCount: 0,
+      })
+    })
+
+    return view
+  }
+
+  activate(instanceId: string): void {
+    const win = this.shellWindow
+    const view = this.views.get(instanceId)
+    if (!win || !view)
+      return
+    if (this.activeViewId && this.activeViewId !== instanceId)
+      this.views.get(this.activeViewId)?.setVisible(false)
+    this.activeViewId = instanceId
+    view.setBounds(this.contentRect)
+    view.setVisible(true)
+  }
+
+  deactivate(instanceId: string): void {
+    if (this.activeViewId === instanceId) {
+      this.views.get(instanceId)?.setVisible(false)
+      this.activeViewId = undefined
+    }
+  }
+
+  destroy(instanceId: string): void {
+    const view = this.views.get(instanceId)
+    if (!view)
+      return
+    this.removeView(view)
+    this.views.delete(instanceId)
+    if (this.activeViewId === instanceId)
+      this.activeViewId = undefined
+  }
+
+  setContentRect(rect: { x: number, y: number, width: number, height: number }): void {
+    this.contentRect = rect
+    if (this.activeViewId)
+      this.views.get(this.activeViewId)?.setBounds(rect)
+  }
+
+  /** 活跃视图实例（供组合根做 JSAPI origin 校验等） */
+  get activeViewInstanceId(): string | undefined {
+    return this.activeViewId
+  }
+
+  private removeView(view: Electron.WebContentsView): void {
+    this.shellWindow?.contentView.removeChildView(view)
+    view.webContents.close()
+  }
+
+  private isOriginAllowed(url: string, allowed: string[]): boolean {
+    if (allowed.length === 0)
+      return false
+    try {
+      const origin = new URL(url).origin
+      return allowed.some(pattern =>
+        pattern === origin || origin.startsWith(pattern.replace(/\*$/, '')),
+      )
+    }
+    catch {
+      return false
+    }
+  }
+}
 }

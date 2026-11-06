@@ -20,11 +20,30 @@ const desktop = {
     return () => ipcRenderer.removeListener(`event:${event}`, listener)
   },
 
+  /** 应用运行时：打开 / 关闭 / 激活 / 清单 */
+  apps: {
+    list: () => ipcRenderer.invoke('app:list'),
+    open: (appId: string) => ipcRenderer.invoke('app:open', appId),
+    close: (instanceId: string) => ipcRenderer.invoke('app:close', instanceId),
+    /** 切到某实例的视图（embedded 切换由渲染层本地完成，无需过桥） */
+    activate: (instanceId: string) => ipcRenderer.invoke('app:activate', instanceId),
+  },
+
+  /** 内容区矩形上报：WebContentsView 的布局依据（渲染层自绘 chrome，主进程不猜） */
+  reportContentRect: (rect: { x: number, y: number, width: number, height: number }) =>
+    ipcRenderer.send('view:content-rect', rect),
+
   /** 窗口控制（自绘标题栏按钮） */
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
     close: () => ipcRenderer.invoke('window:close'),
+  },
+
+  /** 设置（schema 驱动） */
+  settings: {
+    all: () => ipcRenderer.invoke('settings:all'),
+    set: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
   },
 
   /** 启动打点回传（渲染层 T4 首帧） */

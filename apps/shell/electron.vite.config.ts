@@ -19,7 +19,11 @@ export default defineConfig({
   preload: {
     build: {
       rollupOptions: {
-        input: { index: fileURLToPath(new URL('./electron/preload/index.ts', import.meta.url)) },
+        input: {
+          index: fileURLToPath(new URL('./electron/preload/index.ts', import.meta.url)),
+          // remote 形态的 JSAPI 受控桥（RemoteOpener 以 preload 注入）
+          jsapi: fileURLToPath(new URL('../../packages/bridge/src/jsapi-preload.ts', import.meta.url)),
+        },
       },
     },
   },

@@ -12,7 +12,8 @@
   "dependencies": {
     "@shell/kernel": "workspace:*",
     "@shell/shared": "workspace:*",
-    "electron": "catalog:"
+    "electron": "catalog:",
+    "@shell/app-runtime": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:"

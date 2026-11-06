@@ -6,7 +6,8 @@
   "description": "渲染层唯一门面：preload contextBridge 单文件集中（可审计）+ 渲染层类型化客户端",
   "exports": {
     "./preload": "./src/preload.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./jsapi-preload": "./src/jsapi-preload.ts"
   },
   "dependencies": {
     "@shell/shared": "workspace:*",

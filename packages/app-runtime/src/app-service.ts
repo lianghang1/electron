@@ -1,10 +1,7 @@
 import type { AppInstance, AppManifest, RegisteredApp } from '@shell/shared'
-import type { Startable } from '@shell/kernel'
+import type { EventBus, Startable } from '@shell/kernel'
 import { randomUUID } from 'node:crypto'
 import type { AppOpener } from './opener'
-import { EmbeddedOpener } from './openers/embedded'
-import { PackagedOpener } from './openers/packaged'
-import { RemoteOpener } from './openers/remote'
 
 export class AppOpenError extends Error {
   constructor(public readonly code: 'APP_NOT_FOUND' | 'APP_NOT_ALLOWED' | 'NO_OPENER', message: string) {
@@ -14,7 +11,8 @@ export class AppOpenError extends Error {
 
 /**
  * AppService：应用运行时。持有注册表与活跃实例，经 AppOpener SPI 分发——
- * 本类不 import 任何具体形态（铁律二），新增形态零改动。
+ * 本类不 import 任何具体形态、不认识窗口（铁律二），新增形态零改动。
+ * openers / events 由组合根注入（铁律一）。
  */
 export class AppService implements Startable {
   readonly name = 'apps'
@@ -22,18 +20,16 @@ export class AppService implements Startable {
   private instances = new Map<string, AppInstance>()
   private activeByApp = new Map<string, string>()
 
-  private readonly openers: AppOpener[] = [
-    new EmbeddedOpener(),
-    new PackagedOpener(),
-    new RemoteOpener(),
-  ]
-
-  constructor(private readonly allowThirdParty: () => boolean) {}
+  constructor(
+    private readonly allowThirdParty: () => boolean,
+    private readonly openers: AppOpener[],
+    private readonly events: EventBus,
+  ) {}
 
   async start(): Promise<void> {}
   async stop(): Promise<void> {
     for (const instance of this.instances.values())
-      await this.close(instance.instanceId).catch(() => {})
+      await this.close(instance.instanceId, 'update').catch(() => {})
   }
 
   register(manifest: AppManifest, source: RegisteredApp['source'] = 'flavor'): void {
@@ -44,6 +40,16 @@ export class AppService implements Startable {
 
   list(): RegisteredApp[] {
     return [...this.registry.values()]
+  }
+
+  find(instanceId: string): { instance: AppInstance, registered: RegisteredApp } | undefined {
+    const instance = this.instances.get(instanceId)
+    if (!instance)
+      return undefined
+    const registered = this.registry.get(instance.appId)
+    if (!registered)
+      return undefined
+    return { instance, registered }
   }
 
   async open(appId: string): Promise<AppInstance> {
@@ -70,16 +76,18 @@ export class AppService implements Startable {
     }
     this.instances.set(instance.instanceId, instance)
     this.activeByApp.set(appId, instance.instanceId)
+    this.events.emit('app.opening', { appId, instanceId: instance.instanceId })
 
     const opener = this.openers.find(o => o.supports(registered.manifest.entry))
     if (!opener)
       throw new AppOpenError('NO_OPENER', `No opener supports entry kind of: ${appId}`)
     await opener.open(registered.manifest, instance)
     instance.state = 'opened'
+    this.events.emit('app.opened', { appId, instanceId: instance.instanceId })
     return instance
   }
 
-  async close(instanceId: string): Promise<void> {
+  async close(instanceId: string, reason: 'user' | 'crash' | 'update' = 'user'): Promise<void> {
     const instance = this.instances.get(instanceId)
     if (!instance || instance.state === 'closed')
       return
@@ -91,5 +99,6 @@ export class AppService implements Startable {
     instance.state = 'closed'
     if (this.activeByApp.get(instance.appId) === instanceId)
       this.activeByApp.delete(instance.appId)
+    this.events.emit('app.closed', { appId: instance.appId, instanceId, reason })
   }
 }

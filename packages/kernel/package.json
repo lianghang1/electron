@@ -5,7 +5,8 @@
   "private": true,
   "exports": {
     ".": "./src/index.ts",
-    "./logger": "./src/logger/index.ts"
+    "./logger": "./src/logger/index.ts",
+    "./settings": "./src/settings/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

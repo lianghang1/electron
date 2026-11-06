@@ -1,6 +1,7 @@
 export { AppService, AppOpenError } from './app-service'
 export type { AppOpener, AppInstanceHandle } from './opener'
+export type { ViewHost, ViewSpec } from './view-host'
 export { EmbeddedOpener } from './openers/embedded'
 export { PackagedOpener } from './openers/packaged'
 export { RemoteOpener } from './openers/remote'
-export { registerEmbeddedApp, resolveEmbeddedRoute, listEmbeddedRoutes } from './builtin-routes'
+export { registerAppScheme, registerAppProtocol, APP_SCHEME } from './protocol'
