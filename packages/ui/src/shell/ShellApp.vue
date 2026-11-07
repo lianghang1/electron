@@ -238,13 +238,6 @@ onBeforeUnmount(() => {
               style="background: #1c2433; color: #fff; font-size: var(--dt-font-caption); border-radius: 8px"
             >{{ tab.title }}</span>
           </div>
-          <button
-            class="rail-icon flex items-center justify-center"
-            style="width: var(--dt-icon-size); height: var(--dt-icon-size); border-radius: var(--dt-radius-icon); border: 1px dashed var(--dt-line); color: var(--dt-text-3)"
-            @click="showAppLauncher = !showAppLauncher"
-          >
-            <Plus :size="16" />
-          </button>
         </nav>
 
         <!-- 内容容器：platform 有边距+圆角卡片；solo 全屏直出（accent 垫场防视图白屏） -->
