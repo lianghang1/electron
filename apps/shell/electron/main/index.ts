@@ -58,6 +58,10 @@ async function main(): Promise<void> {
   applySettingsSideEffects()
   const flavor = loadFlavor()
 
+  // 档位约束：solo/kiosk 容器隐形档必须有直达目标，否则窗口无内容可铺
+  if (flavor.chrome === 'solo' && !flavor.defaultAppId && flavor.apps.length > 0)
+    logger.warn('flavor chrome=solo 但未配置 defaultAppId，启动将无应用直出', { flavor: flavor.id })
+
   const windows = new WindowSystem(flavor, join(__dirname, '../renderer'))
   const kernel = createKernel(flavor, [windows])
 
@@ -142,17 +146,28 @@ async function main(): Promise<void> {
     })
   })
 
-  // 应用运行时通道
+  // 应用运行时通道（open 返回值是 IPC 边界投影：实例内部持有视图/窗口引用，
+  // 不可结构化克隆——只出渲染层需要的纯数据）
   ipcMain.handle('app:list', () => apps.list())
-  ipcMain.handle('app:open', (_e, appId: string) => apps.open(appId))
+  ipcMain.handle('app:open', async (_e, appId: string) => {
+    const instance = await apps.open(appId)
+    return {
+      instanceId: instance.instanceId,
+      appId: instance.appId,
+      state: instance.state,
+      handle: { route: instance.handle.route },
+    }
+  })
   ipcMain.handle('app:close', (_e, instanceId: string) => apps.close(instanceId))
   ipcMain.handle('app:activate', (_e, instanceId: string) => windows.activate(instanceId))
 
-  // 壳信息（空状态页消费：品牌名 / 应用版本 / 启动直达目标）
+  // 壳信息（渲染层按 chrome 档位决定挂不挂壳界面）
   ipcMain.handle('shell:info', () => ({
     name: flavor.name,
     version: app.getVersion(),
     defaultAppId: flavor.defaultAppId,
+    chrome: flavor.mode === 'kiosk' ? 'solo' : flavor.chrome,
+    mode: flavor.mode,
   }))
   ipcMain.on('view:content-rect', (_e, rect: { x: number, y: number, width: number, height: number }) =>
     windows.setContentRect(rect))

@@ -61,6 +61,11 @@ export const flavorManifestSchema = z.object({
   mode: z.enum(['desktop', 'kiosk']).default('desktop'),
   /** 启动直达的默认应用（须在 apps 清单内）；未配置 = 启动落空状态页 */
   defaultAppId: z.string().optional(),
+  /**
+   * 壳 chrome 档位：platform = tab 体系完整壳（多应用可切换）；
+   * solo = 容器隐形（单应用直出、全屏 chrome 归零）。kiosk 运行模式强制 solo。
+   */
+  chrome: z.enum(['platform', 'solo']).default('platform'),
   /** 内置应用清单（apps.json 同构，也可远程下发） */
   apps: z.array(appManifestSchema).default([]),
   branding: z

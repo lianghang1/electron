@@ -249,7 +249,17 @@ export class WindowSystem implements Startable, ViewHost {
       this.views.get(this.activeViewId)?.setVisible(false)
     this.activeViewId = instanceId
     view.setBounds(this.contentRect)
-    view.setVisible(true)
+    // 垫场纪律：页面未加载完成不露白页（渲染层 accent 底透出），完成后仍是激活实例才显示
+    if (view.webContents.isLoading()) {
+      view.setVisible(false)
+      view.webContents.once('did-finish-load', () => {
+        if (this.activeViewId === instanceId)
+          view.setVisible(true)
+      })
+    }
+    else {
+      view.setVisible(true)
+    }
   }
 
   deactivate(instanceId: string): void {

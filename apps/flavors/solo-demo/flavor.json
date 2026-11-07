@@ -1,0 +1,20 @@
+{
+  "id": "solo-demo",
+  "name": "单应用客户端演示",
+  "mode": "desktop",
+  "chrome": "solo",
+  "defaultAppId": "demo-web",
+  "apps": [
+    {
+      "id": "demo-web",
+      "name": "演示应用",
+      "version": "1.0.0",
+      "type": "internal",
+      "entry": { "kind": "remote", "url": "https://example.com", "origins": ["https://example.com"] },
+      "devices": [],
+      "permissions": []
+    }
+  ],
+  "branding": { "accent": "#3b82f6" },
+  "update": { "allowedOrigins": [] }
+}

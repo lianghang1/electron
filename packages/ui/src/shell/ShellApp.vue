@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
- * ShellApp：工作台主体（标题栏 tab 条 + 左图标栏 + 内容容器）。
+ * ShellApp：壳 chrome 渲染（按 flavor.chrome 档位分支）。
+ * - platform：完整壳——44px tab 条 / 64px 图标栏 / 应用启动器 / 空状态兜底
+ * - solo：容器隐形——仅 desktop 模式留 30px 窗口控制条（拖拽+三键），
+ *   应用启动直出全屏；kiosk 连控制条都没有（纯全屏容器）
  * 三形态应用的宿主：
  * - embedded：内容区直接渲染注册组件（同进程，零桥接开销）
  * - packaged/remote：主进程 WebContentsView 盖在内容区矩形上（rect 经桥上报）
- * 参考稿布局：44px 自绘标题栏 / 64px 图标栏 / 圆角内容区。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Settings, Plus, Minus, Square, X, LayoutGrid, AppWindow } from 'lucide-vue-next'
@@ -30,9 +32,11 @@ interface AppSummary {
 
 const TAB_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b6d4']
 
-/** 无常驻首页：tabs 空 = 空状态页；flavor.defaultAppId 配置时启动直达 */
+/** 无常驻首页：platform 档 tabs 空 = 空状态页；solo 档启动直达 defaultAppId */
 const tabs = ref<ShellTab[]>([])
 const activeKey = ref('')
+const chrome = ref<'platform' | 'solo'>('platform')
+const mode = ref<'desktop' | 'kiosk'>('desktop')
 const railHover = ref<string | null>(null)
 const appList = ref<AppSummary[]>([])
 const showAppLauncher = ref(false)
@@ -118,8 +122,10 @@ onMounted(async () => {
   const list = await desktop().apps.list() as AppSummary[]
   appList.value = list
 
-  // 启动直达：flavor.defaultAppId 配置且应用存在时自动开 tab，跳过空状态页
+  // 档位与直达：solo 档启动即铺满 defaultAppId；platform 档配置了也直达
   const info = await desktop().shell.info()
+  chrome.value = info.chrome
+  mode.value = info.mode
   if (info.defaultAppId && list.some(a => a.manifest.id === info.defaultAppId))
     void openApp(info.defaultAppId)
 })
@@ -133,8 +139,9 @@ onBeforeUnmount(() => {
 <template>
   <div class="shell h-screen w-screen overflow-hidden" style="background: var(--dt-page)">
     <div class="shell-window relative flex h-full w-full flex-col" style="background: var(--dt-glass); backdrop-filter: var(--dt-blur); border-radius: var(--dt-radius-window)">
-      <!-- 标题栏：tab 条 + 设置 + 窗口控制 -->
+      <!-- platform：完整 tab chrome；solo：30px 窗口控制条；kiosk：无 chrome -->
       <header
+        v-if="chrome === 'platform'"
         class="flex items-center gap-2 px-3"
         style="height: var(--dt-titlebar-h); border-bottom: 1px solid var(--dt-line)"
       >
@@ -183,9 +190,30 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
+      <!-- solo（desktop）：30px 玻璃细条 = 拖拽区 + 窗口三键，无任何壳功能件 -->
+      <header
+        v-else-if="mode === 'desktop'"
+        class="flex items-center"
+        style="height: 30px; background: var(--dt-glass); border-bottom: 1px solid var(--dt-line)"
+      >
+        <span class="titlebar-drag h-full flex-1" />
+        <div class="flex h-full items-center">
+          <button class="ctrl flex h-full w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.minimize()">
+            <Minus :size="13" />
+          </button>
+          <button class="ctrl flex h-full w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.toggleMaximize()">
+            <Square :size="11" />
+          </button>
+          <button class="ctrl ctrl-close flex h-full w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.close()">
+            <X :size="13" />
+          </button>
+        </div>
+      </header>
+
       <div class="flex min-h-0 flex-1">
-        <!-- 左图标栏（折叠形态：纯图标 + tooltip） -->
+        <!-- 左图标栏（仅 platform 档；折叠形态：纯图标 + tooltip） -->
         <nav
+          v-if="chrome === 'platform'"
           class="flex flex-col items-center gap-1.5 py-3"
           style="width: var(--dt-rail-w); border-right: 1px solid var(--dt-line)"
         >
@@ -219,23 +247,39 @@ onBeforeUnmount(() => {
           </button>
         </nav>
 
-        <!-- 内容容器：embedded 组件 / view 实例（主进程 WebContentsView 盖在此矩形上） -->
-        <main ref="contentEl" class="relative min-w-0 flex-1 p-2">
-          <!-- 无 tab = 空状态页（透明底，页面色透出） -->
-          <EmptyState v-if="!activeTab" class="h-full w-full" @open="openApp" />
-          <component
-            :is="resolveEmbeddedRoute(activeTab.route!)"
-            v-else-if="activeTab.kind === 'embedded' && activeTab.route"
-            class="h-full w-full overflow-hidden"
-            style="background: var(--dt-surface); border-radius: var(--dt-radius)"
-          />
-          <!-- view 形态：此区域保持透明，WebContentsView 由主进程定位在此矩形 -->
+        <!-- 内容容器：platform 有边距+圆角卡片；solo 全屏直出（accent 垫场防视图白屏） -->
+        <main
+          ref="contentEl"
+          class="relative min-w-0 flex-1 overflow-hidden"
+          :class="chrome === 'platform' ? 'p-2' : ''"
+          :style="chrome === 'solo' ? 'background: var(--dt-accent)' : ''"
+        >
+          <template v-if="chrome === 'platform'">
+            <!-- 无 tab = 空状态页（时钟兜底） -->
+            <EmptyState v-if="!activeTab" class="h-full w-full" @open="openApp" />
+            <component
+              :is="resolveEmbeddedRoute(activeTab.route!)"
+              v-else-if="activeTab.kind === 'embedded' && activeTab.route"
+              class="h-full w-full overflow-hidden"
+              style="background: var(--dt-surface); border-radius: var(--dt-radius)"
+            />
+          </template>
+          <template v-else>
+            <!-- solo：唯一应用直出（embedded 组件 / view 透明区） -->
+            <component
+              :is="resolveEmbeddedRoute(activeTab!.route!)"
+              v-if="activeTab?.kind === 'embedded' && activeTab.route"
+              class="h-full w-full overflow-hidden"
+              style="background: var(--dt-surface)"
+            />
+          </template>
+          <!-- view 形态：此区域保持透明/垫场，WebContentsView 由主进程定位在此矩形 -->
         </main>
       </div>
 
-      <!-- 应用启动器（新 tab + 号触发） -->
+      <!-- 应用启动器（新 tab + 号触发，仅 platform 档） -->
       <div
-        v-if="showAppLauncher"
+        v-if="showAppLauncher && chrome === 'platform'"
         class="absolute right-4 z-50 w-72 rounded-xl p-2 shadow-xl"
         style="top: calc(var(--dt-titlebar-h) + 8px); background: var(--dt-glass); border: 1px solid var(--dt-line); backdrop-filter: var(--dt-blur)"
       >
@@ -257,12 +301,21 @@ onBeforeUnmount(() => {
       </div>
 
       <!-- 统一设置（schema 驱动面板） -->
-      <SettingsDialog v-model:open="showSettings" />
+      <SettingsDialog v-if="chrome === 'platform'" v-model:open="showSettings" />
     </div>
   </div>
 </template>
 
 <style scoped>
+/* 自绘标题栏拖拽：拖拽区全局生效，可点组件必须显式豁免 */
+.titlebar-drag {
+  -webkit-app-region: drag;
+}
+.tab,
+.new-tab {
+  -webkit-app-region: no-drag;
+}
+
 /* tab：非 active 透明，active 白底浮起（参考稿的玻璃胶囊） */
 .tab {
   transition: background 0.15s ease, box-shadow 0.15s ease;
