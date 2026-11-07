@@ -59,6 +59,8 @@ export const flavorManifestSchema = z.object({
   name: z.string().min(1),
   /** 运行模式：desktop = 窗口可调；kiosk = 全屏锁定 + 看门狗 */
   mode: z.enum(['desktop', 'kiosk']).default('desktop'),
+  /** 启动直达的默认应用（须在 apps 清单内）；未配置 = 启动落空状态页 */
+  defaultAppId: z.string().optional(),
   /** 内置应用清单（apps.json 同构，也可远程下发） */
   apps: z.array(appManifestSchema).default([]),
   branding: z

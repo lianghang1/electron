@@ -42,6 +42,11 @@ export const desktop = {
     close: () => ipcRenderer.invoke('window:close'),
   },
 
+  /** 壳信息：品牌名 / 应用版本 / 启动直达目标（空状态页消费） */
+  shell: {
+    info: () => ipcRenderer.invoke('shell:info') as Promise<{ name: string, version: string, defaultAppId?: string }>,
+  },
+
   /** 设置（schema 驱动） */
   settings: {
     all: () => ipcRenderer.invoke('settings:all'),

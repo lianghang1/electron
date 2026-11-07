@@ -50,6 +50,12 @@ export class WindowSystem implements Startable, ViewHost {
       ...win32OcclusionSwitch,
       width: 1280,
       height: 800,
+      // shell 桥必须注入：preload 与 main/preload 产物同层（out/preload/index.mjs）
+      webPreferences: {
+        ...shellBase.webPreferences,
+        sandbox: false,
+        preload: join(this.rendererDir, '../preload/index.mjs'),
+      },
     })
     mode.enter(win)
 

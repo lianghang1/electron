@@ -32,10 +32,10 @@
   --dt-warn: #f59e0b;
   --dt-danger: #ef4444;
 
-  /* 几何 */
-  --dt-radius-window: 14px;
-  --dt-radius: 10px;
-  --dt-radius-icon: 12px;
+  /* 几何：克制小圆角（窗口 12 / 容器 8 / 图标 10） */
+  --dt-radius-window: 12px;
+  --dt-radius: 8px;
+  --dt-radius-icon: 10px;
 
   /* 字号（5 档封顶） */
   --dt-font-title: 15px;

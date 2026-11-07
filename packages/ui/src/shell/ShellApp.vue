@@ -7,10 +7,10 @@
  * 参考稿布局：44px 自绘标题栏 / 64px 图标栏 / 圆角内容区。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Settings, Plus, Minus, Square, X, LayoutGrid, Home, AppWindow } from 'lucide-vue-next'
+import { Settings, Plus, Minus, Square, X, LayoutGrid, AppWindow } from 'lucide-vue-next'
 import { desktop } from '@shell/bridge/client'
 import { resolveEmbeddedRoute } from '../apps/registry'
-import HomePage from '../apps/pages/HomePage.vue'
+import EmptyState from '../apps/pages/EmptyState.vue'
 import SettingsDialog from './SettingsDialog.vue'
 
 /** 工作台 tab：embedded 路由页或视图实例（packaged/remote） */
@@ -28,18 +28,18 @@ interface AppSummary {
   manifest: { id: string, name: string, icon?: string }
 }
 
-const HOME: ShellTab = { key: 'home', kind: 'embedded', title: '首页', iconColor: '#3b82f6' }
 const TAB_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b6d4']
 
-const tabs = ref<ShellTab[]>([HOME])
-const activeKey = ref(HOME.key)
+/** 无常驻首页：tabs 空 = 空状态页；flavor.defaultAppId 配置时启动直达 */
+const tabs = ref<ShellTab[]>([])
+const activeKey = ref('')
 const railHover = ref<string | null>(null)
 const appList = ref<AppSummary[]>([])
 const showAppLauncher = ref(false)
 const showSettings = ref(false)
 const contentEl = ref<HTMLElement | null>(null)
 
-const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value) ?? HOME)
+const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
 
 /** 内容区矩形 = 主元素相对窗口内容原点（chrome 高度由布局自然决定，主进程不猜） */
 let resizeObserver: ResizeObserver | undefined
@@ -65,10 +65,7 @@ function colorFor(appId: string): string {
   return TAB_COLORS[hash % TAB_COLORS.length]!
 }
 
-/** tab 图标：首页 = Home，其余 = AppWindow（彩色方块内的白色线性图标） */
-function iconFor(tab: ShellTab) {
-  return tab.key === HOME.key ? Home : AppWindow
-}
+/** tab 图标：彩色方块内的白色线性图标（全界面唯一允许的颜色） */
 
 async function openApp(appId: string) {
   const result = await desktop().apps.open(appId) as { instanceId: string, handle: Record<string, unknown> }
@@ -99,8 +96,16 @@ function closeTab(tab: ShellTab) {
   tabs.value = tabs.value.filter(t => t.key !== tab.key)
   if (tab.instanceId)
     void desktop().apps.close(tab.instanceId)
-  if (activeKey.value === tab.key)
-    activate(tabs.value[0] ?? HOME)
+  if (activeKey.value === tab.key) {
+    const next = tabs.value[tabs.value.length - 1]
+    if (next)
+      activate(next)
+    else {
+      // 全关 = 回空状态页（主进程隐藏全部视图）
+      activeKey.value = ''
+      void desktop().apps.activate('')
+    }
+  }
 }
 
 onMounted(async () => {
@@ -112,6 +117,11 @@ onMounted(async () => {
 
   const list = await desktop().apps.list() as AppSummary[]
   appList.value = list
+
+  // 启动直达：flavor.defaultAppId 配置且应用存在时自动开 tab，跳过空状态页
+  const info = await desktop().shell.info()
+  if (info.defaultAppId && list.some(a => a.manifest.id === info.defaultAppId))
+    void openApp(info.defaultAppId)
 })
 
 onBeforeUnmount(() => {
@@ -141,10 +151,10 @@ onBeforeUnmount(() => {
               class="flex size-5 shrink-0 items-center justify-center rounded-md text-white"
               :style="{ background: tab.iconColor }"
             >
-              <component :is="iconFor(tab)" :size="12" :stroke-width="2.4" />
+              <AppWindow :size="12" :stroke-width="2.4" />
             </span>
             <span class="font-medium" style="color: var(--dt-text-1)">{{ tab.title }}</span>
-            <button v-if="tab.key !== HOME.key" class="tab-close ml-0.5 opacity-0 hover:opacity-100" @click.stop="closeTab(tab)">
+            <button class="tab-close ml-0.5 opacity-0 hover:opacity-100" @click.stop="closeTab(tab)">
               <X :size="12" />
             </button>
           </div>
@@ -192,7 +202,7 @@ onBeforeUnmount(() => {
               :style="{ width: 'var(--dt-icon-size)', height: 'var(--dt-icon-size)', borderRadius: 'var(--dt-radius-icon)', background: tab.iconColor }"
               @click="activate(tab)"
             >
-              <component :is="iconFor(tab)" :size="19" :stroke-width="2.2" />
+              <AppWindow :size="19" :stroke-width="2.2" />
             </button>
             <span
               v-if="railHover === tab.key"
@@ -211,7 +221,8 @@ onBeforeUnmount(() => {
 
         <!-- 内容容器：embedded 组件 / view 实例（主进程 WebContentsView 盖在此矩形上） -->
         <main ref="contentEl" class="relative min-w-0 flex-1 p-2">
-          <HomePage v-if="activeTab.key === HOME.key" class="h-full w-full overflow-hidden" style="background: var(--dt-surface); border-radius: var(--dt-radius)" />
+          <!-- 无 tab = 空状态页（透明底，页面色透出） -->
+          <EmptyState v-if="!activeTab" class="h-full w-full" @open="openApp" />
           <component
             :is="resolveEmbeddedRoute(activeTab.route!)"
             v-else-if="activeTab.kind === 'embedded' && activeTab.route"

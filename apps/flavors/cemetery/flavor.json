@@ -2,17 +2,7 @@
   "id": "cemetery",
   "name": "陵园服务工作台",
   "mode": "desktop",
-  "apps": [
-    {
-      "id": "home",
-      "name": "首页",
-      "version": "2.0.0",
-      "type": "internal",
-      "entry": { "kind": "embedded", "route": "/home" },
-      "devices": [],
-      "permissions": []
-    }
-  ],
+  "apps": [],
   "branding": { "accent": "#3b82f6" },
   "update": { "allowedOrigins": [] }
 }

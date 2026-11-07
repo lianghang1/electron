@@ -116,7 +116,7 @@ async function main(): Promise<void> {
     [
       new EmbeddedOpener(),
       new PackagedOpener(windows, appsRoot),
-      new RemoteOpener(windows, join(__dirname, '../preload/jsapi.js')),
+      new RemoteOpener(windows, join(__dirname, '../preload/jsapi.mjs')),
     ],
     kernel.ctx.events,
   )
@@ -147,6 +147,13 @@ async function main(): Promise<void> {
   ipcMain.handle('app:open', (_e, appId: string) => apps.open(appId))
   ipcMain.handle('app:close', (_e, instanceId: string) => apps.close(instanceId))
   ipcMain.handle('app:activate', (_e, instanceId: string) => windows.activate(instanceId))
+
+  // 壳信息（空状态页消费：品牌名 / 应用版本 / 启动直达目标）
+  ipcMain.handle('shell:info', () => ({
+    name: flavor.name,
+    version: app.getVersion(),
+    defaultAppId: flavor.defaultAppId,
+  }))
   ipcMain.on('view:content-rect', (_e, rect: { x: number, y: number, width: number, height: number }) =>
     windows.setContentRect(rect))
 
