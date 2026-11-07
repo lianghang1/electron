@@ -1,8 +1,7 @@
 /*
  * dt-* 设计令牌：全仓库唯一颜色/字号/间距/圆角来源。
- * 视觉基调（按 2026-11 参考稿定版）：浅色玻璃、浮动圆角窗口、
- * 顶部 tab 条（彩色应用图标）、左侧圆角图标栏（可折叠）。
- * 纪律：页面禁裸写颜色/字号/圆角，只准消费本文件的变量。
+ * 视觉纪律：灰阶 + 单强调色。强调色由 flavor.branding.accent 在 preload 阶段
+ * 注入 --dt-accent，soft/hover/ring 一律基于它派生（color-mix），不写死第二处。
  */
 @import 'tailwindcss';
 
@@ -18,19 +17,27 @@
   --dt-surface: #ffffff;
   --dt-surface-hover: #f2f6fd;
   --dt-line: rgba(148, 163, 199, 0.28);
+  --dt-line-strong: rgba(148, 163, 199, 0.48);
 
   /* 文字 */
   --dt-text-1: #1c2433;
   --dt-text-2: #5b6879;
   --dt-text-3: #97a1b5;
 
-  /* 强调与语义 */
+  /* 强调与语义：唯一彩色来源，派生量自动跟随注入值 */
   --dt-accent: #3b82f6;
-  --dt-accent-soft: rgba(59, 130, 246, 0.14);
+  --dt-accent-soft: color-mix(in srgb, var(--dt-accent) 14%, transparent);
+  --dt-accent-hover: color-mix(in srgb, var(--dt-accent) 88%, #000);
+  --dt-on-accent: #ffffff;
   --dt-hover: rgba(148, 163, 199, 0.14);
   --dt-ok: #22c55e;
   --dt-warn: #f59e0b;
   --dt-danger: #ef4444;
+
+  /* 阴影与边界：无边框窗口靠内描边建立边界感，浮层用两级阴影 */
+  --dt-shadow-1: 0 1px 2px rgb(28 36 51 / 0.06), 0 4px 16px rgb(28 36 51 / 0.08);
+  --dt-shadow-2: 0 12px 40px rgb(28 36 51 / 0.18);
+  --dt-window-ring: inset 0 0 0 1px var(--dt-line);
 
   /* 几何：克制小圆角（窗口 12 / 容器 8 / 图标 10） */
   --dt-radius-window: 12px;
@@ -48,19 +55,53 @@
   --dt-rail-w-expanded: 92px;
   --dt-icon-size: 40px;
 
-  /* 玻璃效果 */
   --dt-blur: blur(20px) saturate(1.4);
 }
 
-/* 深色主题（kiosk 夜间可选，值待 M3 定） */
+/* 深色主题：只覆盖表面/文字/阴影，强调色仍由 flavor 注入（单一来源） */
 :root[data-theme='dark'] {
-  --dt-page: #0d1117;
+  --dt-page: #0b0f16;
   --dt-glass: rgba(22, 27, 34, 0.86);
   --dt-surface: #161b22;
   --dt-surface-hover: #21262d;
-  --dt-line: rgba(139, 148, 158, 0.25);
+  --dt-line: rgba(139, 148, 158, 0.22);
+  --dt-line-strong: rgba(139, 148, 158, 0.38);
   --dt-text-1: #e6edf3;
-  --dt-text-2: #8b949e;
+  --dt-text-2: #a0aab5;
   --dt-text-3: #6e7681;
-  --dt-hover: rgba(139, 148, 158, 0.18);
+  --dt-hover: rgba(139, 148, 158, 0.16);
+  --dt-ok: #3fb950;
+  --dt-warn: #d29922;
+  --dt-danger: #f85149;
+  --dt-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.35);
+  --dt-shadow-2: 0 12px 40px rgb(0 0 0 / 0.55);
+  --dt-blur: blur(20px) saturate(1.2);
+}
+
+/* 键盘可达：焦点环只在键盘导航时显形（鼠标点击不触发） */
+:where(button, a, input, [tabindex]):focus-visible {
+  outline: 2px solid var(--dt-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* 细窄滚动条：灰阶、不抢视觉 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--dt-line-strong) transparent;
+}
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb {
+  background: var(--dt-line-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track { background: transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

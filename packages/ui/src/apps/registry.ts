@@ -8,8 +8,7 @@ import type { Component } from 'vue'
 const routes = new Map<string, Component>()
 
 export function registerEmbeddedApp(route: string, component: Component): void {
-  if (routes.has(route))
-    throw new Error(`[embedded-registry] route already registered: ${route}`)
+  // 覆盖而非抛错：渲染层 dev HMR 会重新执行入口模块，重复注册应取最新组件
   routes.set(route, component)
 }
 

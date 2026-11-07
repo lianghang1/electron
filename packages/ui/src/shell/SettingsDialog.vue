@@ -6,8 +6,9 @@
  * 新增设置项只在 @shell/shared 的 schema 加字段——本文件永不改。
  */
 import { onMounted, ref } from 'vue'
-import type { SettingField, SettingGroup, SettingsValues } from '@shell/shared'
+import type { SettingField, SettingGroup, SettingsValues, ThemePreference } from '@shell/shared'
 import { desktop } from '@shell/bridge/client'
+import { applyTheme } from '../styles/appearance'
 import DtDialog from '../components/DtDialog.vue'
 import DtInput from '../components/DtInput.vue'
 import DtSwitch from '../components/DtSwitch.vue'
@@ -30,7 +31,10 @@ function fieldValue(group: string, field: SettingField): unknown {
 
 async function setField(group: string, field: SettingField, value: unknown) {
   values.value[group] = { ...values.value[group], [field.key]: value }
-  await desktop().settings.set(`${group}.${field.key}`, value)
+  const key = `${group}.${field.key}`
+  if (key === 'appearance.theme')
+    applyTheme(value as ThemePreference)
+  await desktop().settings.set(key, value)
 }
 
 const visibleFields = (group: SettingGroup) =>

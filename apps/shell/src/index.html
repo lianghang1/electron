@@ -6,18 +6,18 @@
     <style>
       html, body, #app { margin: 0; width: 100%; height: 100%; }
       /* 内联启动层：纯 CSS，不依赖任何 JS——白屏物理消失。
-         品牌 accent 由 flavor.branding.accent 注入（构建期替换 --splash-accent）。 */
+         --dt-accent 由 preload 从 flavor.branding.accent 同步注入（零闪烁）。 */
       #splash {
         position: fixed; inset: 0; z-index: 2147483647;
         display: flex; align-items: center; justify-content: center;
-        background: linear-gradient(180deg, #eaf1fc 0%, #dde7f8 100%);
+        background: linear-gradient(180deg, var(--dt-surface-hover, #eaf1fc) 0%, var(--dt-page, #dde7f8) 100%);
         transition: opacity 0.16s ease;
       }
       body.ready #splash { pointer-events: none; opacity: 0; }
       .splash-logo {
         width: 88px; height: 88px; border-radius: 24px;
-        background: linear-gradient(135deg, var(--splash-accent, #3b82f6), #93c5fd);
-        box-shadow: 0 20px 40px rgb(59 130 246 / 0.28);
+        background: linear-gradient(135deg, var(--dt-accent), color-mix(in srgb, var(--dt-accent) 45%, #fff));
+        box-shadow: 0 20px 40px color-mix(in srgb, var(--dt-accent) 28%, transparent);
         animation: splash-pop 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
         opacity: 0; transform: scale(0.72);
       }

@@ -47,6 +47,23 @@ export const SETTINGS_SCHEMA: SettingGroup[] = [
       { key: 'kioskSilentUpdate', label: 'Kiosk 静默整包更新', type: 'boolean', default: true, hiddenInKiosk: false, description: '在锁屏时段安装整包更新' },
     ],
   },
+  {
+    key: 'appearance',
+    label: '外观',
+    fields: [
+      {
+        key: 'theme',
+        label: '主题',
+        type: 'enum',
+        default: 'system',
+        options: [{ value: 'system', label: '跟随系统' }, { value: 'light', label: '浅色' }, { value: 'dark', label: '深色' }],
+        description: '切换后立即生效，无需重启',
+      },
+    ],
+  },
 ]
 
 export type SettingsValues = Record<string, Record<string, unknown>>
+
+/** 主题偏好（appearance.theme 的取值，也为外观运行时复用） */
+export type ThemePreference = 'light' | 'dark' | 'system'

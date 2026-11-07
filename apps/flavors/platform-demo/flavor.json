@@ -1,0 +1,37 @@
+{
+  "id": "platform-demo",
+  "name": "平台日常态演示",
+  "mode": "desktop",
+  "chrome": "platform",
+  "apps": [
+    {
+      "id": "registration",
+      "name": "业务登记",
+      "version": "1.0.0",
+      "type": "internal",
+      "entry": { "kind": "embedded", "route": "/demo/registration" },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "archive",
+      "name": "档案查询",
+      "version": "1.0.0",
+      "type": "internal",
+      "entry": { "kind": "embedded", "route": "/demo/archive" },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "devices",
+      "name": "设备台账",
+      "version": "1.0.0",
+      "type": "internal",
+      "entry": { "kind": "embedded", "route": "/demo/devices" },
+      "devices": [],
+      "permissions": []
+    }
+  ],
+  "branding": { "accent": "#0d9488" },
+  "update": { "allowedOrigins": [] }
+}

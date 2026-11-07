@@ -9,6 +9,40 @@ import { contextBridge, ipcRenderer } from 'electron'
  * remote 页面不经过本桥（它们拿 JSAPI 受控桥，按 manifest.devices 过滤）。
  */
 
+/** 启动外观：由组合根经 additionalArguments 同步送达，避免异步 IPC 造成的首帧闪烁 */
+function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'system' } {
+  const pick = (prefix: string, fallback: string) =>
+    process.argv.find(a => a.startsWith(prefix))?.slice(prefix.length) ?? fallback
+  const accent = pick('--shell-accent=', '#3b82f6')
+  const theme = pick('--shell-theme=', 'system')
+  return {
+    accent,
+    theme: theme === 'light' || theme === 'dark' ? theme : 'system',
+  }
+}
+
+const bootAppearance = readBootAppearance()
+
+/** preload 阶段尽早写 :root：内联 splash 与 Vue 首帧都吃到同一个 flavor 主色 */
+function injectBootAppearance(): void {
+  const apply = () => {
+    const root = document.documentElement
+    if (!root)
+      return
+    root.style.setProperty('--dt-accent', bootAppearance.accent)
+    const dark = bootAppearance.theme === 'dark'
+      || (bootAppearance.theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
+    if (dark)
+      root.dataset.theme = 'dark'
+  }
+  if (document.documentElement)
+    apply()
+  else
+    document.addEventListener('DOMContentLoaded', apply, { once: true })
+}
+
+injectBootAppearance()
+
 export const desktop = {
   /** 通用域方法调用端：invoke('idcard.read', input) */
   invoke: (method: string, input: unknown) => ipcRenderer.invoke('domain-call', method, input),
@@ -51,6 +85,8 @@ export const desktop = {
       chrome: 'platform' | 'solo'
       mode: 'desktop' | 'kiosk'
     }>,
+    /** 启动外观同步快照（读启动参数，不经 IPC） */
+    appearance: () => bootAppearance,
   },
 
   /** 设置（schema 驱动） */

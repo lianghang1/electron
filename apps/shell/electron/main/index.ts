@@ -18,8 +18,7 @@ import { configDir, filesDir } from '@shell/kernel/storage'
 import { flavorManifestSchema } from '@shell/shared'
 import { WindowSystem, TraySystem } from '@shell/window'
 import { DistHotChannel, AsarHotChannel, FullPackageChannel, UpdateCenter, finalizeAsarUpdate, installScheduled } from '@shell/update'
-import { applySettingsSideEffects } from '@shell/kernel/settings'
-import { registerSettingsIpc } from '@shell/kernel/settings'
+import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
 
 /**
  * 组合根：全仓库唯一的组装现场（铁律一）。
@@ -62,7 +61,8 @@ async function main(): Promise<void> {
   if (flavor.chrome === 'solo' && !flavor.defaultAppId && flavor.apps.length > 0)
     logger.warn('flavor chrome=solo 但未配置 defaultAppId，启动将无应用直出', { flavor: flavor.id })
 
-  const windows = new WindowSystem(flavor, join(__dirname, '../renderer'))
+  const theme = (settingsSnapshot().values.appearance?.theme as 'light' | 'dark' | 'system' | undefined) ?? 'system'
+  const windows = new WindowSystem(flavor, join(__dirname, '../renderer'), theme)
   const kernel = createKernel(flavor, [windows])
 
   // 更新中心：三通道按 flavor.update 配置装配（无 manifestUrl 的通道不注册）

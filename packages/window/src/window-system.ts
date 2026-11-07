@@ -24,6 +24,8 @@ export class WindowSystem implements Startable, ViewHost {
   constructor(
     private readonly flavor: FlavorManifest,
     private readonly rendererDir: string,
+    /** 启动外观：组合根从 flavor + 持久化设置读出，经启动参数同步注入渲染层 */
+    private readonly initialTheme: 'light' | 'dark' | 'system' = 'system',
   ) {}
 
   /** 注入事件总线（组合根在 createKernel 之后调用；崩溃事件经它广播） */
@@ -55,6 +57,11 @@ export class WindowSystem implements Startable, ViewHost {
         ...shellBase.webPreferences,
         sandbox: false,
         preload: join(this.rendererDir, '../preload/index.mjs'),
+        // 启动外观：同步随 preload 抵达，渲染层挂载前即可应用（零闪烁；不走异步 IPC）
+        additionalArguments: [
+          `--shell-accent=${this.flavor.branding.accent}`,
+          `--shell-theme=${this.initialTheme}`,
+        ],
       },
     })
     mode.enter(win)

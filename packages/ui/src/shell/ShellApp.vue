@@ -1,19 +1,20 @@
 <script setup lang="ts">
 /**
  * ShellApp：壳 chrome 渲染（按 flavor.chrome 档位分支）。
- * - platform：完整壳——44px tab 条 / 64px 图标栏 / 应用启动器 / 空状态兜底
+ * - platform：完整壳——44px tab 条 / 64px 图标栏 / 命令面板 / 空状态兜底
  * - solo：容器隐形——仅 desktop 模式留 30px 窗口控制条（拖拽+三键），
  *   应用启动直出全屏；kiosk 连控制条都没有（纯全屏容器）
  * 三形态应用的宿主：
  * - embedded：内容区直接渲染注册组件（同进程，零桥接开销）
  * - packaged/remote：主进程 WebContentsView 盖在内容区矩形上（rect 经桥上报）
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Settings, Plus, Minus, Square, X, LayoutGrid, AppWindow } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Settings, Plus, Minus, Square, X, AppWindow } from 'lucide-vue-next'
 import { desktop } from '@shell/bridge/client'
 import { resolveEmbeddedRoute } from '../apps/registry'
 import EmptyState from '../apps/pages/EmptyState.vue'
 import SettingsDialog from './SettingsDialog.vue'
+import CommandPalette from './CommandPalette.vue'
 
 /** 工作台 tab：embedded 路由页或视图实例（packaged/remote） */
 interface ShellTab {
@@ -27,10 +28,12 @@ interface ShellTab {
 }
 
 interface AppSummary {
-  manifest: { id: string, name: string, icon?: string }
+  manifest: { id: string, name: string, icon?: string, entry: { kind: string } }
 }
 
 const TAB_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b6d4']
+const RECENT_KEY = 'shell.recentAppIds'
+const MAX_RECENT = 8
 
 /** 无常驻首页：platform 档 tabs 空 = 空状态页；solo 档启动直达 defaultAppId */
 const tabs = ref<ShellTab[]>([])
@@ -39,11 +42,19 @@ const chrome = ref<'platform' | 'solo'>('platform')
 const mode = ref<'desktop' | 'kiosk'>('desktop')
 const railHover = ref<string | null>(null)
 const appList = ref<AppSummary[]>([])
-const showAppLauncher = ref(false)
 const showSettings = ref(false)
+const showPalette = ref(false)
+const recentIds = ref<string[]>([])
 const contentEl = ref<HTMLElement | null>(null)
+const tabStripEl = ref<HTMLElement | null>(null)
 
 const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
+
+const paletteItems = computed(() => appList.value.map(a => ({
+  id: a.manifest.id,
+  name: a.manifest.name,
+  kind: a.manifest.entry.kind,
+})))
 
 /** 内容区矩形 = 主元素相对窗口内容原点（chrome 高度由布局自然决定，主进程不猜） */
 let resizeObserver: ResizeObserver | undefined
@@ -56,10 +67,16 @@ function reportRect() {
   desktop().reportContentRect({ x: r.left, y: r.top, width: r.width, height: r.height })
 }
 
+function onResize() {
+  reportRect()
+  updateTabFade()
+}
+
 function activate(tab: ShellTab) {
   activeKey.value = tab.key
   // view 形态：主进程显示该实例视图；embedded：传空实例号 = 全部视图隐藏
   void desktop().apps.activate(tab.instanceId ?? '')
+  void nextTick(() => scrollActiveIntoView())
 }
 
 function colorFor(appId: string): string {
@@ -69,7 +86,13 @@ function colorFor(appId: string): string {
   return TAB_COLORS[hash % TAB_COLORS.length]!
 }
 
-/** tab 图标：彩色方块内的白色线性图标（全界面唯一允许的颜色） */
+function rememberRecent(appId: string) {
+  recentIds.value = [appId, ...recentIds.value.filter(id => id !== appId)].slice(0, MAX_RECENT)
+  try {
+    localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds.value))
+  }
+  catch { /* 隐私模式下 localStorage 不可用：本次会话内仍有效 */ }
+}
 
 async function openApp(appId: string) {
   const result = await desktop().apps.open(appId) as { instanceId: string, handle: Record<string, unknown> }
@@ -77,8 +100,9 @@ async function openApp(appId: string) {
   const kind = result.handle.route !== undefined ? 'embedded' : 'view'
   const target = tabs.value.find(t => t.instanceId === result.instanceId)
     ?? tabs.value.find(t => t.appId === appId && t.kind === 'embedded')
+  rememberRecent(appId)
   if (target) {
-    showAppLauncher.value = false
+    showPalette.value = false
     activate(target)
     return
   }
@@ -92,7 +116,7 @@ async function openApp(appId: string) {
     appId,
   }
   tabs.value.push(tab)
-  showAppLauncher.value = false
+  showPalette.value = false
   activate(tab)
 }
 
@@ -112,12 +136,127 @@ function closeTab(tab: ShellTab) {
   }
 }
 
+/* ---------------- tab 条：横向滚动 + 两端渐隐 ---------------- */
+
+const fadeStart = ref(false)
+const fadeEnd = ref(false)
+
+function updateTabFade() {
+  const el = tabStripEl.value
+  if (!el) {
+    fadeStart.value = false
+    fadeEnd.value = false
+    return
+  }
+  // 1px 容差避免亚像素抖动
+  fadeStart.value = el.scrollLeft > 1
+  fadeEnd.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+}
+
+function scrollActiveIntoView() {
+  const strip = tabStripEl.value
+  const active = strip?.querySelector<HTMLElement>('.tab-active')
+  if (strip && active)
+    active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  updateTabFade()
+}
+
+watch(() => tabs.value.length, () => nextTick(updateTabFade))
+
+/* ---------------- tab 拖拽排序 ---------------- */
+
+const draggingKey = ref<string | null>(null)
+const dropTargetKey = ref<string | null>(null)
+
+function onDragStart(e: DragEvent, tab: ShellTab) {
+  draggingKey.value = tab.key
+  dropTargetKey.value = tab.key
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', tab.key)
+  }
+}
+
+function onDragOver(e: DragEvent, tab: ShellTab) {
+  if (!draggingKey.value || draggingKey.value === tab.key)
+    return
+  e.preventDefault()
+  if (e.dataTransfer)
+    e.dataTransfer.dropEffect = 'move'
+  dropTargetKey.value = tab.key
+}
+
+function onDrop(e: DragEvent, tab: ShellTab) {
+  e.preventDefault()
+  const from = draggingKey.value
+  const to = tab.key
+  if (from && from !== to) {
+    const arr = [...tabs.value]
+    const fromIdx = arr.findIndex(t => t.key === from)
+    const toIdx = arr.findIndex(t => t.key === to)
+    if (fromIdx >= 0 && toIdx >= 0) {
+      const [moved] = arr.splice(fromIdx, 1)
+      arr.splice(toIdx, 0, moved!)
+      tabs.value = arr
+    }
+  }
+  onDragEnd()
+}
+
+function onDragEnd() {
+  draggingKey.value = null
+  dropTargetKey.value = null
+}
+
+/* ---------------- 全局快捷键（仅 platform 档） ---------------- */
+
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (chrome.value !== 'platform')
+    return
+  const mod = e.ctrlKey || e.metaKey
+  if (!mod)
+    return
+
+  // ⌘K / Ctrl+K：开关命令面板
+  if (e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    showPalette.value = !showPalette.value
+    return
+  }
+  if (showPalette.value)
+    return
+
+  // Ctrl+Tab / Ctrl+Shift+Tab：tab 轮转
+  if (e.key === 'Tab' && tabs.value.length > 1) {
+    e.preventDefault()
+    const idx = tabs.value.findIndex(t => t.key === activeKey.value)
+    const step = e.shiftKey ? -1 : 1
+    const next = (idx + step + tabs.value.length) % tabs.value.length
+    activate(tabs.value[next]!)
+    return
+  }
+  // Ctrl+1~9：tab 直达
+  if (/^[1-9]$/.test(e.key)) {
+    const tab = tabs.value[Number(e.key) - 1]
+    if (tab) {
+      e.preventDefault()
+      activate(tab)
+    }
+  }
+}
+
 onMounted(async () => {
   reportRect()
   resizeObserver = new ResizeObserver(reportRect)
   if (contentEl.value)
     resizeObserver.observe(contentEl.value)
-  window.addEventListener('resize', reportRect)
+  window.addEventListener('resize', onResize)
+  window.addEventListener('keydown', onGlobalKeydown)
+
+  try {
+    recentIds.value = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[]
+  }
+  catch { recentIds.value = [] }
 
   const list = await desktop().apps.list() as AppSummary[]
   appList.value = list
@@ -128,63 +267,93 @@ onMounted(async () => {
   mode.value = info.mode
   if (info.defaultAppId && list.some(a => a.manifest.id === info.defaultAppId))
     void openApp(info.defaultAppId)
+  await nextTick(updateTabFade)
 })
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
-  window.removeEventListener('resize', reportRect)
+  window.removeEventListener('resize', onResize)
+  window.removeEventListener('keydown', onGlobalKeydown)
 })
 </script>
 
 <template>
   <div class="shell h-screen w-screen overflow-hidden" style="background: var(--dt-page)">
-    <div class="shell-window relative flex h-full w-full flex-col" style="background: var(--dt-glass); backdrop-filter: var(--dt-blur); border-radius: var(--dt-radius-window)">
+    <div
+      class="shell-window relative flex h-full w-full flex-col"
+      style="background: var(--dt-glass); backdrop-filter: var(--dt-blur); border-radius: var(--dt-radius-window); box-shadow: var(--dt-window-ring)"
+    >
       <!-- platform：完整 tab chrome；solo：30px 窗口控制条；kiosk：无 chrome -->
       <header
         v-if="chrome === 'platform'"
         class="flex items-center gap-2 px-3"
         style="height: var(--dt-titlebar-h); border-bottom: 1px solid var(--dt-line)"
       >
-        <div class="titlebar-drag flex min-w-0 flex-1 items-center gap-1.5">
+        <div class="titlebar-drag relative flex min-w-0 flex-1 items-center gap-1.5">
+          <!-- tab 条：横向滚动，两端按滚动位置渐隐 -->
           <div
-            v-for="tab in tabs"
-            :key="tab.key"
-            class="tab flex h-9 cursor-default items-center gap-2 px-2.5"
-            :class="{ 'tab-active': tab.key === activeKey }"
-            style="border-radius: var(--dt-radius); font-size: var(--dt-font-base)"
-            @click="activate(tab)"
+            ref="tabStripEl"
+            class="tab-strip relative flex min-w-0 items-center gap-1.5 overflow-x-auto"
+            :class="{ 'fade-start': fadeStart, 'fade-end': fadeEnd }"
+            @scroll="updateTabFade"
           >
-            <span
-              class="flex size-5 shrink-0 items-center justify-center rounded-md text-white"
-              :style="{ background: tab.iconColor }"
+            <div
+              v-for="(tab, i) in tabs"
+              :key="tab.key"
+              class="tab flex h-9 shrink-0 cursor-default items-center gap-2 px-2.5"
+              :class="{
+                'tab-active': tab.key === activeKey,
+                'tab-dragging': draggingKey === tab.key,
+                'tab-drop-target': dropTargetKey === tab.key && draggingKey !== tab.key,
+              }"
+              style="border-radius: var(--dt-radius); font-size: var(--dt-font-base)"
+              draggable="true"
+              role="tab"
+              tabindex="0"
+              :aria-selected="tab.key === activeKey"
+              @click="activate(tab)"
+              @keydown.enter="activate(tab)"
+              @keydown.space.prevent="activate(tab)"
+              @dragstart="onDragStart($event, tab)"
+              @dragover="onDragOver($event, tab)"
+              @drop="onDrop($event, tab)"
+              @dragend="onDragEnd"
             >
-              <AppWindow :size="12" :stroke-width="2.4" />
-            </span>
-            <span class="font-medium" style="color: var(--dt-text-1)">{{ tab.title }}</span>
-            <button class="tab-close ml-0.5 opacity-0 hover:opacity-100" @click.stop="closeTab(tab)">
-              <X :size="12" />
-            </button>
+              <span
+                class="flex size-5 shrink-0 items-center justify-center rounded-md text-white"
+                :style="{ background: tab.iconColor }"
+              >
+                <AppWindow :size="12" :stroke-width="2.4" />
+              </span>
+              <span class="font-medium" style="color: var(--dt-text-1)">{{ tab.title }}</span>
+              <span v-if="i < 9" class="tab-index text-[10px]" style="color: var(--dt-text-3)">{{ i + 1 }}</span>
+              <button class="tab-close ml-0.5 opacity-0 hover:opacity-100" aria-label="关闭标签" @click.stop="closeTab(tab)">
+                <X :size="12" />
+              </button>
+            </div>
           </div>
           <button
-            class="new-tab flex size-8 items-center justify-center"
+            class="new-tab flex size-8 shrink-0 items-center justify-center"
             style="border-radius: var(--dt-radius); color: var(--dt-text-2)"
-            @click="showAppLauncher = !showAppLauncher"
+            aria-label="打开应用"
+            @click="showPalette = true"
           >
             <Plus :size="15" />
           </button>
         </div>
-        <button class="ctrl flex size-8 items-center justify-center" style="color: var(--dt-text-2); border-radius: var(--dt-radius)" @click="showSettings = true">
+        <span class="shrink-0 text-[11px]" style="color: var(--dt-text-3)">⌘K</span>
+        <button class="ctrl flex size-8 shrink-0 items-center justify-center" style="color: var(--dt-text-2); border-radius: var(--dt-radius)" aria-label="设置" @click="showSettings = true">
           <Settings :size="16" />
         </button>
-        <div class="mx-1 h-4 w-px" style="background: var(--dt-line)" />
-        <div class="flex items-center">
-          <button class="ctrl flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.minimize()">
+        <div class="mx-1 h-4 w-px shrink-0" style="background: var(--dt-line)" />
+        <div class="flex shrink-0 items-center">
+          <button class="ctrl flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1)" aria-label="最小化" @click="desktop().window.minimize()">
             <Minus :size="15" />
           </button>
-          <button class="ctrl flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.toggleMaximize()">
+          <button class="ctrl flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1)" aria-label="最大化" @click="desktop().window.toggleMaximize()">
             <Square :size="13" />
           </button>
-          <button class="ctrl ctrl-close flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1); border-radius: 0 var(--dt-radius) 0 0" @click="desktop().window.close()">
+          <button class="ctrl ctrl-close flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1); border-radius: 0 var(--dt-radius) 0 0" aria-label="关闭" @click="desktop().window.close()">
             <X :size="15" />
           </button>
         </div>
@@ -235,7 +404,7 @@ onBeforeUnmount(() => {
             <span
               v-if="railHover === tab.key"
               class="tooltip absolute left-full z-50 ml-2 whitespace-nowrap px-2.5 py-1.5"
-              style="background: #1c2433; color: #fff; font-size: var(--dt-font-caption); border-radius: 8px"
+              style="background: var(--dt-text-1); color: var(--dt-surface); font-size: var(--dt-font-caption); border-radius: 8px"
             >{{ tab.title }}</span>
           </div>
         </nav>
@@ -270,28 +439,14 @@ onBeforeUnmount(() => {
         </main>
       </div>
 
-      <!-- 应用启动器（新 tab + 号触发，仅 platform 档） -->
-      <div
-        v-if="showAppLauncher && chrome === 'platform'"
-        class="absolute right-4 z-50 w-72 rounded-xl p-2 shadow-xl"
-        style="top: calc(var(--dt-titlebar-h) + 8px); background: var(--dt-glass); border: 1px solid var(--dt-line); backdrop-filter: var(--dt-blur)"
-      >
-        <p class="px-2 py-1.5 text-xs" style="color: var(--dt-text-3)">
-          <LayoutGrid :size="12" class="mr-1 inline" />应用中心
-        </p>
-        <button
-          v-for="app in appList"
-          :key="app.manifest.id"
-          class="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left hover:bg-[var(--dt-hover)]"
-          @click="openApp(app.manifest.id)"
-        >
-          <span class="size-6 rounded-md" :style="{ background: colorFor(app.manifest.id) }" />
-          <span class="text-sm" style="color: var(--dt-text-1)">{{ app.manifest.name }}</span>
-        </button>
-        <p v-if="appList.length === 0" class="px-2 py-3 text-xs" style="color: var(--dt-text-3)">
-          暂无应用——flavor.json 的 apps 清单为空
-        </p>
-      </div>
+      <!-- 命令面板（仅 platform 档）：⌘K/Ctrl+K 或顶栏 + 号唤起 -->
+      <CommandPalette
+        v-if="chrome === 'platform'"
+        v-model:open="showPalette"
+        :items="paletteItems"
+        :recent-ids="recentIds"
+        @select="openApp"
+      />
 
       <!-- 统一设置（schema 驱动面板） -->
       <SettingsDialog v-if="chrome === 'platform'" v-model:open="showSettings" />
@@ -309,16 +464,43 @@ onBeforeUnmount(() => {
   -webkit-app-region: no-drag;
 }
 
+/* tab 条：隐藏滚动条，两端渐隐由 mask 按滚动状态切换 */
+.tab-strip {
+  scrollbar-width: none;
+  padding-right: 4px;
+}
+.tab-strip::-webkit-scrollbar {
+  display: none;
+}
+.tab-strip.fade-start {
+  mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 100%);
+}
+.tab-strip.fade-end {
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 20px), transparent 100%);
+}
+.tab-strip.fade-start.fade-end {
+  mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
+}
+
 /* tab：非 active 透明，active 白底浮起（参考稿的玻璃胶囊） */
 .tab {
-  transition: background 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease, opacity 0.12s ease;
+  user-select: none;
 }
 .tab:hover {
   background: var(--dt-hover);
 }
 .tab-active {
   background: var(--dt-surface);
-  box-shadow: 0 2px 10px rgb(28 36 51 / 0.10);
+  box-shadow: var(--dt-shadow-1);
+}
+.tab-index {
+  font-variant-numeric: tabular-nums;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.tab:hover .tab-index {
+  opacity: 0.5;
 }
 .tab-close {
   color: var(--dt-text-3);
@@ -334,6 +516,12 @@ onBeforeUnmount(() => {
   background: var(--dt-hover);
   opacity: 1 !important;
 }
+.tab-dragging {
+  opacity: 0.35;
+}
+.tab-drop-target {
+  box-shadow: inset 2px 0 0 var(--dt-accent);
+}
 .new-tab,
 .ctrl {
   transition: background 0.12s ease;
@@ -343,7 +531,7 @@ onBeforeUnmount(() => {
   background: var(--dt-hover);
 }
 .ctrl-close:hover {
-  background: #ef4444 !important;
+  background: var(--dt-danger) !important;
   color: #fff !important;
 }
 
@@ -353,12 +541,12 @@ onBeforeUnmount(() => {
 }
 .rail-icon:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px rgb(28 36 51 / 0.18);
+  box-shadow: var(--dt-shadow-1);
 }
 .rail-icon-active {
   box-shadow:
     0 0 0 2.5px var(--dt-surface),
     0 0 0 4px var(--dt-accent-soft),
-    0 6px 14px rgb(59 130 246 / 0.28);
+    0 6px 14px color-mix(in srgb, var(--dt-accent) 28%, transparent);
 }
 </style>
