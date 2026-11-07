@@ -6,6 +6,11 @@
  */
 @import 'tailwindcss';
 
+/* 显式声明扫描源：Tailwind v4 自动检测会忽略 node_modules 下的 workspace 包
+   （@shell/ui 以 symlink 形式被消费），壳组件的工具类必须手动圈进来。 */
+@source '../../src';
+@source '../../../../apps/shell/src';
+
 :root {
   /* 表面三层：页面底 → 窗口玻璃 → 悬浮件 */
   --dt-page: #dfe7f6;
