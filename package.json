@@ -4,7 +4,7 @@
   "private": true,
   "description": "壳平台 v2：一套壳 × N 产品形态（flavor）",
   "engines": {
-    "node": "^24.15.0 || >=26.0.0"
+    "node": "^20.19.0 || >=22.12.0"
   },
   "scripts": {
     "dev": "pnpm --filter @app/shell dev",

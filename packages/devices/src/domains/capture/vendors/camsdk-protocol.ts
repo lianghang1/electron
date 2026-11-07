@@ -1,4 +1,4 @@
-import type { WsLike } from '../../kernel/channel/ws-channel'
+import type { WsLike } from '../../../kernel/channel/ws-channel'
 import { captureError } from '../errors'
 
 /**

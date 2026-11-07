@@ -1,5 +1,5 @@
 import type { IcReaderDeviceConfig } from '@shell/shared'
-import type { DeviceHost } from '../../host/device-host'
+import type { DeviceHost } from '../../../host/device-host'
 import type { IcCardAdapter, IcCardData, IcCardReadRequest, IcCardWriteRequest, IcReaderDevice } from '../types'
 
 /**

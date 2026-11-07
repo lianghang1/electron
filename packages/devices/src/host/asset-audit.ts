@@ -1,8 +1,8 @@
 import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { CAPTURE_DLL_BINARIES } from '../capture/configs'
-import { SUMATRA_PDF_FILE } from '../print/sumatra'
-import { HANVON_DLL_FILE } from '../signature/vendors/hanvon'
+import { CAPTURE_DLL_BINARIES } from '../domains/capture/configs'
+import { SUMATRA_PDF_FILE } from '../domains/print/sumatra'
+import { HANVON_DLL_FILE } from '../domains/signature/vendors/hanvon'
 import { IC_DRIVERS, ID_DRIVERS } from './run'
 
 /**
@@ -59,7 +59,8 @@ export function collectAssetDeclarations(): AssetDeclaration[] {
 
 /**
  * 扫描 devices 树全部 assets 源目录：assets 父目录名 = 厂商名，
- * 域名 = 相对 devices 根的第一层目录名，产物子路径 = <域>/<厂商>（同名合并为域名）。
+ * 域名 = src/domains 下的第一层目录名，产物子路径 = <域>/<厂商>（同名合并为域名）。
+ * v2 布局的 src/ 与 domains/ 为容器段，不参与域键推导。
  */
 export function collectAssetSources(devicesRoot: string): AssetSource[] {
   const sources: AssetSource[] = []
@@ -72,6 +73,10 @@ export function collectAssetSources(devicesRoot: string): AssetSource[] {
       if (entry.name === 'assets') {
         const vendor = path.basename(dir)
         sources.push({ vendor, dir: child, targetRel: domain === vendor ? domain : `${domain}/${vendor}` })
+        continue
+      }
+      if (domain === '' && (entry.name === 'src' || entry.name === 'domains')) {
+        walk(child, '')
         continue
       }
       walk(child, domain || entry.name)

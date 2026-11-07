@@ -10,8 +10,10 @@ import { Readable } from 'node:stream'
  * 一切写入先进 staging 目录，校验通过才原子 rename 进正式位。
  */
 
-export function sha256File(path: string): string {
-  return createHash('sha256').update(createReadStream(path)).digest('hex')
+export async function sha256File(path: string): Promise<string> {
+  const hash = createHash('sha256')
+  await pipeline(createReadStream(path), hash)
+  return hash.digest('hex')
 }
 
 /** 断点续传下载：服务端须支持 Range；不支持则整文件重下 */
@@ -32,8 +34,8 @@ export async function downloadFile(url: string, dest: string, headers: Record<st
 }
 
 /** 校验失败即抛（调用方负责清理 staging） */
-export function verifySha256(path: string, expected: string): void {
-  const actual = sha256File(path)
+export async function verifySha256(path: string, expected: string): Promise<void> {
+  const actual = await sha256File(path)
   if (actual !== expected)
     throw new Error(`sha256 mismatch: expect ${expected}, got ${actual}`)
 }

@@ -1,5 +1,5 @@
-import type { WsLike } from '../../kernel/channel/ws-channel'
-import { connectWs, parseWsUrl, tcpProbe } from '../../kernel/channel/ws-channel'
+import type { WsLike } from '../../../kernel/channel/ws-channel'
+import { connectWs, parseWsUrl, tcpProbe } from '../../../kernel/channel/ws-channel'
 import { signatureError } from '../errors'
 
 /**

@@ -1,7 +1,7 @@
 import type { PrinterDefaults, PrinterPaper } from '@shell/shared'
-import type { KoffiModule } from '../kernel/koffi'
+import type { KoffiModule } from '../../kernel/koffi'
 import { Buffer } from 'node:buffer'
-import { koffiAvailable, requireKoffi } from '../kernel/koffi'
+import { koffiAvailable, requireKoffi } from '../../kernel/koffi'
 import { detectDevicePlatform } from '../platform'
 
 /**

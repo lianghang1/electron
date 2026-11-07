@@ -1,5 +1,5 @@
 import type { IdReaderErrorCode } from './types'
-import { HostRemoteError } from '../host/errors'
+import { HostRemoteError } from '../../host/errors'
 
 /** idcard 统一错误（PII 域：错误信息不得携带证件号/照片）：适配器失败必须收敛为该类型 */
 export class IdCardError extends Error {

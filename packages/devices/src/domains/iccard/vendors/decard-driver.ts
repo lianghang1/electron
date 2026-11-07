@@ -1,9 +1,9 @@
 /* eslint-disable node/prefer-global/buffer */
-import type { KoffiFn, KoffiLib } from '../../kernel/koffi'
+import type { KoffiFn, KoffiLib } from '../../../kernel/koffi'
 import type { IcCardData, IcCardDriver, IcCardReadRequest, IcCardWriteRequest } from '../types'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { requireKoffi } from '../../kernel/koffi'
+import { requireKoffi } from '../../../kernel/koffi'
 import { icCardError } from '../errors'
 
 /**

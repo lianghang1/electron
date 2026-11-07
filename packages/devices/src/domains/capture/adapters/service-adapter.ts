@@ -2,7 +2,7 @@ import type { AdapterCaptureRequest, CaptureAdapter, CaptureDevice, CaptureDevic
 import { Buffer } from 'node:buffer'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { probeHttp } from '../../kernel/channel/http-channel'
+import { probeHttp } from '../../../kernel/channel/http-channel'
 import { captureError } from '../errors'
 
 /**

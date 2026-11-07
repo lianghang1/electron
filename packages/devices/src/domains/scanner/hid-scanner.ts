@@ -1,7 +1,7 @@
 import type { ScannerStatus, ScanResult } from '@shell/shared'
-import type { WsLike } from '../kernel/channel/ws-channel'
+import type { WsLike } from '../../kernel/channel/ws-channel'
 import type { KeyboardScanner } from './keyboard-scanner'
-import { connectWs, parseWsUrl, tcpProbe } from '../kernel/channel/ws-channel'
+import { connectWs, parseWsUrl, tcpProbe } from '../../kernel/channel/ws-channel'
 
 /**
  * 厂商本地服务 HID 扫码通道（CamSDKServer（华夏电通）BarcodeScanner，由服务端监听 HID 条码枪）。

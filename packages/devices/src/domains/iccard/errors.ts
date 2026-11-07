@@ -1,5 +1,5 @@
 import type { IcCardErrorCode } from './types'
-import { HostRemoteError } from '../host/errors'
+import { HostRemoteError } from '../../host/errors'
 
 /** iccard 统一错误（卡数据域：错误信息不得携带卡块数据/密钥）：适配器失败必须收敛为该类型 */
 export class IcCardError extends Error {

@@ -1,5 +1,5 @@
 import type { IdCardData } from '@shell/shared'
-import { parseWsUrl, tcpProbe, withWsSession } from '../../kernel/channel/ws-channel'
+import { parseWsUrl, tcpProbe, withWsSession } from '../../../kernel/channel/ws-channel'
 import { idCardError } from '../errors'
 import { normalizeCardDate } from './card-date'
 

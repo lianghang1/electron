@@ -49,7 +49,7 @@ export class FullPackageChannel implements UpdateChannel {
       const installerPath = join(app.getPath('userData'), 'desktop-updater', 'pending-installer.exe')
       await downloadFile(plan.downloadUrl, installerPath)
       if (meta.sha256)
-        verifySha256(installerPath, meta.sha256)
+        await verifySha256(installerPath, meta.sha256)
 
       // 安排退出后安装：before-quit 时由 installScheduled() 拉起分离进程
       scheduled = { installerPath, args: meta.silentArgs ?? '/S' }

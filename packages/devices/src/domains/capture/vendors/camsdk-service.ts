@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import process from 'node:process'
 import { promisify } from 'node:util'
-import { parseWsUrl, tcpProbe } from '../../kernel/channel/ws-channel'
+import { parseWsUrl, tcpProbe } from '../../../kernel/channel/ws-channel'
 
 const execFileAsync = promisify(execFile)
 

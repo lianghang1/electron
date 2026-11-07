@@ -1,5 +1,5 @@
 import type { IdcardDeviceConfig } from '@shell/shared'
-import type { DeviceHost } from '../../host/device-host'
+import type { DeviceHost } from '../../../host/device-host'
 import type { IdCardAdapter, IdCardData, IdReaderDevice } from '../types'
 
 /**

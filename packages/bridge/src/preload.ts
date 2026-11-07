@@ -9,7 +9,7 @@ import { contextBridge, ipcRenderer } from 'electron'
  * remote 页面不经过本桥（它们拿 JSAPI 受控桥，按 manifest.devices 过滤）。
  */
 
-const desktop = {
+export const desktop = {
   /** 通用域方法调用端：invoke('idcard.read', input) */
   invoke: (method: string, input: unknown) => ipcRenderer.invoke('domain-call', method, input),
 

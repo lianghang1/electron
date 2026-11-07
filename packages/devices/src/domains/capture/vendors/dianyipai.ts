@@ -1,5 +1,5 @@
 import type { CaptureVendor, WsEndpoint } from './vendor-types'
-import { withWsSession } from '../../kernel/channel/ws-channel'
+import { withWsSession } from '../../../kernel/channel/ws-channel'
 import { captureError } from '../errors'
 
 /**

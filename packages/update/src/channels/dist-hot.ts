@@ -1,7 +1,7 @@
 import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
 import { existsSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import { extract } from 'extract-zip'
+import extract from 'extract-zip'
 import { downloadFile, verifySha256 } from '../net'
 
 /**
@@ -55,7 +55,7 @@ export class DistHotChannel implements UpdateChannel {
     try {
       const zipPath = `${staging}.zip`
       await downloadFile(plan.downloadUrl, zipPath)
-      verifySha256(zipPath, meta.sha256)
+      await verifySha256(zipPath, meta.sha256)
 
       rmSync(staging, { recursive: true, force: true })
       await extract(zipPath, { dir: staging })

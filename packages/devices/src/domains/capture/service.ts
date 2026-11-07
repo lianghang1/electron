@@ -1,5 +1,5 @@
 import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides, CaptureLogFn, CaptureRequest, CaptureResult } from '@shell/shared'
-import type { DeviceHost } from '../host/device-host'
+import type { DeviceHost } from '../../host/device-host'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'

@@ -1,5 +1,5 @@
 import type { PrintError, PrintErrorCode } from '@shell/shared'
-import { HostRemoteError } from '../host/errors'
+import { HostRemoteError } from '../../host/errors'
 
 /** 统一打印错误：所有通道/平台失败都必须收敛为该类型，禁止裸异常越过归一化层 */
 export class PrintErrorImpl extends Error implements PrintError {

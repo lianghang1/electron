@@ -90,7 +90,7 @@ async function main(): Promise<void> {
     start: () => devices.warmup(() => {
       kernel.ctx.marks.t2DeviceHostReady = Date.now()
     }),
-    stop: () => devices.dispose(),
+    stop: async () => devices.dispose(),
   })
 
   // 托盘（kiosk 全屏形态不创建——现场不该有逃逸入口）

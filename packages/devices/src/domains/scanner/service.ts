@@ -1,9 +1,12 @@
 import type { ScannerConfig, ScannerDeviceConfig, ScannerDeviceOverrides, ScannerLogFn, ScannerOverrides, ScannerSetInput, ScannerStatus, ScanOptions, ScanResult } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
-import { DesktopError, scannerDomain } from '@shell/shared'
+import { DesktopError } from '@shell/shared'
 import { webContents } from 'electron'
 import { HID_SERVICE_URL, HidScanner } from './hid-scanner'
 import { KeyboardScanner } from './keyboard-scanner'
+
+/** 推送通道（沿用旧域通道命名 `${域}:${方法}`；bridge preload 已做 scanner.scanned → 旧通道映射） */
+export const SCANNER_PUSH_CHANNELS = { scanReceived: 'scanner:scanReceived', statusUpdated: 'scanner:statusUpdated' } as const
 
 /** 节奏参数出厂值（keyboard / hid 档案共用一份缺省，旧单值迁移也以此回填） */
 const PACE_DEFAULTS = { timeout: 100, minLength: 4, endKey: 'Enter', prefixes: [] as string[], requirePrefix: false }
@@ -129,7 +132,7 @@ export interface ScannerSystem {
  * 精华在 before-input-event：键盘事件在到达页面前被"观察"（不 preventDefault），
  * 扫码枪在任何输入焦点下都能被识别，且不会污染人工输入；缓冲器靠节奏+长度区分人与枪。
  * 档案制：节奏/通道参数随档案走，激活档案（activeId）决定当前生效通道与参数。
- * 结果广播到所有窗口（推送通道见 scannerDomain.channels.scanReceived）。
+ * 结果广播到所有窗口（推送通道见 SCANNER_PUSH_CHANNELS.scanReceived）。
  */
 export class ScanService {
   private config: ScannerConfig
@@ -177,7 +180,7 @@ export class ScanService {
     // 全量 webContents（BrowserWindow + shell Tab 的 WebContentsView 都在内），
     // 只遍历 BrowserWindow 会漏掉 Tab 装载的页面
     for (const wc of webContents.getAllWebContents()) {
-      if (!wc.isDestroyed()) { wc.send(scannerDomain.channels.scanReceived, result) }
+      if (!wc.isDestroyed()) { wc.send(SCANNER_PUSH_CHANNELS.scanReceived, result) }
     }
   }
 
@@ -250,7 +253,7 @@ export class ScanService {
 
   private pushStatus(status: ScannerStatus): void {
     for (const wc of webContents.getAllWebContents()) {
-      if (!wc.isDestroyed()) { wc.send(scannerDomain.channels.statusUpdated, status) }
+      if (!wc.isDestroyed()) { wc.send(SCANNER_PUSH_CHANNELS.statusUpdated, status) }
     }
   }
 }

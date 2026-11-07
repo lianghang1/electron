@@ -1,6 +1,6 @@
-import type { WsLike } from '../../kernel/channel/ws-channel'
+import type { WsLike } from '../../../kernel/channel/ws-channel'
 import type { CapturePreviewSession, WsEndpoint } from './vendor-types'
-import { connectWs } from '../../kernel/channel/ws-channel'
+import { connectWs } from '../../../kernel/channel/ws-channel'
 import { captureError } from '../errors'
 import { checkCamSdkFrame, frameImage, parseCamSdkFrame, sendCamSdk } from './camsdk-protocol'
 

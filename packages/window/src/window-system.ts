@@ -293,4 +293,3 @@ export class WindowSystem implements Startable, ViewHost {
     }
   }
 }
-}

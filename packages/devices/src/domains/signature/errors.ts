@@ -1,5 +1,5 @@
 import type { SignErrorCode } from './types'
-import { HostRemoteError } from '../host/errors'
+import { HostRemoteError } from '../../host/errors'
 
 /** signature 统一错误：适配器失败必须收敛为该类型（笔迹内容不得进入错误信息） */
 export class SignatureError extends Error {

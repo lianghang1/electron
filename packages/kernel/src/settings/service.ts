@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, ipcMain } from 'electron'
 import { SETTINGS_SCHEMA } from '@shell/shared'
-import { configDir } from './storage/app-paths'
+import { configDir } from '../storage/app-paths'
 
 /**
  * 设置服务（VS Code schema 驱动模式）：SETTINGS_SCHEMA 是唯一事实源——

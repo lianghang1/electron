@@ -1,6 +1,7 @@
 import type { EventBus } from '@shell/kernel'
 import type { Logger } from '@shell/kernel/logger'
 import type { DomainCallContext, DomainDefinition } from '@shell/shared'
+import { defineDomain } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'

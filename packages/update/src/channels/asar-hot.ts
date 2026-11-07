@@ -67,7 +67,7 @@ export class AsarHotChannel implements UpdateChannel {
       const pendingAsar = join(this.updaterDir, 'pending.asar')
       await downloadFile(plan.downloadUrl, pendingAsar)
       if (meta.sha256)
-        verifySha256(pendingAsar, meta.sha256)
+        await verifySha256(pendingAsar, meta.sha256)
 
       writeFileSync(join(this.updaterDir, MARKER), JSON.stringify({ version: plan.targetVersion, stage: 'downloaded' }))
       return { ok: true, requiresRestart: true }

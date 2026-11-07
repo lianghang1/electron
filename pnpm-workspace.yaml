@@ -7,7 +7,7 @@ catalog:
   '@electron-toolkit/utils': 4.0.0
   '@tailwindcss/vite': ^4.3.0
   '@types/node': 24.13.3
-  '@vitejs/plugin-vue': ^6.1.0
+  '@vitejs/plugin-vue': ^6.0.10
   '@vueuse/core': 15.0.0
   electron: 45.2.3
   electron-builder: 26.0.12

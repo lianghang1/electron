@@ -1,5 +1,5 @@
 import type { SignDeviceConfig } from '@shell/shared'
-import type { DeviceHost } from '../../host/device-host'
+import type { DeviceHost } from '../../../host/device-host'
 import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from '../types'
 import { signatureError } from '../errors'
 
