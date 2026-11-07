@@ -7,7 +7,7 @@
  * 参考稿布局：44px 自绘标题栏 / 64px 图标栏 / 圆角内容区。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import { Settings, Plus, Minus, Square, X, LayoutGrid } from 'lucide-vue-next'
+import { Settings, Plus, Minus, Square, X, LayoutGrid, Home, AppWindow } from 'lucide-vue-next'
 import { desktop } from '@shell/bridge/client'
 import { resolveEmbeddedRoute } from '../apps/registry'
 import HomePage from '../apps/pages/HomePage.vue'
@@ -63,6 +63,11 @@ function colorFor(appId: string): string {
   for (const ch of appId)
     hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
   return TAB_COLORS[hash % TAB_COLORS.length]!
+}
+
+/** tab 图标：首页 = Home，其余 = AppWindow（彩色方块内的白色线性图标） */
+function iconFor(tab: ShellTab) {
+  return tab.key === HOME.key ? Home : AppWindow
 }
 
 async function openApp(appId: string) {
@@ -123,18 +128,23 @@ onBeforeUnmount(() => {
         class="flex items-center gap-2 px-3"
         style="height: var(--dt-titlebar-h); border-bottom: 1px solid var(--dt-line)"
       >
-        <div class="titlebar-drag flex min-w-0 flex-1 items-center gap-1">
+        <div class="titlebar-drag flex min-w-0 flex-1 items-center gap-1.5">
           <div
             v-for="tab in tabs"
             :key="tab.key"
-            class="tab flex h-8 cursor-default items-center gap-2 px-3"
+            class="tab flex h-9 cursor-default items-center gap-2 px-2.5"
             :class="{ 'tab-active': tab.key === activeKey }"
             style="border-radius: var(--dt-radius); font-size: var(--dt-font-base)"
             @click="activate(tab)"
           >
-            <span class="size-2.5 rounded-md" :style="{ background: tab.iconColor }" />
-            <span style="color: var(--dt-text-1)">{{ tab.title }}</span>
-            <button v-if="tab.key !== HOME.key" class="tab-close ml-1 opacity-40 hover:opacity-100" @click.stop="closeTab(tab)">
+            <span
+              class="flex size-5 shrink-0 items-center justify-center rounded-md text-white"
+              :style="{ background: tab.iconColor }"
+            >
+              <component :is="iconFor(tab)" :size="12" :stroke-width="2.4" />
+            </span>
+            <span class="font-medium" style="color: var(--dt-text-1)">{{ tab.title }}</span>
+            <button v-if="tab.key !== HOME.key" class="tab-close ml-0.5 opacity-0 hover:opacity-100" @click.stop="closeTab(tab)">
               <X :size="12" />
             </button>
           </div>
@@ -143,22 +153,22 @@ onBeforeUnmount(() => {
             style="border-radius: var(--dt-radius); color: var(--dt-text-2)"
             @click="showAppLauncher = !showAppLauncher"
           >
-            <Plus :size="14" />
+            <Plus :size="15" />
           </button>
         </div>
         <button class="ctrl flex size-8 items-center justify-center" style="color: var(--dt-text-2); border-radius: var(--dt-radius)" @click="showSettings = true">
-          <Settings :size="15" />
+          <Settings :size="16" />
         </button>
         <div class="mx-1 h-4 w-px" style="background: var(--dt-line)" />
         <div class="flex items-center">
-          <button class="ctrl flex h-8 w-11 items-center justify-center" style="color: var(--dt-text-2)" @click="desktop().window.minimize()">
-            <Minus :size="13" />
+          <button class="ctrl flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.minimize()">
+            <Minus :size="15" />
           </button>
-          <button class="ctrl flex h-8 w-11 items-center justify-center" style="color: var(--dt-text-2)" @click="desktop().window.toggleMaximize()">
-            <Square :size="11" />
+          <button class="ctrl flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.toggleMaximize()">
+            <Square :size="13" />
           </button>
-          <button class="ctrl flex h-8 w-11 items-center justify-center hover:bg-[#ef4444] hover:text-white" style="border-radius: 0 var(--dt-radius) 0 0" @click="desktop().window.close()">
-            <X :size="13" />
+          <button class="ctrl ctrl-close flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1); border-radius: 0 var(--dt-radius) 0 0" @click="desktop().window.close()">
+            <X :size="15" />
           </button>
         </div>
       </header>
@@ -177,11 +187,13 @@ onBeforeUnmount(() => {
             @mouseleave="railHover = null"
           >
             <button
-              class="rail-icon flex items-center justify-center"
+              class="rail-icon flex items-center justify-center text-white"
               :class="{ 'rail-icon-active': tab.key === activeKey }"
               :style="{ width: 'var(--dt-icon-size)', height: 'var(--dt-icon-size)', borderRadius: 'var(--dt-radius-icon)', background: tab.iconColor }"
               @click="activate(tab)"
-            />
+            >
+              <component :is="iconFor(tab)" :size="19" :stroke-width="2.2" />
+            </button>
             <span
               v-if="railHover === tab.key"
               class="tooltip absolute left-full z-50 ml-2 whitespace-nowrap px-2.5 py-1.5"
@@ -238,3 +250,58 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* tab：非 active 透明，active 白底浮起（参考稿的玻璃胶囊） */
+.tab {
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.tab:hover {
+  background: var(--dt-hover);
+}
+.tab-active {
+  background: var(--dt-surface);
+  box-shadow: 0 2px 10px rgb(28 36 51 / 0.10);
+}
+.tab-close {
+  color: var(--dt-text-3);
+  border-radius: 6px;
+  padding: 2px;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.tab:hover .tab-close,
+.tab-active .tab-close {
+  opacity: 0.7;
+}
+.tab-close:hover {
+  background: var(--dt-hover);
+  opacity: 1 !important;
+}
+.new-tab,
+.ctrl {
+  transition: background 0.12s ease;
+}
+.new-tab:hover,
+.ctrl:hover {
+  background: var(--dt-hover);
+}
+.ctrl-close:hover {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+
+/* 左侧图标栏：选中加同色描边浮起，hover 微升 */
+.rail-icon {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.rail-icon:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgb(28 36 51 / 0.18);
+}
+.rail-icon-active {
+  box-shadow:
+    0 0 0 2.5px var(--dt-surface),
+    0 0 0 4px var(--dt-accent-soft),
+    0 6px 14px rgb(59 130 246 / 0.28);
+}
+</style>
