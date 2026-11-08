@@ -1,0 +1,22 @@
+{
+  "id": "update-e2e",
+  "name": "更新链路端到端",
+  "mode": "desktop",
+  "chrome": "platform",
+  "apps": [
+    {
+      "id": "demo-packaged",
+      "name": "演示打包应用",
+      "version": "1.0.0",
+      "type": "internal",
+      "entry": { "kind": "packaged" },
+      "devices": [],
+      "permissions": []
+    }
+  ],
+  "branding": { "accent": "#0d9488" },
+  "update": {
+    "manifestUrl": "http://127.0.0.1:8899/manifest.json",
+    "allowedOrigins": ["http://127.0.0.1:8899"]
+  }
+}

@@ -2,6 +2,7 @@ import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
+import { assertAllowedUrl, fetchUpdateManifest } from '../manifest'
 import { downloadFile, verifySha256 } from '../net'
 
 /**
@@ -25,10 +26,6 @@ export interface AsarHotOptions {
   allowedOrigins: string[]
 }
 
-interface AsarManifest {
-  asar: { version: string, url: string, sha256: string }
-}
-
 const UPDATER_DIR = 'desktop-updater'
 const MARKER = 'pending.asar.json'
 type Stage = 'downloaded' | 'swapped'
@@ -44,38 +41,37 @@ export class AsarHotChannel implements UpdateChannel {
 
   async check(current: VersionMatrix): Promise<UpdatePlan | null> {
     if (!existsSync(join(this.options.resourcesDir, 'app.asar'))) { return null }
-    const res = await fetch(this.options.manifestUrl)
-    if (!res.ok) { throw new Error(`manifest fetch failed: ${res.status}`) }
-    const manifest = await res.json() as AsarManifest
+    const manifest = await fetchUpdateManifest(this.options.manifestUrl, this.options.allowedOrigins)
+    if (!manifest.asar) { return null }
     if ((current.asar ?? '0.0.0') < manifest.asar.version) {
       return {
         channel: this.id,
         targetVersion: manifest.asar.version,
         downloadUrl: manifest.asar.url,
-        ...({ sha256: manifest.asar.sha256 } as object),
-      } as UpdatePlan
+        payload: { sha256: manifest.asar.sha256 },
+      }
     }
     return null
   }
 
   async apply(plan: UpdatePlan): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
-    const meta = plan as UpdatePlan & { sha256?: string }
     try {
+      assertAllowedUrl(plan.downloadUrl, this.options.allowedOrigins)
       mkdirSync(this.updaterDir, { recursive: true })
       const pendingAsar = join(this.updaterDir, 'pending.asar')
       await downloadFile(plan.downloadUrl, pendingAsar)
-      if (meta.sha256) { await verifySha256(pendingAsar, meta.sha256) }
+      if (plan.payload?.sha256) { await verifySha256(pendingAsar, plan.payload.sha256) }
 
       writeFileSync(join(this.updaterDir, MARKER), JSON.stringify({ version: plan.targetVersion, stage: 'downloaded' }))
       return { ok: true, requiresRestart: true }
     }
     catch (err) {
+      // 校验失败必须删掉坏 pending.asar：否则下次下载按 Range 续传会拼出损坏文件
+      rmSync(join(this.updaterDir, 'pending.asar'), { force: true })
       return { ok: false, requiresRestart: true, error: String(err) }
     }
   }
 }
-
-type UpdateCenterVersionMatrix = VersionMatrix
 
 /**
  * asar 热更的落盘切换 + 启动 finalize（见类注释的三段状态机）。

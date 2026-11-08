@@ -16,7 +16,7 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, filesDir } from '@shell/kernel/storage'
 import { flavorManifestSchema } from '@shell/shared'
-import { AsarHotChannel, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, installScheduled, UpdateCenter } from '@shell/update'
+import { AsarHotChannel, collectAppVersions, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, installScheduled, UpdateCenter } from '@shell/update'
 import { TraySystem, WindowSystem } from '@shell/window'
 import { app, ipcMain, session } from 'electron'
 
@@ -34,7 +34,7 @@ finalizeAsarUpdate(process.resourcesPath ?? '.')
 registerAppScheme()
 
 function loadFlavor() {
-  // 打包：构建期把 flavor.json 注入 resources/（见 electron-builder.yml extraResources）；
+  // 打包：构建期把 flavor.json 注入 resources/（见 electron-builder.config.mjs extraResources）；
   // dev：--flavor=<id> 指向仓库 apps/flavors/<id>/flavor.json，缺省 cemetery。
   const packaged = join(process.resourcesPath ?? '', 'flavor.json')
   if (existsSync(packaged)) {
@@ -62,17 +62,31 @@ async function main(): Promise<void> {
   const windows = new WindowSystem(flavor, join(__dirname, '../renderer'), theme)
   const kernel = createKernel(flavor, [windows])
 
+  // 应用 dist 根：打包态必须在 asar 外（extraResources 已把 resources/apps 复制到
+  // <resources>/apps），asar 内不可写——dist-hot 通道的原子替换写的就是这个目录；
+  // dev 态从仓库目录解析。app:// 协议读取与 dist-hot 写入必须同源（见 protocol.ts）
+  const appsRoot = app.isPackaged
+    ? join(process.resourcesPath ?? '.', 'apps')
+    : join(app.getAppPath(), 'resources/apps')
+
   // 更新中心：三通道按 flavor.update 配置装配（无 manifestUrl 的通道不注册）
   const updateManifestUrl = flavor.update.manifestUrl ?? ''
   if (updateManifestUrl) {
     void kernel.register(new UpdateCenter({
       channels: [
-        new DistHotChannel({ appsRoot: join(app.getAppPath(), 'resources/apps'), manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
+        new DistHotChannel({ appsRoot, manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
         new AsarHotChannel({ resourcesDir: process.resourcesPath ?? '.', manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
         new FullPackageChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
       ],
       events: kernel.ctx.events,
       deviceId: `${flavor.id}-${process.platform}`,
+      // 版本矩阵由组合根提供：app 版本读 appsRoot 下各应用 version.json（dist-hot 换目录后自动刷新），
+      // asar 与 shell 同版本（asar 就是壳本身）
+      versionMatrix: async () => ({
+        shell: app.getVersion(),
+        asar: app.getVersion(),
+        apps: collectAppVersions(appsRoot),
+      }),
     }))
   }
   windows.bindEvents(kernel.ctx.events)
@@ -110,7 +124,6 @@ async function main(): Promise<void> {
   }
 
   // 应用运行时：openers 在此装配（铁律一），AppService 只认 SPI
-  const appsRoot = join(app.getAppPath(), 'resources/apps')
   const apps = new AppService(
     () => true,
     [

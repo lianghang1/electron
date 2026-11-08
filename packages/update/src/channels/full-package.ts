@@ -1,7 +1,9 @@
 import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
 import { spawn } from 'node:child_process'
+import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
+import { assertAllowedUrl, fetchUpdateManifest } from '../manifest'
 import { downloadFile, verifySha256 } from '../net'
 
 /**
@@ -16,10 +18,6 @@ export interface FullPackageOptions {
   silentInstallAt?: string
 }
 
-interface FullManifest {
-  package: { version: string, url: string, sha256: string, silentArgs: string }
-}
-
 let scheduled: { installerPath: string, args: string } | null = null
 
 export class FullPackageChannel implements UpdateChannel {
@@ -28,33 +26,33 @@ export class FullPackageChannel implements UpdateChannel {
   constructor(private readonly options: FullPackageOptions) {}
 
   async check(current: VersionMatrix): Promise<UpdatePlan | null> {
-    const res = await fetch(this.options.manifestUrl)
-    if (!res.ok) { throw new Error(`manifest fetch failed: ${res.status}`) }
-    const manifest = await res.json() as FullManifest
+    const manifest = await fetchUpdateManifest(this.options.manifestUrl, this.options.allowedOrigins)
+    if (!manifest.package) { return null }
     if (current.shell < manifest.package.version) {
       return {
         channel: this.id,
         targetVersion: manifest.package.version,
         downloadUrl: manifest.package.url,
-        ...({ sha256: manifest.package.sha256, silentArgs: manifest.package.silentArgs } as object),
-      } as UpdatePlan
+        payload: { sha256: manifest.package.sha256, silentArgs: manifest.package.silentArgs },
+      }
     }
     return null
   }
 
   async apply(plan: UpdatePlan): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
-    const meta = plan as UpdatePlan & { sha256?: string, silentArgs?: string }
+    const installerPath = join(app.getPath('userData'), 'desktop-updater', 'pending-installer.exe')
     try {
-      const installerPath = join(app.getPath('userData'), 'desktop-updater', 'pending-installer.exe')
+      assertAllowedUrl(plan.downloadUrl, this.options.allowedOrigins)
       await downloadFile(plan.downloadUrl, installerPath)
-      if (meta.sha256) { await verifySha256(installerPath, meta.sha256) }
+      if (plan.payload?.sha256) { await verifySha256(installerPath, plan.payload.sha256) }
 
       // 安排退出后安装：before-quit 时由 installScheduled() 拉起分离进程
-      scheduled = { installerPath, args: meta.silentArgs ?? '/S' }
+      scheduled = { installerPath, args: plan.payload?.silentArgs ?? '/S' }
       return { ok: true, requiresRestart: true }
     }
     catch (err) {
       scheduled = null
+      rmSync(installerPath, { force: true })
       return { ok: false, requiresRestart: true, error: String(err) }
     }
   }

@@ -13,6 +13,8 @@ export interface UpdatePlan {
   targetVersion: string
   /** 原子切换前必须完成的校验（sha256/签名）由各通道自行执行 */
   downloadUrl: string
+  /** 通道自有载荷（appId / sha256 / silentArgs），平台不解析 */
+  payload?: Record<string, string>
 }
 
 export interface ApplyResult {
@@ -41,6 +43,8 @@ export interface UpdateCenterOptions {
   deviceId: string
   /** 灰度白名单与放量百分比（服务端清单下发，本地兜底全量） */
   greylist?: { whitelist: string[], percent: number }
+  /** 版本矩阵由组合根注入（读 appsRoot 版本文件），未注入时退化为 shell 版本 */
+  versionMatrix?: () => Promise<VersionMatrix>
   /** 巡检间隔 ms；0 = 不自动巡检（默认 6h） */
   intervalMs?: number
 }
@@ -105,12 +109,9 @@ export class UpdateCenter implements Startable {
     return channel.apply(plan)
   }
 
-  /** 当前版本矩阵：shell 版本 + asar 版本 + 各 app 版本（app 版本以 appsRoot 清单为准，M6 收口） */
   private async collectVersionMatrix(): Promise<VersionMatrix> {
+    if (this.options.versionMatrix) { return this.options.versionMatrix() }
     const { app } = await import('electron')
-    return {
-      shell: app.getVersion(),
-      apps: {},
-    }
+    return { shell: app.getVersion(), apps: {} }
   }
 }

@@ -15,6 +15,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "pnpm --filter './packages/**' run build && pnpm --filter @shell/devices test",
+    "test:e2e:update": "pnpm --filter './packages/**' run build && node scripts/e2e/update-e2e.mjs",
     "typecheck": "pnpm --filter './packages/**' run build && pnpm -r typecheck",
     "postinstall": "node scripts/ensure-electron.mjs"
   },

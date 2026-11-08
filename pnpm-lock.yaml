@@ -113,9 +113,6 @@ importers:
       '@shell/window':
         specifier: workspace:*
         version: link:../../packages/window
-      electron:
-        specifier: 'catalog:'
-        version: 45.2.3
     devDependencies:
       '@tailwindcss/vite':
         specifier: 'catalog:'
@@ -126,6 +123,9 @@ importers:
       '@vitejs/plugin-vue':
         specifier: 'catalog:'
         version: 6.0.10(vite@8.3.6(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(sass@1.105.1)(tsx@4.20.6)(yaml@2.9.1))(vue@3.5.25(typescript@5.8.3))
+      electron:
+        specifier: 'catalog:'
+        version: 45.2.3
       electron-builder:
         specifier: 'catalog:'
         version: 26.0.12(electron-builder-squirrel-windows@26.0.12)

@@ -2,6 +2,7 @@ import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
 import { existsSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import extract from 'extract-zip'
+import { assertAllowedUrl, fetchUpdateManifest } from '../manifest'
 import { downloadFile, verifySha256 } from '../net'
 
 /**
@@ -20,48 +21,45 @@ export interface DistHotOptions {
   allowedOrigins: string[]
 }
 
-interface DistManifest {
-  apps: Record<string, { version: string, url: string, sha256: string }>
-}
-
 export class DistHotChannel implements UpdateChannel {
   readonly id = 'dist-hot' as const
 
   constructor(private readonly options: DistHotOptions) {}
 
   async check(current: VersionMatrix): Promise<UpdatePlan | null> {
-    const manifest = await this.fetchManifest()
+    const manifest = await fetchUpdateManifest(this.options.manifestUrl, this.options.allowedOrigins)
+    if (!manifest.apps) { return null }
     for (const [appId, entry] of Object.entries(manifest.apps)) {
       if ((current.apps[appId] ?? '0.0.0') < entry.version) {
         return {
           channel: this.id,
           targetVersion: entry.version,
           downloadUrl: entry.url,
-          // 扩展载荷：appId 与校验值随 plan 传递（SPI 契约外的通道自有字段）
-          ...({ appId, sha256: entry.sha256 } as object),
-        } as UpdatePlan
+          payload: { appId, sha256: entry.sha256 },
+        }
       }
     }
     return null
   }
 
   async apply(plan: UpdatePlan): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
-    const meta = plan as UpdatePlan & { appId?: string, sha256?: string }
-    if (!meta.appId || !meta.sha256) { return { ok: false, requiresRestart: false, error: 'dist-hot plan missing appId/sha256' } }
+    const { appId, sha256 } = plan.payload ?? {}
+    if (!appId || !sha256) { return { ok: false, requiresRestart: false, error: 'dist-hot plan missing appId/sha256' } }
 
-    const staging = join(this.options.appsRoot, `.staging-${meta.appId}`)
-    const target = join(this.options.appsRoot, meta.appId)
+    const staging = join(this.options.appsRoot, `.staging-${appId}`)
+    const target = join(this.options.appsRoot, appId)
     try {
+      assertAllowedUrl(plan.downloadUrl, this.options.allowedOrigins)
       const zipPath = `${staging}.zip`
       await downloadFile(plan.downloadUrl, zipPath)
-      await verifySha256(zipPath, meta.sha256)
+      await verifySha256(zipPath, sha256)
 
       rmSync(staging, { recursive: true, force: true })
       await extract(zipPath, { dir: staging })
       rmSync(zipPath, { force: true })
 
       // 原子切换：旧目录先改名保留（.bak），新目录就位后删除——中途断电旧版本仍在
-      const backup = join(this.options.appsRoot, `.bak-${meta.appId}`)
+      const backup = join(this.options.appsRoot, `.bak-${appId}`)
       if (existsSync(backup)) { rmSync(backup, { recursive: true, force: true }) }
       if (existsSync(target)) { renameSync(target, backup) }
       renameSync(staging, target)
@@ -70,13 +68,11 @@ export class DistHotChannel implements UpdateChannel {
     }
     catch (err) {
       rmSync(staging, { recursive: true, force: true })
+      rmSync(`${staging}.zip`, { force: true })
+      // 原子切换中途失败：正式位可能已让给 .bak，必须回滚，否则下次启动无版本可跑
+      const backup = join(this.options.appsRoot, `.bak-${appId}`)
+      if (!existsSync(target) && existsSync(backup)) { renameSync(backup, target) }
       return { ok: false, requiresRestart: false, error: String(err) }
     }
-  }
-
-  private async fetchManifest(): Promise<DistManifest> {
-    const res = await fetch(this.options.manifestUrl)
-    if (!res.ok) { throw new Error(`manifest fetch failed: ${res.status}`) }
-    return res.json() as Promise<DistManifest>
   }
 }
