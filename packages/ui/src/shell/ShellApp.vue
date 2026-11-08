@@ -43,6 +43,15 @@ const contentEl = ref<HTMLElement | null>(null)
 const tabStripEl = ref<HTMLElement | null>(null)
 const restart = ref<RestartRequired | null>(null)
 
+let offRestartRequired: (() => void) | undefined
+
+/** 跨进程载荷不可信：形状不符就忽略，不渲染脏数据 */
+function isRestartRequired(value: unknown): value is RestartRequired {
+  if (!value || typeof value !== 'object') { return false }
+  const record = value as Record<string, unknown>
+  return typeof record.channel === 'string' && typeof record.version === 'string'
+}
+
 const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
 
 const paletteItems = computed(() => appList.value.map(a => ({
@@ -226,8 +235,8 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onGlobalKeydown)
 
-  desktop().onEvent('update.restart-required', (payload) => {
-    restart.value = payload as RestartRequired
+  offRestartRequired = desktop().onEvent('update.restart-required', (payload) => {
+    if (isRestartRequired(payload)) { restart.value = payload }
   })
 
   try {
@@ -248,6 +257,7 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onGlobalKeydown)
+  offRestartRequired?.()
 })
 </script>
 

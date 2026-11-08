@@ -21,10 +21,17 @@ function fieldValue(group: string, field: SettingField): unknown {
   return values.value[group]?.[field.key] ?? field.default
 }
 
+const THEME_VALUES = ['light', 'dark', 'system'] as const
+
+function asThemePreference(value: unknown): ThemePreference | undefined {
+  return THEME_VALUES.includes(value as ThemePreference) ? value as ThemePreference : undefined
+}
+
 async function setField(group: string, field: SettingField, value: unknown) {
   values.value[group] = { ...values.value[group], [field.key]: value }
   const key = `${group}.${field.key}`
-  if (key === 'appearance.theme') { applyTheme(value as ThemePreference) }
+  const theme = key === 'appearance.theme' ? asThemePreference(value) : undefined
+  if (theme) { applyTheme(theme) }
   await desktop().settings.set(key, value)
 }
 
