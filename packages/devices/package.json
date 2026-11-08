@@ -5,11 +5,16 @@
   "private": true,
   "description": "设备网关：kernel→adapters→vendors→host 四层（自 core 平移，逻辑未动）",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "tsdown",
+    "dev": "tsdown --watch"
   },
   "dependencies": {
     "@shell/kernel": "workspace:*",

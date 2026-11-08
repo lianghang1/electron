@@ -4,16 +4,36 @@
   "version": "2.0.0-alpha.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts",
-    "./manifest": "./src/manifest.ts",
-    "./capability": "./src/capability.ts",
-    "./settings": "./src/settings.ts",
-    "./events": "./src/events.ts",
-    "./domain": "./src/domain.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./manifest": {
+      "types": "./dist/manifest.d.ts",
+      "default": "./dist/manifest.js"
+    },
+    "./capability": {
+      "types": "./dist/capability.d.ts",
+      "default": "./dist/capability.js"
+    },
+    "./settings": {
+      "types": "./dist/settings.d.ts",
+      "default": "./dist/settings.js"
+    },
+    "./events": {
+      "types": "./dist/events.d.ts",
+      "default": "./dist/events.js"
+    },
+    "./domain": {
+      "types": "./dist/domain.d.ts",
+      "default": "./dist/domain.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "tsdown",
+    "dev": "tsdown --watch"
   },
   "dependencies": {
     "zod": "catalog:"

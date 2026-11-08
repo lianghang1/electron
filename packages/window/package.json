@@ -4,10 +4,15 @@
   "version": "2.0.0-alpha.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsdown",
+    "dev": "tsdown --watch"
   },
   "dependencies": {
     "@shell/app-runtime": "workspace:*",

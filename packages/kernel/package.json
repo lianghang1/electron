@@ -4,13 +4,27 @@
   "version": "2.0.0-alpha.0",
   "private": true,
   "exports": {
-    ".": "./src/index.ts",
-    "./logger": "./src/logger/index.ts",
-    "./settings": "./src/settings/index.ts",
-    "./storage": "./src/storage/app-paths.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./logger": {
+      "types": "./dist/logger/index.d.ts",
+      "default": "./dist/logger/index.js"
+    },
+    "./settings": {
+      "types": "./dist/settings/index.d.ts",
+      "default": "./dist/settings/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/app-paths.d.ts",
+      "default": "./dist/storage/app-paths.js"
+    }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "tsdown",
+    "dev": "tsdown --watch"
   },
   "dependencies": {
     "@shell/shared": "workspace:*",

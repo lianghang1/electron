@@ -3,7 +3,12 @@ import tailwindcss from '@tailwindcss/vite'
 import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'electron-vite'
 
-/** workspace 源码内联（包 exports 指向 .ts，运行时不认），三方包维持外置。 */
+/**
+ * workspace 包内联声明（asar 自包含契约）：打包配置 files 只含 out/**，asar 内没有
+ * node_modules，@shell/* 必须打进 bundle 才能运行。这些包有真实构建产物（dist/*.js），
+ * 类型与解析走标准 exports——本清单只是显式的打包策略，不是解析兼容补丁。
+ * （@shell/ui 不在内：它只被 renderer 消费，Vite 直接编译其源码。）
+ */
 const externalizeDeps = {
   exclude: [
     '@shell/app-runtime',
@@ -11,7 +16,6 @@ const externalizeDeps = {
     '@shell/devices',
     '@shell/kernel',
     '@shell/shared',
-    '@shell/ui',
     '@shell/update',
     '@shell/window',
   ],

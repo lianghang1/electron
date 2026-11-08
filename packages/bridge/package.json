@@ -5,9 +5,22 @@
   "private": true,
   "description": "渲染层唯一门面：preload contextBridge 单文件集中（可审计）+ 渲染层类型化客户端",
   "exports": {
-    "./preload": "./src/preload.ts",
-    "./client": "./src/client.ts",
-    "./jsapi-preload": "./src/jsapi-preload.ts"
+    "./preload": {
+      "types": "./dist/preload.d.ts",
+      "default": "./dist/preload.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./jsapi-preload": {
+      "types": "./dist/jsapi-preload.d.ts",
+      "default": "./dist/jsapi-preload.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch"
   },
   "dependencies": {
     "@shell/shared": "workspace:*",
