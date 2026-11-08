@@ -11,12 +11,6 @@ node_modules
 .DS_Store
 dist
 out
-# 例外：packages/core/launcher/out 是引导器源码（asar 内布局镜像，非构建产物），必须入库
-!packages/core/launcher/out/
-!packages/core/launcher/out/**
-# 设备 SDK 资产单一来源在 packages/core/src/devices/**/assets/（已跟踪）；应用侧 resources/devices
-# 是 scripts/sync-dev-resources.ts（postinstall）覆盖式重建的产物，不入库
-apps/*/resources/devices/
 *.tsbuildinfo
 *.local
 unpackage/release

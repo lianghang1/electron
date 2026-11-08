@@ -1,10 +1,9 @@
-import { createEslintConfig } from '@desktop/config/eslint'
+import { createEslintConfig } from '@shell/config/eslint'
 
 export default createEslintConfig(
   {
-    // 设计文档与 README 里的 TS 代码块只是示意，不参与 lint；
-    // resources/ 是打包资源目录（图标与内部应用静态页），非 lint 对象
-    ignores: ['README.md', 'docs/**', '.trae/**', '**/resources/**', 'resources/**'],
+    // 设计文档里的 TS 代码块只是示意，不参与 lint；resources/ 是打包资源，非 lint 对象
+    ignores: ['docs/**', '**/resources/**', 'resources/**'],
   },
   {
     // IPC 契约必须保持 type alias：Main 侧 handle 包装用 keyof/Parameters 提取，

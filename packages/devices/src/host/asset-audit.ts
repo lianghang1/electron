@@ -13,8 +13,8 @@ import { IC_DRIVERS, ID_DRIVERS } from './run'
  * 跨域同名厂商（不同公司撞名）不会互相污染。
  * 资产源：<devicesRoot>/**\/assets/<平台>/<文件>，assets 父目录名 = 厂商名；
  * 域名 = assets 相对 devices 根的第一层目录名；厂商与域同名时（print 形态）声明省略厂商段。
- * 同步脚本（scripts/sync-dev-resources.ts）与单测（asset-audit.test.ts）共用本模块，
- * 保证「代码声明 ↔ 源资产」只有一套对账规则；目录名打错 / SDK 忘放在此暴露。
+ * 单测（asset-audit.test.ts）用本模块对账，保证「代码声明 ↔ 源资产」只有一套规则；
+ * 目录名打错 / SDK 忘放在此暴露。
  */
 
 /** 一条代码内资源声明（报错定位用 origin 标注来源） */

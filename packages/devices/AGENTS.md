@@ -1,4 +1,4 @@
-# 设备体系规范（packages/core/src/devices）
+# 设备体系规范（packages/devices）
 
 设备域统一架构：**传输基座（kernel）→ 域适配器（adapters）→ 厂商模块（vendors/drivers）→ 守护进程（host）**。
 品牌差异在配置数据，接入方式差异在适配器代码，厂商协议差异在厂商模块，全部 native 调用收敛在守护进程。
@@ -12,7 +12,7 @@ devices/
 ├── platform/           平台能力面：detectDevicePlatform() 单点探测（windows/mac/linux/linux-cn）
 ├── host/               设备守护进程（utilityProcess）：koffi 调用全部在此进程，崩溃退避自愈
 │   ├── run.ts          域方法表注册制：域接入 = registerDomainMethods('<域>', {...}) 一处
-│   └── asset-audit.ts  SDK 资产对账：代码声明 ↔ assets 源资产（同步脚本与单测共用）
+│   └── asset-audit.ts  SDK 资产对账：代码声明 ↔ assets 源资产（单测对账）
 ├── <域>/adapters/      接入方式适配器：按 transport 路由（ws/dll/service/wia...）
 └── <域>/vendors/       厂商模块：一个厂商 = 一个模块文件 + 注册表一行 + assets/ SDK 资产
 ```
@@ -24,9 +24,8 @@ devices/
 - 驱动声明路径格式统一 `devices/<域>/<厂商>/<平台>/<文件>`（如 `devices/idcard/huashi/win64/Termb.dll`；
   print 无厂商层为四段 `devices/print/<平台>/<文件>`），域 + 厂商双键命名空间隔离跨域同名厂商，
   相对宿主资源根（dev = `<应用根>/resources/`，打包 = `<resourcesPath>/resources/`）；
-- 各应用 `resources/devices/` 是 `scripts/sync-dev-resources.ts`（postinstall 自动跑）覆盖式重建的
-  **生成物，禁止手放文件、gitignore**——同步前先跑 asset-audit 对账，目录名打错 / SDK 漏放 /
-  孤儿厂商目录直接报错终止；`pnpm test` 里 asset-audit.test.ts 同规则兜底；
+- `pnpm test` 里 asset-audit.test.ts 对账「代码声明 ↔ 源资产」，目录名打错 / SDK 漏放 /
+  孤儿厂商目录直接报错终止；
 - 新增信创平台 = 厂商 assets 下加 `linux-arm64/` 等平台目录 + 驱动按 `detectDevicePlatform()` 选文件，
   同步链路零改动。
 

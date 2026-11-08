@@ -4,17 +4,9 @@
   "version": "0.2.0",
   "private": true,
   "exports": {
-    "./vite": {
-      "types": "./dist/vite/index.d.ts",
-      "default": "./dist/vite/index.js"
-    },
-    "./electron-builder": "./electron-builder.cjs",
-    "./eslint": "./eslint/index.ts",
-    "./tsconfig.base.json": "./tsconfig.base.json"
+    "./eslint": "./eslint/index.ts"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "dev": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "devDependencies": {

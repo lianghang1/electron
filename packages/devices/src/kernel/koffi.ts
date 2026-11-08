@@ -21,10 +21,7 @@ export interface KoffiModule {
   address: (value: unknown) => bigint | number
 }
 
-// createRequire 基准：CJS（electron-vite 产物）取 __filename；ESM（tsx 直跑源码联调）无 __filename，退回 cwd（koffi 经根依赖解析）
-const nodeRequire = createRequire(
-  typeof __filename === 'string' ? __filename : process.cwd(),
-)
+const nodeRequire = createRequire(import.meta.url)
 
 /**
  * 打包态的 koffi 分发目录（afterPack 钩子拷入 <resourcesPath>/node_modules，跟整包更新）。

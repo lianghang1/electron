@@ -1,26 +1,37 @@
-import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
-import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
+import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'electron-vite'
 
-/**
- * 外置规则（Rolldown 只接受 RegExp）：本地路径与 @shell/* 一律内联，其余裸包走运行时解析。
- * external 会二次匹配「解析后的绝对 ID」，Windows 下该 ID 形如 D:\...，必须一并排除，
- * 否则产物残留 import "D:/..."，ESM loader 把盘符当协议报 ERR_UNSUPPORTED_ESM_URL_SCHEME。
- */
-const EXTERNAL_PATTERN = /^(?!\.{1,2}[\\/]|[A-Za-z]:[\\/]|\\\\|\/|file:|@shell\/)/
+/** workspace 源码内联（包 exports 指向 .ts，运行时不认），三方包维持外置。 */
+const externalizeDeps = {
+  exclude: [
+    '@shell/app-runtime',
+    '@shell/bridge',
+    '@shell/devices',
+    '@shell/kernel',
+    '@shell/shared',
+    '@shell/ui',
+    '@shell/update',
+    '@shell/window',
+  ],
+  include: [
+    'electron-log',
+    'electron-store',
+    'extract-zip',
+    'koffi',
+    'ws',
+    'zod',
+  ],
+}
 
 export default defineConfig({
   main: {
     build: {
-      // 关闭默认的依赖外置：由 EXTERNAL_PATTERN 接管（@shell/* 须内联）
-      externalizeDeps: false,
+      externalizeDeps,
       rollupOptions: {
-        external: [EXTERNAL_PATTERN],
         input: {
-          index: fileURLToPath(new URL('./electron/main/index.ts', import.meta.url)),
-          // 守护进程独立 bundle：utilityProcess fork 目标（DeviceHost.entryPath 指向它）
+          'index': fileURLToPath(new URL('./electron/main/index.ts', import.meta.url)),
           'device-host': fileURLToPath(new URL('../../packages/devices/src/host/entry.ts', import.meta.url)),
         },
       },
@@ -28,13 +39,11 @@ export default defineConfig({
   },
   preload: {
     build: {
-      externalizeDeps: false,
+      externalizeDeps,
       rollupOptions: {
-        external: [EXTERNAL_PATTERN],
         input: {
-          index: fileURLToPath(new URL('./electron/preload/index.ts', import.meta.url)),
-          // remote 形态的 JSAPI 受控桥（RemoteOpener 以 preload 注入）
-          jsapi: fileURLToPath(new URL('../../packages/bridge/src/jsapi-preload.ts', import.meta.url)),
+          'index': fileURLToPath(new URL('./electron/preload/index.ts', import.meta.url)),
+          'jsapi': fileURLToPath(new URL('../../packages/bridge/src/jsapi-preload.ts', import.meta.url)),
         },
       },
     },

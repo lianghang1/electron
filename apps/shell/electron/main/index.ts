@@ -43,7 +43,6 @@ function loadFlavor() {
   const flavorArg = process.argv.find(a => a.startsWith('--flavor='))
   const flavorId = flavorArg?.split('=')[1] ?? 'cemetery'
   const flavorPath = join(app.getAppPath(), '../../apps/flavors', flavorId, 'flavor.json')
-  // JSON.parse 而非 require：main bundle 为 ESM，require 在打包产物里不可用
   const raw = JSON.parse(readFileSync(flavorPath, 'utf-8')) as unknown
   return flavorManifestSchema.parse(raw)
 }
