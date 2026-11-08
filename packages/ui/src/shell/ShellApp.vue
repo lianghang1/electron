@@ -1,22 +1,13 @@
 <script setup lang="ts">
 import { desktop } from '@shell/bridge/client'
+import { Button, Separator, Tooltip } from '@ui/components/ui'
 import { AppWindow, Minus, Plus, Settings, Square, X } from 'lucide-vue-next'
-/**
- * ShellApp：壳 chrome 渲染（按 flavor.chrome 档位分支）。
- * - platform：完整壳——44px tab 条 / 64px 图标栏 / 命令面板 / 空状态兜底
- * - solo：容器隐形——仅 desktop 模式留 30px 窗口控制条（拖拽+三键），
- *   应用启动直出全屏；kiosk 连控制条都没有（纯全屏容器）
- * 三形态应用的宿主：
- * - embedded：内容区直接渲染注册组件（同进程，零桥接开销）
- * - packaged/remote：主进程 WebContentsView 盖在内容区矩形上（rect 经桥上报）
- */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EmptyState from '../apps/pages/EmptyState.vue'
 import { resolveEmbeddedRoute } from '../apps/registry'
 import CommandPalette from './CommandPalette.vue'
 import SettingsDialog from './SettingsDialog.vue'
 
-/** 工作台 tab：embedded 路由页或视图实例（packaged/remote） */
 interface ShellTab {
   key: string
   kind: 'embedded' | 'view'
@@ -35,12 +26,10 @@ const TAB_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b
 const RECENT_KEY = 'shell.recentAppIds'
 const MAX_RECENT = 8
 
-/** 无常驻首页：platform 档 tabs 空 = 空状态页；solo 档启动直达 defaultAppId */
 const tabs = ref<ShellTab[]>([])
 const activeKey = ref('')
 const chrome = ref<'platform' | 'solo'>('platform')
 const mode = ref<'desktop' | 'kiosk'>('desktop')
-const railHover = ref<string | null>(null)
 const appList = ref<AppSummary[]>([])
 const showSettings = ref(false)
 const showPalette = ref(false)
@@ -56,7 +45,6 @@ const paletteItems = computed(() => appList.value.map(a => ({
   kind: a.manifest.entry.kind,
 })))
 
-/** 内容区矩形 = 主元素相对窗口内容原点（chrome 高度由布局自然决定，主进程不猜） */
 let resizeObserver: ResizeObserver | undefined
 
 function reportRect() {
@@ -73,7 +61,6 @@ function onResize() {
 
 function activate(tab: ShellTab) {
   activeKey.value = tab.key
-  // view 形态：主进程显示该实例视图；embedded：传空实例号 = 全部视图隐藏
   void desktop().apps.activate(tab.instanceId ?? '')
   void nextTick(() => scrollActiveIntoView())
 }
@@ -127,14 +114,11 @@ function closeTab(tab: ShellTab) {
       activate(next)
     }
     else {
-      // 全关 = 回空状态页（主进程隐藏全部视图）
       activeKey.value = ''
       void desktop().apps.activate('')
     }
   }
 }
-
-/* ---------------- tab 条：横向滚动 + 两端渐隐 ---------------- */
 
 const fadeStart = ref(false)
 const fadeEnd = ref(false)
@@ -146,7 +130,6 @@ function updateTabFade() {
     fadeEnd.value = false
     return
   }
-  // 1px 容差避免亚像素抖动
   fadeStart.value = el.scrollLeft > 1
   fadeEnd.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
 }
@@ -159,8 +142,6 @@ function scrollActiveIntoView() {
 }
 
 watch(() => tabs.value.length, () => nextTick(updateTabFade))
-
-/* ---------------- tab 拖拽排序 ---------------- */
 
 const draggingKey = ref<string | null>(null)
 const dropTargetKey = ref<string | null>(null)
@@ -203,14 +184,11 @@ function onDragEnd() {
   dropTargetKey.value = null
 }
 
-/* ---------------- 全局快捷键（仅 platform 档） ---------------- */
-
 function onGlobalKeydown(e: KeyboardEvent) {
   if (chrome.value !== 'platform') { return }
   const mod = e.ctrlKey || e.metaKey
   if (!mod) { return }
 
-  // ⌘K / Ctrl+K：开关命令面板
   if (e.key.toLowerCase() === 'k') {
     e.preventDefault()
     showPalette.value = !showPalette.value
@@ -218,7 +196,6 @@ function onGlobalKeydown(e: KeyboardEvent) {
   }
   if (showPalette.value) { return }
 
-  // Ctrl+Tab / Ctrl+Shift+Tab：tab 轮转
   if (e.key === 'Tab' && tabs.value.length > 1) {
     e.preventDefault()
     const idx = tabs.value.findIndex(t => t.key === activeKey.value)
@@ -227,7 +204,6 @@ function onGlobalKeydown(e: KeyboardEvent) {
     activate(tabs.value[next]!)
     return
   }
-  // Ctrl+1~9：tab 直达
   if (/^[1-9]$/.test(e.key)) {
     const tab = tabs.value[Number(e.key) - 1]
     if (tab) {
@@ -249,14 +225,12 @@ onMounted(async () => {
   }
   catch { recentIds.value = [] }
 
-  const list = await desktop().apps.list() as AppSummary[]
-  appList.value = list
+  appList.value = await desktop().apps.list() as AppSummary[]
 
-  // 档位与直达：solo 档启动即铺满 defaultAppId；platform 档配置了也直达
   const info = await desktop().shell.info()
   chrome.value = info.chrome
   mode.value = info.mode
-  if (info.defaultAppId && list.some(a => a.manifest.id === info.defaultAppId)) { void openApp(info.defaultAppId) }
+  if (info.defaultAppId && appList.value.some(a => a.manifest.id === info.defaultAppId)) { void openApp(info.defaultAppId) }
   await nextTick(updateTabFade)
 })
 
@@ -268,19 +242,13 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="shell h-screen w-screen overflow-hidden" style="background: var(--dt-page)">
-    <div
-      class="shell-window relative flex h-full w-full flex-col"
-      style="background: var(--dt-glass); backdrop-filter: var(--dt-blur); border-radius: var(--dt-radius-window); box-shadow: var(--dt-window-ring)"
-    >
-      <!-- platform：完整 tab chrome；solo：30px 窗口控制条；kiosk：无 chrome -->
+  <div class="shell h-screen w-screen overflow-hidden bg-background">
+    <div class="shell-window relative flex h-full w-full flex-col rounded-window bg-glass shadow-window backdrop-blur-xl backdrop-saturate-150">
       <header
         v-if="chrome === 'platform'"
-        class="flex items-center gap-2 px-3"
-        style="height: var(--dt-titlebar-h); border-bottom: 1px solid var(--dt-line)"
+        class="flex h-11 items-center gap-2 border-b border-border px-3"
       >
         <div class="titlebar-drag relative flex min-w-0 flex-1 items-center gap-1.5">
-          <!-- tab 条：横向滚动，两端按滚动位置渐隐 -->
           <div
             ref="tabStripEl"
             class="tab-strip relative flex min-w-0 items-center gap-1.5 overflow-x-auto"
@@ -290,13 +258,12 @@ onBeforeUnmount(() => {
             <div
               v-for="(tab, i) in tabs"
               :key="tab.key"
-              class="tab flex h-9 shrink-0 cursor-default items-center gap-2 px-2.5"
+              class="tab flex h-9 shrink-0 cursor-default items-center gap-2 rounded-md px-2.5 text-ui-base"
               :class="{
-                'tab-active': tab.key === activeKey,
-                'tab-dragging': draggingKey === tab.key,
-                'tab-drop-target': dropTargetKey === tab.key && draggingKey !== tab.key,
+                'tab-active bg-card shadow-card': tab.key === activeKey,
+                'opacity-40': draggingKey === tab.key,
+                'shadow-[inset_2px_0_0_var(--ring)]': dropTargetKey === tab.key && draggingKey !== tab.key,
               }"
-              style="border-radius: var(--dt-radius); font-size: var(--dt-font-base)"
               draggable="true"
               role="tab"
               tabindex="0"
@@ -315,121 +282,93 @@ onBeforeUnmount(() => {
               >
                 <AppWindow :size="12" :stroke-width="2.4" />
               </span>
-              <span class="font-medium" style="color: var(--dt-text-1)">{{ tab.title }}</span>
-              <span v-if="i < 9" class="tab-index text-[10px]" style="color: var(--dt-text-3)">{{ i + 1 }}</span>
+              <span class="font-medium text-foreground">{{ tab.title }}</span>
+              <span v-if="i < 9" class="tab-index text-ui-xs text-foreground-subtle">{{ i + 1 }}</span>
               <button class="tab-close ml-0.5 opacity-0 hover:opacity-100" aria-label="关闭标签" @click.stop="closeTab(tab)">
                 <X :size="12" />
               </button>
             </div>
           </div>
-          <button
-            class="new-tab flex size-8 shrink-0 items-center justify-center"
-            style="border-radius: var(--dt-radius); color: var(--dt-text-2)"
-            aria-label="打开应用"
-            @click="showPalette = true"
-          >
+          <Button variant="ghost" size="icon-sm" aria-label="打开应用" @click="showPalette = true">
             <Plus :size="15" />
-          </button>
+          </Button>
         </div>
-        <span class="shrink-0 text-[11px]" style="color: var(--dt-text-3)">⌘K</span>
-        <button class="ctrl flex size-8 shrink-0 items-center justify-center" style="color: var(--dt-text-2); border-radius: var(--dt-radius)" aria-label="设置" @click="showSettings = true">
+        <span class="shrink-0 text-ui-sm text-foreground-subtle">⌘K</span>
+        <Button variant="ghost" size="icon-sm" aria-label="设置" @click="showSettings = true">
           <Settings :size="16" />
-        </button>
-        <div class="mx-1 h-4 w-px shrink-0" style="background: var(--dt-line)" />
+        </Button>
+        <Separator orientation="vertical" class="mx-1 h-4" />
         <div class="flex shrink-0 items-center">
-          <button class="ctrl flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1)" aria-label="最小化" @click="desktop().window.minimize()">
+          <button class="ctrl flex h-9 w-11 items-center justify-center text-foreground" aria-label="最小化" @click="desktop().window.minimize()">
             <Minus :size="15" />
           </button>
-          <button class="ctrl flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1)" aria-label="最大化" @click="desktop().window.toggleMaximize()">
+          <button class="ctrl flex h-9 w-11 items-center justify-center text-foreground" aria-label="最大化" @click="desktop().window.toggleMaximize()">
             <Square :size="13" />
           </button>
-          <button class="ctrl ctrl-close flex h-9 w-11 items-center justify-center" style="color: var(--dt-text-1); border-radius: 0 var(--dt-radius) 0 0" aria-label="关闭" @click="desktop().window.close()">
+          <button class="ctrl ctrl-close flex h-9 w-11 items-center justify-center text-foreground" aria-label="关闭" @click="desktop().window.close()">
             <X :size="15" />
           </button>
         </div>
       </header>
 
-      <!-- solo（desktop）：30px 玻璃细条 = 拖拽区 + 窗口三键，无任何壳功能件 -->
       <header
         v-else-if="mode === 'desktop'"
-        class="flex items-center"
-        style="height: 30px; background: var(--dt-glass); border-bottom: 1px solid var(--dt-line)"
+        class="flex h-chrome-solo items-center border-b border-border bg-glass"
       >
         <span class="titlebar-drag h-full flex-1" />
         <div class="flex h-full items-center">
-          <button class="ctrl flex h-full w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.minimize()">
+          <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="最小化" @click="desktop().window.minimize()">
             <Minus :size="13" />
           </button>
-          <button class="ctrl flex h-full w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.toggleMaximize()">
+          <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="最大化" @click="desktop().window.toggleMaximize()">
             <Square :size="11" />
           </button>
-          <button class="ctrl ctrl-close flex h-full w-11 items-center justify-center" style="color: var(--dt-text-1)" @click="desktop().window.close()">
+          <button class="ctrl ctrl-close flex h-full w-11 items-center justify-center text-foreground" aria-label="关闭" @click="desktop().window.close()">
             <X :size="13" />
           </button>
         </div>
       </header>
 
       <div class="flex min-h-0 flex-1">
-        <!-- 左图标栏（仅 platform 档；折叠形态：纯图标 + tooltip） -->
         <nav
           v-if="chrome === 'platform'"
-          class="flex flex-col items-center gap-1.5 py-3"
-          style="width: var(--dt-rail-w); border-right: 1px solid var(--dt-line)"
+          class="flex w-16 flex-col items-center gap-1.5 border-r border-border py-3"
         >
-          <div
-            v-for="tab in tabs"
-            :key="tab.key"
-            class="relative"
-            @mouseenter="railHover = tab.key"
-            @mouseleave="railHover = null"
-          >
+          <Tooltip v-for="tab in tabs" :key="tab.key" :text="tab.title">
             <button
-              class="rail-icon flex items-center justify-center text-white"
+              class="rail-icon flex size-10 items-center justify-center rounded-icon text-white"
               :class="{ 'rail-icon-active': tab.key === activeKey }"
-              :style="{ width: 'var(--dt-icon-size)', height: 'var(--dt-icon-size)', borderRadius: 'var(--dt-radius-icon)', background: tab.iconColor }"
+              :style="{ background: tab.iconColor }"
               @click="activate(tab)"
             >
               <AppWindow :size="19" :stroke-width="2.2" />
             </button>
-            <span
-              v-if="railHover === tab.key"
-              class="tooltip absolute left-full z-50 ml-2 whitespace-nowrap px-2.5 py-1.5"
-              style="background: var(--dt-text-1); color: var(--dt-surface); font-size: var(--dt-font-caption); border-radius: 8px"
-            >{{ tab.title }}</span>
-          </div>
+          </Tooltip>
         </nav>
 
-        <!-- 内容容器：platform 有边距+圆角卡片；solo 全屏直出（accent 垫场防视图白屏） -->
         <main
           ref="contentEl"
           class="relative min-w-0 flex-1 overflow-hidden"
-          :class="chrome === 'platform' ? 'p-2' : ''"
-          :style="chrome === 'solo' ? 'background: var(--dt-accent)' : ''"
+          :class="[chrome === 'platform' ? 'p-2' : '', chrome === 'solo' ? 'bg-primary' : '']"
         >
           <template v-if="chrome === 'platform'">
-            <!-- 无 tab = 空状态页（时钟兜底） -->
-            <EmptyState v-if="!activeTab" class="h-full w-full" @open="openApp" />
+            <EmptyState v-if="!activeTab" class="h-full w-full" />
             <component
               :is="resolveEmbeddedRoute(activeTab.route!)"
               v-else-if="activeTab.kind === 'embedded' && activeTab.route"
-              class="h-full w-full overflow-hidden"
-              style="background: var(--dt-surface); border-radius: var(--dt-radius)"
+              class="h-full w-full overflow-hidden rounded-md bg-card"
             />
           </template>
           <template v-else>
-            <!-- solo：唯一应用直出（embedded 组件 / view 透明区） -->
             <component
               :is="resolveEmbeddedRoute(activeTab!.route!)"
               v-if="activeTab?.kind === 'embedded' && activeTab.route"
-              class="h-full w-full overflow-hidden"
-              style="background: var(--dt-surface)"
+              class="h-full w-full overflow-hidden bg-card"
             />
           </template>
-          <!-- view 形态：此区域保持透明/垫场，WebContentsView 由主进程定位在此矩形 -->
         </main>
       </div>
 
-      <!-- 命令面板（仅 platform 档）：⌘K/Ctrl+K 或顶栏 + 号唤起 -->
       <CommandPalette
         v-if="chrome === 'platform'"
         v-model:open="showPalette"
@@ -438,7 +377,6 @@ onBeforeUnmount(() => {
         @select="openApp"
       />
 
-      <!-- 统一设置（schema 驱动面板） -->
       <SettingsDialog v-if="chrome === 'platform'" v-model:open="showSettings" />
     </div>
   </div>
@@ -449,12 +387,11 @@ onBeforeUnmount(() => {
 .titlebar-drag {
   -webkit-app-region: drag;
 }
-.tab,
-.new-tab {
+.titlebar-drag :deep(button),
+.tab {
   -webkit-app-region: no-drag;
 }
 
-/* tab 条：隐藏滚动条，两端渐隐由 mask 按滚动状态切换 */
 .tab-strip {
   scrollbar-width: none;
   padding-right: 4px;
@@ -472,17 +409,12 @@ onBeforeUnmount(() => {
   mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
 }
 
-/* tab：非 active 透明，active 白底浮起（参考稿的玻璃胶囊） */
 .tab {
   transition: background 0.15s ease, box-shadow 0.15s ease, opacity 0.12s ease;
   user-select: none;
 }
 .tab:hover {
-  background: var(--dt-hover);
-}
-.tab-active {
-  background: var(--dt-surface);
-  box-shadow: var(--dt-shadow-1);
+  background: var(--hover);
 }
 .tab-index {
   font-variant-numeric: tabular-nums;
@@ -493,7 +425,7 @@ onBeforeUnmount(() => {
   opacity: 0.5;
 }
 .tab-close {
-  color: var(--dt-text-3);
+  color: var(--foreground-subtle);
   border-radius: 6px;
   padding: 2px;
   transition: opacity 0.12s ease, background 0.12s ease;
@@ -503,40 +435,31 @@ onBeforeUnmount(() => {
   opacity: 0.7;
 }
 .tab-close:hover {
-  background: var(--dt-hover);
+  background: var(--hover);
   opacity: 1 !important;
 }
-.tab-dragging {
-  opacity: 0.35;
-}
-.tab-drop-target {
-  box-shadow: inset 2px 0 0 var(--dt-accent);
-}
-.new-tab,
 .ctrl {
   transition: background 0.12s ease;
 }
-.new-tab:hover,
 .ctrl:hover {
-  background: var(--dt-hover);
+  background: var(--hover);
 }
 .ctrl-close:hover {
-  background: var(--dt-danger) !important;
-  color: #fff !important;
+  background: var(--destructive) !important;
+  color: var(--destructive-foreground) !important;
 }
 
-/* 左侧图标栏：选中加同色描边浮起，hover 微升 */
 .rail-icon {
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .rail-icon:hover {
   transform: translateY(-1px);
-  box-shadow: var(--dt-shadow-1);
+  box-shadow: var(--elevation-card);
 }
 .rail-icon-active {
   box-shadow:
-    0 0 0 2.5px var(--dt-surface),
-    0 0 0 4px var(--dt-accent-soft),
-    0 6px 14px color-mix(in srgb, var(--dt-accent) 28%, transparent);
+    0 0 0 2.5px var(--card),
+    0 0 0 4px var(--accent),
+    0 6px 14px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 </style>

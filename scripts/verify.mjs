@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 干净 clone 全链路验证：复制「git 会入库的文件」到临时目录，排除一切 gitignore 产物，
-// 再跑 install → guard → lint → typecheck → test → e2e → build → dev 解析阶段。
+// 再跑 install → guard → design → lint → typecheck → test → e2e → build → design:css → dev 解析阶段。
 // 退出码说话，结论不依赖任何人的口述；这一步专门防「沙箱里有产物、用户本地没有」。
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -85,6 +85,7 @@ function main() {
   const results = []
   results.push(['install', run('install', 'pnpm', ['install', '--prefer-offline'], { timeout: 300000 })])
   results.push(['guard', run('guard', 'pnpm', ['guard'], { show: true })])
+  results.push(['design', run('design', 'pnpm', ['check:design'], { show: true })])
   results.push(['lint', run('lint', 'pnpm', ['lint'])])
   results.push(['typecheck', run('typecheck', 'pnpm', ['typecheck'])])
   results.push(['test', run('test', 'pnpm', ['test'], { show: true })])
@@ -92,6 +93,7 @@ function main() {
   results.push(['e2e:overlay', run('e2e:overlay', 'pnpm', ['test:e2e:overlay'], { show: true })])
   results.push(['e2e:permission', run('e2e:permission', 'pnpm', ['test:e2e:permission'], { show: true })])
   results.push(['build', run('build', 'pnpm', ['build'], { show: true })])
+  results.push(['design:css', run('design:css', 'pnpm', ['check:design:css'], { show: true })])
   results.push(['dev-resolve', devResolve()])
 
   // 构建后不得重新出现中间 dist（源码直引约定的反向证明）

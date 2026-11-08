@@ -71,3 +71,13 @@
 - `@shell/ui` 只可 import `@shell/bridge` / `@shell/shared`，禁 `@shell/devices` / `electron` / 其他上层包。
 - `@shell/kernel`、`@shell/shared` 禁 import 上层包。
 - `packages/*` 之间只能按"shared ← kernel ← window/app-runtime/devices/update ← apps"方向引用；禁止双向 workspace 声明与声明但零引用的依赖。
+
+## 设计纪律
+
+界面约定以根目录 `DESIGN.md` 为单一事实源，本文件不重复颜色/字号数值。
+
+- 组件源码集中在 `packages/ui/src/components/ui/`，按 shadcn-vue 源码分发形态维护；`components.json` 是 CLI 唯一配置，`@ui/*` 别名在 ui tsconfig、apps/shell web tsconfig 与 renderer vite 三处登记。
+- 颜色经「物理层 `--dt-*` → 语义层官方变量 → `@theme inline` 工具类」三层消费；模板禁止直接引用 `var(--dt-*)`。
+- 界面文字只用 `text-ui-*` 阶梯，禁止任意字号；`--ui-font-size` 是唯一缩放输入。
+- 业务侧只经 `@shell/ui` 门面消费组件；壳内组件可用 `@ui/components/ui`。
+- `pnpm check:design` / `pnpm check:design:css` 把 `DESIGN.md` 的禁令变成机器退出码，CI 与 `pnpm verify` 都会执行。

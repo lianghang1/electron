@@ -9,6 +9,8 @@ catalog:
   '@types/node': 24.13.3
   '@vitejs/plugin-vue': ^6.0.10
   '@vueuse/core': 15.0.0
+  class-variance-authority: ^0.7.1
+  clsx: ^2.1.1
   electron: 45.2.3
   electron-builder: 26.0.12
   electron-vite: ^6.0.0
@@ -16,6 +18,7 @@ catalog:
   koffi: ^2.12.0
   lucide-vue-next: ^0.552.0
   reka-ui: ^2.10.5
+  tailwind-merge: ^3.7.0
   tailwindcss: ^4.3.0
   tsx: 4.20.6
   typescript: 5.8.3

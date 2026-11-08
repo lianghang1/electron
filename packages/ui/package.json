@@ -13,8 +13,11 @@
   "dependencies": {
     "@shell/bridge": "workspace:*",
     "@shell/shared": "workspace:*",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
     "lucide-vue-next": "catalog:",
     "reka-ui": "catalog:",
+    "tailwind-merge": "catalog:",
     "vue": "catalog:"
   },
   "devDependencies": {

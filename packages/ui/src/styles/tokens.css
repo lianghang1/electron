@@ -1,7 +1,9 @@
 /*
- * dt-* 设计令牌：全仓库唯一颜色/字号/间距/圆角来源。
- * 视觉纪律：灰阶 + 单强调色。强调色由 flavor.branding.accent 在 preload 阶段
- * 注入 --dt-accent，soft/hover/ring 一律基于它派生（color-mix），不写死第二处。
+ * 设计令牌单一事实源。三层结构：
+ *   物理层 dt-*：原始色值、flavor 主色注入点、深浅主题覆盖。
+ *   语义层：shadcn-vue 官方变量，值只引用物理层，不在此处写死颜色。
+ *   消费层：@theme inline 把语义变量注册成 Tailwind 工具类。
+ * 组件只消费语义类，不直接引用 dt-*；新增主题只需改物理层一处。
  */
 @import 'tailwindcss';
 
@@ -11,7 +13,7 @@
 @source '../../../../apps/shell/src';
 
 :root {
-  /* 表面三层：页面底 → 窗口玻璃 → 悬浮件 */
+  /* 物理层 · 表面三层：页面底 → 窗口玻璃 → 悬浮件 */
   --dt-page: #dfe7f6;
   --dt-glass: rgba(240, 245, 253, 0.86);
   --dt-surface: #ffffff;
@@ -19,12 +21,12 @@
   --dt-line: rgba(148, 163, 199, 0.28);
   --dt-line-strong: rgba(148, 163, 199, 0.48);
 
-  /* 文字 */
+  /* 物理层 · 文字 */
   --dt-text-1: #1c2433;
   --dt-text-2: #5b6879;
   --dt-text-3: #97a1b5;
 
-  /* 强调与语义：唯一彩色来源，派生量自动跟随注入值 */
+  /* 物理层 · 强调与语义：唯一彩色来源，派生量自动跟随注入值 */
   --dt-accent: #3b82f6;
   --dt-accent-soft: color-mix(in srgb, var(--dt-accent) 14%, transparent);
   --dt-accent-hover: color-mix(in srgb, var(--dt-accent) 88%, #000);
@@ -34,31 +36,54 @@
   --dt-warn: #f59e0b;
   --dt-danger: #ef4444;
 
-  /* 阴影与边界：无边框窗口靠内描边建立边界感，浮层用两级阴影 */
+  /* 物理层 · 阴影与边界：无边框窗口靠内描边建立边界感，浮层用两级阴影 */
   --dt-shadow-1: 0 1px 2px rgb(28 36 51 / 0.06), 0 4px 16px rgb(28 36 51 / 0.08);
   --dt-shadow-2: 0 12px 40px rgb(28 36 51 / 0.18);
-  --dt-window-ring: inset 0 0 0 1px var(--dt-line);
+  --dt-blur: blur(20px) saturate(1.4);
 
-  /* 几何：克制小圆角（窗口 12 / 容器 8 / 图标 10） */
+  /* 物理层 · 几何 */
   --dt-radius-window: 12px;
   --dt-radius: 8px;
   --dt-radius-icon: 10px;
 
-  /* 字号（5 档封顶） */
-  --dt-font-title: 15px;
-  --dt-font-base: 13px;
-  --dt-font-caption: 11px;
+  /* 全局字号：唯一输入，字号阶梯由它派生 */
+  --ui-font-size: 13px;
 
-  /* 布局骨架 */
-  --dt-titlebar-h: 44px;
-  --dt-rail-w: 64px;
-  --dt-rail-w-expanded: 92px;
-  --dt-icon-size: 40px;
+  /* 语义层 · shadcn-vue 官方变量，全部映射到物理层 */
+  --background: var(--dt-page);
+  --foreground: var(--dt-text-1);
+  --card: var(--dt-surface);
+  --card-foreground: var(--dt-text-1);
+  --popover: var(--dt-surface);
+  --popover-foreground: var(--dt-text-1);
+  --primary: var(--dt-accent);
+  --primary-foreground: var(--dt-on-accent);
+  --secondary: var(--dt-surface-hover);
+  --secondary-foreground: var(--dt-text-1);
+  --muted: var(--dt-surface-hover);
+  --muted-foreground: var(--dt-text-2);
+  --accent: var(--dt-accent-soft);
+  --accent-foreground: var(--dt-accent);
+  --destructive: var(--dt-danger);
+  --destructive-foreground: var(--dt-on-accent);
+  --border: var(--dt-line);
+  --input: var(--dt-line);
+  --ring: var(--dt-accent);
+  --radius: var(--dt-radius);
 
-  --dt-blur: blur(20px) saturate(1.4);
+  /* 语义层 · 项目扩展：玻璃表面、弱化文字、悬浮底 */
+  --glass: var(--dt-glass);
+  --foreground-subtle: var(--dt-text-3);
+  --hover: var(--dt-hover);
+  --overlay: rgba(15, 23, 42, 0.32);
+  --elevation-card: var(--dt-shadow-1);
+  --elevation-float: var(--dt-shadow-2);
+
+  color-scheme: light;
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
 }
 
-/* 深色主题：只覆盖表面/文字/阴影，强调色仍由 flavor 注入（单一来源） */
+/* 深色只覆盖物理层：语义层全部是变量引用，自动跟随，零重复 */
 :root[data-theme='dark'] {
   --dt-page: #0b0f16;
   --dt-glass: rgba(22, 27, 34, 0.86);
@@ -76,11 +101,68 @@
   --dt-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.35);
   --dt-shadow-2: 0 12px 40px rgb(0 0 0 / 0.55);
   --dt-blur: blur(20px) saturate(1.2);
+
+  color-scheme: dark;
+}
+
+/*
+ * inline 关键字让工具类直接引用 var()，而不是把值固化进 --color-*。
+ * 缺了它，flavor 主色注入与深浅主题切换都不会反映到已生成的类上。
+ */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-glass: var(--glass);
+  --color-surface: var(--dt-surface);
+  --color-surface-hover: var(--dt-surface-hover);
+  --color-page: var(--dt-page);
+  --color-hover: var(--hover);
+  --color-foreground-subtle: var(--foreground-subtle);
+  --color-ok: var(--dt-ok);
+  --color-warn: var(--dt-warn);
+  --color-overlay: var(--overlay);
+
+  /* 覆盖 Tailwind 的 md 档，让官方组件习惯的 rounded-md 与项目圆角一致 */
+  --radius-md: var(--radius);
+  --radius-window: var(--dt-radius-window);
+  --radius-icon: var(--dt-radius-icon);
+
+  --shadow-card: var(--elevation-card);
+  --shadow-float: var(--elevation-float);
+  --shadow-window: inset 0 0 0 1px var(--border);
+
+  /* 布局刻度：solo 档 30px 控制条是产品定版尺寸 */
+  --spacing-chrome-solo: 30px;
+
+  --text-ui-xs: calc(var(--ui-font-size) - 3px);
+  --text-ui-sm: calc(var(--ui-font-size) - 2px);
+  --text-ui-caption: calc(var(--ui-font-size) - 1px);
+  --text-ui-base: var(--ui-font-size);
+  --text-ui-lg: calc(var(--ui-font-size) + 2px);
+  --text-ui-xl: calc(var(--ui-font-size) + 5px);
+  --text-ui-display: 64px;
 }
 
 /* 键盘可达：焦点环只在键盘导航时显形（鼠标点击不触发） */
 :where(button, a, input, [tabindex]):focus-visible {
-  outline: 2px solid var(--dt-accent);
+  outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -98,6 +180,14 @@
   background-clip: content-box;
 }
 ::-webkit-scrollbar-track { background: transparent; }
+
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-size: var(--ui-font-size);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

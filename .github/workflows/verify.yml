@@ -30,6 +30,9 @@ jobs:
       - name: Guard (full)
         run: pnpm guard
 
+      - name: Design guard (templates)
+        run: pnpm check:design
+
       - name: Lint
         run: pnpm lint
 
@@ -42,8 +45,18 @@ jobs:
       - name: Update e2e
         run: pnpm test:e2e:update
 
+      - name: Overlay e2e
+        run: pnpm test:e2e:overlay
+
+      - name: Permission e2e
+        run: pnpm test:e2e:permission
+
       - name: Build (three targets)
         run: pnpm build
+
+      # 语义类与 @theme inline 的产物级验证
+      - name: Design guard (built CSS)
+        run: pnpm check:design:css
 
       # 构建后不得出现逐包 dist（源码直引约定的机器证明）
       - name: No intermediate dist

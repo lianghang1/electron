@@ -1,11 +1,6 @@
 <script setup lang="ts">
+import { Kbd, Separator } from '@ui/components/ui'
 import { AppWindow, Search } from 'lucide-vue-next'
-/**
- * CommandPalette：⌘K/Ctrl+K 居中命令面板（替换顶栏 + 号小浮层）。
- * 交互收敛到搜索框一个焦点（VS Code / Linear 范式）：↑↓ 选择 / ↵ 打开 /
- * Esc 关闭 / 输入即过滤；最近使用置顶，列表用 aria-activedescendant 保持键盘可达。
- * 视觉纪律：灰阶 + 单强调色，仅选中行出现 accent，无渐变、无堆叠阴影。
- */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 interface PaletteItem {
@@ -83,7 +78,6 @@ function onWindowKeydown(e: KeyboardEvent): void {
       break
     }
     case 'Tab':
-      // 面板模态期间焦点锁在搜索框
       e.preventDefault()
       inputEl.value?.focus()
       break
@@ -111,87 +105,81 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
 <template>
   <div
     v-if="open"
-    class="cp-overlay fixed inset-0 z-[60] flex items-start justify-center"
-    style="background: rgba(15, 23, 42, 0.32); backdrop-filter: blur(2px)"
+    class="cp-overlay fixed inset-0 z-[60] flex items-start justify-center bg-overlay backdrop-blur-[2px]"
     @click.self="close"
   >
     <div
-      class="cp-panel mt-[14vh] w-[560px] max-w-[92vw] overflow-hidden"
+      class="cp-panel mt-[14vh] w-[560px] max-w-[92vw] overflow-hidden rounded-window border border-border bg-popover text-popover-foreground shadow-float"
       role="dialog"
       aria-modal="true"
       aria-label="打开应用"
-      style="background: var(--dt-surface); border: 1px solid var(--dt-line); border-radius: var(--dt-radius-window); box-shadow: var(--dt-shadow-2)"
     >
-      <!-- 搜索行 -->
-      <div class="flex items-center gap-3 px-4" style="height: 52px; border-bottom: 1px solid var(--dt-line)">
-        <Search :size="17" style="color: var(--dt-text-3)" />
+      <div class="flex h-13 items-center gap-3 border-b border-border px-4">
+        <Search :size="17" class="text-foreground-subtle" />
         <input
           ref="inputEl"
           v-model="query"
-          class="cp-input min-w-0 flex-1 bg-transparent outline-none"
-          style="font-size: 15px; color: var(--dt-text-1)"
+          class="cp-input min-w-0 flex-1 bg-transparent text-ui-lg text-foreground outline-none"
           placeholder="搜索应用…"
           aria-label="搜索应用"
           autocomplete="off"
           spellcheck="false"
         >
-        <kbd class="cp-kbd px-1.5 py-0.5 text-[11px]" style="color: var(--dt-text-3); border: 1px solid var(--dt-line); border-radius: 5px">Esc</kbd>
+        <Kbd>Esc</Kbd>
       </div>
 
-      <!-- 结果列表 -->
       <div class="cp-list max-h-[46vh] overflow-y-auto py-1.5" role="listbox" aria-label="应用列表">
         <template v-if="recentItems.length">
-          <p class="px-4 py-1.5 text-[11px] font-medium" style="color: var(--dt-text-3)">
+          <p class="px-4 py-1.5 text-ui-sm font-medium text-foreground-subtle">
             最近使用
           </p>
           <div
             v-for="(item, i) in recentItems"
             :id="`cp-opt-${i}`"
             :key="item.id"
-            class="cp-row mx-1.5 flex items-center gap-2.5 px-2.5 py-2"
+            class="cp-row mx-1.5 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2"
             :class="{ 'cp-row-active': highlighted === i }"
             role="option"
             :aria-selected="highlighted === i"
             @mouseenter="highlighted = i"
             @click="choose(item.id)"
           >
-            <AppWindow :size="16" style="color: var(--dt-text-2)" />
-            <span class="flex-1 truncate text-[13px]" style="color: var(--dt-text-1)">{{ item.name }}</span>
-            <span class="text-[11px]" style="color: var(--dt-text-3)">{{ item.kind }}</span>
-            <kbd v-if="highlighted === i" class="text-[11px]" style="color: var(--dt-text-3)">↵</kbd>
+            <AppWindow :size="16" class="text-muted-foreground" />
+            <span class="flex-1 truncate text-ui-base text-foreground">{{ item.name }}</span>
+            <span class="text-ui-sm text-foreground-subtle">{{ item.kind }}</span>
+            <Kbd v-if="highlighted === i">↵</Kbd>
           </div>
-          <div v-if="restItems.length" class="my-1.5 h-px" style="background: var(--dt-line)" />
+          <Separator v-if="restItems.length" class="my-1.5" />
         </template>
 
         <template v-if="restItems.length">
-          <p class="px-4 py-1.5 text-[11px] font-medium" style="color: var(--dt-text-3)">
+          <p class="px-4 py-1.5 text-ui-sm font-medium text-foreground-subtle">
             {{ recentItems.length ? '全部应用' : '应用' }}
           </p>
           <div
             v-for="(item, j) in restItems"
             :id="`cp-opt-${recentItems.length + j}`"
             :key="item.id"
-            class="cp-row mx-1.5 flex items-center gap-2.5 px-2.5 py-2"
+            class="cp-row mx-1.5 flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2"
             :class="{ 'cp-row-active': highlighted === recentItems.length + j }"
             role="option"
             :aria-selected="highlighted === recentItems.length + j"
             @mouseenter="highlighted = recentItems.length + j"
             @click="choose(item.id)"
           >
-            <AppWindow :size="16" style="color: var(--dt-text-2)" />
-            <span class="flex-1 truncate text-[13px]" style="color: var(--dt-text-1)">{{ item.name }}</span>
-            <span class="text-[11px]" style="color: var(--dt-text-3)">{{ item.kind }}</span>
-            <kbd v-if="highlighted === recentItems.length + j" class="text-[11px]" style="color: var(--dt-text-3)">↵</kbd>
+            <AppWindow :size="16" class="text-muted-foreground" />
+            <span class="flex-1 truncate text-ui-base text-foreground">{{ item.name }}</span>
+            <span class="text-ui-sm text-foreground-subtle">{{ item.kind }}</span>
+            <Kbd v-if="highlighted === recentItems.length + j">↵</Kbd>
           </div>
         </template>
 
-        <p v-if="flat.length === 0" class="px-4 py-8 text-center text-[13px]" style="color: var(--dt-text-3)">
+        <p v-if="flat.length === 0" class="px-4 py-8 text-center text-ui-base text-foreground-subtle">
           {{ items.length === 0 ? '暂无应用——flavor.json 的 apps 清单为空' : '没有匹配的应用' }}
         </p>
       </div>
 
-      <!-- 页脚提示 -->
-      <div class="flex items-center gap-3 px-4 py-2 text-[11px]" style="border-top: 1px solid var(--dt-line); color: var(--dt-text-3)">
+      <div class="flex items-center gap-3 border-t border-border px-4 py-2 text-ui-sm text-foreground-subtle">
         <span>↑↓ 选择</span>
         <span>↵ 打开</span>
         <span>Esc 关闭</span>
@@ -203,17 +191,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
 
 <style scoped>
 .cp-input::placeholder {
-  color: var(--dt-text-3);
-}
-.cp-row {
-  border-radius: var(--dt-radius);
-  cursor: pointer;
+  color: var(--foreground-subtle);
 }
 .cp-row-active {
-  background: var(--dt-hover);
-  box-shadow: inset 2px 0 0 var(--dt-accent);
+  background: var(--hover);
+  box-shadow: inset 2px 0 0 var(--ring);
 }
 .cp-row-active :deep(svg) {
-  color: var(--dt-accent);
+  color: var(--ring);
 }
 </style>

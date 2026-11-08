@@ -19,6 +19,8 @@
     "guard:baseline": "node scripts/guardrails/guard.mjs baseline",
     "guard:dead": "node scripts/guardrails/guard.mjs dead",
     "guard:list": "node scripts/guardrails/guard.mjs list",
+    "check:design": "node scripts/check-design-system.mjs check",
+    "check:design:css": "node scripts/check-design-system.mjs css",
     "verify": "node scripts/verify.mjs",
     "test": "pnpm -r test",
     "test:e2e:update": "node --import tsx scripts/e2e/update-e2e.mjs",
