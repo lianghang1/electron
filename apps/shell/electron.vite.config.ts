@@ -5,12 +5,11 @@ import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'electron-vite'
 
 /**
- * 外置规则（Rolldown 只接受 RegExp，不支持函数）：相对路径与 @shell/* 打进产物，
- * 其余（electron / node: 内建 / node_modules 三方包）走运行时解析——
- * @shell/* 的 exports 直指 .ts 源码，运行时按包解析会撞上
- * Node ESM 对 TS 的扩展名解析限制，必须打包期内联。
+ * 外置规则（Rolldown 只接受 RegExp）：本地路径与 @shell/* 一律内联，其余裸包走运行时解析。
+ * external 会二次匹配「解析后的绝对 ID」，Windows 下该 ID 形如 D:\...，必须一并排除，
+ * 否则产物残留 import "D:/..."，ESM loader 把盘符当协议报 ERR_UNSUPPORTED_ESM_URL_SCHEME。
  */
-const EXTERNAL_PATTERN = /^(?!\.{1,2}\/|\/|@shell\/)/
+const EXTERNAL_PATTERN = /^(?!\.{1,2}[\\/]|[A-Za-z]:[\\/]|\\\\|\/|file:|@shell\/)/
 
 export default defineConfig({
   main: {
