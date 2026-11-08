@@ -93,6 +93,8 @@ export const desktop = {
     }>,
     /** 启动外观同步快照（读启动参数，不经 IPC） */
     appearance: () => bootAppearance,
+    /** 重启壳：先 relaunch 再 quit，before-quit 钩子会执行暂存的整包安装 */
+    relaunch: () => ipcRenderer.invoke('shell:relaunch') as Promise<void>,
   },
 
   /** 设置（schema 驱动） */

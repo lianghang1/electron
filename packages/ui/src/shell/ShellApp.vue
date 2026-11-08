@@ -1,12 +1,17 @@
 <script setup lang="ts">
 import { desktop } from '@shell/bridge/client'
-import { Button, Separator, Tooltip } from '@ui/components/ui'
+import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Separator, Tooltip } from '@ui/components/ui'
 import { AppWindow, Minus, Plus, Settings, Square, X } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EmptyState from '../apps/pages/EmptyState.vue'
 import { resolveEmbeddedRoute } from '../apps/registry'
 import CommandPalette from './CommandPalette.vue'
 import SettingsDialog from './SettingsDialog.vue'
+
+interface RestartRequired {
+  channel: string
+  version: string
+}
 
 interface ShellTab {
   key: string
@@ -36,6 +41,7 @@ const showPalette = ref(false)
 const recentIds = ref<string[]>([])
 const contentEl = ref<HTMLElement | null>(null)
 const tabStripEl = ref<HTMLElement | null>(null)
+const restart = ref<RestartRequired | null>(null)
 
 const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
 
@@ -220,6 +226,10 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onGlobalKeydown)
 
+  desktop().onEvent('update.restart-required', (payload) => {
+    restart.value = payload as RestartRequired
+  })
+
   try {
     recentIds.value = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[]
   }
@@ -378,6 +388,25 @@ onBeforeUnmount(() => {
       />
 
       <SettingsDialog v-if="chrome === 'platform'" v-model:open="showSettings" />
+
+      <Dialog :open="restart !== null" @update:open="restart = null">
+        <DialogContent class="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>更新已就绪</DialogTitle>
+            <DialogDescription>
+              新版本 {{ restart?.version }} 已下载完成，重启应用后生效。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" @click="restart = null">
+              稍后
+            </Button>
+            <Button @click="desktop().shell.relaunch()">
+              立即重启
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   </div>
 </template>

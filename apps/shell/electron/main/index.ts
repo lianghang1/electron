@@ -243,6 +243,11 @@ async function main(): Promise<void> {
       notes: capability.notes,
     },
   }))
+  // 重启壳：quit 会触发 before-quit，把暂存的整包安装执行掉，再以新版本拉起
+  ipcMain.handle('shell:relaunch', () => {
+    app.relaunch()
+    app.quit()
+  })
   ipcMain.on('view:content-rect', (_e, rect: { x: number, y: number, width: number, height: number }) =>
     windows.setContentRect(rect))
 
