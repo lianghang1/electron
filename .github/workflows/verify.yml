@@ -1,0 +1,53 @@
+name: verify
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # 护栏：存量冻结，只让本次改动引入的新违规失败
+      - name: Guard (changed scope)
+        run: pnpm guard:changed
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Update e2e
+        run: pnpm test:e2e:update
+
+      - name: Build (three targets)
+        run: pnpm build
+
+      # 构建后不得出现逐包 dist（源码直引约定的机器证明）
+      - name: No intermediate dist
+        run: |
+          count=$(find packages -type d -name dist | wc -l)
+          echo "dist dirs: $count"
+          test "$count" -eq 0

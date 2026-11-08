@@ -43,8 +43,31 @@
 
 **只写代码本身说不出来的信息**（为什么/坑/边界）。描述性注释（复述函数名）、过程性注释（"先…再…最后…"）一律不写。修复类注释必须写明触发条件与机制。
 
-## 依赖规则（eslint 边界，M1 落地强制）
+禁用过程词与自夸词：里程碑编号（M2…M9 / 批次 / 里程碑）、时间线词（本轮 / 本次 / 此前 / 曾 / 现已 / 接管后 / 待落地）、内部编号自夸（铁律）、占位承诺（预留 / 骨架 / 占位 / TODO / TBD）。这些由 `pnpm guard` 的注释词表机器拦截；领域术语（接入方式 / 落地 / 新增厂商）不在禁列。
 
-- `@shell/ui` 禁 import `@shell/devices` / `electron`
-- `@shell/kernel`、`@shell/shared` 禁 import 上层包
-- `packages/*` 之间只能按"shared ← kernel ← window/app-runtime/devices/update ← apps"方向引用
+## 护栏（`pnpm guard`）
+
+`scripts/guardrails/guard.mjs` 是独立于 eslint 的检查器，扫 `packages/` `apps/` 下的 `.ts/.vue/.mjs`：
+
+- 注释词表、类型逃逸（`as never` / `as any` / `as unknown as` / `@ts-ignore`）、依赖边界（向上 import、ui 越层、包循环依赖与幽灵依赖）。
+- 存量违规按指纹冻结在 `.guardrails-baseline.json`；**只让基线之外的新增违规失败**，不追求一次清空全仓。
+- `pnpm guard` 全量，`pnpm guard:changed` 只查改动文件（CI 用），`pnpm guard:baseline` 在清理后收紧基线，`pnpm guard:dead` 输出无仓内引用的导出（只报告、不阻断）。
+- 新增规则或误报，先跑一次故意违规确认护栏确实报错（反向验证），再谈通过。
+
+## 验证纪律
+
+- 结论以机器退出码为准，不以"沙箱里能跑"为准。`pnpm verify` 复制 `git ls-files` 的入库文件到干净目录（排除一切 gitignore 产物），跑 install → guard → lint → typecheck → test → e2e → build → dev 解析阶段，任一失败即退出非零。
+- 验证环境与交付条件必须一致：禁止在存在 `dist/out/resources/devices` 的工作树里宣称"全绿"。
+- 构建后不得出现逐包 `dist`（源码直引的机器证明）。
+
+## 提交纪律
+
+- 一个 commit 一件事，附该批验证输出；每步可单独 revert。
+- 禁止把多个批次/多个主题塞进一个提交。
+- CI（`.github/workflows/verify.yml`）每次 push 自动跑护栏与全链路。
+
+## 依赖规则
+
+- `@shell/ui` 只可 import `@shell/bridge` / `@shell/shared`，禁 `@shell/devices` / `electron` / 其他上层包。
+- `@shell/kernel`、`@shell/shared` 禁 import 上层包。
+- `packages/*` 之间只能按"shared ← kernel ← window/app-runtime/devices/update ← apps"方向引用；禁止双向 workspace 声明与声明但零引用的依赖。

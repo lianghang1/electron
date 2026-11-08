@@ -16,6 +16,8 @@ release
 
 # 驱动资产构建期聚合产物（源在 packages/devices/src/**/assets/，不入库）
 resources/devices/
+# 干净 clone 验证的临时工作区（verify.mjs 结束时自删，此处防中断残留入库）
+.verify-work/
 *.local
 unpackage/release
 packages/*/lib/
