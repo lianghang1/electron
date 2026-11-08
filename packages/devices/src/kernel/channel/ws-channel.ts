@@ -20,7 +20,29 @@ export interface WsLike {
 
 /** 创建 ws 连接（常驻会话由调用方自行管理生命周期） */
 export function connectWs(url: string): WsLike {
-  return new WebSocket(url) as unknown as WsLike
+  const socket = new WebSocket(url)
+  const bridge: WsLike = {
+    send: data => socket.send(data),
+    close: () => socket.close(),
+    onopen: null,
+    onmessage: null,
+    onerror: null,
+    onclose: null,
+  }
+  socket.on('open', () => bridge.onopen?.())
+  socket.on('message', data => bridge.onmessage?.({ data }))
+  socket.on('error', err => bridge.onerror?.(err))
+  socket.on('close', () => bridge.onclose?.())
+  Object.defineProperty(bridge, 'binaryType', {
+    configurable: true,
+    get: () => socket.binaryType,
+    set: (value: string) => {
+      if (value === 'arraybuffer' || value === 'nodebuffer' || value === 'fragments') {
+        socket.binaryType = value
+      }
+    },
+  })
+  return bridge
 }
 
 /** tcp 探活：端口可连即视为服务在线（不校验协议） */

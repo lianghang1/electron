@@ -18,7 +18,7 @@ interface SignProfileBase {
  * 设备档案（多设备档案制，与 capture/idcard 同构）：
  * - ws 路线：一条档案 = 一条 CamSDKServer 本地服务连接（服务下全部签名屏经该连接枚举）；
  * - dll 路线：一条档案 = 一个设备守护进程签名驱动（档案 id = 驱动名，见 host/run.ts），
- *   运行时设备 id = "dll:<档案 id>"，DLL 由守护进程按注册表自动加载（档案参数预留）。
+ *   运行时设备 id = "dll:<档案 id>"，DLL 由守护进程按注册表自动加载。
  */
 export interface SignWsProfile extends SignProfileBase {
   transport: 'ws'

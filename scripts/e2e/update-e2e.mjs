@@ -320,7 +320,6 @@ await step('共用清单缺 apps 段: 调度跳过 dist-hot 命中 asar-hot（�
       new FullPackageChannel({ manifestUrl: onlyAsar, allowedOrigins, installer: new Win32Installer() }),
     ],
     events: { emit: (type, payload) => emitted.push({ type, payload }) },
-    deviceId: 'e2e',
     versionMatrix: async () => matrix,
   })
   const plan = await center.check(matrix)

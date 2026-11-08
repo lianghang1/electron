@@ -22,13 +22,13 @@ import { TraySystem, WindowSystem } from '@shell/window'
 import { app, ipcMain, session } from 'electron'
 
 /**
- * 组合根：全仓库唯一的组装现场（铁律一）。
+ * 组合根：全仓库唯一的组装现场。
  * 读本文件 = 读产品目录；除此之外任何模块不得创建跨系统对象。
  */
 
 const logger = createRootLogger()
 
-// 整包落地策略：平台差异收敛为数据表，组合根查表唯一创建并注入通道（铁律一/二）
+// 整包落地策略：平台差异收敛为数据表，组合根查表唯一创建并注入通道
 const INSTALLERS: Record<string, new () => PackageInstaller> = {
   win32: Win32Installer,
   darwin: DarwinInstaller,
@@ -104,7 +104,6 @@ async function main(): Promise<void> {
         ...(fullPackage ? [fullPackage] : []),
       ],
       events: kernel.ctx.events,
-      deviceId: `${flavor.id}-${process.platform}`,
       // 版本矩阵由组合根提供：app 版本读 appsRoot 下各应用 version.json（dist-hot 换目录后自动刷新），
       // asar 与 shell 同版本（asar 就是壳本身）
       versionMatrix: async () => ({
@@ -116,7 +115,7 @@ async function main(): Promise<void> {
   }
   windows.bindEvents(kernel.ctx.events)
 
-  // 平台能力一次探测，处处消费：能力表 → 驱动寻址策略 / 路由闸门 / 渲染层下发（M4）
+  // 平台能力一次探测，处处消费：能力表 → 驱动寻址策略 / 路由闸门 / 渲染层下发
   const capability = resolvePlatformCapability(detectDevicePlatform().id, process.arch)
   // 声明格式是 devices/<域>/...，故资源根 = 包含 devices/ 的那个父目录。
   // dev/打包差异只在此处解析一次（唯一组装现场），域内部零感知。
@@ -161,7 +160,7 @@ async function main(): Promise<void> {
     ))
   }
 
-  // 应用运行时：openers 在此装配（铁律一），AppService 只认 SPI
+  // 应用运行时：openers 在此装配，AppService 只认 SPI
   const apps = new AppService(
     () => true,
     [
@@ -173,7 +172,7 @@ async function main(): Promise<void> {
   )
   for (const appManifest of flavor.apps) { apps.register(appManifest, 'flavor') }
 
-  // ── IPC 接线（都在组合根，铁律一）─────────────────────────────
+  // ── IPC 接线 ─────────────────────────────────────────────
   windows.registerWindowControls()
   windows.attachEventBroadcast(kernel.ctx.events)
 

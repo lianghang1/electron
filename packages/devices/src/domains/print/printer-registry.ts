@@ -4,6 +4,13 @@ import type { WinspoolHost } from './system-default'
 import { printError } from './errors'
 import { detectPrinterHardware, detectPrinterPapers, detectSystemDefaultPrinter } from './system-default'
 
+/** CUPS/lpoptions 上报的选项形状随驱动变化，按键取值，不依赖 Electron 版本的具体字段声明 */
+function readPrinterOption(options: unknown, key: string): string {
+  if (!options || typeof options !== 'object') { return '' }
+  const found = Object.entries(options).find(([name]) => name === key)
+  return typeof found?.[1] === 'string' ? found[1] : ''
+}
+
 /** 打印机注册表：枚举系统打印机（getPrintersAsync），业务层只见 UnifiedPrinter。 */
 export class PrinterRegistry {
   constructor(
@@ -35,7 +42,7 @@ export class PrinterRegistry {
         capabilities: {} as PrinterCaps,
         meta: {
           description: p.description ?? '',
-          driver: (p.options as unknown as Record<string, string>)?.['printer-make-and-model'] ?? '',
+          driver: readPrinterOption(p.options, 'printer-make-and-model'),
         },
       }))
       // 设备驱动上报的纸张（Win: winspool；Unix: lpoptions）与打印首选项默认值/能力位，纸型联动与默认值展示以此为准

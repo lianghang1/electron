@@ -14,7 +14,7 @@ function detectLinuxCn(): boolean {
   }
 }
 
-/** Linux 骨架：native 对接面预留（so），winspool 不适用；国产化发行版细分供适配差异预留 */
+/** Linux 平台：native 对接 so，winspool 不适用；国产化发行版按适配差异扩展 */
 export function detectLinuxPlatform(): DevicePlatform {
   return {
     id: detectLinuxCn() ? 'linux-cn' : 'linux',

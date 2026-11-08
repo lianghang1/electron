@@ -1,6 +1,6 @@
 import type { DevicePlatform } from './platform-types'
 
-/** macOS 骨架：native 对接面预留（dylib + koffi），winspool 不适用；厂商接入按此形状扩展 */
+/** macOS 平台：native 对接 dylib + koffi，winspool 不适用；厂商接入按此形状扩展 */
 export const macPlatform: DevicePlatform = {
   id: 'mac',
   nativeSupported: true,

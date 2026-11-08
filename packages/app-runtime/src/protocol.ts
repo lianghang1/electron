@@ -1,5 +1,5 @@
 import type { Session } from 'electron'
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync } from 'node:fs'
 import { extname, join, normalize, sep } from 'node:path'
 import { protocol } from 'electron'
 
@@ -61,7 +61,7 @@ export function registerAppProtocol(session: Session, appsRoot: string): void {
     if (!mime || !existsSync(resolved) || !statSync(resolved).isFile()) {
       return new Response('not found', { status: 404 })
     }
-    return new Response(createReadStream(resolved) as unknown as ReadableStream, {
+    return new Response(readFileSync(resolved), {
       headers: { 'content-type': mime },
     })
   })

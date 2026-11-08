@@ -1,5 +1,4 @@
 import type { EventBus, Startable } from '@shell/kernel'
-import { isGreylisted } from './greylist'
 
 /** 版本矩阵：设备当前各层版本，与服务端清单比对 */
 export interface VersionMatrix {
@@ -27,7 +26,7 @@ export interface ApplyResult {
 /**
  * 更新通道 SPI：平台只认识此接口。
  * 三通道（dist-hot 免重启 / asar-hot 原子换+回滚 / full-package 锁屏安装）各自实现，
- * 公共设施（灰度、事件上报、调度）由 UpdateCenter 统一提供。
+ * 公共设施（事件上报、调度）由 UpdateCenter 统一提供。
  * 每条路径的验收：任何中断后，下次启动必须落在可运行版本。
  */
 export interface UpdateChannel {
@@ -39,10 +38,6 @@ export interface UpdateChannel {
 export interface UpdateCenterOptions {
   channels: UpdateChannel[]
   events: EventBus
-  /** 设备指纹（灰度判定输入） */
-  deviceId: string
-  /** 灰度白名单与放量百分比（服务端清单下发，本地兜底全量） */
-  greylist?: { whitelist: string[], percent: number }
   /** 版本矩阵由组合根注入（读 appsRoot 版本文件），未注入时退化为 shell 版本 */
   versionMatrix?: () => Promise<VersionMatrix>
   /** 巡检间隔 ms；0 = 不自动巡检（默认 6h） */
@@ -131,12 +126,6 @@ export class UpdateCenter implements Startable {
   async apply(plan: UpdatePlan): Promise<ApplyResult> {
     const channel = this.options.channels.find(c => c.id === plan.channel)
     if (!channel) { return { ok: false, requiresRestart: false, error: `unknown channel: ${plan.channel}` } }
-
-    // 灰度闸门：白名单优先，其次百分比放量（未配置灰度 = 全量放行）
-    if (this.options.greylist) {
-      const { whitelist, percent } = this.options.greylist
-      if (!isGreylisted(this.options.deviceId, whitelist, percent)) { return { ok: false, requiresRestart: false, error: 'greylisted: device not in rollout' } }
-    }
     return channel.apply(plan)
   }
 

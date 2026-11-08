@@ -133,7 +133,7 @@ export class SystemChannel implements PrintChannel {
         await win.webContents.executeJavaScript(
           'document.readyState === "complete" ? true : new Promise(r => window.addEventListener("load", () => r(true)))',
         )
-        const opts: Record<string, unknown> = {
+        const opts: Electron.WebContentsPrintOptions = {
           silent: job.options.silent !== false,
           deviceName: printer.id,
           copies,
@@ -142,7 +142,7 @@ export class SystemChannel implements PrintChannel {
         if (job.options.duplex) { opts.duplexMode = duplexMode(job.options.duplex) }
         const ranges = parsePageRanges(job.options.pages)
         if (ranges) { opts.pageRanges = ranges }
-        await webContentsPrint(win.webContents, opts as never)
+        await webContentsPrint(win.webContents, opts)
       })
       return { archivedPdfPath: pdfPath, detail: { via: 'chromium-pdf-plugin' } }
     }

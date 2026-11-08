@@ -9,8 +9,8 @@ import { createDesktopMode, createKioskMode } from './modes'
 import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
 
 /**
- * WindowSystem：全仓库唯一 new BrowserWindow 的地方（铁律一）。
- * 对外只暴露目的命名 API——读调用处即读产品动作（铁律二）。
+ * WindowSystem：全仓库唯一 new BrowserWindow 的地方。
+ * 对外只暴露目的命名 API——读调用处即读产品动作。
  * 同时实现 ViewHost SPI：packaged/remote 应用的 WebContentsView 容器。
  */
 export class WindowSystem implements Startable, ViewHost {
@@ -185,7 +185,7 @@ export class WindowSystem implements Startable, ViewHost {
   private track(win: BrowserWindow): void {
     this.windows.set(win.id, win)
     win.on('closed', () => this.windows.delete(win.id))
-    // 全部窗口关闭即退出（托盘常驻由 TraySystem M6 接管后调整）
+    // 全部窗口关闭即退出
     if (this.windows.size === 1) { app.on('window-all-closed', () => app.quit()) }
   }
 

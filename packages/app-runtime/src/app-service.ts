@@ -11,8 +11,8 @@ export class AppOpenError extends Error {
 
 /**
  * AppService：应用运行时。持有注册表与活跃实例，经 AppOpener SPI 分发——
- * 本类不 import 任何具体形态、不认识窗口（铁律二），新增形态零改动。
- * openers / events 由组合根注入（铁律一）。
+ * 不 import 任何具体形态、不认识窗口；新增形态零改动。
+ * openers / events 由组合根注入。
  */
 export class AppService implements Startable {
   readonly name = 'apps'

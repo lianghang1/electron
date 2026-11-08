@@ -32,10 +32,10 @@ export { createDomainRouter, DomainRouteError } from './domain-kit'
 export type { DomainRouter } from './domain-kit'
 
 /**
- * 设备网关：主进程侧的组装现场（铁律一）。
+ * 设备网关：主进程侧的组装现场。
  * 六个域各自 defineDomain 自描述，本文件只做两件事：创建系统、按数据表收集域定义。
  * 平台能力闸门在 createDomainRouter（组合根注入 availableDomains），驱动资产寻址
- * 由注入的 DriverResolver 决定——dev / 打包 / 现场部署三种根，域内部零感知（铁律二）。
+ * 由注入的 DriverResolver 决定——dev / 打包 / 现场部署三种根，域内部零感知。
  */
 
 export interface DeviceGatewayPaths {
@@ -115,7 +115,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
 
   const deps: DomainDeps = { events: options.events, isPackaged: app.isPackaged }
 
-  // 域注册 = 数据表：新增域 = 加一行工厂，平台代码零分支（铁律二）
+  // 域注册 = 数据表：新增域 = 加一行工厂，平台代码零分支
   const domains: DomainDefinition[] = [
     createIdcardDomain(idcard),
     createIccardDomain(iccard),

@@ -26,9 +26,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # 护栏：存量冻结，只让本次改动引入的新违规失败
-      - name: Guard (changed scope)
-        run: pnpm guard:changed
+      # 护栏：全仓零容忍，注释词表/类型逃逸/依赖边界任一违规都失败
+      - name: Guard (full)
+        run: pnpm guard
 
       - name: Lint
         run: pnpm lint

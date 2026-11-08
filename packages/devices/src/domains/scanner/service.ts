@@ -1,4 +1,4 @@
-import type { ScannerConfig, ScannerDeviceConfig, ScannerDeviceOverrides, ScannerLogFn, ScannerOverrides, ScannerSetInput, ScannerStatus, ScanOptions, ScanResult } from '@shell/shared'
+import type { ScannerConfig, ScannerDeviceConfig, ScannerDeviceOverrides, ScannerLogFn, ScannerOverrides, ScannerSetInput, ScannerStatus, ScanResult } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
 import { DesktopError } from '@shell/shared'
 import { webContents } from 'electron'
@@ -32,12 +32,10 @@ export const SCANNER_OVERRIDES_DEFAULTS: ScannerOverrides = {
   devices: [],
 }
 
-/** 旧版单值配置（v1 根对象直存节奏参数 + mode/hidUrl），识别后迁移为档案制 */
-interface LegacyScannerConfig extends Required<ScanOptions> {
-  enabled: boolean
-  mode: 'keyboard' | 'hid'
-  hidUrl: string
-}
+/** 旧版单值配置（v1 根对象直存节奏参数 + mode/hidUrl），逐字段读取，缺字段不生效 */
+const asNumber = (v: unknown): number | undefined => typeof v === 'number' ? v : undefined
+const asString = (v: unknown): string | undefined => typeof v === 'string' ? v : undefined
+const asBoolean = (v: unknown): boolean | undefined => typeof v === 'boolean' ? v : undefined
 
 /** 白名单字段就地覆盖（仅提供且合法的字段生效；旧整条持久化按同名字段读取，brand/transport 等自然忽略） */
 function applyOverrides(profile: ScannerDeviceConfig, s: ScannerDeviceOverrides): void {
@@ -88,13 +86,25 @@ function migrateScannerConfig(stored?: ScannerOverrides): ScannerConfig {
   const base = structuredClone(SCANNER_DEFAULTS)
   const raw = stored && typeof stored === 'object' ? stored as ScannerOverrides & Record<string, unknown> : undefined
   const storedDevices = Array.isArray(raw?.devices) ? raw.devices : []
-  const legacy = raw && !Array.isArray(raw.devices) ? raw as unknown as LegacyScannerConfig : undefined
+  const legacy = raw && !Array.isArray(raw.devices)
+    ? {
+        timeout: asNumber(raw.timeout),
+        minLength: asNumber(raw.minLength),
+        endKey: asString(raw.endKey),
+        prefixes: Array.isArray(raw.prefixes)
+          ? raw.prefixes.filter((x): x is string => typeof x === 'string')
+          : undefined,
+        requirePrefix: asBoolean(raw.requirePrefix),
+        hidUrl: asString(raw.hidUrl),
+        mode: raw.mode === 'hid' || raw.mode === 'keyboard' ? raw.mode : undefined,
+      }
+    : undefined
   const legacyPace: ScannerDeviceOverrides | undefined = legacy
     ? {
         timeout: legacy.timeout,
         minLength: legacy.minLength,
         endKey: legacy.endKey,
-        prefixes: Array.isArray(legacy.prefixes) ? [...legacy.prefixes] : undefined,
+        prefixes: legacy.prefixes,
         requirePrefix: legacy.requirePrefix,
       }
     : undefined

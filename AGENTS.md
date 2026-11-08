@@ -50,8 +50,8 @@
 `scripts/guardrails/guard.mjs` 是独立于 eslint 的检查器，扫 `packages/` `apps/` 下的 `.ts/.vue/.mjs`：
 
 - 注释词表、类型逃逸（`as never` / `as any` / `as unknown as` / `@ts-ignore`）、依赖边界（向上 import、ui 越层、包循环依赖与幽灵依赖）。
-- 存量违规按指纹冻结在 `.guardrails-baseline.json`；**只让基线之外的新增违规失败**，不追求一次清空全仓。
-- `pnpm guard` 全量，`pnpm guard:changed` 只查改动文件（CI 用），`pnpm guard:baseline` 在清理后收紧基线，`pnpm guard:dead` 输出无仓内引用的导出（只报告、不阻断）。
+- 存量违规已全部清账，`.guardrails-baseline.json` 为空指纹集；护栏对全仓零容忍，任何违规直接失败，不再靠冻结放行。
+- `pnpm guard` 全量（CI 用），`pnpm guard:changed` 只查改动文件，`pnpm guard:list` 列出全量违规明细供机器清账，`pnpm guard:baseline` 在清理后收紧基线，`pnpm guard:dead` 输出无仓内引用的导出（只报告、不阻断）。
 - 新增规则或误报，先跑一次故意违规确认护栏确实报错（反向验证），再谈通过。
 
 ## 验证纪律

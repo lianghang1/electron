@@ -60,7 +60,7 @@ export function paperToPrintPageSize(paper: PaperSpec | undefined): Electron.Web
   return { width: paper.widthMm * 1000, height: paper.heightMm * 1000 }
 }
 
-/** printToPDF 的 pageSize（对象单位：英寸）。未指定纸型/连续纸高度退固定占位，实际分页由 preferCSSPageSize 走模板 @page */
+/** printToPDF 的 pageSize（对象单位：英寸）。未指定纸型/连续纸高度时取固定值，实际分页由 preferCSSPageSize 走模板 @page */
 export function paperToPdfPageSize(paper: PaperSpec | undefined): Electron.PrintToPDFOptions['pageSize'] {
   if (paper == null) { return undefined }
   return { width: paper.widthMm / 25.4, height: (paper.heightMm || 297) / 25.4 }

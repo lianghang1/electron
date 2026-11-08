@@ -3,7 +3,7 @@ import type { Logger } from './logger'
 import { app } from 'electron'
 import log from 'electron-log/main'
 
-/** 渲染进程身份反查：由窗口系统实现（M2 注入），内核只依赖此最小契约 */
+/** 渲染进程身份反查：由窗口系统实现，内核只依赖此最小契约 */
 export interface CallerResolver {
   tryResolve: (contents: Electron.WebContents) => { appId: string } | undefined
 }

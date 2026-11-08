@@ -4,7 +4,7 @@ import { z } from 'zod'
 
 export { assertAllowedUrl }
 
-/** 单份更新清单：三通道各取所需；缺省段表示该通道本次无更新。 */
+/** 单份更新清单：三通道各取所需；缺省段表示该通道无更新。 */
 export interface UpdateManifest {
   apps?: Record<string, { version: string, url: string, sha256: string }>
   asar?: { version: string, url: string, sha256: string }

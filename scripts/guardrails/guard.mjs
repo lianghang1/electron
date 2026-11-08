@@ -207,6 +207,15 @@ function cmdDead() {
   for (const [name, at] of dead.slice(0, 60)) { console.log(`  ${name.padEnd(32)} ${at.file}:${at.line}`) }
 }
 
+// 全量违规明细：机器可消费，用于存量清账；只报告、不判定成败
+function cmdList() {
+  const all = [...scanSource(), ...scanPackages()]
+  for (const v of all) {
+    console.log(`${v.rule.padEnd(28)} ${v.file}:${v.line}  ${v.text.slice(0, 140)}`)
+  }
+  console.log(`\n[guard:list] 共 ${all.length} 条`)
+}
+
 const cmd = process.argv[2] || 'check'
 if (cmd === 'check') {
   cmdCheck()
@@ -217,4 +226,7 @@ else if (cmd === 'baseline') {
 else if (cmd === 'dead') {
   cmdDead()
 }
-else { console.error(`用法: guard.mjs check [--changed] | baseline | dead`); process.exit(2) }
+else if (cmd === 'list') {
+  cmdList()
+}
+else { console.error(`用法: guard.mjs check [--changed] | baseline | dead | list`); process.exit(2) }

@@ -11,7 +11,6 @@
   },
   "scripts": {},
   "dependencies": {
-    "@shell/shared": "workspace:*",
     "electron": "catalog:"
   },
   "devDependencies": {

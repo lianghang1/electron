@@ -1,5 +1,5 @@
 /**
- * ViewHost SPI（依赖倒置，铁律三）：app-runtime 声明它需要窗口系统提供的能力，
+ * ViewHost SPI：app-runtime 声明它需要窗口系统提供的能力，
  * 不 import WindowSystem——具体实现由组合根注入（window 包实现）。
  *
  * 视图 = WebContentsView（packaged/remote 形态的页面容器）。

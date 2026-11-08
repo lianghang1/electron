@@ -5,7 +5,7 @@ import { createLaunchMarks } from './lifecycle'
 
 /**
  * 平台内核上下文：组合根创建一次，各系统经构造函数接收。
- * 全仓库只有这里有权创建和接线系统对象（铁律一）。
+ * 全仓库只有这里有权创建和接线系统对象。
  */
 export interface KernelContext {
   flavor: FlavorManifest
@@ -20,7 +20,7 @@ export interface KernelSystem extends Startable {
 
 /**
  * PlatformKernel：创建即装配，start 按依赖序拉起，stop 逆序关闭。
- * 依赖目前只有 flavor + eventBus + marks——随里程碑逐个系统接入（window/apps/devices/update）。
+ * 依赖只有 flavor + eventBus + marks。
  */
 export interface PlatformKernel {
   ctx: KernelContext

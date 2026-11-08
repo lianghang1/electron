@@ -25,7 +25,7 @@ export interface SettingGroup {
   fields: SettingField[]
 }
 
-/** 平台设置 schema（M6 填充完整；先立通用/更新两组骨架） */
+/** 平台设置 schema */
 export const SETTINGS_SCHEMA: SettingGroup[] = [
   {
     key: 'general',

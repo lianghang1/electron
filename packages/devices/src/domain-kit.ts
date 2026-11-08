@@ -33,7 +33,7 @@ export interface DomainRouter {
 }
 
 /**
- * availableDomains：能力矩阵接线点（M4-B）。
+ * availableDomains：能力矩阵接线点。
  * 不在该平台能力清单内的域，调用在路由层即被拒绝——业务页/JSAPI 无需自行判断平台，
  * 平台差异由组合根探测一次后经此闸门生效，域内部零感知。
  */

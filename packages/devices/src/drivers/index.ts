@@ -12,14 +12,14 @@ export { SystemDriverResolver } from './system'
 
 /**
  * 驱动资产根：bundled 随包（resources/），manual 现场（platformDataRoot()/devices/）。
- * 由组合根按唯一路径出口注入，drivers 层不自行寻址（铁律一/三）。
+ * 由组合根按唯一路径出口注入，drivers 层不自行寻址。
  */
 export interface DriverRoots {
   bundled: string
   manual: string
 }
 
-/** 部署方式 → 策略构造器：平台差异收敛为数据表，零 switch（铁律二） */
+/** 部署方式 → 策略构造器：平台差异收敛为数据表，零 switch */
 const RESOLVERS: Record<PlatformCapability['driverDeployment'], (roots: DriverRoots) => DriverResolver> = {
   bundled: roots => new BundledDriverResolver(roots.bundled),
   manual: roots => new ManualDriverResolver(roots.manual),

@@ -183,7 +183,7 @@ export class IcCardService {
   }
 
   /**
-   * 写扇区字符串组：texts 按序占用数据块，未占用的数据块清零（保证读取结果与本次写入一致）。
+   * 写扇区字符串组：texts 按序占用数据块，未占用的数据块清零，保证读取结果与写入一致。
    * 整扇区写入在同一设备锁内完成；中途失败（如密钥认证不过）可能留下部分写入，重试即整扇区覆盖修复。
    */
   async writeIcTexts(req: IcCardTextsWriteRequest & { deviceId: string }): Promise<void> {

@@ -150,9 +150,6 @@ importers:
       '@shell/shared':
         specifier: workspace:*
         version: link:../shared
-      '@shell/window':
-        specifier: workspace:*
-        version: link:../window
       electron:
         specifier: 'catalog:'
         version: 45.2.3
@@ -163,9 +160,6 @@ importers:
 
   packages/bridge:
     dependencies:
-      '@shell/shared':
-        specifier: workspace:*
-        version: link:../shared
       electron:
         specifier: 'catalog:'
         version: 45.2.3
@@ -260,9 +254,6 @@ importers:
 
   packages/ui:
     dependencies:
-      '@shell/app-runtime':
-        specifier: workspace:*
-        version: link:../app-runtime
       '@shell/bridge':
         specifier: workspace:*
         version: link:../bridge

@@ -99,7 +99,7 @@ export class DeviceHost {
         this.crashInjected = true
       }
       const forkOptions: Parameters<typeof utilityProcess.fork>[2] = {}
-      // 联调注入开关曾出现在环境里时显式覆盖子进程值（重启后的实例不再继承 '1'，避免崩溃死循环）
+      // 环境变量存在时显式覆盖子进程的值：重启实例不再继承 '1'，避免崩溃反复触发
       if (process.env[DEVICE_HOST_CRASH_ENV] !== undefined) {
         forkOptions.env = { ...process.env, [DEVICE_HOST_CRASH_ENV]: injectCrash ? '1' : '' }
       }

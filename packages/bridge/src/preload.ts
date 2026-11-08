@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
 /**
- * 渲染层唯一桥面（铁律三：每层之间一个门面）。
+ * 渲染层唯一桥面：每层之间一个门面。
  * 本文件集中暴露全部 contextBridge 能力——安全审计只看这一处。
  * 域方法按 @shell/shared 的域签名调用：invoke('domain.method', input)，
  * 运行时校验由主进程侧按 zod schema 执行。

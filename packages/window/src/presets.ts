@@ -1,6 +1,6 @@
 /**
  * 窗口基础选项常量：组合出各目的窗口的共性。
- * 对外永远不暴露这些原始组合——外部只见目的命名函数（铁律二）。
+ * 对外永远不暴露这些原始组合——外部只见目的命名函数。
  */
 import type { BrowserWindowConstructorOptions } from 'electron'
 

@@ -4,7 +4,7 @@ export type DriverDeployment = PlatformCapability['driverDeployment']
 
 /**
  * 驱动资产寻址 SPI：域内 DLL 声明是逻辑路径 devices/<域>/<厂商>/<平台>/<文件>，
- * 「逻辑路径 → 运行时绝对路径」由按平台部署方式装配的策略决定（铁律二）。
+ * 「逻辑路径 → 运行时绝对路径」由按平台部署方式装配的策略决定。
  * 域内部只认 assetRoot + 声明，零感知 dev / 打包 / 现场部署差异。
  *
  * 平台差异收敛为数据表：组合根查 PLATFORM_CAPABILITIES 得 driverDeployment，
