@@ -1,3 +1,4 @@
+import type { PermissionRule } from '@shell/app-runtime'
 import type { DomainCallContext } from '@shell/shared'
 import type { PackageInstaller } from '@shell/update'
 import { existsSync, readFileSync } from 'node:fs'
@@ -7,6 +8,7 @@ import {
   AppService,
   EmbeddedOpener,
   PackagedOpener,
+  PermissionService,
   registerAppProtocol,
   registerAppScheme,
   RemoteOpener,
@@ -163,9 +165,26 @@ async function main(): Promise<void> {
     ))
   }
 
+  // 权限策略：flavor 声明哪些应用能用哪些域/平台权限，未声明一律拒绝
+  const allow = (appId: string, permission: string): PermissionRule => ({ app: appId, permission, verdict: 'allow' })
+  const permissionRules: PermissionRule[] = flavor.apps.flatMap(appManifest => [
+    allow(appManifest.id, 'app.open'),
+    ...appManifest.devices.map(device => allow(appManifest.id, `domain.${device}`)),
+    ...appManifest.permissions.map(permission => allow(appManifest.id, permission)),
+  ])
+  const permissions = new PermissionService({
+    rules: permissionRules,
+    audit: decision => logger.scope('permission').info('decision', {
+      appId: decision.request.appId,
+      permission: decision.request.permission,
+      verdict: decision.verdict,
+      source: decision.source,
+    }),
+  })
+
   // 应用运行时：openers 在此装配，AppService 只认 SPI
   const apps = new AppService(
-    () => true,
+    manifest => permissions.allowsApp(manifest),
     [
       new EmbeddedOpener(),
       new PackagedOpener(windows, appsRoot),

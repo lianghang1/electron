@@ -23,6 +23,7 @@
     "test": "pnpm -r test",
     "test:e2e:update": "node --import tsx scripts/e2e/update-e2e.mjs",
     "test:e2e:overlay": "node --import tsx scripts/e2e/overlay-e2e.mjs",
+    "test:e2e:permission": "node --import tsx scripts/e2e/permission-e2e.mjs",
     "typecheck": "pnpm -r typecheck",
     "postinstall": "node scripts/ensure-electron.mjs"
   },

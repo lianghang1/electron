@@ -21,7 +21,7 @@ export class AppService implements Startable {
   private activeByApp = new Map<string, string>()
 
   constructor(
-    private readonly allowThirdParty: () => boolean,
+    private readonly admit: (manifest: AppManifest) => boolean | Promise<boolean>,
     private readonly openers: AppOpener[],
     private readonly events: EventBus,
   ) {}
@@ -51,7 +51,7 @@ export class AppService implements Startable {
   async open(appId: string): Promise<AppInstance> {
     const registered = this.registry.get(appId)
     if (!registered) { throw new AppOpenError('APP_NOT_FOUND', `App not registered: ${appId}`) }
-    if (registered.manifest.type === 'third-party' && !this.allowThirdParty()) { throw new AppOpenError('APP_NOT_ALLOWED', `Third-party app is not allowed: ${appId}`) }
+    if (!await this.admit(registered.manifest)) { throw new AppOpenError('APP_NOT_ALLOWED', `App not allowed: ${appId}`) }
 
     // 同 App 复用活跃实例
     const activeId = this.activeByApp.get(appId)
