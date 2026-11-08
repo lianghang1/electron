@@ -4,16 +4,14 @@ import type { PrintChannel } from './channels/print-channel'
 import type { HiddenWindowPool } from './hidden-window'
 import type { PrinterRegistry } from './printer-registry'
 import { randomUUID } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
-import { extname } from 'node:path'
+import { existsSync } from 'node:fs'
 import { cleanupArchiveDir } from './archive-cleanup'
 import { IppChannel } from './channels/ipp-channel'
 import { SystemChannel } from './channels/system-channel'
+import { normalizeContent } from './content-normalizers'
 import { printError, toPrintError } from './errors'
 import { JobStore } from './job-store'
 import { assertPaperSupported, resolvePaper } from './paper'
-import { IMAGE_MIME, renderImageViewerHtml } from './templates'
-import { downloadUrlContent } from './url-content'
 
 /**
  * PrintService = 统一打印 API 的实现体（归一化层）。
@@ -183,38 +181,14 @@ export class PrintService {
     }
   }
 
-  /** 内容归一：三类负载（HTML/文件/URL）→ 通道可执行形态（HTML / PDF）。paper 为宽松解析结果（undefined = 交驱动默认纸张） */
-  private async normalizeContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> {
-    const p = req.payload
-    switch (p.kind) {
-      case 'html':
-        return { type: 'html', html: p.html }
-      case 'file': {
-        if (!existsSync(p.path)) {
-          throw printError('VALIDATION_FAILED', `文件不存在: ${p.path}`)
-        }
-        return this.contentFromLocalFile(p.path, paper)
-      }
-      case 'url': {
-        const downloaded = await downloadUrlContent(p, this.archiveDir, jobId, this.log.bind(this))
-        return this.contentFromLocalFile(downloaded.path, paper)
-      }
-    }
-  }
-
-  /** 本地文件 → 通道内容：PDF 直通 / 图片转 base64 查看器（file 与 url 负载共用） */
-  private contentFromLocalFile(filePath: string, paper: PaperSpec | undefined): PreparedContent {
-    const ext = extname(filePath).toLowerCase()
-    if (ext === '.pdf') {
-      // PDF 版式由文件自身页面决定，options.paper 不作用于 PDF 直通
-      return { type: 'pdf', path: filePath }
-    }
-    const mime = IMAGE_MIME[ext]
-    if (mime) {
-      const dataUrl = `data:${mime};base64,${readFileSync(filePath).toString('base64')}`
-      return { type: 'html', html: renderImageViewerHtml(dataUrl, paper) }
-    }
-    throw printError('VALIDATION_FAILED', `不支持的文件类型: ${ext}（支持 PDF 与常见图片格式）`)
+  /** 内容归一委托给策略表：本类零 switch，负载形态差异收敛在 content-normalizers */
+  private normalizeContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> | PreparedContent {
+    return normalizeContent(req.payload, {
+      archiveDir: this.archiveDir,
+      jobId,
+      paper,
+      log: this.log.bind(this),
+    })
   }
 
   private validate(req: PrintRequest): void {

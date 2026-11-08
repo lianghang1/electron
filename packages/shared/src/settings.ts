@@ -37,15 +37,6 @@ export const SETTINGS_SCHEMA: SettingGroup[] = [
     ],
   },
   {
-    key: 'update',
-    label: '更新',
-    fields: [
-      { key: 'updateChannel', label: '更新通道', type: 'enum', default: 'stable', options: [{ value: 'stable', label: '稳定版' }, { value: 'beta', label: '测试版' }] },
-      { key: 'autoDistHotUpdate', label: '资源热更', type: 'boolean', default: true, description: '应用 dist 资源自动热更新，无需重启' },
-      { key: 'kioskSilentUpdate', label: 'Kiosk 静默整包更新', type: 'boolean', default: true, hiddenInKiosk: false, description: '在锁屏时段安装整包更新' },
-    ],
-  },
-  {
     key: 'appearance',
     label: '外观',
     fields: [

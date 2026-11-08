@@ -11,11 +11,11 @@ import {
   registerAppScheme,
   RemoteOpener,
 } from '@shell/app-runtime'
-import { createDeviceGateway, createDomainRouter, DomainRouteError } from '@shell/devices'
+import { createDeviceGateway, createDomainRouter, createDriverResolver, detectDevicePlatform, DomainRouteError, resolvePlatformCapability } from '@shell/devices'
 import { createKernel } from '@shell/kernel'
 import { createRootLogger } from '@shell/kernel/logger'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
-import { configDir, filesDir } from '@shell/kernel/storage'
+import { configDir, filesDir, platformDataRoot } from '@shell/kernel/storage'
 import { flavorManifestSchema } from '@shell/shared'
 import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
 import { TraySystem, WindowSystem } from '@shell/window'
@@ -108,11 +108,22 @@ async function main(): Promise<void> {
   }
   windows.bindEvents(kernel.ctx.events)
 
+  // 平台能力一次探测，处处消费：能力表 → 驱动寻址策略 / 路由闸门 / 渲染层下发（M4）
+  const capability = resolvePlatformCapability(detectDevicePlatform().id, process.arch)
+  // 声明格式是 devices/<域>/...，故资源根 = 包含 devices/ 的那个父目录。
+  // dev/打包差异只在此处解析一次（唯一组装现场），域内部零感知。
+  const bundledRoot = app.isPackaged
+    ? (process.resourcesPath ?? app.getAppPath())
+    : join(app.getAppPath(), '../../resources')
+  const driver = createDriverResolver(capability, {
+    bundled: bundledRoot,
+    manual: join(platformDataRoot(), 'resources'),
+  })
   const devices = createDeviceGateway({
     logger,
     events: kernel.ctx.events,
     hostEntryPath: join(__dirname, 'device-host.js'),
-    resourcesRoot: join(process.resourcesPath ?? app.getAppPath(), 'devices'),
+    driver,
     paths: { storageRoot: configDir(), filesRoot: filesDir() },
   })
 
@@ -156,8 +167,8 @@ async function main(): Promise<void> {
   windows.registerWindowControls()
   windows.attachEventBroadcast(kernel.ctx.events)
 
-  // 域方法调用（shell 渲染层，全量能力）
-  const router = createDomainRouter(devices.domains, logger)
+  // 域方法调用（能力矩阵闸门：不在本平台 availableDomains 的域调用在路由层即拒绝）
+  const router = createDomainRouter(devices.domains, logger, capability.availableDomains)
   ipcMain.handle('domain-call', (event, method: string, input: unknown) => {
     const ctx: DomainCallContext = {
       appId: 'shell',
@@ -193,6 +204,13 @@ async function main(): Promise<void> {
     defaultAppId: flavor.defaultAppId,
     chrome: flavor.mode === 'kiosk' ? 'solo' : flavor.chrome,
     mode: flavor.mode,
+    // 能力矩阵下发：业务页按 availableDomains 决定功能可用性，无需自行判断平台
+    capabilities: {
+      platform: capability.platform,
+      availableDomains: capability.availableDomains,
+      driverDeployment: capability.driverDeployment,
+      notes: capability.notes,
+    },
   }))
   ipcMain.on('view:content-rect', (_e, rect: { x: number, y: number, width: number, height: number }) =>
     windows.setContentRect(rect))

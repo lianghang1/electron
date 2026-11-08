@@ -4,30 +4,11 @@ import vue from '@vitejs/plugin-vue'
 import { defineConfig } from 'electron-vite'
 
 /**
- * workspace 包内联声明（asar 自包含契约）：打包配置 files 只含 out/**，asar 内没有
- * node_modules，@shell/* 必须打进 bundle 才能运行。这些包有真实构建产物（dist/*.js），
- * 类型与解析走标准 exports——本清单只是显式的打包策略，不是解析兼容补丁。
- * （@shell/ui 不在内：它只被 renderer 消费，Vite 直接编译其源码。）
+ * asar 自包含契约：打包后 asar 内没有 node_modules，所有依赖（含 @shell/* workspace 包）
+ * 都必须由 Vite 编译进 bundle，不能外部化成裸导入。
+ * internal 包的 exports 直接指向 src/*.ts，Vite 原生编译，dev 零前置构建（对齐 master）。
  */
-const externalizeDeps = {
-  exclude: [
-    '@shell/app-runtime',
-    '@shell/bridge',
-    '@shell/devices',
-    '@shell/kernel',
-    '@shell/shared',
-    '@shell/update',
-    '@shell/window',
-  ],
-  include: [
-    'electron-log',
-    'electron-store',
-    'extract-zip',
-    'koffi',
-    'ws',
-    'zod',
-  ],
-}
+const externalizeDeps = false
 
 export default defineConfig({
   main: {

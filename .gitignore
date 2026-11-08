@@ -13,6 +13,9 @@ dist
 out
 release
 *.tsbuildinfo
+
+# 驱动资产构建期聚合产物（源在 packages/devices/src/**/assets/，不入库）
+resources/devices/
 *.local
 unpackage/release
 packages/*/lib/

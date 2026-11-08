@@ -3,7 +3,11 @@ import path from 'node:path'
 import { CAPTURE_DLL_BINARIES } from '../domains/capture/configs'
 import { SUMATRA_PDF_FILE } from '../domains/print/sumatra'
 import { HANVON_DLL_FILE } from '../domains/signature/vendors/hanvon'
+import { collectAssetSources } from '../drivers/asset-layout.mjs'
 import { IC_DRIVERS, ID_DRIVERS } from './run'
+
+export { collectAssetSources } from '../drivers/asset-layout.mjs'
+export type { AssetSource } from '../drivers/asset-layout.mjs'
 
 /**
  * 设备 SDK 资产对账：驱动/协议档案声明的资源路径 ↔ devices 树 assets/ 源资产。
@@ -32,14 +36,6 @@ export interface AssetAuditResult {
   orphans: string[]
 }
 
-/** 源资产目录（assets 父目录名 = 厂商名；targetRel = 产物相对 devices 根的子路径） */
-export interface AssetSource {
-  vendor: string
-  dir: string
-  /** 产物子路径：devices/<域>/<厂商>；厂商与域同名时为域本身（print 形态） */
-  targetRel: string
-}
-
 /** 枚举全部代码内资源声明：idcard/iccard 驱动注册表 + capture DLL 注册表 + signature/print 常量 */
 export function collectAssetDeclarations(): AssetDeclaration[] {
   const declarations: AssetDeclaration[] = []
@@ -55,35 +51,6 @@ export function collectAssetDeclarations(): AssetDeclaration[] {
   declarations.push({ origin: 'signature 汉王', file: HANVON_DLL_FILE })
   declarations.push({ origin: 'print SumatraPDF', file: SUMATRA_PDF_FILE })
   return declarations
-}
-
-/**
- * 扫描 devices 树全部 assets 源目录：assets 父目录名 = 厂商名，
- * 域名 = src/domains 下的第一层目录名，产物子路径 = <域>/<厂商>（同名合并为域名）。
- * v2 布局的 src/ 与 domains/ 为容器段，不参与域键推导。
- */
-export function collectAssetSources(devicesRoot: string): AssetSource[] {
-  const sources: AssetSource[] = []
-  const walk = (dir: string, domain: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      if (!entry.isDirectory()) {
-        continue
-      }
-      const child = path.join(dir, entry.name)
-      if (entry.name === 'assets') {
-        const vendor = path.basename(dir)
-        sources.push({ vendor, dir: child, targetRel: domain === vendor ? domain : `${domain}/${vendor}` })
-        continue
-      }
-      if (domain === '' && (entry.name === 'src' || entry.name === 'domains')) {
-        walk(child, '')
-        continue
-      }
-      walk(child, domain || entry.name)
-    }
-  }
-  walk(devicesRoot, '')
-  return sources
 }
 
 /**

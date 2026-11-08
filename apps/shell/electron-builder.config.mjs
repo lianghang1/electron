@@ -8,12 +8,16 @@
  * 用法：FLAVOR=update-e2e pnpm build:linux（不设 FLAVOR 默认 cemetery）
  * 打包态组合根读取 <resources>/flavor.json（extraResources 注入，见 main/index.ts loadFlavor）
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import process from 'node:process'
+import { ensureDriverAssets } from '../../scripts/prepare-driver-assets.mjs'
 
 const flavorId = process.env.FLAVOR ?? 'cemetery'
 const flavor = JSON.parse(readFileSync(new URL(`../../apps/flavors/${flavorId}/flavor.json`, import.meta.url), 'utf-8'))
-const deviceSdkDir = new URL('./node_modules/@device-sdk/', import.meta.url)
+
+// 构建期把源码树 assets 按同一套规则聚合成 resources/devices/<域>/<厂商>/<平台>/<文件>，
+// 使 bundled 策略的 <resources>/devices/... 与域内声明一一对应（不在 asar 内散落携带 DLL）。
+await ensureDriverAssets()
 
 export default {
   appId: `cn.shellplatform.${flavor.id}`,
@@ -33,8 +37,9 @@ export default {
     { from: `../../apps/flavors/${flavorId}/flavor.json`, to: 'flavor.json' },
     // 应用 dist（packaged 形态）：各应用产物放 resources/apps/<appId>/
     { from: '../../resources/apps', to: 'apps' },
-    // 厂商驱动包（@device-sdk/* 私有包）：资产跟着驱动走，未接入私有包时不注入
-    ...(existsSync(deviceSdkDir) ? [{ from: 'node_modules/@device-sdk/', to: 'devices' }] : []),
+    // 驱动资产：构建期聚合产物注入 resources/devices/，声明 devices/<域>/... 直接命中。
+    // system 部署（mac/linux）不携带 DLL，manual 部署（信创）从现场数据目录取，见 docs/driver-packaging.md。
+    { from: '../../resources/devices', to: 'devices' },
   ],
 
   win: {
@@ -44,7 +49,7 @@ export default {
 
   nsis: {
     oneClick: false,
-    // kiosk 静默更新依赖的静默参数（/S），由 Win32Installer 默认命令拉起
+    // 静默参数（/S）由 Win32Installer 默认命令拉起，供整包更新退出后安装
     allowToChangeInstallationDirectory: false,
     perMachine: true,
     deleteAppDataOnUninstall: false,
