@@ -1,11 +1,13 @@
 import type { ViewHost, ViewSpec } from '@shell/app-runtime'
 import type { EventBus, Startable } from '@shell/kernel'
 import type { FlavorManifest } from '@shell/shared'
+import type { OverlayKind, OverlayPolicy } from './overlay-host'
 import { join } from 'node:path'
 import process from 'node:process'
 import { matchesOrigin } from '@shell/shared'
 import { app, BrowserWindow, ipcMain, WebContentsView } from 'electron'
 import { createDesktopMode, createKioskMode } from './modes'
+import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
 
 /**
@@ -22,13 +24,26 @@ export class WindowSystem implements Startable, ViewHost {
   private activeViewId?: string
   private contentRect = { x: 0, y: 0, width: 0, height: 0 }
   private events?: EventBus
+  private readonly flavor: FlavorManifest
+  private readonly rendererDir: string
+  private readonly initialTheme: 'light' | 'dark' | 'system'
+  /** 通用浮层宿主：新增浮层 = 注册一条策略，本类零分发 */
+  readonly overlays: OverlayHost<OverlayKind>
 
   constructor(
-    private readonly flavor: FlavorManifest,
-    private readonly rendererDir: string,
+    flavor: FlavorManifest,
+    rendererDir: string,
     /** 启动外观：组合根从 flavor + 持久化设置读出，经启动参数同步注入渲染层 */
-    private readonly initialTheme: 'light' | 'dark' | 'system' = 'system',
-  ) {}
+    initialTheme: 'light' | 'dark' | 'system' = 'system',
+  ) {
+    this.flavor = flavor
+    this.rendererDir = rendererDir
+    this.initialTheme = initialTheme
+    this.overlays = new OverlayHost<OverlayKind>((policy, params) => this.createOverlay(policy, params))
+    for (const policy of DEFAULT_OVERLAY_POLICIES) {
+      this.overlays.register({ ...policy, parent: () => this.shellWindow })
+    }
+  }
 
   /** 注入事件总线（组合根在 createKernel 之后调用；崩溃事件经它广播） */
   bindEvents(events: EventBus): void {
@@ -37,6 +52,7 @@ export class WindowSystem implements Startable, ViewHost {
 
   async start(): Promise<void> {}
   async stop(): Promise<void> {
+    this.overlays.closeAll()
     for (const view of this.views.values()) { this.removeView(view) }
     this.views.clear()
     for (const win of this.windows.values()) { win.destroy() }
@@ -124,22 +140,35 @@ export class WindowSystem implements Startable, ViewHost {
 
   /** 拍摄浮窗 */
   openCaptureOverlay(): BrowserWindow {
-    return this.createOverlay('capture')
+    return this.overlays.open('capture')
   }
 
   /** 授权弹窗 */
   openPermissionDialog(): BrowserWindow {
-    return this.createOverlay('permission')
+    return this.overlays.open('permission')
   }
 
   /** 应用中心浮窗 */
   openAppCenterOverlay(): BrowserWindow {
-    return this.createOverlay('app-center')
+    return this.overlays.open('app-center')
   }
 
   /** 设置浮窗 */
   openSettingsOverlay(): BrowserWindow {
-    return this.createOverlay('settings')
+    return this.overlays.open('settings')
+  }
+
+  /** 通用宿主入口：会话/授权服务按种类取窗、带参数开窗、收场；新增浮层只改策略表 */
+  openOverlay(kind: OverlayKind, params?: Readonly<Record<string, string>>): BrowserWindow {
+    return this.overlays.open(kind, params)
+  }
+
+  getOverlay(kind: OverlayKind): BrowserWindow | undefined {
+    return this.overlays.get(kind)
+  }
+
+  dismissOverlay(kind: OverlayKind): void {
+    this.overlays.dismiss(kind)
   }
 
   get(id: number): BrowserWindow | undefined {
@@ -171,10 +200,17 @@ export class WindowSystem implements Startable, ViewHost {
     })
   }
 
-  private createOverlay(kind: string): BrowserWindow {
-    const win = new BrowserWindow({ ...overlayBase, width: 480, height: 360 })
+  private createOverlay(policy: OverlayPolicy<OverlayKind>, params: Readonly<Record<string, string>>): BrowserWindow {
+    const parent = policy.parent?.()
+    const win = new BrowserWindow({
+      ...overlayBase,
+      width: policy.width,
+      height: policy.height,
+      ...(parent ? { parent } : {}),
+    })
+    const extra = new URLSearchParams(params).toString()
+    const hash = extra ? `${policy.route}&${extra}` : policy.route
     const devUrl = process.env.ELECTRON_RENDERER_URL
-    const hash = `#/overlay?kind=${kind}`
     if (devUrl) { void win.loadURL(`${devUrl}/${hash}`) }
     else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash }) }
     win.once('ready-to-show', () => win.show())

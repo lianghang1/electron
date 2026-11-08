@@ -89,6 +89,7 @@ function main() {
   results.push(['typecheck', run('typecheck', 'pnpm', ['typecheck'])])
   results.push(['test', run('test', 'pnpm', ['test'], { show: true })])
   results.push(['e2e', run('e2e:update', 'pnpm', ['test:e2e:update'], { show: true })])
+  results.push(['e2e:overlay', run('e2e:overlay', 'pnpm', ['test:e2e:overlay'], { show: true })])
   results.push(['build', run('build', 'pnpm', ['build'], { show: true })])
   results.push(['dev-resolve', devResolve()])
 

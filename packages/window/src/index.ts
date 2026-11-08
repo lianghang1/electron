@@ -1,5 +1,7 @@
 export { createDesktopMode, createKioskMode } from './modes'
 export type { DesktopMode, KioskMode } from './modes'
+export { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
+export type { OverlayFactory, OverlayKind, OverlayPolicy } from './overlay-host'
 export * from './presets'
 export { TraySystem } from './tray'
 export { WindowSystem } from './window-system'

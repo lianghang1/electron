@@ -15,7 +15,7 @@ import { createDeviceGateway, createDomainRouter, createDriverResolver, detectDe
 import { createKernel } from '@shell/kernel'
 import { createRootLogger } from '@shell/kernel/logger'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
-import { configDir, filesDir, platformDataRoot } from '@shell/kernel/storage'
+import { configDir, filesDir, migrateLegacyLayout, platformDataRoot } from '@shell/kernel/storage'
 import { assertSafeSegment, flavorManifestSchema, matchesOrigin } from '@shell/shared'
 import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
 import { TraySystem, WindowSystem } from '@shell/window'
@@ -25,6 +25,9 @@ import { app, ipcMain, session } from 'electron'
  * 组合根：全仓库唯一的组装现场。
  * 读本文件 = 读产品目录；除此之外任何模块不得创建跨系统对象。
  */
+
+// 旧布局一次性迁移必须先于任何写盘；失败仅告警不阻断启动
+migrateLegacyLayout()
 
 const logger = createRootLogger()
 
