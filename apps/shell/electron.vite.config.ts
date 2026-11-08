@@ -40,7 +40,14 @@ export default defineConfig({
   preload: {
     build: {
       externalizeDeps,
+      // 沙箱 preload 只认 CJS（ESM preload 要求 sandbox:false，放弃安全默认）；
+      // 显式固定文件名，不受 app package.json type:module 影响
       rollupOptions: {
+        output: {
+          format: 'cjs',
+          entryFileNames: '[name].cjs',
+          chunkFileNames: '[name]-[hash].cjs',
+        },
         input: {
           index: fileURLToPath(new URL('./electron/preload/index.ts', import.meta.url)),
           jsapi: fileURLToPath(new URL('../../packages/bridge/src/jsapi-preload.ts', import.meta.url)),

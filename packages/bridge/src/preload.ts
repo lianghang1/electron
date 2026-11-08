@@ -1,4 +1,3 @@
-import process from 'node:process'
 import { contextBridge, ipcRenderer } from 'electron'
 
 /**
@@ -6,6 +5,10 @@ import { contextBridge, ipcRenderer } from 'electron'
  * 本文件集中暴露全部 contextBridge 能力——安全审计只看这一处。
  * 域方法按 @shell/shared 的域签名调用：invoke('domain.method', input)，
  * 运行时校验由主进程侧按 zod schema 执行。
+ *
+ * 本文件必须与沙箱 preload 白名单兼容（electron/events/timers/url 四个模块 +
+ * polyfill 的 process 全局）——只 import node:process 就会迫使主窗关沙箱：
+ * process.argv 读启动参数用沙箱 polyfill 的全局 process，不要 import。
  *
  * remote 页面不经过本桥（它们拿 JSAPI 受控桥，按 manifest.devices 过滤）。
  */

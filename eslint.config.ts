@@ -14,4 +14,12 @@ export default createEslintConfig(
       'ts/method-signature-style': 'off',
     },
   },
+  {
+    // 沙箱 preload 的 require 白名单只有 electron/events/timers/url——import 'node:process'
+    // 会迫使主窗关沙箱；process.argv 用沙箱 polyfill 的全局（该环境必然存在）
+    files: ['packages/bridge/src/preload.ts', 'packages/bridge/src/jsapi-preload.ts'],
+    rules: {
+      'node/prefer-global/process': 'off',
+    },
+  },
 )

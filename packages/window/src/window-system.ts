@@ -51,11 +51,12 @@ export class WindowSystem implements Startable, ViewHost {
       ...win32OcclusionSwitch,
       width: 1280,
       height: 800,
-      // shell 桥必须注入：preload 与 main/preload 产物同层（out/preload/index.mjs）
+      // shell 桥必须注入：preload 与 main/preload 产物同层（out/preload/index.cjs）。
+      // 沙箱保持 shellBase 的 true——preload 只用 contextBridge/ipcRenderer（白名单内）+
+      // 全局 process.argv，CJS 产物下沙箱可用，勿因 ESM preload 而关沙箱
       webPreferences: {
         ...shellBase.webPreferences,
-        sandbox: false,
-        preload: join(this.rendererDir, '../preload/index.mjs'),
+        preload: join(this.rendererDir, '../preload/index.cjs'),
         // 启动外观：同步随 preload 抵达，渲染层挂载前即可应用（零闪烁；不走异步 IPC）
         additionalArguments: [
           `--shell-accent=${this.flavor.branding.accent}`,
@@ -197,7 +198,8 @@ export class WindowSystem implements Startable, ViewHost {
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: !spec.preload,
+        // 恒为 true：jsapi preload 只用 contextBridge/ipcRenderer，白名单内沙箱可用
+        sandbox: true,
         preload: spec.preload,
         partition: spec.partition,
       },

@@ -116,7 +116,7 @@ async function main(): Promise<void> {
     [
       new EmbeddedOpener(),
       new PackagedOpener(windows, appsRoot),
-      new RemoteOpener(windows, join(__dirname, '../preload/jsapi.mjs')),
+      new RemoteOpener(windows, join(__dirname, '../preload/jsapi.cjs')),
     ],
     kernel.ctx.events,
   )
