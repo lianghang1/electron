@@ -1,7 +1,7 @@
 import type { Session } from 'electron'
-import { protocol } from 'electron'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, sep } from 'node:path'
+import { protocol } from 'electron'
 
 /**
  * app:// 内部页协议：服务打包好的应用 dist（resources/apps/<appId>/）。

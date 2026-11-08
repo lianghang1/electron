@@ -47,8 +47,7 @@ export class DistHotChannel implements UpdateChannel {
 
   async apply(plan: UpdatePlan): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
     const meta = plan as UpdatePlan & { appId?: string, sha256?: string }
-    if (!meta.appId || !meta.sha256)
-      return { ok: false, requiresRestart: false, error: 'dist-hot plan missing appId/sha256' }
+    if (!meta.appId || !meta.sha256) { return { ok: false, requiresRestart: false, error: 'dist-hot plan missing appId/sha256' } }
 
     const staging = join(this.options.appsRoot, `.staging-${meta.appId}`)
     const target = join(this.options.appsRoot, meta.appId)
@@ -63,13 +62,10 @@ export class DistHotChannel implements UpdateChannel {
 
       // 原子切换：旧目录先改名保留（.bak），新目录就位后删除——中途断电旧版本仍在
       const backup = join(this.options.appsRoot, `.bak-${meta.appId}`)
-      if (existsSync(backup))
-        rmSync(backup, { recursive: true, force: true })
-      if (existsSync(target))
-        renameSync(target, backup)
+      if (existsSync(backup)) { rmSync(backup, { recursive: true, force: true }) }
+      if (existsSync(target)) { renameSync(target, backup) }
       renameSync(staging, target)
-      if (existsSync(backup))
-        rmSync(backup, { recursive: true, force: true })
+      if (existsSync(backup)) { rmSync(backup, { recursive: true, force: true }) }
       return { ok: true, requiresRestart: false }
     }
     catch (err) {
@@ -80,8 +76,7 @@ export class DistHotChannel implements UpdateChannel {
 
   private async fetchManifest(): Promise<DistManifest> {
     const res = await fetch(this.options.manifestUrl)
-    if (!res.ok)
-      throw new Error(`manifest fetch failed: ${res.status}`)
+    if (!res.ok) { throw new Error(`manifest fetch failed: ${res.status}`) }
     return res.json() as Promise<DistManifest>
   }
 }

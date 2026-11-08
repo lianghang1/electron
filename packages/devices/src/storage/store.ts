@@ -1,6 +1,6 @@
 import type { Options } from 'electron-store'
-import Store from 'electron-store'
 import { configDir } from '@shell/kernel/storage'
+import Store from 'electron-store'
 
 /**
  * 平台统一的 Store 创建入口：所有 electron-store 文件集中落盘

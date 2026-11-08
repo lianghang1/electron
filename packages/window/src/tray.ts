@@ -1,5 +1,5 @@
 import type { EventBus, Startable } from '@shell/kernel'
-import { Menu, Tray, app, nativeImage } from 'electron'
+import { app, Menu, nativeImage, Tray } from 'electron'
 
 /**
  * TraySystem：桌面形态的系统托盘（kiosk 全屏形态不创建）。

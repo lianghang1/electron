@@ -1,19 +1,25 @@
 import type { EventBus } from '@shell/kernel'
 import type { Logger } from '@shell/kernel/logger'
 import type { DomainCallContext, DomainDefinition } from '@shell/shared'
-import { defineDomain } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
+import type { CaptureSystem } from './domains/capture'
+import type { IcCardSystem } from './domains/iccard'
+import type { IdCardSystem } from './domains/idcard'
+import type { PrintSystem } from './domains/print'
+import type { ScannerSystem } from './domains/scanner'
+import type { SignatureSystem } from './domains/signature'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { defineDomain } from '@shell/shared'
 import { app } from 'electron'
 import { z } from 'zod'
+import { createCaptureSystem } from './domains/capture'
+import { createIcCardSystem } from './domains/iccard'
+import { createIdCardSystem } from './domains/idcard'
+import { createPrintSystem } from './domains/print'
+import { createScannerSystem } from './domains/scanner'
+import { createSignatureSystem } from './domains/signature'
 import { DeviceHost } from './host/device-host'
-import { createCaptureSystem, type CaptureSystem } from './domains/capture'
-import { createIcCardSystem, type IcCardSystem } from './domains/iccard'
-import { createIdCardSystem, type IdCardSystem } from './domains/idcard'
-import { createPrintSystem, type PrintSystem } from './domains/print'
-import { createScannerSystem, type ScannerSystem } from './domains/scanner'
-import { createSignatureSystem, type SignatureSystem } from './domains/signature'
 
 /**
  * 设备网关：主进程侧的域方法装配与调用路由（铁律二）。
@@ -50,15 +56,15 @@ export interface DeviceGatewayOptions {
 export interface DeviceGateway {
   domains: DomainDefinition[]
   /** 预热守护进程（含 koffi 加载）；完成即打 t2DeviceHostReady */
-  warmup(onReady: () => void): Promise<void>
+  warmup: (onReady: () => void) => Promise<void>
   /** 工作台窗口就绪后调用：scanner 键盘观察挂到窗口（域方法不依赖窗口时序） */
-  attachShellWindow(win: BrowserWindow): void
-  dispose(): void
+  attachShellWindow: (win: BrowserWindow) => void
+  dispose: () => void
 }
 
 /** 域调用路由："<域>.<方法>" → zod 校验 + handler 分发（组合根把它接到 ipcMain） */
 export interface DomainRouter {
-  call(method: string, input: unknown, ctx: DomainCallContext): Promise<unknown>
+  call: (method: string, input: unknown, ctx: DomainCallContext) => Promise<unknown>
 }
 
 export class DomainRouteError extends Error {
@@ -74,20 +80,17 @@ export class DomainRouteError extends Error {
 export function createDomainRouter(domains: DomainDefinition[], logger: Logger): DomainRouter {
   const table = new Map<string, DomainDefinition['methods'][string]>()
   for (const domain of domains) {
-    for (const [name, def] of Object.entries(domain.methods))
-      table.set(`${domain.name}.${name}`, def)
+    for (const [name, def] of Object.entries(domain.methods)) { table.set(`${domain.name}.${name}`, def) }
   }
 
   return {
     async call(method, input, ctx) {
       const started = Date.now()
       const def = table.get(method)
-      if (!def)
-        throw new DomainRouteError('METHOD_NOT_FOUND', `未注册的域方法：${method}`)
+      if (!def) { throw new DomainRouteError('METHOD_NOT_FOUND', `未注册的域方法：${method}`) }
 
       const parsed = def.input.safeParse(input)
-      if (!parsed.success)
-        throw new DomainRouteError('INVALID_INPUT', `入参校验失败：${method}`, parsed.error.flatten())
+      if (!parsed.success) { throw new DomainRouteError('INVALID_INPUT', `入参校验失败：${method}`, parsed.error.flatten()) }
 
       try {
         return await def.handler(parsed.data as never, ctx)
@@ -165,8 +168,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
   /** IC 卡/读卡器定位：deviceId 缺省 = 第一个就绪设备（沿用旧域通道语义） */
   async function pickReady(devices: { id: string, status: string }[], kind: string): Promise<string> {
     const found = devices.find(d => d.status === 'ready')?.id
-    if (!found)
-      throw new DomainRouteError('DEVICE_NOT_FOUND', `无可用${kind}`)
+    if (!found) { throw new DomainRouteError('DEVICE_NOT_FOUND', `无可用${kind}`) }
     return found
   }
 
@@ -301,8 +303,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
         input: z.object({ code: z.string().min(1) }),
         output: z.unknown(),
         handler: ({ code }) => {
-          if (app.isPackaged)
-            throw new DomainRouteError('INVALID_INPUT', 'scanner.simulate 仅限开发环境')
+          if (app.isPackaged) { throw new DomainRouteError('INVALID_INPUT', 'scanner.simulate 仅限开发环境') }
           return scanner.simulate(code)
         },
       },
@@ -356,8 +357,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
         handler: async (input) => {
           const resolved = input.deviceId
             ?? (await capture.resolveDefaultDevice() as { id?: string } | undefined)?.id
-          if (!resolved)
-            throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备')
+          if (!resolved) { throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备') }
           // 预览帧经 EventBus 广播（高频数据不进 invoke 通道）
           return capture.startPreview(resolved, frame =>
             options.events.emit('capture.frame', { deviceId: resolved, frame }))
@@ -374,8 +374,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
         handler: async ({ deviceId }) => {
           const resolved = deviceId
             ?? (await capture.resolveDefaultDevice() as { id?: string } | undefined)?.id
-          if (!resolved)
-            throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备')
+          if (!resolved) { throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备') }
           return capture.listCameras(resolved)
         },
       },

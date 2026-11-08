@@ -5,13 +5,13 @@
 export interface Startable {
   /** 名称用于启动日志与错误定位 */
   readonly name: string
-  start(): Promise<void>
-  stop(): Promise<void>
+  start: () => Promise<void>
+  stop: () => Promise<void>
 }
 
 /** 可释放资源（窗口、进程句柄等） */
 export interface Disposable {
-  dispose(): void
+  dispose: () => void
 }
 
 /** 启动阶段打点（launch marks）：T0=进程启动 → T4=首帧渲染 */

@@ -1,5 +1,5 @@
-export { WindowSystem } from './window-system'
-export * from './presets'
 export { createDesktopMode, createKioskMode } from './modes'
-export type { KioskMode, DesktopMode } from './modes'
+export type { DesktopMode, KioskMode } from './modes'
+export * from './presets'
 export { TraySystem } from './tray'
+export { WindowSystem } from './window-system'

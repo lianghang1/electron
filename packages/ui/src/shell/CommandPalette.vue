@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { AppWindow, Search } from 'lucide-vue-next'
 /**
  * CommandPalette：⌘K/Ctrl+K 居中命令面板（替换顶栏 + 号小浮层）。
  * 交互收敛到搜索框一个焦点（VS Code / Linear 范式）：↑↓ 选择 / ↵ 打开 /
@@ -6,7 +7,6 @@
  * 视觉纪律：灰阶 + 单强调色，仅选中行出现 accent，无渐变、无堆叠阴影。
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { AppWindow, Search } from 'lucide-vue-next'
 
 interface PaletteItem {
   id: string
@@ -22,7 +22,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  select: [id: string]
+  'select': [id: string]
 }>()
 
 const query = ref('')
@@ -31,16 +31,14 @@ const inputEl = ref<HTMLInputElement | null>(null)
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
-  if (!q)
-    return props.items
+  if (!q) { return props.items }
   return props.items.filter(i =>
     i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q),
   )
 })
 
 const recentItems = computed<PaletteItem[]>(() => {
-  if (query.value.trim())
-    return []
+  if (query.value.trim()) { return [] }
   return props.recentIds
     .map(id => props.items.find(i => i.id === id))
     .filter((i): i is PaletteItem => i !== undefined)
@@ -64,8 +62,7 @@ function choose(id: string): void {
 }
 
 function onWindowKeydown(e: KeyboardEvent): void {
-  if (!props.open)
-    return
+  if (!props.open) { return }
   switch (e.key) {
     case 'Escape':
       e.preventDefault()
@@ -73,19 +70,16 @@ function onWindowKeydown(e: KeyboardEvent): void {
       break
     case 'ArrowDown':
       e.preventDefault()
-      if (flat.value.length)
-        highlighted.value = (highlighted.value + 1) % flat.value.length
+      if (flat.value.length) { highlighted.value = (highlighted.value + 1) % flat.value.length }
       break
     case 'ArrowUp':
       e.preventDefault()
-      if (flat.value.length)
-        highlighted.value = (highlighted.value - 1 + flat.value.length) % flat.value.length
+      if (flat.value.length) { highlighted.value = (highlighted.value - 1 + flat.value.length) % flat.value.length }
       break
     case 'Enter': {
       e.preventDefault()
       const item = flat.value[highlighted.value]
-      if (item)
-        choose(item.id)
+      if (item) { choose(item.id) }
       break
     }
     case 'Tab':
@@ -99,8 +93,7 @@ function onWindowKeydown(e: KeyboardEvent): void {
 }
 
 watch(() => props.open, async (open) => {
-  if (!open)
-    return
+  if (!open) { return }
   query.value = ''
   highlighted.value = 0
   await nextTick()
@@ -148,7 +141,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
       <!-- 结果列表 -->
       <div class="cp-list max-h-[46vh] overflow-y-auto py-1.5" role="listbox" aria-label="应用列表">
         <template v-if="recentItems.length">
-          <p class="px-4 py-1.5 text-[11px] font-medium" style="color: var(--dt-text-3)">最近使用</p>
+          <p class="px-4 py-1.5 text-[11px] font-medium" style="color: var(--dt-text-3)">
+            最近使用
+          </p>
           <div
             v-for="(item, i) in recentItems"
             :id="`cp-opt-${i}`"
@@ -169,7 +164,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
         </template>
 
         <template v-if="restItems.length">
-          <p class="px-4 py-1.5 text-[11px] font-medium" style="color: var(--dt-text-3)">{{ recentItems.length ? '全部应用' : '应用' }}</p>
+          <p class="px-4 py-1.5 text-[11px] font-medium" style="color: var(--dt-text-3)">
+            {{ recentItems.length ? '全部应用' : '应用' }}
+          </p>
           <div
             v-for="(item, j) in restItems"
             :id="`cp-opt-${recentItems.length + j}`"

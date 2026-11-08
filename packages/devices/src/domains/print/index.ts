@@ -1,6 +1,6 @@
+import type { Logger } from '@shell/kernel/logger'
 import type { JobStatus, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
-import type { Logger } from '@shell/kernel/logger'
 import type { DeviceHost } from '../../host/device-host'
 import { HiddenWindowPool } from './hidden-window'
 import { PrinterRegistry } from './printer-registry'

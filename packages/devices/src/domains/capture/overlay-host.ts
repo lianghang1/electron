@@ -8,9 +8,9 @@ import type { WebContents } from 'electron'
  */
 export interface CaptureOverlayHost {
   /** 浮层确认/取消后经此回传会话结果 */
-  pushCaptureSession(session: CaptureDialogSession): void
+  pushCaptureSession: (session: CaptureDialogSession) => void
   /** 浮层窗句柄（预览帧与结果回传的 sender 身份校验用） */
-  getCaptureWindow(): { webContents: WebContents } | null
+  getCaptureWindow: () => { webContents: WebContents } | null
   /** 结束当前拍摄会话并关闭浮层 */
-  dismissCaptureSession(): void
+  dismissCaptureSession: () => void
 }

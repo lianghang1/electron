@@ -1,13 +1,13 @@
 {
   "compilerOptions": {
     "target": "ES2023",
+    "jsx": "preserve",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "types": ["node"],
     "strict": true,
-    "skipLibCheck": true,
     "noEmit": true,
-    "jsx": "preserve",
-    "types": ["node"]
+    "skipLibCheck": true
   },
   "include": ["src", "vite.config.ts"]
 }

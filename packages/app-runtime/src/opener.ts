@@ -6,9 +6,9 @@ import type { AppInstance, AppManifest } from '@shell/shared'
  */
 export interface AppOpener {
   readonly kind: string
-  supports(entry: AppManifest['entry']): boolean
-  open(manifest: AppManifest, instance: AppInstance): Promise<void>
-  close(instance: AppInstance): Promise<void>
+  supports: (entry: AppManifest['entry']) => boolean
+  open: (manifest: AppManifest, instance: AppInstance) => Promise<void>
+  close: (instance: AppInstance) => Promise<void>
 }
 
 /** 运行中实例的容器句柄：各 opener 自行扩展（如 WebContentsView 引用） */

@@ -32,7 +32,9 @@ const forwarded = useForwardPropsEmits(() => props, emit)
         :style="{ width: props.width ?? '480px', maxWidth: '92vw', maxHeight: '84vh', overflow: 'auto', background: 'var(--dt-surface)', border: '1px solid var(--dt-line)', borderRadius: '14px' }"
       >
         <div class="mb-4 flex items-center justify-between">
-          <DialogTitle class="text-[15px] font-semibold" style="color: var(--dt-text-1)">{{ props.title }}</DialogTitle>
+          <DialogTitle class="text-[15px] font-semibold" style="color: var(--dt-text-1)">
+            {{ props.title }}
+          </DialogTitle>
           <DialogClose
             class="flex size-7 items-center justify-center rounded-md hover:bg-[var(--dt-hover)]"
             style="color: var(--dt-text-3)"

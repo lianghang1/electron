@@ -1,5 +1,5 @@
-import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides, CaptureLogFn, CaptureRequest, CaptureResult } from '@shell/shared'
 import type { Logger } from '@shell/kernel/logger'
+import type { CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides, CaptureLogFn, CaptureRequest, CaptureResult } from '@shell/shared'
 import type { DeviceHost } from '../../host/device-host'
 import { CaptureService } from './service'
 

@@ -1,9 +1,9 @@
 <script setup lang="ts">
+defineProps<{ placeholder?: string }>()
 /**
  * Input：文本输入（纯皮肤组件）。
  */
 const model = defineModel<string>({ default: '' })
-defineProps<{ placeholder?: string }>()
 </script>
 
 <template>

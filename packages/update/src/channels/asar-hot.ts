@@ -1,4 +1,4 @@
-import type { UpdateCenter, UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
+import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { app } from 'electron'
@@ -43,11 +43,9 @@ export class AsarHotChannel implements UpdateChannel {
   }
 
   async check(current: VersionMatrix): Promise<UpdatePlan | null> {
-    if (!existsSync(join(this.options.resourcesDir, 'app.asar')))
-      return null
+    if (!existsSync(join(this.options.resourcesDir, 'app.asar'))) { return null }
     const res = await fetch(this.options.manifestUrl)
-    if (!res.ok)
-      throw new Error(`manifest fetch failed: ${res.status}`)
+    if (!res.ok) { throw new Error(`manifest fetch failed: ${res.status}`) }
     const manifest = await res.json() as AsarManifest
     if ((current.asar ?? '0.0.0') < manifest.asar.version) {
       return {
@@ -66,8 +64,7 @@ export class AsarHotChannel implements UpdateChannel {
       mkdirSync(this.updaterDir, { recursive: true })
       const pendingAsar = join(this.updaterDir, 'pending.asar')
       await downloadFile(plan.downloadUrl, pendingAsar)
-      if (meta.sha256)
-        await verifySha256(pendingAsar, meta.sha256)
+      if (meta.sha256) { await verifySha256(pendingAsar, meta.sha256) }
 
       writeFileSync(join(this.updaterDir, MARKER), JSON.stringify({ version: plan.targetVersion, stage: 'downloaded' }))
       return { ok: true, requiresRestart: true }
@@ -87,8 +84,7 @@ type UpdateCenterVersionMatrix = VersionMatrix
 export function finalizeAsarUpdate(resourcesDir: string): void {
   const updaterDir = join(app.getPath('userData'), UPDATER_DIR)
   const markerPath = join(updaterDir, MARKER)
-  if (!existsSync(markerPath))
-    return
+  if (!existsSync(markerPath)) { return }
 
   let stage: Stage = 'downloaded'
   try {
@@ -104,8 +100,7 @@ export function finalizeAsarUpdate(resourcesDir: string): void {
 
   if (stage === 'downloaded' && existsSync(pendingAsar)) {
     // 原子换名：当前 → .bak（回滚点），pending → 正式位
-    if (existsSync(liveAsar))
-      renameSync(liveAsar, bakAsar)
+    if (existsSync(liveAsar)) { renameSync(liveAsar, bakAsar) }
     renameSync(pendingAsar, liveAsar)
     writeFileSync(markerPath, JSON.stringify({ stage: 'swapped' }))
     return
@@ -114,6 +109,5 @@ export function finalizeAsarUpdate(resourcesDir: string): void {
   // swapped（或 downloaded 但 pending 丢失——下载被中断）：清理收尾
   rmSync(bakAsar, { force: true })
   rmSync(markerPath, { force: true })
-  if (stage === 'downloaded')
-    rmSync(pendingAsar, { force: true })
+  if (stage === 'downloaded') { rmSync(pendingAsar, { force: true }) }
 }

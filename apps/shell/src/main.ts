@@ -1,12 +1,11 @@
+import { bootstrapAppearance, registerEmbeddedApp, ShellApp } from '@shell/ui'
 import { createApp, defineComponent, h } from 'vue'
-import { ShellApp, bootstrapAppearance, registerEmbeddedApp } from '@shell/ui'
 import DemoTable from './demo/DemoTable.vue'
 import '@shell/ui/styles.css'
 
 // 挂载前同步应用启动外观：preload 已写 :root，此处补 system 模式的动态跟随
 const boot = window.desktop?.shell.appearance()
-if (boot)
-  bootstrapAppearance(boot.accent, boot.theme)
+if (boot) { bootstrapAppearance(boot.accent, boot.theme) }
 
 /* platform-demo 演示应用：三个 embedded 业务页，仅当有对应 flavor 时才有意义，
    注册动作本身是渲染层职责（vue 组件不进主进程包）。 */

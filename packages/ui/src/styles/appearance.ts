@@ -38,10 +38,8 @@ export function applyTheme(pref: ThemePreference): void {
 }
 
 function paint(resolved: 'light' | 'dark'): void {
-  if (resolved === 'dark')
-    document.documentElement.dataset.theme = 'dark'
-  else
-    document.documentElement.removeAttribute('data-theme')
+  if (resolved === 'dark') { document.documentElement.dataset.theme = 'dark' }
+  else { document.documentElement.removeAttribute('data-theme') }
 }
 
 /** 挂载前一次性 bootstrap（同步，无 IPC） */

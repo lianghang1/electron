@@ -1,5 +1,5 @@
-import type { SignatureConfig, SignatureDeviceOverrides, SignDeviceConfig } from '@shell/shared'
 import type { Logger } from '@shell/kernel/logger'
+import type { SignatureConfig, SignatureDeviceOverrides, SignDeviceConfig } from '@shell/shared'
 import type { DeviceHost } from '../../host/device-host'
 import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
 

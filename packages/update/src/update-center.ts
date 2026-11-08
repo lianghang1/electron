@@ -30,8 +30,8 @@ export interface ApplyResult {
  */
 export interface UpdateChannel {
   readonly id: 'dist-hot' | 'asar-hot' | 'full-package'
-  check(current: VersionMatrix): Promise<UpdatePlan | null>
-  apply(plan: UpdatePlan): Promise<ApplyResult>
+  check: (current: VersionMatrix) => Promise<UpdatePlan | null>
+  apply: (plan: UpdatePlan) => Promise<ApplyResult>
 }
 
 export interface UpdateCenterOptions {
@@ -53,15 +53,13 @@ export class UpdateCenter implements Startable {
 
   async start(): Promise<void> {
     const interval = this.options.intervalMs ?? 6 * 60 * 60 * 1000
-    if (interval > 0)
-      this.timer = setInterval(() => void this.checkAndApply(), interval)
+    if (interval > 0) { this.timer = setInterval(() => void this.checkAndApply(), interval) }
     // 启动即巡检一次（延迟 1min，避开启动高峰）
     setTimeout(() => void this.checkAndApply(), 60_000)
   }
 
   async stop(): Promise<void> {
-    if (this.timer)
-      clearInterval(this.timer)
+    if (this.timer) { clearInterval(this.timer) }
   }
 
   /** 巡检一轮：灰度过滤 → 首个可用 plan → 应用 → 事件上报 */
@@ -72,10 +70,8 @@ export class UpdateCenter implements Startable {
         return { skipped: 'up-to-date' }
       }
       const result = await this.apply(plan)
-      if (result.ok)
-        this.options.events.emit('update.applied', { channel: plan.channel, version: plan.targetVersion })
-      else
-        this.options.events.emit('update.failed', { channel: plan.channel, reason: result.error ?? 'unknown' })
+      if (result.ok) { this.options.events.emit('update.applied', { channel: plan.channel, version: plan.targetVersion }) }
+      else { this.options.events.emit('update.failed', { channel: plan.channel, reason: result.error ?? 'unknown' }) }
       return result
     }
     catch (err) {
@@ -99,14 +95,12 @@ export class UpdateCenter implements Startable {
 
   async apply(plan: UpdatePlan): Promise<ApplyResult> {
     const channel = this.options.channels.find(c => c.id === plan.channel)
-    if (!channel)
-      return { ok: false, requiresRestart: false, error: `unknown channel: ${plan.channel}` }
+    if (!channel) { return { ok: false, requiresRestart: false, error: `unknown channel: ${plan.channel}` } }
 
     // 灰度闸门：白名单优先，其次百分比放量（未配置灰度 = 全量放行）
     if (this.options.greylist) {
       const { whitelist, percent } = this.options.greylist
-      if (!isGreylisted(this.options.deviceId, whitelist, percent))
-        return { ok: false, requiresRestart: false, error: 'greylisted: device not in rollout' }
+      if (!isGreylisted(this.options.deviceId, whitelist, percent)) { return { ok: false, requiresRestart: false, error: 'greylisted: device not in rollout' } }
     }
     return channel.apply(plan)
   }

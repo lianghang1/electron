@@ -29,8 +29,7 @@ export class FullPackageChannel implements UpdateChannel {
 
   async check(current: VersionMatrix): Promise<UpdatePlan | null> {
     const res = await fetch(this.options.manifestUrl)
-    if (!res.ok)
-      throw new Error(`manifest fetch failed: ${res.status}`)
+    if (!res.ok) { throw new Error(`manifest fetch failed: ${res.status}`) }
     const manifest = await res.json() as FullManifest
     if (current.shell < manifest.package.version) {
       return {
@@ -48,8 +47,7 @@ export class FullPackageChannel implements UpdateChannel {
     try {
       const installerPath = join(app.getPath('userData'), 'desktop-updater', 'pending-installer.exe')
       await downloadFile(plan.downloadUrl, installerPath)
-      if (meta.sha256)
-        await verifySha256(installerPath, meta.sha256)
+      if (meta.sha256) { await verifySha256(installerPath, meta.sha256) }
 
       // 安排退出后安装：before-quit 时由 installScheduled() 拉起分离进程
       scheduled = { installerPath, args: meta.silentArgs ?? '/S' }
@@ -64,8 +62,7 @@ export class FullPackageChannel implements UpdateChannel {
 
 /** 组合根在退出流程调用：有排程则拉起分离的安装进程再退出 */
 export function installScheduled(): void {
-  if (!scheduled)
-    return
+  if (!scheduled) { return }
   const child = spawn(scheduled.installerPath, scheduled.args.split(' '), {
     detached: true,
     stdio: 'ignore',

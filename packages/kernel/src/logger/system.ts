@@ -1,11 +1,11 @@
+import type { EventBus } from '../event-bus'
 import type { Logger } from './logger'
 import { app } from 'electron'
 import log from 'electron-log/main'
-import type { EventBus } from '../event-bus'
 
 /** 渲染进程身份反查：由窗口系统实现（M2 注入），内核只依赖此最小契约 */
 export interface CallerResolver {
-  tryResolve(contents: Electron.WebContents): { appId: string } | undefined
+  tryResolve: (contents: Electron.WebContents) => { appId: string } | undefined
 }
 
 /**

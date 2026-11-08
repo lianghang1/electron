@@ -21,13 +21,13 @@ export interface ViewSpec {
 
 export interface ViewHost {
   /** 创建视图（隐藏态挂载，不显示）；返回值由 opener 存入 instance.handle.view */
-  create(spec: ViewSpec): unknown
+  create: (spec: ViewSpec) => unknown
   /** 激活：视图按最新内容区矩形显示并置顶 */
-  activate(instanceId: string): void
+  activate: (instanceId: string) => void
   /** 隐藏（切到 embedded 页或其他视图时调用） */
-  deactivate(instanceId: string): void
+  deactivate: (instanceId: string) => void
   /** 销毁并从窗口摘除 */
-  destroy(instanceId: string): void
+  destroy: (instanceId: string) => void
   /** 渲染层上报的内容区矩形（CSS px，相对窗口内容原点） */
-  setContentRect(rect: { x: number, y: number, width: number, height: number }): void
+  setContentRect: (rect: { x: number, y: number, width: number, height: number }) => void
 }

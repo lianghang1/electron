@@ -1,5 +1,5 @@
-import type { IccardConfig, IccardDeviceOverrides } from '@shell/shared'
 import type { Logger } from '@shell/kernel/logger'
+import type { IccardConfig, IccardDeviceOverrides } from '@shell/shared'
 import type { DeviceHost } from '../../host/device-host'
 import type { IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice } from './types'
 import { IcCardService } from './service'

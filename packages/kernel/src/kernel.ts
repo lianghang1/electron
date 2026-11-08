@@ -1,7 +1,7 @@
 import type { FlavorManifest } from '@shell/shared'
-import type { Startable } from './lifecycle'
-import { createLaunchMarks, type LaunchMarks } from './lifecycle'
+import type { LaunchMarks, Startable } from './lifecycle'
 import { EventBus } from './event-bus'
+import { createLaunchMarks } from './lifecycle'
 
 /**
  * 平台内核上下文：组合根创建一次，各系统经构造函数接收。
@@ -25,9 +25,9 @@ export interface KernelSystem extends Startable {
 export interface PlatformKernel {
   ctx: KernelContext
   /** 注册后补系统：kernel 已启动则立即拉起，否则并入启动序（组合根解耦创建时序用） */
-  register(system: KernelSystem): Promise<void>
-  start(): Promise<void>
-  stop(): Promise<void>
+  register: (system: KernelSystem) => Promise<void>
+  start: () => Promise<void>
+  stop: () => Promise<void>
 }
 
 export function createKernel(flavor: FlavorManifest, systems: KernelSystem[] = []): PlatformKernel {
@@ -42,8 +42,7 @@ export function createKernel(flavor: FlavorManifest, systems: KernelSystem[] = [
   }
 
   async function start(): Promise<void> {
-    for (const system of systems)
-      await startOne(system)
+    for (const system of systems) { await startOne(system) }
     bootCompleted = true
     ctx.marks.t1KernelReady = Date.now()
   }
@@ -57,8 +56,7 @@ export function createKernel(flavor: FlavorManifest, systems: KernelSystem[] = [
   }
 
   async function stop(): Promise<void> {
-    for (const system of started.reverse())
-      await system.stop().catch(() => {})
+    for (const system of started.reverse()) { await system.stop().catch(() => {}) }
   }
 
   return { ctx, register, start, stop }

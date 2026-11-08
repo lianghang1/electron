@@ -1,3 +1,4 @@
+import process from 'node:process'
 import { contextBridge, ipcRenderer } from 'electron'
 
 /**
@@ -27,18 +28,14 @@ const bootAppearance = readBootAppearance()
 function injectBootAppearance(): void {
   const apply = () => {
     const root = document.documentElement
-    if (!root)
-      return
+    if (!root) { return }
     root.style.setProperty('--dt-accent', bootAppearance.accent)
     const dark = bootAppearance.theme === 'dark'
       || (bootAppearance.theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches)
-    if (dark)
-      root.dataset.theme = 'dark'
+    if (dark) { root.dataset.theme = 'dark' }
   }
-  if (document.documentElement)
-    apply()
-  else
-    document.addEventListener('DOMContentLoaded', apply, { once: true })
+  if (document.documentElement) { apply() }
+  else { document.addEventListener('DOMContentLoaded', apply, { once: true }) }
 }
 
 injectBootAppearance()

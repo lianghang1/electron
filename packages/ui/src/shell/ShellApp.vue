@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { desktop } from '@shell/bridge/client'
+import { AppWindow, Minus, Plus, Settings, Square, X } from 'lucide-vue-next'
 /**
  * ShellApp：壳 chrome 渲染（按 flavor.chrome 档位分支）。
  * - platform：完整壳——44px tab 条 / 64px 图标栏 / 命令面板 / 空状态兜底
@@ -9,12 +11,10 @@
  * - packaged/remote：主进程 WebContentsView 盖在内容区矩形上（rect 经桥上报）
  */
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { Settings, Plus, Minus, Square, X, AppWindow } from 'lucide-vue-next'
-import { desktop } from '@shell/bridge/client'
-import { resolveEmbeddedRoute } from '../apps/registry'
 import EmptyState from '../apps/pages/EmptyState.vue'
-import SettingsDialog from './SettingsDialog.vue'
+import { resolveEmbeddedRoute } from '../apps/registry'
 import CommandPalette from './CommandPalette.vue'
+import SettingsDialog from './SettingsDialog.vue'
 
 /** 工作台 tab：embedded 路由页或视图实例（packaged/remote） */
 interface ShellTab {
@@ -61,8 +61,7 @@ let resizeObserver: ResizeObserver | undefined
 
 function reportRect() {
   const el = contentEl.value
-  if (!el)
-    return
+  if (!el) { return }
   const r = el.getBoundingClientRect()
   desktop().reportContentRect({ x: r.left, y: r.top, width: r.width, height: r.height })
 }
@@ -81,8 +80,7 @@ function activate(tab: ShellTab) {
 
 function colorFor(appId: string): string {
   let hash = 0
-  for (const ch of appId)
-    hash = (hash * 31 + ch.charCodeAt(0)) >>> 0
+  for (const ch of appId) { hash = (hash * 31 + ch.charCodeAt(0)) >>> 0 }
   return TAB_COLORS[hash % TAB_COLORS.length]!
 }
 
@@ -122,12 +120,12 @@ async function openApp(appId: string) {
 
 function closeTab(tab: ShellTab) {
   tabs.value = tabs.value.filter(t => t.key !== tab.key)
-  if (tab.instanceId)
-    void desktop().apps.close(tab.instanceId)
+  if (tab.instanceId) { void desktop().apps.close(tab.instanceId) }
   if (activeKey.value === tab.key) {
     const next = tabs.value[tabs.value.length - 1]
-    if (next)
+    if (next) {
       activate(next)
+    }
     else {
       // 全关 = 回空状态页（主进程隐藏全部视图）
       activeKey.value = ''
@@ -156,8 +154,7 @@ function updateTabFade() {
 function scrollActiveIntoView() {
   const strip = tabStripEl.value
   const active = strip?.querySelector<HTMLElement>('.tab-active')
-  if (strip && active)
-    active.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  if (strip && active) { active.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }
   updateTabFade()
 }
 
@@ -178,11 +175,9 @@ function onDragStart(e: DragEvent, tab: ShellTab) {
 }
 
 function onDragOver(e: DragEvent, tab: ShellTab) {
-  if (!draggingKey.value || draggingKey.value === tab.key)
-    return
+  if (!draggingKey.value || draggingKey.value === tab.key) { return }
   e.preventDefault()
-  if (e.dataTransfer)
-    e.dataTransfer.dropEffect = 'move'
+  if (e.dataTransfer) { e.dataTransfer.dropEffect = 'move' }
   dropTargetKey.value = tab.key
 }
 
@@ -211,11 +206,9 @@ function onDragEnd() {
 /* ---------------- 全局快捷键（仅 platform 档） ---------------- */
 
 function onGlobalKeydown(e: KeyboardEvent) {
-  if (chrome.value !== 'platform')
-    return
+  if (chrome.value !== 'platform') { return }
   const mod = e.ctrlKey || e.metaKey
-  if (!mod)
-    return
+  if (!mod) { return }
 
   // ⌘K / Ctrl+K：开关命令面板
   if (e.key.toLowerCase() === 'k') {
@@ -223,8 +216,7 @@ function onGlobalKeydown(e: KeyboardEvent) {
     showPalette.value = !showPalette.value
     return
   }
-  if (showPalette.value)
-    return
+  if (showPalette.value) { return }
 
   // Ctrl+Tab / Ctrl+Shift+Tab：tab 轮转
   if (e.key === 'Tab' && tabs.value.length > 1) {
@@ -248,8 +240,7 @@ function onGlobalKeydown(e: KeyboardEvent) {
 onMounted(async () => {
   reportRect()
   resizeObserver = new ResizeObserver(reportRect)
-  if (contentEl.value)
-    resizeObserver.observe(contentEl.value)
+  if (contentEl.value) { resizeObserver.observe(contentEl.value) }
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onGlobalKeydown)
 
@@ -265,8 +256,7 @@ onMounted(async () => {
   const info = await desktop().shell.info()
   chrome.value = info.chrome
   mode.value = info.mode
-  if (info.defaultAppId && list.some(a => a.manifest.id === info.defaultAppId))
-    void openApp(info.defaultAppId)
+  if (info.defaultAppId && list.some(a => a.manifest.id === info.defaultAppId)) { void openApp(info.defaultAppId) }
   await nextTick(updateTabFade)
 })
 

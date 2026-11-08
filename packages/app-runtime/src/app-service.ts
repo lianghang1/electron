@@ -1,7 +1,7 @@
-import type { AppInstance, AppManifest, RegisteredApp } from '@shell/shared'
 import type { EventBus, Startable } from '@shell/kernel'
-import { randomUUID } from 'node:crypto'
+import type { AppInstance, AppManifest, RegisteredApp } from '@shell/shared'
 import type { AppOpener } from './opener'
+import { randomUUID } from 'node:crypto'
 
 export class AppOpenError extends Error {
   constructor(public readonly code: 'APP_NOT_FOUND' | 'APP_NOT_ALLOWED' | 'NO_OPENER', message: string) {
@@ -28,13 +28,11 @@ export class AppService implements Startable {
 
   async start(): Promise<void> {}
   async stop(): Promise<void> {
-    for (const instance of this.instances.values())
-      await this.close(instance.instanceId, 'update').catch(() => {})
+    for (const instance of this.instances.values()) { await this.close(instance.instanceId, 'update').catch(() => {}) }
   }
 
   register(manifest: AppManifest, source: RegisteredApp['source'] = 'flavor'): void {
-    if (this.registry.has(manifest.id))
-      throw new Error(`[app-runtime] App already registered: ${manifest.id}`)
+    if (this.registry.has(manifest.id)) { throw new Error(`[app-runtime] App already registered: ${manifest.id}`) }
     this.registry.set(manifest.id, { manifest, source })
   }
 
@@ -44,27 +42,22 @@ export class AppService implements Startable {
 
   find(instanceId: string): { instance: AppInstance, registered: RegisteredApp } | undefined {
     const instance = this.instances.get(instanceId)
-    if (!instance)
-      return undefined
+    if (!instance) { return undefined }
     const registered = this.registry.get(instance.appId)
-    if (!registered)
-      return undefined
+    if (!registered) { return undefined }
     return { instance, registered }
   }
 
   async open(appId: string): Promise<AppInstance> {
     const registered = this.registry.get(appId)
-    if (!registered)
-      throw new AppOpenError('APP_NOT_FOUND', `App not registered: ${appId}`)
-    if (registered.manifest.type === 'third-party' && !this.allowThirdParty())
-      throw new AppOpenError('APP_NOT_ALLOWED', `Third-party app is not allowed: ${appId}`)
+    if (!registered) { throw new AppOpenError('APP_NOT_FOUND', `App not registered: ${appId}`) }
+    if (registered.manifest.type === 'third-party' && !this.allowThirdParty()) { throw new AppOpenError('APP_NOT_ALLOWED', `Third-party app is not allowed: ${appId}`) }
 
     // 同 App 复用活跃实例
     const activeId = this.activeByApp.get(appId)
     if (activeId) {
       const existing = this.instances.get(activeId)
-      if (existing && existing.state !== 'closed')
-        return existing
+      if (existing && existing.state !== 'closed') { return existing }
     }
 
     const instance: AppInstance = {
@@ -79,8 +72,7 @@ export class AppService implements Startable {
     this.events.emit('app.opening', { appId, instanceId: instance.instanceId })
 
     const opener = this.openers.find(o => o.supports(registered.manifest.entry))
-    if (!opener)
-      throw new AppOpenError('NO_OPENER', `No opener supports entry kind of: ${appId}`)
+    if (!opener) { throw new AppOpenError('NO_OPENER', `No opener supports entry kind of: ${appId}`) }
     await opener.open(registered.manifest, instance)
     instance.state = 'opened'
     this.events.emit('app.opened', { appId, instanceId: instance.instanceId })
@@ -89,16 +81,13 @@ export class AppService implements Startable {
 
   async close(instanceId: string, reason: 'user' | 'crash' | 'update' = 'user'): Promise<void> {
     const instance = this.instances.get(instanceId)
-    if (!instance || instance.state === 'closed')
-      return
+    if (!instance || instance.state === 'closed') { return }
     instance.state = 'closing'
     const registered = this.registry.get(instance.appId)
     const opener = registered && this.openers.find(o => o.supports(registered.manifest.entry))
-    if (opener)
-      await opener.close(instance)
+    if (opener) { await opener.close(instance) }
     instance.state = 'closed'
-    if (this.activeByApp.get(instance.appId) === instanceId)
-      this.activeByApp.delete(instance.appId)
+    if (this.activeByApp.get(instance.appId) === instanceId) { this.activeByApp.delete(instance.appId) }
     this.events.emit('app.closed', { appId: instance.appId, instanceId, reason })
   }
 }

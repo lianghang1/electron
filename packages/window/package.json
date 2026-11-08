@@ -10,10 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@shell/app-runtime": "workspace:*",
     "@shell/kernel": "workspace:*",
     "@shell/shared": "workspace:*",
-    "electron": "catalog:",
-    "@shell/app-runtime": "workspace:*"
+    "electron": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"

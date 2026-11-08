@@ -3,10 +3,10 @@
     "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "types": ["node"],
     "strict": true,
-    "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"]
+    "skipLibCheck": true
   },
   "include": ["src"]
 }

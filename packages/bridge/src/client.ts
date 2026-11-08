@@ -10,8 +10,7 @@ declare global {
   }
 }
 
-export const desktop = (): DesktopBridge => {
-  if (!window.desktop)
-    throw new Error('[bridge] desktop bridge not installed — preload missing?')
+export function desktop(): DesktopBridge {
+  if (!window.desktop) { throw new Error('[bridge] desktop bridge not installed — preload missing?') }
   return window.desktop
 }

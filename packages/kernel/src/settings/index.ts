@@ -1,6 +1,6 @@
 export {
-  settingsSnapshot,
-  setSetting,
-  registerSettingsIpc,
   applySettingsSideEffects,
+  registerSettingsIpc,
+  setSetting,
+  settingsSnapshot,
 } from './service'

@@ -5,6 +5,7 @@
  * 用法：FLAVOR=kiosk node scripts/prepare-flavor.mjs && electron-builder --win
  */
 import { readFileSync } from 'node:fs'
+import process from 'node:process'
 
 const flavorId = process.env.FLAVOR ?? 'cemetery'
 const flavor = JSON.parse(readFileSync(new URL(`../../apps/flavors/${flavorId}/flavor.json`, import.meta.url), 'utf-8'))

@@ -10,10 +10,10 @@ import { DecardDriver } from '../domains/iccard/vendors/decard-driver'
 import { idCardError } from '../domains/idcard/errors'
 import { HuashiDriver } from '../domains/idcard/vendors/huashi-driver'
 import { KemiDriver } from '../domains/idcard/vendors/kemi-driver'
-import { koffiAvailable } from '../kernel/koffi'
 import { detectDevicePlatform } from '../domains/platform'
 import { queryWinspoolForms, queryWinspoolHardware } from '../domains/print/winspool-forms'
 import { probeHanvonDevice } from '../domains/signature/vendors/hanvon'
+import { koffiAvailable } from '../kernel/koffi'
 
 /**
  * 设备守护进程入口运行器（utilityProcess 子进程内执行）：

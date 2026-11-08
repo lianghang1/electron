@@ -6,11 +6,12 @@ export default createEslintConfig(
     ignores: ['docs/**', '**/resources/**', 'resources/**'],
   },
   {
-    // IPC 契约必须保持 type alias：Main 侧 handle 包装用 keyof/Parameters 提取，
-    // interface 无隐式索引签名会导致契约提取失效（原 ipc.ts 逐行 disable，域文件化后统一豁免）
-    files: ['packages/shared/src/types/ipc/**'],
+    // 这些文件必须保持 type alias 方法签名：interface 的属性函数签名与 zod class 方法
+    // 在泛型约束/契约提取下失配（IPC handle 的 keyof/Parameters 提取、DomainInputLike 对 zod schema 的约束）
+    files: ['packages/shared/src/types/ipc/**', 'packages/shared/src/domain.ts'],
     rules: {
       'ts/consistent-type-definitions': 'off',
+      'ts/method-signature-style': 'off',
     },
   },
 )

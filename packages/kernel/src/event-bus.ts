@@ -28,12 +28,9 @@ export class EventBus {
   }
 
   emit<K extends PlatformEventName>(event: K, payload: PlatformEvents[K]): void {
-    for (const handler of this.anyHandlers)
-      (handler as AnyHandler)(event, payload as PlatformEvents[PlatformEventName])
+    for (const handler of this.anyHandlers) { (handler as AnyHandler)(event, payload as PlatformEvents[PlatformEventName]) }
     const set = this.handlers.get(event)
-    if (!set)
-      return
-    for (const handler of set)
-      (handler as Handler<PlatformEvents[K]>)(payload)
+    if (!set) { return }
+    for (const handler of set) { (handler as Handler<PlatformEvents[K]>)(payload) }
   }
 }

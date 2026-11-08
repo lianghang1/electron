@@ -12,8 +12,8 @@ export interface KioskWatchdog {
 
 export interface KioskMode {
   readonly name: 'kiosk'
-  enter(win: BrowserWindow): void
-  exit(win: BrowserWindow): void
+  enter: (win: BrowserWindow) => void
+  exit: (win: BrowserWindow) => void
 }
 
 export function createKioskMode(): KioskMode {
@@ -33,8 +33,8 @@ export function createKioskMode(): KioskMode {
 
 export interface DesktopMode {
   readonly name: 'desktop'
-  enter(win: BrowserWindow): void
-  exit(win: BrowserWindow): void
+  enter: (win: BrowserWindow) => void
+  exit: (win: BrowserWindow) => void
 }
 
 export function createDesktopMode(): DesktopMode {

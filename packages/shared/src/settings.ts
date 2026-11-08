@@ -1,5 +1,3 @@
-import { z } from 'zod'
-
 /**
  * 设置 schema：统一设置的唯一事实源。
  * 新增设置项 = 在某个分组加一个字段——类型、存储、UI 面板三处自动同步。
@@ -12,7 +10,7 @@ export interface SettingField<T = unknown> {
   type: (typeof settingFieldTypes)[number]
   default: T
   /** enum 类型的可选项 */
-  options?: readonly { value: string; label: string }[]
+  options?: readonly { value: string, label: string }[]
   /** 描述（设置面板的次级说明文字） */
   description?: string
   /** kiosk 模式下是否隐藏（终端现场不该出现的设置） */

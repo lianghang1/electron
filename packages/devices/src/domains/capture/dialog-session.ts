@@ -1,7 +1,7 @@
 import type { CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSession, CaptureResult } from '@shell/shared'
 import type { WebContents } from 'electron'
-import type { CaptureOverlayHost } from './overlay-host'
 import type { CaptureSystem } from './index'
+import type { CaptureOverlayHost } from './overlay-host'
 import { DesktopError } from '@shell/shared'
 import { captureError } from './errors'
 

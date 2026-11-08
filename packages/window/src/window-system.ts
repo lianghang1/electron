@@ -1,10 +1,11 @@
-import type { FlavorManifest } from '@shell/shared'
-import type { EventBus, Startable } from '@shell/kernel'
 import type { ViewHost, ViewSpec } from '@shell/app-runtime'
-import { BrowserWindow, WebContentsView, app, ipcMain } from 'electron'
+import type { EventBus, Startable } from '@shell/kernel'
+import type { FlavorManifest } from '@shell/shared'
 import { join } from 'node:path'
-import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
+import process from 'node:process'
+import { app, BrowserWindow, ipcMain, WebContentsView } from 'electron'
 import { createDesktopMode, createKioskMode } from './modes'
+import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
 
 /**
  * WindowSystem：全仓库唯一 new BrowserWindow 的地方（铁律一）。
@@ -35,11 +36,9 @@ export class WindowSystem implements Startable, ViewHost {
 
   async start(): Promise<void> {}
   async stop(): Promise<void> {
-    for (const view of this.views.values())
-      this.removeView(view)
+    for (const view of this.views.values()) { this.removeView(view) }
     this.views.clear()
-    for (const win of this.windows.values())
-      win.destroy()
+    for (const win of this.windows.values()) { win.destroy() }
     this.windows.clear()
   }
 
@@ -68,16 +67,13 @@ export class WindowSystem implements Startable, ViewHost {
 
     // 生产：加载本地产物；dev：electron-vite 注入 ELECTRON_RENDERER_URL
     const devUrl = process.env.ELECTRON_RENDERER_URL
-    if (devUrl)
-      void win.loadURL(devUrl)
-    else
-      void win.loadFile(join(this.rendererDir, 'index.html'))
+    if (devUrl) { void win.loadURL(devUrl) }
+    else { void win.loadFile(join(this.rendererDir, 'index.html')) }
 
     win.once('ready-to-show', () => win.show())
     this.track(win)
     this.shellWindowId = win.id
-    if (this.flavor.mode === 'kiosk')
-      this.installKioskWatchdog(win)
+    if (this.flavor.mode === 'kiosk') { this.installKioskWatchdog(win) }
     return win
   }
 
@@ -97,10 +93,8 @@ export class WindowSystem implements Startable, ViewHost {
         this.events?.emit('watchdog.recovery-mode', { reason: `renderer gone x${this.kioskRestarts}: ${details.reason}` })
         const devUrl = process.env.ELECTRON_RENDERER_URL
         const recovery = devUrl ? `${devUrl}/#/recovery` : undefined
-        if (recovery)
-          void win.loadURL(recovery)
-        else
-          void win.loadFile(join(this.rendererDir, 'index.html'), { hash: '/recovery' })
+        if (recovery) { void win.loadURL(recovery) }
+        else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash: '/recovery' }) }
         return
       }
 
@@ -157,12 +151,9 @@ export class WindowSystem implements Startable, ViewHost {
     })
     ipcMain.handle('window:toggle-maximize', (event) => {
       const win = BrowserWindow.fromWebContents(event.sender)
-      if (!win)
-        return
-      if (win.isMaximized())
-        win.unmaximize()
-      else
-        win.maximize()
+      if (!win) { return }
+      if (win.isMaximized()) { win.unmaximize() }
+      else { win.maximize() }
     })
     ipcMain.handle('window:close', (event) => {
       BrowserWindow.fromWebContents(event.sender)?.close()
@@ -173,8 +164,7 @@ export class WindowSystem implements Startable, ViewHost {
   attachEventBroadcast(events: EventBus): void {
     events.onAny((name, payload) => {
       for (const win of this.windows.values()) {
-        if (!win.isDestroyed())
-          win.webContents.send(`event:${name}`, payload)
+        if (!win.isDestroyed()) { win.webContents.send(`event:${name}`, payload) }
       }
     })
   }
@@ -183,10 +173,8 @@ export class WindowSystem implements Startable, ViewHost {
     const win = new BrowserWindow({ ...overlayBase, width: 480, height: 360 })
     const devUrl = process.env.ELECTRON_RENDERER_URL
     const hash = `#/overlay?kind=${kind}`
-    if (devUrl)
-      void win.loadURL(`${devUrl}/${hash}`)
-    else
-      void win.loadFile(join(this.rendererDir, 'index.html'), { hash })
+    if (devUrl) { void win.loadURL(`${devUrl}/${hash}`) }
+    else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash }) }
     win.once('ready-to-show', () => win.show())
     this.track(win)
     return win
@@ -196,22 +184,20 @@ export class WindowSystem implements Startable, ViewHost {
     this.windows.set(win.id, win)
     win.on('closed', () => this.windows.delete(win.id))
     // 全部窗口关闭即退出（托盘常驻由 TraySystem M6 接管后调整）
-    if (this.windows.size === 1)
-      app.on('window-all-closed', () => app.quit())
+    if (this.windows.size === 1) { app.on('window-all-closed', () => app.quit()) }
   }
 
   // ── ViewHost SPI（packaged/remote 应用视图容器）────────────────
 
   create(spec: ViewSpec): unknown {
     const win = this.shellWindow
-    if (!win)
-      throw new Error('[window] shell window not created yet')
+    if (!win) { throw new Error('[window] shell window not created yet') }
 
     const view = new WebContentsView({
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: spec.preload ? false : true,
+        sandbox: !spec.preload,
         preload: spec.preload,
         partition: spec.partition,
       },
@@ -225,8 +211,7 @@ export class WindowSystem implements Startable, ViewHost {
 
     // origin 白名单强制：导航出白名单即拦截回退
     webContents.on('will-navigate', (event, url) => {
-      if (!this.isOriginAllowed(url, spec.allowedOrigins))
-        event.preventDefault()
+      if (!this.isOriginAllowed(url, spec.allowedOrigins)) { event.preventDefault() }
     })
     webContents.setWindowOpenHandler(({ url }) => {
       return { action: this.isOriginAllowed(url, spec.allowedOrigins) ? 'allow' : 'deny' }
@@ -250,18 +235,15 @@ export class WindowSystem implements Startable, ViewHost {
   activate(instanceId: string): void {
     const win = this.shellWindow
     const view = this.views.get(instanceId)
-    if (!win || !view)
-      return
-    if (this.activeViewId && this.activeViewId !== instanceId)
-      this.views.get(this.activeViewId)?.setVisible(false)
+    if (!win || !view) { return }
+    if (this.activeViewId && this.activeViewId !== instanceId) { this.views.get(this.activeViewId)?.setVisible(false) }
     this.activeViewId = instanceId
     view.setBounds(this.contentRect)
     // 垫场纪律：页面未加载完成不露白页（渲染层 accent 底透出），完成后仍是激活实例才显示
     if (view.webContents.isLoading()) {
       view.setVisible(false)
       view.webContents.once('did-finish-load', () => {
-        if (this.activeViewId === instanceId)
-          view.setVisible(true)
+        if (this.activeViewId === instanceId) { view.setVisible(true) }
       })
     }
     else {
@@ -278,18 +260,15 @@ export class WindowSystem implements Startable, ViewHost {
 
   destroy(instanceId: string): void {
     const view = this.views.get(instanceId)
-    if (!view)
-      return
+    if (!view) { return }
     this.removeView(view)
     this.views.delete(instanceId)
-    if (this.activeViewId === instanceId)
-      this.activeViewId = undefined
+    if (this.activeViewId === instanceId) { this.activeViewId = undefined }
   }
 
   setContentRect(rect: { x: number, y: number, width: number, height: number }): void {
     this.contentRect = rect
-    if (this.activeViewId)
-      this.views.get(this.activeViewId)?.setBounds(rect)
+    if (this.activeViewId) { this.views.get(this.activeViewId)?.setBounds(rect) }
   }
 
   /** 活跃视图实例（供组合根做 JSAPI origin 校验等） */
@@ -303,8 +282,7 @@ export class WindowSystem implements Startable, ViewHost {
   }
 
   private isOriginAllowed(url: string, allowed: string[]): boolean {
-    if (allowed.length === 0)
-      return false
+    if (allowed.length === 0) { return false }
     try {
       const origin = new URL(url).origin
       return allowed.some(pattern =>

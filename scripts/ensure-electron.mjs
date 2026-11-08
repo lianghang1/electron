@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 /**
  * Electron 二进制自愈：postinstall 时保证 node_modules/electron/dist 就位。
  *
@@ -9,9 +10,9 @@
  *   - 仍失败 → 给出可直接复制的修复命令，安装不再静默带病通过
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import path from 'node:path'
+import process from 'node:process'
 
 const MIRROR = 'https://npmmirror.com/mirrors/electron/'
 const require = createRequire(import.meta.url)
@@ -23,8 +24,7 @@ function electronDir() {
 
 function binaryReady(dir) {
   const pathTxt = path.join(dir, 'path.txt')
-  if (!existsSync(pathTxt))
-    return false
+  if (!existsSync(pathTxt)) { return false }
   const binaryName = readFileSync(pathTxt, 'utf8').trim()
   return existsSync(path.join(dir, 'dist', binaryName))
 }

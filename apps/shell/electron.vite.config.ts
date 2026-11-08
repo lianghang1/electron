@@ -42,8 +42,8 @@ export default defineConfig({
       externalizeDeps,
       rollupOptions: {
         input: {
-          'index': fileURLToPath(new URL('./electron/preload/index.ts', import.meta.url)),
-          'jsapi': fileURLToPath(new URL('../../packages/bridge/src/jsapi-preload.ts', import.meta.url)),
+          index: fileURLToPath(new URL('./electron/preload/index.ts', import.meta.url)),
+          jsapi: fileURLToPath(new URL('../../packages/bridge/src/jsapi-preload.ts', import.meta.url)),
         },
       },
     },

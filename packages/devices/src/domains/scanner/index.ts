@@ -1,6 +1,6 @@
+import type { Logger } from '@shell/kernel/logger'
 import type { ScannerConfig, ScannerLogFn, ScannerOverrides, ScannerSetInput, ScanResult } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
-import type { Logger } from '@shell/kernel/logger'
 import { ScanService } from './service'
 
 export { SCANNER_DEFAULTS, SCANNER_OVERRIDES_DEFAULTS } from './service'

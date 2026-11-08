@@ -1,8 +1,8 @@
 import type { SettingGroup, SettingsValues } from '@shell/shared'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { app, ipcMain } from 'electron'
 import { SETTINGS_SCHEMA } from '@shell/shared'
+import { app } from 'electron'
 import { configDir } from '../storage/app-paths'
 
 /**
@@ -28,8 +28,7 @@ function defaults(): SettingsValues {
 }
 
 function load(): SettingsValues {
-  if (cache)
-    return cache
+  if (cache) { return cache }
   const base = defaults()
   try {
     if (existsSync(filePath())) {
@@ -69,8 +68,7 @@ export function setSetting(key: string, value: unknown): void {
   const [groupKey, fieldKey] = key.split('.')
   const group = SETTINGS_SCHEMA.find(g => g.key === groupKey)
   const field = group?.fields.find(f => f.key === fieldKey)
-  if (!field)
-    throw new Error(`[settings] unknown key: ${key}`)
+  if (!field) { throw new Error(`[settings] unknown key: ${key}`) }
 
   const typeOk
     = (field.type === 'boolean' && typeof value === 'boolean')
@@ -78,8 +76,7 @@ export function setSetting(key: string, value: unknown): void {
       || (field.type === 'number' && typeof value === 'number')
       || (field.type === 'enum' && typeof value === 'string'
         && (!field.options || field.options.some(o => o.value === value)))
-  if (!typeOk)
-    throw new Error(`[settings] invalid value for ${key}`)
+  if (!typeOk) { throw new Error(`[settings] invalid value for ${key}`) }
 
   const values = load()
   values[groupKey!] = { ...values[groupKey!], [fieldKey!]: value }
