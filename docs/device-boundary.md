@@ -52,7 +52,6 @@
 | `DomainMethodDef.grant` 接线 | 契约已声明，未与 `PermissionService` 贯通 |
 | IPP 打印通道 | 显式不可用扩展点 |
 | CaptureDialogSession → OverlayHost | 服务与 `#/overlay` 挂载入口均无消费方 |
-| Playwright UI e2e 进 CI | 截图为本地验证，CI 未跑真实窗口 |
 
 ## 验证纪律
 

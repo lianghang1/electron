@@ -51,7 +51,7 @@
 
 - 注释词表、类型逃逸（`as never` / `as any` / `as unknown as` / `@ts-ignore`）、依赖边界（向上 import、ui 越层、包循环依赖与幽灵依赖）。
 - 存量违规已全部清账，`.guardrails-baseline.json` 为空指纹集；护栏对全仓零容忍，任何违规直接失败，不再靠冻结放行。
-- `pnpm guard` 全量（CI 用），`pnpm guard:changed` 只查改动文件，`pnpm guard:list` 列出全量违规明细供机器清账，`pnpm guard:baseline` 在清理后收紧基线，`pnpm guard:dead` 输出无仓内引用的导出（只报告、不阻断）。
+- `pnpm guard` 全量，`pnpm guard:changed` 只查改动文件，`pnpm guard:list` 列出全量违规明细供机器清账，`pnpm guard:baseline` 在清理后收紧基线，`pnpm guard:dead` 输出无仓内引用的导出（只报告、不阻断）。
 - 新增规则或误报，先跑一次故意违规确认护栏确实报错（反向验证），再谈通过。
 
 ## 验证纪律
@@ -64,7 +64,6 @@
 
 - 一个 commit 一件事，附该批验证输出；每步可单独 revert。
 - 禁止把多个批次/多个主题塞进一个提交。
-- CI（`.github/workflows/verify.yml`）每次 push 自动跑护栏与全链路。
 
 ## 依赖规则
 
@@ -80,4 +79,4 @@
 - 颜色经「物理层 `--dt-*` → 语义层官方变量 → `@theme inline` 工具类」三层消费；模板禁止直接引用 `var(--dt-*)`。
 - 界面文字只用 `text-ui-*` 阶梯，禁止任意字号；`--ui-font-size` 是唯一缩放输入。
 - 业务侧只经 `@shell/ui` 门面消费组件；壳内组件可用 `@ui/components/ui`。
-- `pnpm check:design` / `pnpm check:design:css` 把 `DESIGN.md` 的禁令变成机器退出码，CI 与 `pnpm verify` 都会执行。
+- `pnpm check:design` / `pnpm check:design:css` 把 `DESIGN.md` 的禁令变成机器退出码，`pnpm verify` 会执行。
