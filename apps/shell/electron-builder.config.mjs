@@ -44,7 +44,7 @@ export default {
 
   nsis: {
     oneClick: false,
-    // kiosk 静默更新依赖的静默参数（/S），full-package 通道退出时拉起
+    // kiosk 静默更新依赖的静默参数（/S），由 Win32Installer 默认命令拉起
     allowToChangeInstallationDirectory: false,
     perMachine: true,
     deleteAppDataOnUninstall: false,

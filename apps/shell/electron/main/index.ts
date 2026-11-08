@@ -1,4 +1,5 @@
 import type { DomainCallContext } from '@shell/shared'
+import type { PackageInstaller } from '@shell/update'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import process from 'node:process'
@@ -16,7 +17,7 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, filesDir } from '@shell/kernel/storage'
 import { flavorManifestSchema } from '@shell/shared'
-import { AsarHotChannel, collectAppVersions, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, installScheduled, UpdateCenter } from '@shell/update'
+import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
 import { TraySystem, WindowSystem } from '@shell/window'
 import { app, ipcMain, session } from 'electron'
 
@@ -27,8 +28,20 @@ import { app, ipcMain, session } from 'electron'
 
 const logger = createRootLogger()
 
-// asar 热更落盘切换（三段状态机 finalize）：必须早于任何模块加载 app.asar 内容
-finalizeAsarUpdate(process.resourcesPath ?? '.')
+// 整包落地策略：平台差异收敛为数据表，组合根查表唯一创建并注入通道（铁律一/二）
+const INSTALLERS: Record<string, new () => PackageInstaller> = {
+  win32: Win32Installer,
+  darwin: DarwinInstaller,
+  linux: LinuxInstaller,
+}
+const InstallerCtor = INSTALLERS[process.platform]
+if (!InstallerCtor) { logger.error('未支持的构建平台，整包更新通道不注册', { platform: process.platform }) }
+const packageInstaller = InstallerCtor ? new InstallerCtor() : undefined
+
+// asar 热更落盘切换（三段状态机 finalize）：必须早于任何模块加载 app.asar 内容；
+// 切换失败只记录不抛出——Windows 文件锁下保留现场，下次启动重试
+const asarFinalize = finalizeAsarUpdate(process.resourcesPath ?? '.')
+if (!asarFinalize.ok) { logger.warn('asar 热更切换失败，下次启动重试', { error: asarFinalize.error }) }
 
 // app:// 协议的特权声明必须在 app ready 前（Electron 时序硬约束）
 registerAppScheme()
@@ -69,14 +82,18 @@ async function main(): Promise<void> {
     ? join(process.resourcesPath ?? '.', 'apps')
     : join(app.getAppPath(), 'resources/apps')
 
-  // 更新中心：三通道按 flavor.update 配置装配（无 manifestUrl 的通道不注册）
+  // 更新中心：通道按 flavor.update 配置装配，整包落地策略由组合根注入
   const updateManifestUrl = flavor.update.manifestUrl ?? ''
+  let fullPackage: FullPackageChannel | undefined
   if (updateManifestUrl) {
+    if (packageInstaller) {
+      fullPackage = new FullPackageChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins, installer: packageInstaller })
+    }
     void kernel.register(new UpdateCenter({
       channels: [
         new DistHotChannel({ appsRoot, manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
         new AsarHotChannel({ resourcesDir: process.resourcesPath ?? '.', manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
-        new FullPackageChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
+        ...(fullPackage ? [fullPackage] : []),
       ],
       events: kernel.ctx.events,
       deviceId: `${flavor.id}-${process.platform}`,
@@ -234,8 +251,10 @@ async function main(): Promise<void> {
   devices.attachShellWindow(windows.shellWindow!)
   kernel.ctx.marks.t3WindowShown = Date.now()
 
-  // 整包更新排程：退出前拉起静默安装器
-  app.on('before-quit', () => installScheduled())
+  // 整包更新排程：退出前拉起安装器（状态在通道实例上，只拉起一次）
+  app.on('before-quit', () => {
+    fullPackage?.installOnQuit(err => logger.warn('整包安装器拉起失败', { error: String(err) }))
+  })
 }
 
 void app.whenReady().then(() => main())

@@ -1,14 +1,14 @@
 /**
- * 更新链路端到端：真实 HTTP 清单服务 + 真实文件系统 + 真实三通道实现类。
- * 覆盖 dist-hot（免重启热更）/ asar-hot（原子换+回滚）/ full-package（整包下载校验），
- * 以及共用清单缺段调度、origin 白名单、sha256 篡改、中断回滚。
+ * 更新链路端到端：真实 HTTP 清单服务 + 真实文件系统 + 真实三通道与三平台策略实现类。
+ * 覆盖 dist-hot（免重启热更）/ asar-hot（原子换+回滚）/ full-package（按平台策略整包落地），
+ * 以及共用清单缺段调度、平台条目缺失、命令模板覆盖、origin 白名单、sha256 篡改、中断兜底。
  *
  * 运行：pnpm test:e2e:update
  */
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { register } from 'node:module'
 import { tmpdir } from 'node:os'
@@ -22,9 +22,12 @@ process.env.E2E_USER_DATA = userData
 
 const {
   AsarHotChannel,
+  DarwinInstaller,
   DistHotChannel,
   FullPackageChannel,
+  LinuxInstaller,
   UpdateCenter,
+  Win32Installer,
   collectAppVersions,
   finalizeAsarUpdate,
 } = await import('@shell/update')
@@ -34,7 +37,7 @@ const port = Number(process.env.E2E_PORT ?? 8899)
 const base = `http://127.0.0.1:${port}`
 const manifestUrl = `${base}/manifest.json`
 
-// ---- 素材：v2 应用 dist（真 zip）、新 asar、新整包安装器 ----
+// ---- 素材：v2 应用 dist（真 zip）、新 asar、整包安装器（同一内容按平台后缀多址提供） ----
 const v2Dir = join(work, 'v2')
 mkdirSync(v2Dir)
 writeFileSync(join(v2Dir, 'index.html'), '<h1>demo-packaged v2.0.0</h1>')
@@ -43,7 +46,7 @@ const zipPath = join(work, 'demo-packaged-2.0.0.zip')
 execFileSync('zip', ['-j', zipPath, 'index.html', 'version.json'], { cwd: v2Dir })
 const asarPath = join(work, 'app-2.0.1.asar')
 writeFileSync(asarPath, 'ASAR-v2.0.1')
-const installerPath = join(work, 'shell-2.0.1.exe')
+const installerPath = join(work, 'shell-2.0.1.bin')
 writeFileSync(installerPath, 'INSTALLER-v2.0.1')
 
 const sha = p => createHash('sha256').update(readFileSync(p)).digest('hex')
@@ -54,20 +57,53 @@ const files = {
   '/demo-packaged-2.0.0.zip': zipPath,
   '/app-2.0.1.asar': asarPath,
   '/shell-2.0.1.exe': installerPath,
+  '/shell-2.0.1.deb': installerPath,
+  '/shell-2.0.1.AppImage': installerPath,
+  '/shell-2.0.1.dmg': installerPath,
+}
+
+function pkgEntry(name, extra = {}) {
+  return {
+    url: `${base}/shell-2.0.1.${name}`,
+    sha256: tampered ? badSha : sha(installerPath),
+    ...extra,
+  }
 }
 
 function manifest() {
   return {
     apps: { 'demo-packaged': { version: '2.0.0', url: `${base}/demo-packaged-2.0.0.zip`, sha256: tampered ? badSha : sha(zipPath) } },
     asar: { version: '2.0.1', url: `${base}/app-2.0.1.asar`, sha256: tampered ? badSha : sha(asarPath) },
-    package: { version: '2.0.1', url: `${base}/shell-2.0.1.exe`, sha256: tampered ? badSha : sha(installerPath), silentArgs: '/S' },
+    package: {
+      version: '2.0.1',
+      artifacts: { win32: pkgEntry('exe'), linux: pkgEntry('deb'), darwin: pkgEntry('dmg') },
+    },
   }
 }
 
 const server = createServer((req, res) => {
   const path = new URL(req.url, base).pathname
-  if (path === '/manifest.json' || path === '/manifest-asar-only.json') {
-    const data = path === '/manifest-asar-only.json' ? { asar: manifest().asar } : manifest()
+  let data
+  if (path === '/manifest.json') { data = manifest() }
+  else if (path === '/manifest-asar-only.json') { data = { asar: manifest().asar } }
+  else if (path === '/manifest-platform-missing.json') { data = { package: { version: '2.0.1', artifacts: { darwin: pkgEntry('dmg') } } } }
+  else if (path === '/manifest-appimage.json') {
+    data = {
+      package: {
+        version: '2.0.1',
+        artifacts: { linux: pkgEntry('AppImage', { command: ['cp', '{path}', '/opt/demo.AppImage'] }) },
+      },
+    }
+  }
+  else if (path === '/manifest-cross-origin.json') {
+    data = {
+      package: {
+        version: '2.0.1',
+        artifacts: { win32: { url: 'http://evil.example/x.exe', sha256: sha(installerPath) } },
+      },
+    }
+  }
+  if (data) {
     res.writeHead(200, { 'content-type': 'application/json' })
     res.end(JSON.stringify(data))
     return
@@ -117,7 +153,6 @@ process.stdout.write(`\n更新链路 e2e  ${base}\n\n`)
 
 const dist = new DistHotChannel({ appsRoot, manifestUrl, allowedOrigins })
 const asar = new AsarHotChannel({ resourcesDir, manifestUrl, allowedOrigins })
-const full = new FullPackageChannel({ manifestUrl, allowedOrigins })
 
 await step('dist-hot: 1.0.0 → 2.0.0 原子替换，免重启', async () => {
   const current = { ...matrix, apps: collectAppVersions(appsRoot) }
@@ -160,11 +195,11 @@ await step('asar-hot: 下载标记 → finalize 原子换 → 二次 finalize �
   assert.equal(result.requiresRestart, true)
   const marker = join(updaterDir, 'pending.asar.json')
   assert.match(readFileSync(marker, 'utf-8'), /"stage":"downloaded"/)
-  finalizeAsarUpdate(resourcesDir)
+  assert.equal(finalizeAsarUpdate(resourcesDir).ok, true)
   assert.equal(readFileSync(join(resourcesDir, 'app.asar'), 'utf-8'), 'ASAR-v2.0.1')
   assert.equal(existsSync(join(resourcesDir, 'app.asar.bak')), true)
   assert.match(readFileSync(marker, 'utf-8'), /"stage":"swapped"/)
-  finalizeAsarUpdate(resourcesDir)
+  assert.equal(finalizeAsarUpdate(resourcesDir).ok, true)
   assert.equal(existsSync(join(resourcesDir, 'app.asar.bak')), false)
   assert.equal(existsSync(marker), false)
 })
@@ -183,24 +218,101 @@ await step('asar-hot: sha256 篡改被拒，坏 pending.asar 不残留', async (
   }
 })
 
-await step('full-package: 整包下载 + 校验 + 退出安装排程', async () => {
-  const plan = await full.check(matrix)
+await step('win32 策略: .exe 暂存 + NSIS /S 命令 + 退出只拉起一次', async () => {
+  const win = new FullPackageChannel({ manifestUrl, allowedOrigins, installer: new Win32Installer() })
+  const plan = await win.check(matrix)
   assert.equal(plan?.channel, 'full-package')
-  assert.equal(plan?.targetVersion, '2.0.1')
-  const result = await full.apply(plan)
+  const result = await win.apply(plan)
   assert.equal(result.ok, true)
   assert.equal(result.requiresRestart, true)
-  assert.equal(readFileSync(join(updaterDir, 'pending-installer.exe'), 'utf-8'), 'INSTALLER-v2.0.1')
+  const staged = join(updaterDir, 'pending-installer.exe')
+  assert.equal(readFileSync(staged, 'utf-8'), 'INSTALLER-v2.0.1')
+  const cmd = await new Win32Installer().prepare(staged, { url: plan.downloadUrl, sha256: '' })
+  assert.equal(cmd.command, staged)
+  assert.deepEqual(cmd.args, ['/S'])
+  assert.equal(cmd.detached, true)
+  const errors = []
+  assert.equal(win.installOnQuit(err => errors.push(err.message)), true)
+  assert.equal(win.installOnQuit(), false)
+  await new Promise(r => setTimeout(r, 80))
+  assert.ok(errors.length > 0, '安装器缺失应经 onError 上报，而不是掀翻退出流程')
 })
 
-await step('共用清单缺 apps 段：调度跳过 dist-hot 命中 asar-hot（不再崩）', async () => {
+await step('linux 策略: .deb 暂存 + pkexec/dpkg 命令 + chmod 可执行', async () => {
+  const linux = new FullPackageChannel({ manifestUrl, allowedOrigins, installer: new LinuxInstaller() })
+  const plan = await linux.check(matrix)
+  assert.equal(plan?.downloadUrl, `${base}/shell-2.0.1.deb`)
+  assert.equal(await linux.apply(plan).then(r => r.ok), true)
+  const staged = join(updaterDir, 'pending-installer.deb')
+  assert.equal(readFileSync(staged, 'utf-8'), 'INSTALLER-v2.0.1')
+  assert.equal(statSync(staged).mode & 0o111, 0o111)
+  const cmd = await new LinuxInstaller().prepare(staged, { url: plan.downloadUrl, sha256: '' })
+  assert.equal(cmd.command, 'pkexec')
+  assert.deepEqual(cmd.args, ['dpkg', '-i', staged])
+})
+
+await step('linux 策略: AppImage + 清单 command 模板覆盖平台默认', async () => {
+  const url = `${base}/manifest-appimage.json`
+  const linux = new FullPackageChannel({ manifestUrl: url, allowedOrigins, installer: new LinuxInstaller() })
+  const plan = await linux.check(matrix)
+  assert.equal(plan?.downloadUrl, `${base}/shell-2.0.1.AppImage`)
+  assert.equal(await linux.apply(plan).then(r => r.ok), true)
+  const staged = join(updaterDir, 'pending-installer.AppImage')
+  assert.equal(existsSync(staged), true)
+  assert.deepEqual(JSON.parse(plan.payload?.command ?? 'null'), ['cp', '{path}', '/opt/demo.AppImage'])
+  const cmd = await new LinuxInstaller().prepare(staged, {
+    url: plan.downloadUrl,
+    sha256: '',
+    command: ['cp', '{path}', '/opt/demo.AppImage'],
+  })
+  assert.equal(cmd.command, 'cp')
+  assert.deepEqual(cmd.args, [staged, '/opt/demo.AppImage'])
+})
+
+await step('darwin 策略: .dmg 暂存 + 默认 open 命令', async () => {
+  const mac = new FullPackageChannel({ manifestUrl, allowedOrigins, installer: new DarwinInstaller() })
+  const plan = await mac.check(matrix)
+  assert.equal(plan?.downloadUrl, `${base}/shell-2.0.1.dmg`)
+  assert.equal(await mac.apply(plan).then(r => r.ok), true)
+  const staged = join(updaterDir, 'pending-installer.dmg')
+  assert.equal(existsSync(staged), true)
+  const cmd = await new DarwinInstaller().prepare(staged, { url: plan.downloadUrl, sha256: '' })
+  assert.equal(cmd.command, 'open')
+  assert.deepEqual(cmd.args, [staged])
+})
+
+await step('清单缺当前平台条目: check 返回 null，不误装其他平台安装包', async () => {
+  const url = `${base}/manifest-platform-missing.json`
+  const win = new FullPackageChannel({ manifestUrl: url, allowedOrigins, installer: new Win32Installer() })
+  assert.equal(await win.check(matrix), null)
+  const mac = new FullPackageChannel({ manifestUrl: url, allowedOrigins, installer: new DarwinInstaller() })
+  assert.notEqual(await mac.check(matrix), null)
+})
+
+await step('full-package: sha256 篡改被拒，暂存文件清理', async () => {
+  tampered = true
+  try {
+    const win = new FullPackageChannel({ manifestUrl, allowedOrigins, installer: new Win32Installer() })
+    const plan = await win.check(matrix)
+    const result = await win.apply(plan)
+    assert.equal(result.ok, false)
+    assert.match(result.error ?? '', /sha256 mismatch/)
+    assert.equal(existsSync(join(updaterDir, 'pending-installer.exe')), false)
+    assert.equal(win.installOnQuit(), false)
+  }
+  finally {
+    tampered = false
+  }
+})
+
+await step('共用清单缺 apps 段: 调度跳过 dist-hot 命中 asar-hot（不再崩）', async () => {
   const onlyAsar = `${base}/manifest-asar-only.json`
   const emitted = []
   const center = new UpdateCenter({
     channels: [
       new DistHotChannel({ appsRoot, manifestUrl: onlyAsar, allowedOrigins }),
       new AsarHotChannel({ resourcesDir, manifestUrl: onlyAsar, allowedOrigins }),
-      new FullPackageChannel({ manifestUrl: onlyAsar, allowedOrigins }),
+      new FullPackageChannel({ manifestUrl: onlyAsar, allowedOrigins, installer: new Win32Installer() }),
     ],
     events: { emit: (type, payload) => emitted.push({ type, payload }) },
     deviceId: 'e2e',
@@ -211,16 +323,34 @@ await step('共用清单缺 apps 段：调度跳过 dist-hot 命中 asar-hot（�
   assert.ok(emitted.some(e => e.type === 'update.checked'))
 })
 
-await step('origin 白名单：清单非授信源站直接拒绝', async () => {
+await step('origin 白名单: 清单与整包地址非授信源站直接拒绝', async () => {
   const evil = new DistHotChannel({ appsRoot, manifestUrl: 'http://evil.example/manifest.json', allowedOrigins })
   await assert.rejects(() => evil.check(matrix), /origin not allowed/)
+  const cross = new FullPackageChannel({ manifestUrl: `${base}/manifest-cross-origin.json`, allowedOrigins, installer: new Win32Installer() })
+  await assert.rejects(() => cross.check(matrix), /origin not allowed/)
 })
 
-await step('全通道已是最新：三个 check 都返回 null', async () => {
+await step('asar finalize 异常兜底: 返回 ok:false 而非抛错拖垮启动', async () => {
+  const brokenDir = join(work, 'resources-broken')
+  mkdirSync(brokenDir, { recursive: true })
+  writeFileSync(join(brokenDir, 'app.asar'), 'LIVE')
+  mkdirSync(join(brokenDir, 'app.asar.bak', 'child'), { recursive: true })
+  const marker = join(updaterDir, 'pending.asar.json')
+  writeFileSync(marker, JSON.stringify({ stage: 'swapped' }))
+  const result = finalizeAsarUpdate(brokenDir)
+  assert.equal(result.ok, false)
+  assert.match(result.error ?? '', /EISDIR|ENOTEMPTY|ERR_FS/)
+  assert.equal(readFileSync(join(brokenDir, 'app.asar'), 'utf-8'), 'LIVE')
+  rmSync(marker, { force: true })
+  rmSync(join(brokenDir, 'app.asar.bak'), { recursive: true, force: true })
+})
+
+await step('全通道已是最新: 三个 check 都返回 null', async () => {
   const latest = { shell: '2.0.1', asar: '2.0.1', apps: { 'demo-packaged': '2.0.0' } }
   assert.equal(await dist.check(latest), null)
   assert.equal(await asar.check(latest), null)
-  assert.equal(await full.check(latest), null)
+  const win = new FullPackageChannel({ manifestUrl, allowedOrigins, installer: new Win32Installer() })
+  assert.equal(await win.check(latest), null)
 })
 
 server.close()

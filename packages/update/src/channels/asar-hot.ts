@@ -76,11 +76,17 @@ export class AsarHotChannel implements UpdateChannel {
 /**
  * asar 热更的落盘切换 + 启动 finalize（见类注释的三段状态机）。
  * 独立模块函数：切换发生在"下一次启动的最早时刻"，谁启动谁 finalize，幂等。
+ * 返回结构而非抛错：Windows 上 app.asar 被占用会让 rename 失败，启动绝不能被更新拖垮。
  */
-export function finalizeAsarUpdate(resourcesDir: string): void {
+export interface FinalizeResult {
+  ok: boolean
+  error?: string
+}
+
+export function finalizeAsarUpdate(resourcesDir: string): FinalizeResult {
   const updaterDir = join(app.getPath('userData'), UPDATER_DIR)
   const markerPath = join(updaterDir, MARKER)
-  if (!existsSync(markerPath)) { return }
+  if (!existsSync(markerPath)) { return { ok: true } }
 
   let stage: Stage = 'downloaded'
   try {
@@ -94,16 +100,29 @@ export function finalizeAsarUpdate(resourcesDir: string): void {
   const bakAsar = join(resourcesDir, 'app.asar.bak')
   const pendingAsar = join(updaterDir, 'pending.asar')
 
-  if (stage === 'downloaded' && existsSync(pendingAsar)) {
-    // 原子换名：当前 → .bak（回滚点），pending → 正式位
-    if (existsSync(liveAsar)) { renameSync(liveAsar, bakAsar) }
-    renameSync(pendingAsar, liveAsar)
-    writeFileSync(markerPath, JSON.stringify({ stage: 'swapped' }))
-    return
-  }
+  try {
+    if (stage === 'downloaded' && existsSync(pendingAsar)) {
+      // 原子换名：当前 → .bak（回滚点），pending → 正式位
+      if (existsSync(liveAsar)) { renameSync(liveAsar, bakAsar) }
+      renameSync(pendingAsar, liveAsar)
+      writeFileSync(markerPath, JSON.stringify({ stage: 'swapped' }))
+      return { ok: true }
+    }
 
-  // swapped（或 downloaded 但 pending 丢失——下载被中断）：清理收尾
-  rmSync(bakAsar, { force: true })
-  rmSync(markerPath, { force: true })
-  if (stage === 'downloaded') { rmSync(pendingAsar, { force: true }) }
+    // swapped（或 downloaded 但 pending 丢失——下载被中断）：清理收尾
+    rmSync(bakAsar, { force: true })
+    rmSync(markerPath, { force: true })
+    if (stage === 'downloaded') { rmSync(pendingAsar, { force: true }) }
+    return { ok: true }
+  }
+  catch (err) {
+    // 正式位可能已让给 .bak：必须恢复，否则下次启动无版本可跑。
+    // downloaded 标记与 pending.asar 都不动，下次启动重试（Windows 文件锁释放后自然成功）。
+    let detail = String(err)
+    if (!existsSync(liveAsar) && existsSync(bakAsar)) {
+      try { renameSync(bakAsar, liveAsar) }
+      catch { detail += '; .bak 回滚也失败，需人工介入' }
+    }
+    return { ok: false, error: detail }
+  }
 }

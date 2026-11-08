@@ -5,7 +5,7 @@
 ## 三铁律
 
 1. **创建集中**：全仓库唯一组装现场是 `apps/shell/electron/main/index.ts`（组合根）。其余模块只经构造函数接收依赖，禁止跨模块 new。
-2. **反转控制**：平台只认识接口。应用形态 = `AppOpener` 策略；更新 = `UpdateChannel` 策略；硬件域 = `defineDomain` 自描述。平台代码里禁止 `switch (entry.kind)` 式分发。
+2. **反转控制**：平台只认识接口。应用形态 = `AppOpener` 策略；更新 = `UpdateChannel` 策略；整包落地 = `PackageInstaller` 策略；硬件域 = `defineDomain` 自描述。平台差异收敛为数据表由组合根查表装配，平台代码里禁止 `switch (entry.kind)` / `if (process.platform)` 式分发。
 3. **依赖单向**：UI → 服务 → 领域/基础设施。每层之间只有一个门面（渲染层只见 `@shell/bridge`）。下层禁止 import 上层。
 
 ## 词汇表（唯一叫法，禁用别名）
@@ -19,6 +19,8 @@
 | 运行中应用 | AppInstance | session、context |
 | 设备域 | Domain | module、feature |
 | 产品形态 | Flavor | app、edition |
+| 构建目标平台 | BuildPlatform（win32 / darwin / linux） | 与 Platform（硬件能力平台）混用 |
+| 整包落地策略 | PackageInstaller（组合根按平台注入） | 通道内写死 `.exe` / `/S` / spawn |
 | 窗口创建 | 目的命名函数（createShellWindow / openCaptureOverlay...） | 裸 new BrowserWindow |
 
 ## 命名规范
