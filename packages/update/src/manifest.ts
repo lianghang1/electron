@@ -1,4 +1,8 @@
 import type { BuildPlatform, PackageArtifact } from './installers/contract'
+import { assertAllowedUrl } from '@shell/shared'
+import { z } from 'zod'
+
+export { assertAllowedUrl }
 
 /** 单份更新清单：三通道各取所需；缺省段表示该通道本次无更新。 */
 export interface UpdateManifest {
@@ -14,17 +18,37 @@ export interface UpdateManifest {
   }
 }
 
-/** 清单地址与下载地址都必须落在 flavor 声明的源站内，防止清单被劫持后拉取任意地址。 */
-export function assertAllowedUrl(url: string, allowedOrigins: string[]): void {
-  if (!allowedOrigins.includes(new URL(url).origin)) {
-    throw new Error(`update url origin not allowed: ${url}`)
+/** 清单结构校验：服务端下发的版本/地址/摘要必须齐全且形状正确，杜绝畸形值进入落地链路。 */
+const hash = z.string().regex(/^[a-f0-9]{64}$/i, 'sha256 须为 64 位十六进制')
+const url = z.string().url()
+/** 应用/asar 条目带自身版本；整包版本由 package.version 统一给出，条目只需地址与摘要 */
+const versionedArtifactSchema = z.object({ version: z.string().min(1), url, sha256: hash })
+const packageArtifactSchema = z.object({ url, sha256: hash })
+const updateManifestSchema = z.object({
+  apps: z.record(z.string(), versionedArtifactSchema).optional(),
+  asar: versionedArtifactSchema.optional(),
+  package: z.object({
+    version: z.string().min(1),
+    artifacts: z.record(z.string(), packageArtifactSchema),
+  }).optional(),
+}).passthrough()
+
+export function parseUpdateManifest(raw: unknown, allowedOrigins: readonly string[]): UpdateManifest {
+  const parsed = updateManifestSchema.parse(raw) as UpdateManifest
+  for (const url of [
+    ...Object.values(parsed.apps ?? {}).map(a => a.url),
+    parsed.asar?.url,
+    ...Object.values(parsed.package?.artifacts ?? {}).map(a => a.url),
+  ].filter((u): u is string => Boolean(u))) {
+    assertAllowedUrl(url, allowedOrigins)
   }
+  return parsed
 }
 
 export function fetchUpdateManifest(manifestUrl: string, allowedOrigins: string[]): Promise<UpdateManifest> {
   assertAllowedUrl(manifestUrl, allowedOrigins)
   return fetch(manifestUrl).then(async (res) => {
     if (!res.ok) { throw new Error(`manifest fetch failed: ${res.status}`) }
-    return await res.json() as UpdateManifest
+    return parseUpdateManifest(await res.json(), allowedOrigins)
   })
 }

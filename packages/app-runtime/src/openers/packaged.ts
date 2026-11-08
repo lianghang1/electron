@@ -22,11 +22,13 @@ export class PackagedOpener implements AppOpener {
 
   async open(manifest: AppManifest, instance: AppInstance): Promise<void> {
     const entry = manifest.entry as { kind: 'packaged', dir?: string }
+    const host = entry.dir ?? manifest.id
     instance.handle.view = this.views.create({
       instanceId: instance.instanceId,
       appId: manifest.id,
-      url: `app://${entry.dir ?? manifest.id}/index.html`,
-      allowedOrigins: [`app://${(entry.dir ?? manifest.id)}.`],
+      url: `app://${host}/index.html`,
+      // standard+secure 协议的 origin = app://<host>，精确匹配，不用尾点前缀
+      allowedOrigins: [`app://${host}`],
     })
   }
 

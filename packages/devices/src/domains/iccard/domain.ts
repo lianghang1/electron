@@ -3,17 +3,18 @@ import type { IcCardSystem } from './index'
 import { defineDomain } from '@shell/shared'
 import { z } from 'zod'
 import { pickReady } from '../../domain-kit'
+import { iccardConfigInput, iccardReadInput, iccardWriteInput, iccardWriteTextsInput, noInput } from '../input-schemas'
 
 /** iccard 域：M1 IC 卡读写。 */
 export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
   return defineDomain('iccard', {
     listReaders: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => iccard.listReaders(),
     },
     readIc: {
-      input: z.object({ deviceId: z.string().optional() }).passthrough(),
+      input: iccardReadInput,
       output: z.unknown(),
       handler: async (input) => {
         const deviceId = input.deviceId
@@ -22,7 +23,7 @@ export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
       },
     },
     writeIc: {
-      input: z.object({ deviceId: z.string().optional() }).passthrough(),
+      input: iccardWriteInput,
       output: z.unknown(),
       handler: async (input) => {
         const deviceId = input.deviceId
@@ -31,7 +32,7 @@ export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
       },
     },
     writeIcTexts: {
-      input: z.object({ deviceId: z.string().optional() }).passthrough(),
+      input: iccardWriteTextsInput,
       output: z.unknown(),
       handler: async (input) => {
         const deviceId = input.deviceId
@@ -40,14 +41,14 @@ export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
       },
     },
     getConfig: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => iccard.getConfig(),
     },
     setConfig: {
-      input: z.object({ id: z.string(), overrides: z.record(z.string(), z.unknown()) }),
+      input: iccardConfigInput,
       output: z.unknown(),
-      handler: ({ id, overrides }) => iccard.setConfig(id, overrides as never),
+      handler: ({ id, overrides }) => iccard.setConfig(id, overrides),
     },
   })
 }

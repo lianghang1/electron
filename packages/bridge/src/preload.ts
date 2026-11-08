@@ -76,7 +76,7 @@ export const desktop = {
     close: () => ipcRenderer.invoke('window:close'),
   },
 
-  /** 壳信息：版本 / 直达目标 / chrome 档位（渲染层按档位决定挂不挂壳界面） */
+  /** 壳信息：版本 / 直达目标 / chrome 档位 / 平台能力（渲染层按档位决定挂不挂壳界面） */
   shell: {
     info: () => ipcRenderer.invoke('shell:info') as Promise<{
       name: string
@@ -84,6 +84,12 @@ export const desktop = {
       defaultAppId?: string
       chrome: 'platform' | 'solo'
       mode: 'desktop' | 'kiosk'
+      capabilities: {
+        platform: string
+        availableDomains: string[]
+        driverDeployment: string
+        notes?: string
+      }
     }>,
     /** 启动外观同步快照（读启动参数，不经 IPC） */
     appearance: () => bootAppearance,

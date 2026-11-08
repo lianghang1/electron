@@ -3,45 +3,46 @@ import type { DomainDeps } from '../../domain-kit'
 import type { SignatureSystem } from './index'
 import { defineDomain } from '@shell/shared'
 import { z } from 'zod'
+import { noInput, optionalDeviceInput, signatureConfigInput } from '../input-schemas'
 
 /** signature 域：手写签名板（笔迹点经 EventBus 广播）。 */
 export function createSignatureDomain(signature: SignatureSystem, deps: DomainDeps): DomainDefinition {
   return defineDomain('signature', {
     listDevices: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => signature.listDevices(),
     },
     start: {
-      input: z.object({ deviceId: z.string().optional() }).optional(),
+      input: optionalDeviceInput.optional(),
       output: z.unknown(),
       handler: input => signature.start(input, point =>
         deps.events.emit('signature.stroke', { point })),
     },
     stop: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => signature.stop(),
     },
     clear: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => signature.clear(),
     },
     cancel: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => signature.cancel(),
     },
     getConfig: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => signature.getConfig(),
     },
     setConfig: {
-      input: z.object({ id: z.string(), overrides: z.record(z.string(), z.unknown()) }),
+      input: signatureConfigInput,
       output: z.unknown(),
-      handler: ({ id, overrides }) => signature.setConfig(id, overrides as never),
+      handler: ({ id, overrides }) => signature.setConfig(id, overrides),
     },
   })
 }

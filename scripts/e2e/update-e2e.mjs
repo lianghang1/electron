@@ -1,7 +1,7 @@
 /**
  * 更新链路端到端：真实 HTTP 清单服务 + 真实文件系统 + 真实三通道与三平台策略实现类。
  * 覆盖 dist-hot（免重启热更）/ asar-hot（原子换+回滚）/ full-package（按平台策略整包落地），
- * 以及共用清单缺段调度、平台条目缺失、命令模板覆盖、origin 白名单、sha256 篡改、中断兜底。
+ * 以及共用清单缺段调度、平台条目缺失、清单命令注入无效、origin 白名单、sha256 篡改、中断兜底。
  *
  * 运行：pnpm test:e2e:update
  */
@@ -88,6 +88,7 @@ const server = createServer((req, res) => {
   else if (path === '/manifest-asar-only.json') { data = { asar: manifest().asar } }
   else if (path === '/manifest-platform-missing.json') { data = { package: { version: '2.0.1', artifacts: { darwin: pkgEntry('dmg') } } } }
   else if (path === '/manifest-appimage.json') {
+    // 对抗素材：服务端清单仍携带 command，落地命令必须只认本地注入的策略，不采信清单
     data = {
       package: {
         version: '2.0.1',
@@ -251,22 +252,26 @@ await step('linux 策略: .deb 暂存 + pkexec/dpkg 命令 + chmod 可执行', a
   assert.deepEqual(cmd.args, ['dpkg', '-i', staged])
 })
 
-await step('linux 策略: AppImage + 清单 command 模板覆盖平台默认', async () => {
+await step('linux 策略: 清单 command 无效，AppImage 落地命令只来自本地注入', async () => {
   const url = `${base}/manifest-appimage.json`
-  const linux = new FullPackageChannel({ manifestUrl: url, allowedOrigins, installer: new LinuxInstaller() })
+  const target = '/opt/demo.AppImage'
+  const linux = new FullPackageChannel({ manifestUrl: url, allowedOrigins, installer: new LinuxInstaller({ appImageTarget: target }) })
   const plan = await linux.check(matrix)
   assert.equal(plan?.downloadUrl, `${base}/shell-2.0.1.AppImage`)
+  assert.equal(plan?.payload?.command, undefined, '清单下发的 command 不得进入更新计划')
   assert.equal(await linux.apply(plan).then(r => r.ok), true)
   const staged = join(updaterDir, 'pending-installer.AppImage')
   assert.equal(existsSync(staged), true)
-  assert.deepEqual(JSON.parse(plan.payload?.command ?? 'null'), ['cp', '{path}', '/opt/demo.AppImage'])
-  const cmd = await new LinuxInstaller().prepare(staged, {
-    url: plan.downloadUrl,
-    sha256: '',
-    command: ['cp', '{path}', '/opt/demo.AppImage'],
-  })
-  assert.equal(cmd.command, 'cp')
-  assert.deepEqual(cmd.args, [staged, '/opt/demo.AppImage'])
+
+  const artifact = { url: plan.downloadUrl, sha256: '' }
+  const injected = await new LinuxInstaller({ appImageTarget: target }).prepare(staged, artifact)
+  assert.equal(injected.command, 'cp')
+  assert.deepEqual(injected.args, [staged, target])
+
+  // 反向：不带本地注入的同一份清单，命令退化为直接运行，绝不执行清单里的 cp
+  const plain = await new LinuxInstaller().prepare(staged, artifact)
+  assert.equal(plain.command, staged)
+  assert.deepEqual(plain.args, [])
 })
 
 await step('darwin 策略: .dmg 暂存 + 默认 open 命令', async () => {

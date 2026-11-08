@@ -2,6 +2,7 @@ import type { InstallCommand, PackageArtifact, PackageInstaller } from '../insta
 import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { isNewer } from '@shell/shared'
 import { app } from 'electron'
 import { launchInstall } from '../installers/contract'
 import { assertAllowedUrl, fetchUpdateManifest } from '../manifest'
@@ -19,15 +20,6 @@ export interface FullPackageOptions {
   installer: PackageInstaller
 }
 
-function parseCommand(raw?: string): string[] | undefined {
-  if (!raw) { return undefined }
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) && parsed.every(x => typeof x === 'string') ? parsed as string[] : undefined
-  }
-  catch { return undefined }
-}
-
 export class FullPackageChannel implements UpdateChannel {
   readonly id = 'full-package' as const
   private pending: InstallCommand | null = null
@@ -37,7 +29,7 @@ export class FullPackageChannel implements UpdateChannel {
   async check(current: VersionMatrix): Promise<UpdatePlan | null> {
     const manifest = await fetchUpdateManifest(this.options.manifestUrl, this.options.allowedOrigins)
     const pkg = manifest.package
-    if (!pkg || current.shell >= pkg.version) { return null }
+    if (!pkg || !isNewer(pkg.version, current.shell)) { return null }
     const artifact = pkg.artifacts[this.options.installer.platform]
     if (!artifact) { return null }
     assertAllowedUrl(artifact.url, this.options.allowedOrigins)
@@ -45,11 +37,7 @@ export class FullPackageChannel implements UpdateChannel {
       channel: this.id,
       targetVersion: pkg.version,
       downloadUrl: artifact.url,
-      payload: {
-        sha256: artifact.sha256,
-        // 命令模板随 plan 走，apply 无需二次请求清单
-        command: artifact.command ? JSON.stringify(artifact.command) : '',
-      },
+      payload: { sha256: artifact.sha256 },
     }
   }
 
@@ -57,7 +45,6 @@ export class FullPackageChannel implements UpdateChannel {
     const artifact: PackageArtifact = {
       url: plan.downloadUrl,
       sha256: plan.payload?.sha256 ?? '',
-      command: parseCommand(plan.payload?.command),
     }
     const staging = join(app.getPath('userData'), 'desktop-updater', this.options.installer.stagingName(artifact))
     this.pending = null

@@ -14,13 +14,13 @@ export const appEntrySchema = z.discriminatedUnion('kind', [
   }),
   z.object({
     kind: z.literal('packaged'),
-    /** 相对 resources/apps 的目录名，缺省 = appId */
-    dir: z.string().optional(),
+    /** 相对 resources/apps 的目录名，缺省 = appId；须为 kebab-case，杜绝路径穿越 */
+    dir: z.string().regex(/^[a-z][a-z0-9-]*$/).optional(),
   }),
   z.object({
     kind: z.literal('remote'),
     url: z.string().url(),
-    /** 允许的页面 origin 白名单；空数组 = 拒绝所有 JSAPI 调用 */
+    /** 允许的页面 origin 白名单；空数组 = 拒绝所有 JSAPI 调用；'*' 显式表示全放行 */
     origins: z.array(z.string()),
   }),
 ])

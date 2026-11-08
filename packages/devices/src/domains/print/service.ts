@@ -24,6 +24,7 @@ export class PrintService {
   /** 可选日志注入（PII 域外的打印数据可记录） */
   private readonly logger: PrintLogFn
   private readonly archiveDir: string
+  private readonly allowedOrigins: readonly string[]
 
   /** 装配注入的依赖与现场数据（文件路径/打印机），设备层不自行寻址 */
   constructor(
@@ -36,11 +37,14 @@ export class PrintService {
       jobsFile: string
       /** SumatraPDF 路径（资源根解析；缺省禁用 PDF 直通通道回退） */
       sumatraPath?: string
+      /** 打印 URL 负载允许的源站；空 = 拒绝远程下载 */
+      allowedOrigins?: readonly string[]
       logger?: PrintLogFn
     },
   ) {
     this.logger = deps.logger ?? (() => {})
     this.archiveDir = deps.archiveDir
+    this.allowedOrigins = deps.allowedOrigins ?? []
     this.jobs = new JobStore(deps.jobsFile)
     this.channels = new Map<string, PrintChannel>([
       ['system', new SystemChannel(windows, deps.archiveDir, deps.sumatraPath)],
@@ -188,6 +192,7 @@ export class PrintService {
       jobId,
       paper,
       log: this.log.bind(this),
+      allowedOrigins: this.allowedOrigins,
     })
   }
 

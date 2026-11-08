@@ -61,7 +61,7 @@ export function createDomainRouter(
       if (!parsed.success) { throw new DomainRouteError('INVALID_INPUT', `入参校验失败：${method}`, parsed.error.flatten()) }
 
       try {
-        return await def.handler(parsed.data as never, ctx)
+        return await def.handler(parsed.data, ctx)
       }
       finally {
         logger.debug('domain call', { method, ms: Date.now() - started })

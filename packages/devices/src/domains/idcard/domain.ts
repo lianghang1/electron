@@ -3,17 +3,18 @@ import type { IdCardSystem } from './index'
 import { defineDomain } from '@shell/shared'
 import { z } from 'zod'
 import { pickReady } from '../../domain-kit'
+import { idcardConfigInput, idcardReadInput, noInput } from '../input-schemas'
 
 /** idcard 域：身份证阅读器。域自描述，gateway 只查表收集。 */
 export function createIdcardDomain(idcard: IdCardSystem): DomainDefinition {
   return defineDomain('idcard', {
     listReaders: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => idcard.listReaders(),
     },
     read: {
-      input: z.object({ deviceId: z.string().optional() }),
+      input: idcardReadInput,
       output: z.unknown(),
       handler: async (input) => {
         const deviceId = input.deviceId
@@ -22,14 +23,14 @@ export function createIdcardDomain(idcard: IdCardSystem): DomainDefinition {
       },
     },
     getConfig: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => idcard.getConfig(),
     },
     setConfig: {
-      input: z.object({ id: z.string(), overrides: z.record(z.string(), z.unknown()) }),
+      input: idcardConfigInput,
       output: z.unknown(),
-      handler: ({ id, overrides }) => idcard.setConfig(id, overrides as never),
+      handler: ({ id, overrides }) => idcard.setConfig(id, overrides),
     },
   })
 }

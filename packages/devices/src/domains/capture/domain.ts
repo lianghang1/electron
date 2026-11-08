@@ -4,69 +4,77 @@ import type { CaptureSystem } from './index'
 import { defineDomain } from '@shell/shared'
 import { z } from 'zod'
 import { DomainRouteError } from '../../domain-kit'
+import {
+  captureConfigInput,
+  captureRequestInput,
+  dataUrlInput,
+  noInput,
+  nullableIdInput,
+  optionalDeviceInput,
+  requiredDeviceInput,
+} from '../input-schemas'
 
 /** capture 域：高拍仪 / 摄像采集（预览帧经 EventBus 广播）。 */
 export function createCaptureDomain(capture: CaptureSystem, deps: DomainDeps): DomainDefinition {
   return defineDomain('capture', {
     listDevices: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => capture.listDevices(),
     },
     getConfigs: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => capture.getConfigs(),
     },
     setConfig: {
-      input: z.object({ id: z.string(), overrides: z.record(z.string(), z.unknown()) }),
+      input: captureConfigInput,
       output: z.unknown(),
-      handler: ({ id, overrides }) => capture.setConfig(id, overrides as never),
+      handler: ({ id, overrides }) => capture.setConfig(id, overrides),
     },
     getDefaultDevice: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => capture.getDefaultDevice(),
     },
     setDefaultDevice: {
-      input: z.object({ id: z.string().nullable() }),
+      input: nullableIdInput,
       output: z.unknown(),
       handler: ({ id }) => capture.setDefaultDevice(id),
     },
     resolveDefaultDevice: {
-      input: z.undefined().optional(),
+      input: noInput,
       output: z.unknown(),
       handler: () => capture.resolveDefaultDevice(),
     },
     capture: {
-      input: z.object({}).passthrough(),
+      input: captureRequestInput,
       output: z.unknown(),
-      handler: input => capture.capture(input as never),
+      handler: input => capture.capture(input),
     },
     saveDataUrl: {
-      input: z.object({ dataUrl: z.string(), ext: z.string().optional() }),
+      input: dataUrlInput,
       output: z.unknown(),
       handler: ({ dataUrl, ext }) => capture.saveDataUrl(dataUrl, ext),
     },
     startPreview: {
-      input: z.object({ deviceId: z.string().optional() }).passthrough(),
+      input: optionalDeviceInput,
       output: z.unknown(),
       handler: async (input) => {
         const resolved = input.deviceId
           ?? (await capture.resolveDefaultDevice() as { id?: string } | undefined)?.id
         if (!resolved) { throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备') }
-        // 预览帧经 EventBus 广播（高频数据不进 invoke 通道）
         return capture.startPreview(resolved, frame =>
           deps.events.emit('capture.frame', { deviceId: resolved, frame }))
       },
     },
     stopPreview: {
-      input: z.object({ deviceId: z.string() }),
+      input: requiredDeviceInput,
       output: z.unknown(),
       handler: ({ deviceId }) => capture.stopPreview(deviceId),
     },
     listCameras: {
-      input: z.object({ deviceId: z.string().optional() }),
+      input: optionalDeviceInput,
       output: z.unknown(),
       handler: async ({ deviceId }) => {
         const resolved = deviceId

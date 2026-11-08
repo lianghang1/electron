@@ -6,11 +6,14 @@ import { spawn } from 'node:child_process'
  */
 export type BuildPlatform = 'win32' | 'darwin' | 'linux'
 
-/** 整包条目；command 模板可覆盖平台默认落地命令，{path} 替换为校验后的本地路径 */
+/**
+ * 整包条目：只描述「去哪下载、怎么校验」。
+ * 落地命令不接受清单下发——服务端清单一旦能带 argv 就能让设备执行任意程序。
+ * 命令模板一律内建在各平台策略里，现场差异由组合根注入本地配置，不来自网络。
+ */
 export interface PackageArtifact {
   url: string
   sha256: string
-  command?: string[]
 }
 
 /** 平台无关的安装命令描述：策略只负责产出，退出时统一拉起 */
@@ -28,11 +31,12 @@ export interface PackageInstaller {
   readonly platform: BuildPlatform
   /** 暂存文件名：Windows 需 .exe 才能 CreateProcess；Linux 保留包后缀供包管理器识别 */
   stagingName: (artifact: PackageArtifact) => string
-  /** 校验通过后的准备动作（chmod 等）→ 安装命令 */
+  /** 校验通过后的准备动作（chmod 等）→ 安装命令。命令模板由实现内建，artifact 不含命令。 */
   prepare: (localPath: string, artifact: PackageArtifact) => Promise<InstallCommand>
 }
 
-export function resolveCommand(template: string[], localPath: string): InstallCommand {
+/** 模板展开：{path} 是唯一可替换标记；不经 shell，杜绝参数注入。调用方只能传代码内建模板。 */
+export function resolveCommand(template: readonly string[], localPath: string): InstallCommand {
   if (template.length === 0) { throw new Error('install command template is empty') }
   const [command, ...args] = template.map(part => part.replaceAll('{path}', localPath))
   return { command, args, detached: true }

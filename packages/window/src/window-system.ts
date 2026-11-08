@@ -3,6 +3,7 @@ import type { EventBus, Startable } from '@shell/kernel'
 import type { FlavorManifest } from '@shell/shared'
 import { join } from 'node:path'
 import process from 'node:process'
+import { matchesOrigin } from '@shell/shared'
 import { app, BrowserWindow, ipcMain, WebContentsView } from 'electron'
 import { createDesktopMode, createKioskMode } from './modes'
 import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
@@ -284,15 +285,6 @@ export class WindowSystem implements Startable, ViewHost {
   }
 
   private isOriginAllowed(url: string, allowed: string[]): boolean {
-    if (allowed.length === 0) { return false }
-    try {
-      const origin = new URL(url).origin
-      return allowed.some(pattern =>
-        pattern === origin || origin.startsWith(pattern.replace(/\*$/, '')),
-      )
-    }
-    catch {
-      return false
-    }
+    return matchesOrigin(url, allowed)
   }
 }

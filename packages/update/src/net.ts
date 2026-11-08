@@ -16,7 +16,7 @@ export async function sha256File(path: string): Promise<string> {
   return hash.digest('hex')
 }
 
-/** 断点续传下载：服务端须支持 Range；不支持则整文件重下 */
+/** 断点续传下载：服务端须支持 Range；不支持或起点不符则整文件重下 */
 export async function downloadFile(url: string, dest: string, headers: Record<string, string> = {}): Promise<void> {
   mkdirSync(dirname(dest), { recursive: true })
 
@@ -25,10 +25,32 @@ export async function downloadFile(url: string, dest: string, headers: Record<st
     headers: done > 0 ? { ...headers, range: `bytes=${done}-` } : headers,
   })
   if (!res.ok && res.status !== 206) { throw new Error(`download failed: ${res.status} ${url}`) }
-  if (!res.body) { throw new Error(`empty body: ${url}`) }
+  const body = res.body
+  if (!body) { throw new Error(`empty body: ${url}`) }
 
-  // 服务端不支持 Range（200 而非 206）时整文件重写
-  await pipeline(Readable.fromWeb(res.body as never), createWriteStream(dest, { flags: res.status === 206 ? 'a' : 'w' }))
+  // 只有 206 且 Content-Range 起点恰好等于本地已有字节数才续传追加；
+  // 否则（200 全量、或服务端忽略了 Range 返回了别的位置）一律整文件重写，避免拼出损坏包
+  const rangeStart = res.status === 206
+    ? Number.parseInt(res.headers.get('content-range')?.match(/bytes\s+(\d+)-/i)?.[1] ?? '', 10)
+    : Number.NaN
+  const append = done > 0 && Number.isFinite(rangeStart) && rangeStart === done
+
+  // fetch 的 body 是 DOM ReadableStream，与 node:stream/web 的 ReadableStream 类型不兼容；
+  // 逐块读取后交给 Readable.from，交给 pipeline 统一处理背压、错误与关闭
+  const reader = body.getReader()
+  const chunks = (async function* () {
+    try {
+      for (;;) {
+        const { done: ended, value } = await reader.read()
+        if (ended) { return }
+        yield value
+      }
+    }
+    finally {
+      reader.releaseLock()
+    }
+  })()
+  await pipeline(Readable.from(chunks, { objectMode: false }), createWriteStream(dest, { flags: append ? 'a' : 'w' }))
 }
 
 /** 校验失败即抛（调用方负责清理 staging） */

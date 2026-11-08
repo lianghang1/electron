@@ -37,6 +37,8 @@ export interface PrintSystemOptions {
   getParent?: () => BrowserWindow | undefined
   /** 设备守护进程：winspool 同步探测经此进 utility 进程，避免阻塞主进程事件循环 */
   host?: DeviceHost
+  /** 打印 URL 负载允许的源站；空 = 拒绝远程下载 */
+  allowedOrigins?: readonly string[]
   /** 结构化日志（模块内不直接 console） */
   logger?: Logger
 }
@@ -52,6 +54,7 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
     archiveDir: options.archiveDir,
     jobsFile: options.jobsFile,
     sumatraPath: options.sumatraPath,
+    allowedOrigins: options.allowedOrigins ?? [],
     logger: log,
   })
 

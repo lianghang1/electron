@@ -14,6 +14,7 @@ export interface PlatformEvents {
   'update.checked': { channel: string, available: boolean }
   'update.applied': { channel: string, version: string }
   'update.failed': { channel: string, reason: string }
+  'update.restart-required': { channel: string, version: string }
   // 窗口
   'window.created': { profile: string, id: number }
   'window.closed': { id: number }

@@ -53,6 +53,10 @@ export interface DeviceGatewayOptions {
   /** 驱动资产寻址策略：组合根查 PLATFORM_CAPABILITIES 装配并注入 */
   driver: DriverResolver
   paths: DeviceGatewayPaths
+  /** 打印 URL 负载允许的源站（组合根注入）；空 = 拒绝远程下载，防 SSRF */
+  allowedOrigins: readonly string[]
+  /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁，避免进程常驻 */
+  getParent?: () => BrowserWindow | undefined
 }
 
 export interface DeviceGateway {
@@ -86,6 +90,8 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     archiveDir: join(options.paths.filesRoot, 'print'),
     sumatraPath,
     host,
+    getParent: options.getParent,
+    allowedOrigins: options.allowedOrigins,
     logger: options.logger.scope('devices:print'),
   })
   const scanner: ScannerSystem = createScannerSystem({

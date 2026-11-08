@@ -1,6 +1,7 @@
 import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { isNewer } from '@shell/shared'
 import { app } from 'electron'
 import { assertAllowedUrl, fetchUpdateManifest } from '../manifest'
 import { downloadFile, verifySha256 } from '../net'
@@ -43,7 +44,7 @@ export class AsarHotChannel implements UpdateChannel {
     if (!existsSync(join(this.options.resourcesDir, 'app.asar'))) { return null }
     const manifest = await fetchUpdateManifest(this.options.manifestUrl, this.options.allowedOrigins)
     if (!manifest.asar) { return null }
-    if ((current.asar ?? '0.0.0') < manifest.asar.version) {
+    if (isNewer(manifest.asar.version, current.asar ?? '0.0.0')) {
       return {
         channel: this.id,
         targetVersion: manifest.asar.version,

@@ -1,6 +1,7 @@
 import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
 import { existsSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { assertSafeSegment, isNewer } from '@shell/shared'
 import extract from 'extract-zip'
 import { assertAllowedUrl, fetchUpdateManifest } from '../manifest'
 import { downloadFile, verifySha256 } from '../net'
@@ -30,7 +31,9 @@ export class DistHotChannel implements UpdateChannel {
     const manifest = await fetchUpdateManifest(this.options.manifestUrl, this.options.allowedOrigins)
     if (!manifest.apps) { return null }
     for (const [appId, entry] of Object.entries(manifest.apps)) {
-      if ((current.apps[appId] ?? '0.0.0') < entry.version) {
+      // 清单里的 appId 会直接拼进文件系统路径：必须先挡住 ../、绝对路径与分隔符穿越
+      assertSafeSegment(appId, 'appId')
+      if (isNewer(entry.version, current.apps[appId] ?? '0.0.0')) {
         return {
           channel: this.id,
           targetVersion: entry.version,
@@ -45,6 +48,12 @@ export class DistHotChannel implements UpdateChannel {
   async apply(plan: UpdatePlan): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
     const { appId, sha256 } = plan.payload ?? {}
     if (!appId || !sha256) { return { ok: false, requiresRestart: false, error: 'dist-hot plan missing appId/sha256' } }
+    try {
+      assertSafeSegment(appId, 'appId')
+    }
+    catch (err) {
+      return { ok: false, requiresRestart: false, error: String(err) }
+    }
 
     const staging = join(this.options.appsRoot, `.staging-${appId}`)
     const target = join(this.options.appsRoot, appId)

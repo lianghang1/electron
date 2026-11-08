@@ -52,35 +52,66 @@ export interface UpdateCenterOptions {
 export class UpdateCenter implements Startable {
   readonly name = 'update'
   private timer?: NodeJS.Timeout
+  private kickoff?: NodeJS.Timeout
+  /** 巡检重入防护：定时触发与手动调用叠加时，同一时刻只跑一轮 */
+  private inFlight = false
+  /** 单轮最多连续应用的免重启更新数，防止清单异常导致死循环 */
+  private static readonly MAX_PER_ROUND = 8
 
   constructor(private readonly options: UpdateCenterOptions) {}
 
   async start(): Promise<void> {
     const interval = this.options.intervalMs ?? 6 * 60 * 60 * 1000
     if (interval > 0) { this.timer = setInterval(() => void this.checkAndApply(), interval) }
-    // 启动即巡检一次（延迟 1min，避开启动高峰）
-    setTimeout(() => void this.checkAndApply(), 60_000)
+    // 启动即巡检一次（延迟 1min，避开启动高峰）；句柄纳入 stop 清理，避免退出后仍触发
+    this.kickoff = setTimeout(() => void this.checkAndApply(), 60_000)
   }
 
   async stop(): Promise<void> {
-    if (this.timer) { clearInterval(this.timer) }
+    if (this.timer) {
+      clearInterval(this.timer)
+      this.timer = undefined
+    }
+    if (this.kickoff) {
+      clearTimeout(this.kickoff)
+      this.kickoff = undefined
+    }
   }
 
-  /** 巡检一轮：灰度过滤 → 首个可用 plan → 应用 → 事件上报 */
+  /**
+   * 巡检一轮：连续应用免重启更新（dist-hot 可一次覆盖多个应用），
+   * 命中需重启的通道（asar/整包）应用后立即停下，等下一次启动生效。
+   */
   async checkAndApply(current?: VersionMatrix): Promise<ApplyResult | { skipped: string }> {
+    if (this.inFlight) { return { skipped: 'in-flight' } }
+    this.inFlight = true
     try {
-      const plan = await this.check(current)
-      if (!plan) {
-        return { skipped: 'up-to-date' }
+      let last: ApplyResult | undefined
+      for (let i = 0; i < UpdateCenter.MAX_PER_ROUND; i++) {
+        const plan = await this.check(current)
+        if (!plan) { return last ?? { skipped: 'up-to-date' } }
+        const result = await this.apply(plan)
+        if (result.ok) {
+          this.options.events.emit('update.applied', { channel: plan.channel, version: plan.targetVersion })
+          if (result.requiresRestart) {
+            this.options.events.emit('update.restart-required', { channel: plan.channel, version: plan.targetVersion })
+          }
+        }
+        else {
+          this.options.events.emit('update.failed', { channel: plan.channel, reason: result.error ?? 'unknown' })
+        }
+        last = result
+        // 失败或需重启时停止，避免反复重试同一计划
+        if (!result.ok || result.requiresRestart) { return result }
       }
-      const result = await this.apply(plan)
-      if (result.ok) { this.options.events.emit('update.applied', { channel: plan.channel, version: plan.targetVersion }) }
-      else { this.options.events.emit('update.failed', { channel: plan.channel, reason: result.error ?? 'unknown' }) }
-      return result
+      return last ?? { skipped: 'up-to-date' }
     }
     catch (err) {
       this.options.events.emit('update.failed', { channel: 'unknown', reason: String(err) })
       return { skipped: 'error' }
+    }
+    finally {
+      this.inFlight = false
     }
   }
 

@@ -16,7 +16,7 @@ import { createKernel } from '@shell/kernel'
 import { createRootLogger } from '@shell/kernel/logger'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, filesDir, platformDataRoot } from '@shell/kernel/storage'
-import { flavorManifestSchema } from '@shell/shared'
+import { assertSafeSegment, flavorManifestSchema, matchesOrigin } from '@shell/shared'
 import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
 import { TraySystem, WindowSystem } from '@shell/window'
 import { app, ipcMain, session } from 'electron'
@@ -55,13 +55,21 @@ function loadFlavor() {
   }
   const flavorArg = process.argv.find(a => a.startsWith('--flavor='))
   const flavorId = flavorArg?.split('=')[1] ?? 'cemetery'
+  assertSafeSegment(flavorId, 'flavorId')
   const flavorPath = join(app.getAppPath(), '../../apps/flavors', flavorId, 'flavor.json')
   const raw = JSON.parse(readFileSync(flavorPath, 'utf-8')) as unknown
   return flavorManifestSchema.parse(raw)
 }
 
 // 单实例锁：kiosk 自愈 relaunch 与重复启动都汇到唯一实例
-if (!app.requestSingleInstanceLock()) { app.quit() }
+let focusShell: (() => void) | undefined
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+}
+else {
+  // 第二次启动：聚焦已有主窗（kiosk 全屏锁定同样适用），而不是静默无反应
+  app.on('second-instance', () => focusShell?.())
+}
 
 async function main(): Promise<void> {
   // 持久化设置的启动副作用（开机自启可能被安装器重置，启动即纠正）
@@ -125,6 +133,8 @@ async function main(): Promise<void> {
     hostEntryPath: join(__dirname, 'device-host.js'),
     driver,
     paths: { storageRoot: configDir(), filesRoot: filesDir() },
+    allowedOrigins: flavor.update.allowedOrigins,
+    getParent: () => windows.shellWindow,
   })
 
   // 设备系统并入内核生命周期：start = 守护进程预热（打 t2），stop = 全域 dispose
@@ -218,10 +228,16 @@ async function main(): Promise<void> {
   // JSAPI 受控桥（remote 页面）：origin 白名单 + manifest.devices 声明双重过滤
   ipcMain.handle('jsapi:call', (event, method: string, input: unknown) => {
     const frameUrl = event.senderFrame?.url ?? ''
-    const origin = new URL(frameUrl).origin
+    let origin: string
+    try {
+      origin = new URL(frameUrl).origin
+    }
+    catch {
+      throw new DomainRouteError('METHOD_NOT_FOUND', '无法解析调用方 origin')
+    }
     const found = apps.list().find((r) => {
       const entry = r.manifest.entry
-      return entry.kind === 'remote' && (entry as { origins: string[] }).origins.includes(origin)
+      return entry.kind === 'remote' && matchesOrigin(frameUrl, (entry as { origins: string[] }).origins)
     })
     if (!found) {
       logger.warn('jsapi rejected: origin not allowed', { origin, method })
@@ -265,6 +281,13 @@ async function main(): Promise<void> {
   registerAppProtocol(session.defaultSession, appsRoot)
 
   windows.createShellWindow()
+  focusShell = () => {
+    const win = windows.shellWindow
+    if (!win) { return }
+    if (win.isMinimized()) { win.restore() }
+    win.show()
+    win.focus()
+  }
   // 扫码枪键盘观察挂到工作台窗口
   devices.attachShellWindow(windows.shellWindow!)
   kernel.ctx.marks.t3WindowShown = Date.now()

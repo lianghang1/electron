@@ -3,6 +3,7 @@ import type { UrlFileType } from './url-type'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { assertFetchableUrl, isPrivateHost } from '@shell/shared'
 import { net } from 'electron'
 import { printError } from './errors'
 import { IMAGE_MIME } from './templates'
@@ -24,22 +25,25 @@ export interface DownloadedUrl {
 /**
  * 下载 URL 负载到归档目录（print/<jobId>.<ext>），复用任务归档生命周期。
  * 类型判定链：fileType 显式提示 > Content-Type > URL 扩展名 > PDF 兜底（记 warn）。
+ * 源站白名单由组合根注入（与更新链路同源）；缺省拒绝一切远程下载，杜绝渲染层借打印通道
+ * 让主进程访问内网/元数据服务（SSRF）。
  */
 export async function downloadUrlContent(
   payload: UrlPayload,
   archiveDir: string,
   jobId: string,
   log: UrlLogFn,
+  allowedOrigins: readonly string[] = [],
 ): Promise<DownloadedUrl> {
   let target: URL
   try {
-    target = new URL(payload.url)
+    target = assertFetchableUrl(payload.url, allowedOrigins)
   }
-  catch {
-    throw printError('VALIDATION_FAILED', `无效的 URL: ${payload.url}`)
+  catch (err) {
+    throw printError('VALIDATION_FAILED', `URL 未通过下载校验: ${String(err)}`)
   }
-  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
-    throw printError('VALIDATION_FAILED', `URL 仅支持 http/https 协议: ${payload.url}`)
+  if (isPrivateHost(target.hostname)) {
+    throw printError('VALIDATION_FAILED', `URL 指向内网地址，拒绝下载: ${target.hostname}`)
   }
 
   const res = await withTimeout(
