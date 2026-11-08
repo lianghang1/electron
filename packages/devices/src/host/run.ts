@@ -52,9 +52,6 @@ export const IC_DRIVERS: Record<string, new (resourcesRoot: string) => IcCardDri
   decard: DecardDriver,
 }
 
-/** 崩溃注入环境变量（联调开关）：由 DeviceHost 决定传给哪个进程实例 */
-export const DEVICE_HOST_CRASH_ENV = 'DESKTOP_DEVICE_HOST_CRASH'
-
 /** 请求载荷公共段：资源根（DLL 寻址基准）+ 驱动名（设备 id "dll:<name>" 的约定后段） */
 interface DriverPayload {
   resourcesRoot: string
@@ -318,12 +315,8 @@ function toHostError(err: unknown): HostError {
   }
 }
 
-/**
- * 启动守护进程消息循环。崩溃注入（DEVICE_HOST_CRASH=1，由 DeviceHost 首次 spawn 时传入）：
- * 首个请求正常响应后立即 process.crash() 真崩溃——验证 pending 拒绝、退避重启与自愈闭环。
- */
+/** 启动守护进程消息循环，按 requestId 配对请求与响应。 */
 export function runDeviceHost(): void {
-  const injectCrash = process.env[DEVICE_HOST_CRASH_ENV] === '1'
   process.parentPort.on('message', (event) => {
     const req = event.data as HostRequest
     let response: HostResponse
@@ -334,8 +327,5 @@ export function runDeviceHost(): void {
       response = { id: req.id, error: toHostError(err) }
     }
     process.parentPort.postMessage(response)
-    if (injectCrash) {
-      setImmediate(() => process.crash())
-    }
   })
 }

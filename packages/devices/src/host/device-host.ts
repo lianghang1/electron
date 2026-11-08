@@ -1,9 +1,7 @@
 import type { Logger } from '@shell/kernel/logger'
 import type { HostRequest, HostResponse } from './protocol'
-import process from 'node:process'
 import { utilityProcess } from 'electron'
 import { DeviceHostError, HostRemoteError } from './errors'
-import { DEVICE_HOST_CRASH_ENV } from './run'
 
 /** 崩溃后退避窗口：1s → 2s → 4s … 封顶 30s；请求成功后归位 */
 const INITIAL_BACKOFF_MS = 1000
@@ -34,8 +32,6 @@ export class DeviceHost {
   /** 退避窗口截止时刻：崩溃后窗口内新请求快速失败，不空转重启 */
   private blockedUntil = 0
   private backoffMs = INITIAL_BACKOFF_MS
-  /** 崩溃注入只做一次：重启后的实例恢复常驻服务（验证自愈闭环，正式部署该环境变量不存在） */
-  private crashInjected = false
   private disposed = false
 
   constructor(
@@ -93,21 +89,11 @@ export class DeviceHost {
 
   private spawn(): Promise<void> {
     return new Promise<void>((resolve) => {
-      // 崩溃注入：首次 spawn 且环境变量开启时传给子进程（重启后的实例不再注入，可观察自愈）
-      const injectCrash = !this.crashInjected && process.env[DEVICE_HOST_CRASH_ENV] === '1'
-      if (injectCrash) {
-        this.crashInjected = true
-      }
-      const forkOptions: Parameters<typeof utilityProcess.fork>[2] = {}
-      // 环境变量存在时显式覆盖子进程的值：重启实例不再继承 '1'，避免崩溃反复触发
-      if (process.env[DEVICE_HOST_CRASH_ENV] !== undefined) {
-        forkOptions.env = { ...process.env, [DEVICE_HOST_CRASH_ENV]: injectCrash ? '1' : '' }
-      }
-      const proc = utilityProcess.fork(this.entryPath, [], { serviceName: 'device-host', ...forkOptions })
+      const proc = utilityProcess.fork(this.entryPath, [], { serviceName: 'device-host' })
       proc.on('message', (response: HostResponse) => this.onResponse(response))
       proc.on('exit', (exitCode: number) => this.onExit(proc, exitCode))
       this.proc = proc
-      this.logger.info('device host spawned', { entry: this.entryPath, injectCrash })
+      this.logger.info('device host spawned', { entry: this.entryPath })
       // fork 同步返回即消息通道就绪；入口模块加载失败经 exit 走崩溃语义（pending 由 exit 清理拒绝）
       resolve()
     })
