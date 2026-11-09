@@ -1,4 +1,5 @@
 import type { EventBus, Startable } from '@shell/kernel'
+import { effectiveVersion } from './boot/pointer'
 
 /** 版本矩阵：设备当前各层版本，与服务端清单比对 */
 export interface VersionMatrix {
@@ -23,22 +24,30 @@ export interface ApplyResult {
   error?: string
 }
 
+export interface UpdateState {
+  status: 'idle' | 'checking' | 'downloading' | 'applying' | 'pending-restart' | 'failed' | 'cancelled'
+  channel?: string
+  version?: string
+  error?: string
+  checkedAt?: number
+}
+
 /**
  * 更新通道 SPI：平台只认识此接口。
- * 三通道（dist-hot 免重启 / asar-hot 原子换+回滚 / full-package 锁屏安装）各自实现，
- * 公共设施（事件上报、调度）由 UpdateCenter 统一提供。
+ * 三通道（dist-hot 免重启 / asar-hot 指针切换 / full-package 锁屏安装）各自实现，
+ * 公共设施（事件上报、调度、状态快照、取消）由 UpdateCenter 统一提供。
  * 每条路径的验收：任何中断后，下次启动必须落在可运行版本。
  */
 export interface UpdateChannel {
   readonly id: 'dist-hot' | 'asar-hot' | 'full-package'
   check: (current: VersionMatrix) => Promise<UpdatePlan | null>
-  apply: (plan: UpdatePlan) => Promise<ApplyResult>
+  apply: (plan: UpdatePlan, signal?: AbortSignal) => Promise<ApplyResult>
 }
 
 export interface UpdateCenterOptions {
   channels: UpdateChannel[]
   events: EventBus
-  /** 版本矩阵由组合根注入（读 appsRoot 版本文件），未注入时退化为 shell 版本 */
+  /** 版本矩阵由组合根注入（读 appsRoot 版本文件与热更指针），未注入时退化为指针生效版本 */
   versionMatrix?: () => Promise<VersionMatrix>
   /** 巡检间隔 ms；0 = 不自动巡检（默认 6h） */
   intervalMs?: number
@@ -50,6 +59,8 @@ export class UpdateCenter implements Startable {
   private kickoff?: NodeJS.Timeout
   /** 巡检重入防护：定时触发与手动调用叠加时，同一时刻只跑一轮 */
   private inFlight = false
+  private controller?: AbortController
+  private state: UpdateState = { status: 'idle' }
   /** 单轮最多连续应用的免重启更新数，防止清单异常导致死循环 */
   private static readonly MAX_PER_ROUND = 8
 
@@ -63,6 +74,7 @@ export class UpdateCenter implements Startable {
   }
 
   async stop(): Promise<void> {
+    this.cancel()
     if (this.timer) {
       clearInterval(this.timer)
       this.timer = undefined
@@ -73,6 +85,28 @@ export class UpdateCenter implements Startable {
     }
   }
 
+  /** 状态快照：渲染层查询进度 / 展示取消按钮 / 展示重启提示 */
+  getState(): UpdateState {
+    return { ...this.state }
+  }
+
+  /** 取消进行中的下载：解压与指针写入是原子收尾，不可中断 */
+  cancel(): void {
+    if (!this.inFlight) { return }
+    this.controller?.abort()
+    this.pushState({ status: 'cancelled' })
+  }
+
+  /** 是否有待重启生效的更新（asar pending 或整包排程） */
+  hasPendingRestart(): boolean {
+    return this.state.status === 'pending-restart'
+  }
+
+  private pushState(next: UpdateState): void {
+    this.state = { ...next, checkedAt: Date.now() }
+    this.options.events.emit('update.state-changed', this.state)
+  }
+
   /**
    * 巡检一轮：连续应用免重启更新（dist-hot 可一次覆盖多个应用），
    * 命中需重启的通道（asar/整包）应用后立即停下，等下一次启动生效。
@@ -80,33 +114,48 @@ export class UpdateCenter implements Startable {
   async checkAndApply(current?: VersionMatrix): Promise<ApplyResult | { skipped: string }> {
     if (this.inFlight) { return { skipped: 'in-flight' } }
     this.inFlight = true
+    this.controller = new AbortController()
+    this.pushState({ status: 'checking' })
     try {
       let last: ApplyResult | undefined
       for (let i = 0; i < UpdateCenter.MAX_PER_ROUND; i++) {
         const plan = await this.check(current)
-        if (!plan) { return last ?? { skipped: 'up-to-date' } }
-        const result = await this.apply(plan)
+        if (!plan) {
+          this.pushState({ status: 'idle' })
+          return last ?? { skipped: 'up-to-date' }
+        }
+        this.pushState({ status: 'downloading', channel: plan.channel, version: plan.targetVersion })
+        const result = await this.apply(plan, this.controller.signal)
         if (result.ok) {
           this.options.events.emit('update.applied', { channel: plan.channel, version: plan.targetVersion })
           if (result.requiresRestart) {
             this.options.events.emit('update.restart-required', { channel: plan.channel, version: plan.targetVersion })
+            this.pushState({ status: 'pending-restart', channel: plan.channel, version: plan.targetVersion })
+          }
+          else {
+            this.pushState({ status: 'applying', channel: plan.channel, version: plan.targetVersion })
           }
         }
         else {
           this.options.events.emit('update.failed', { channel: plan.channel, reason: result.error ?? 'unknown' })
+          this.pushState({ status: 'failed', channel: plan.channel, error: result.error ?? 'unknown' })
         }
         last = result
         // 失败或需重启时停止，避免反复重试同一计划
         if (!result.ok || result.requiresRestart) { return result }
       }
+      this.pushState({ status: 'idle' })
       return last ?? { skipped: 'up-to-date' }
     }
     catch (err) {
-      this.options.events.emit('update.failed', { channel: 'unknown', reason: String(err) })
+      const reason = this.controller.signal.aborted ? 'cancelled' : String(err)
+      this.options.events.emit('update.failed', { channel: 'unknown', reason })
+      this.pushState({ status: this.controller.signal.aborted ? 'cancelled' : 'failed', error: reason })
       return { skipped: 'error' }
     }
     finally {
       this.inFlight = false
+      this.controller = undefined
     }
   }
 
@@ -123,15 +172,15 @@ export class UpdateCenter implements Startable {
     return null
   }
 
-  async apply(plan: UpdatePlan): Promise<ApplyResult> {
+  async apply(plan: UpdatePlan, signal?: AbortSignal): Promise<ApplyResult> {
     const channel = this.options.channels.find(c => c.id === plan.channel)
     if (!channel) { return { ok: false, requiresRestart: false, error: `unknown channel: ${plan.channel}` } }
-    return channel.apply(plan)
+    return channel.apply(plan, signal)
   }
 
   private async collectVersionMatrix(): Promise<VersionMatrix> {
     if (this.options.versionMatrix) { return this.options.versionMatrix() }
     const { app } = await import('electron')
-    return { shell: app.getVersion(), apps: {} }
+    return { shell: effectiveVersion(app.getVersion()), apps: {} }
   }
 }

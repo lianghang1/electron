@@ -46,7 +46,7 @@ export class FullPackageChannel implements UpdateChannel {
     }
   }
 
-  async apply(plan: UpdatePlan): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
+  async apply(plan: UpdatePlan, signal?: AbortSignal): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
     const artifact: PackageArtifact = {
       url: plan.downloadUrl,
       sha256: plan.payload?.sha256 ?? '',
@@ -55,7 +55,7 @@ export class FullPackageChannel implements UpdateChannel {
     this.pending = null
     try {
       assertAllowedUrl(plan.downloadUrl, this.options.allowedOrigins)
-      await downloadFile(plan.downloadUrl, staging)
+      await downloadFile(plan.downloadUrl, staging, {}, signal)
       await verifySha256(staging, artifact.sha256)
       this.pending = await this.options.installer.prepare(staging, artifact)
       return { ok: true, requiresRestart: true }

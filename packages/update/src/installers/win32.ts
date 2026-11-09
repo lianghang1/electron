@@ -1,7 +1,7 @@
 import type { InstallCommand, PackageInstaller } from './contract'
 import { resolveCommand } from './contract'
 
-/** NSIS：/S 为 electron-builder nsis 契约的静默参数；perMachine 安装需管理员权限 */
+/** NSIS：/S 为静默参数，--updated 触发 electron-builder KeepShortcuts（保留用户已删/已固定的快捷方式） */
 export class Win32Installer implements PackageInstaller {
   readonly platform = 'win32' as const
 
@@ -10,6 +10,6 @@ export class Win32Installer implements PackageInstaller {
   }
 
   async prepare(localPath: string): Promise<InstallCommand> {
-    return resolveCommand(['{path}', '/S'], localPath)
+    return resolveCommand(['{path}', '/S', '--updated'], localPath)
   }
 }

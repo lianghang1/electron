@@ -16,13 +16,14 @@ export async function sha256File(path: string): Promise<string> {
   return hash.digest('hex')
 }
 
-/** 断点续传下载：服务端须支持 Range；不支持或起点不符则整文件重下 */
-export async function downloadFile(url: string, dest: string, headers: Record<string, string> = {}): Promise<void> {
+/** 断点续传下载：服务端须支持 Range；不支持或起点不符则整文件重下。signal 用于取消进行中的下载。 */
+export async function downloadFile(url: string, dest: string, headers: Record<string, string> = {}, signal?: AbortSignal): Promise<void> {
   mkdirSync(dirname(dest), { recursive: true })
 
   const done = existsSync(dest) ? statSync(dest).size : 0
   const res = await fetch(url, {
     headers: done > 0 ? { ...headers, range: `bytes=${done}-` } : headers,
+    ...(signal ? { signal } : {}),
   })
   if (!res.ok && res.status !== 206) { throw new Error(`download failed: ${res.status} ${url}`) }
   const body = res.body
@@ -50,7 +51,10 @@ export async function downloadFile(url: string, dest: string, headers: Record<st
       reader.releaseLock()
     }
   })()
-  await pipeline(Readable.from(chunks, { objectMode: false }), createWriteStream(dest, { flags: append ? 'a' : 'w' }))
+  const output = createWriteStream(dest, { flags: append ? 'a' : 'w' })
+  const source = Readable.from(chunks, { objectMode: false })
+  if (signal) { await pipeline(source, output, { signal }) }
+  else { await pipeline(source, output) }
 }
 
 /** 校验失败即抛（调用方负责清理 staging） */

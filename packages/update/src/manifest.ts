@@ -7,7 +7,8 @@ export { assertAllowedUrl }
 /** 单份更新清单：三通道各取所需；缺省段表示该通道无更新。 */
 export interface UpdateManifest {
   apps?: Record<string, { version: string, url: string, sha256: string }>
-  asar?: { version: string, url: string, sha256: string }
+  /** 主程序代码热更包（zip 内 update.json 自描述 + asar 条目，见 boot/bundle.ts） */
+  asar?: { version: string, url: string, sha256: string, minResourcesVersion?: string }
   /**
    * 整包按构建目标平台分组：设备只取自己平台的条目，缺失即跳过整包更新。
    * 一份清单服务多平台设备，落地差异由 PackageInstaller 承担。
@@ -25,10 +26,11 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/i, 'sha256 须为 64 位十六进�
 const url = z.string().url()
 /** 应用/asar 条目带自身版本；整包版本由 package.version 统一给出，条目只需地址与摘要 */
 const versionedArtifactSchema = z.object({ version: z.string().min(1), url, sha256: hash })
+const asarArtifactSchema = versionedArtifactSchema.extend({ minResourcesVersion: z.string().min(1).optional() })
 const packageArtifactSchema = z.object({ url, sha256: hash })
 const updateManifestSchema = z.object({
   apps: z.record(z.string(), versionedArtifactSchema).optional(),
-  asar: versionedArtifactSchema.optional(),
+  asar: asarArtifactSchema.optional(),
   package: z.object({
     version: z.string().min(1),
     artifacts: z.record(z.string(), packageArtifactSchema),

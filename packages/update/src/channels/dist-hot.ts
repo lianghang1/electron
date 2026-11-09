@@ -1,25 +1,25 @@
 import type { UpdateChannel, UpdatePlan, VersionMatrix } from '../update-center'
-import { existsSync, renameSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { assertSafeSegment, isNewer } from '@shell/shared'
 import extract from 'extract-zip'
+import { hotAppsDir, readAppsPointer, writeAppsPointer } from '../boot/pointer'
 import { assertAllowedUrl, fetchUpdateManifest } from '../manifest'
 import { downloadFile, verifySha256 } from '../net'
 
 /**
  * dist-hot 通道：应用 dist 资源热更（免重启）。
- * 场景：packaged 形态应用的前端产物迭代——下载 zip → sha256 校验 →
- * staging 解压 → 原子 rename 换掉 resources/apps/<appId> → 立即生效
- * （app:// 协议直读文件系统，下次进入该应用即是新版本）。
- *
- * 中断安全：全程工作在 staging 目录；rename 是最后一步且原子。
+ * 源码依据 master bundle.ts 的版本化终名思想：产物落 userData 而非安装目录，
+ * 避免 Program Files / mac 签名 seal / 国产化不可变系统下不可写或破坏签名；
+ * apps-current.json 是指针，app:// 协议按 appId 查指针取目录，读写同源。
  */
 export interface DistHotOptions {
-  /** 应用 dist 根目录（与 PackagedOpener.appsRoot 同源） */
-  appsRoot: string
-  /** 更新清单（含各 app 的 zip 地址与 sha256） */
   manifestUrl: string
   allowedOrigins: string[]
+}
+
+function safeVersion(version: string): string {
+  return version.replace(/[^\w.-]/g, '_')
 }
 
 export class DistHotChannel implements UpdateChannel {
@@ -31,7 +31,6 @@ export class DistHotChannel implements UpdateChannel {
     const manifest = await fetchUpdateManifest(this.options.manifestUrl, this.options.allowedOrigins)
     if (!manifest.apps) { return null }
     for (const [appId, entry] of Object.entries(manifest.apps)) {
-      // 清单里的 appId 会直接拼进文件系统路径：必须先挡住 ../、绝对路径与分隔符穿越
       assertSafeSegment(appId, 'appId')
       if (isNewer(entry.version, current.apps[appId] ?? '0.0.0')) {
         return {
@@ -45,43 +44,60 @@ export class DistHotChannel implements UpdateChannel {
     return null
   }
 
-  async apply(plan: UpdatePlan): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
+  async apply(plan: UpdatePlan, signal?: AbortSignal): Promise<{ ok: boolean, requiresRestart: boolean, error?: string }> {
     const { appId, sha256 } = plan.payload ?? {}
     if (!appId || !sha256) { return { ok: false, requiresRestart: false, error: 'dist-hot plan missing appId/sha256' } }
     try {
       assertSafeSegment(appId, 'appId')
+      assertAllowedUrl(plan.downloadUrl, this.options.allowedOrigins)
     }
     catch (err) {
       return { ok: false, requiresRestart: false, error: String(err) }
     }
 
-    const staging = join(this.options.appsRoot, `.staging-${appId}`)
-    const target = join(this.options.appsRoot, appId)
+    const dir = hotAppsDir()
+    const suffix = `${appId}-${safeVersion(plan.targetVersion)}`
+    const versionDir = join(dir, suffix)
+    const staging = join(dir, `.staging-${suffix}`)
+    const backup = join(dir, `.old-${suffix}`)
+    const zipPath = join(dir, `.staging-${suffix}.zip`)
+    mkdirSync(dir, { recursive: true })
     try {
-      assertAllowedUrl(plan.downloadUrl, this.options.allowedOrigins)
-      const zipPath = `${staging}.zip`
-      await downloadFile(plan.downloadUrl, zipPath)
+      await downloadFile(plan.downloadUrl, zipPath, {}, signal)
       await verifySha256(zipPath, sha256)
-
       rmSync(staging, { recursive: true, force: true })
       await extract(zipPath, { dir: staging })
-      rmSync(zipPath, { force: true })
 
-      // 原子切换：旧目录先改名保留（.bak），新目录就位后删除——中途断电旧版本仍在
-      const backup = join(this.options.appsRoot, `.bak-${appId}`)
-      if (existsSync(backup)) { rmSync(backup, { recursive: true, force: true }) }
-      if (existsSync(target)) { renameSync(target, backup) }
-      renameSync(staging, target)
-      if (existsSync(backup)) { rmSync(backup, { recursive: true, force: true }) }
+      // 原子换名：生效目录先让位到 .old，staging 就位后删旧。
+      // 断电落在任一状态都有可运行版本（.old 或新目录），指针始终指向 versionDir。
+      rmSync(backup, { recursive: true, force: true })
+      if (existsSync(versionDir)) { renameSync(versionDir, backup) }
+      renameSync(staging, versionDir)
+
+      const pointer = readAppsPointer()
+      pointer[appId] = { version: plan.targetVersion, dir: versionDir }
+      writeAppsPointer(pointer)
+      rmSync(backup, { recursive: true, force: true })
+      clearOrphanAppDirs(dir, appId, versionDir)
       return { ok: true, requiresRestart: false }
     }
     catch (err) {
       rmSync(staging, { recursive: true, force: true })
-      rmSync(`${staging}.zip`, { force: true })
-      // 原子切换中途失败：正式位可能已让给 .bak，必须回滚，否则下次启动无版本可跑
-      const backup = join(this.options.appsRoot, `.bak-${appId}`)
-      if (!existsSync(target) && existsSync(backup)) { renameSync(backup, target) }
+      if (!existsSync(versionDir) && existsSync(backup)) { renameSync(backup, versionDir) }
       return { ok: false, requiresRestart: false, error: String(err) }
     }
+    finally {
+      rmSync(zipPath, { force: true })
+    }
+  }
+}
+
+/** 下载即清孤儿：只保留该应用生效指针指向的目录 */
+function clearOrphanAppDirs(dir: string, appId: string, keep: string): void {
+  if (!existsSync(dir)) { return }
+  for (const name of readdirSync(dir)) {
+    if (!name.startsWith(`${appId}-`) || join(dir, name) === keep) { continue }
+    try { rmSync(join(dir, name), { recursive: true, force: true }) }
+    catch { /* 清理失败不阻塞热更链路 */ }
   }
 }

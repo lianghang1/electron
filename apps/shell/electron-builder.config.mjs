@@ -15,22 +15,47 @@ import { ensureDriverAssets } from '../../scripts/prepare-driver-assets.mjs'
 const flavorId = process.env.FLAVOR ?? 'cemetery'
 const flavor = JSON.parse(readFileSync(new URL(`../../apps/flavors/${flavorId}/flavor.json`, import.meta.url), 'utf-8'))
 
+/**
+ * 构建目标矩阵（源码依据 ZCode docs/desktop/oss-cdn-multi-target-migration.md 的
+ * update/<platform>/<arch> 契约）：win/mac/linux × x64/arm64 共 6 端，
+ * 飞腾/鲲鹏落 arm64，兆芯/海光落 x64。龙芯/申威无 Electron 官方二进制，不在矩阵内。
+ * 不做 CI：逐端由 TARGET_OS / TARGET_ARCH 指定，在对应平台机器上构建并人工核对产物。
+ */
+const BUILD_MATRIX = {
+  win32: ['x64', 'arm64'],
+  darwin: ['x64', 'arm64'],
+  linux: ['x64', 'arm64'],
+}
+const targetOs = process.env.TARGET_OS ?? process.platform
+const targetArch = process.env.TARGET_ARCH ?? process.arch
+if (!BUILD_MATRIX[targetOs]?.includes(targetArch)) {
+  throw new Error(`unsupported build target: ${targetOs}/${targetArch}`)
+}
+const arch = [targetArch]
+
 // 构建期把源码树 assets 按同一套规则聚合成 resources/devices/<域>/<厂商>/<平台>/<文件>，
 // 使 bundled 策略的 <resources>/devices/... 与域内声明一一对应（不在 asar 内散落携带 DLL）。
 await ensureDriverAssets()
+
+// rpm 需 rpmbuild，逐端构建时由 TARGET_RPM=1 显式启用；默认 deb + AppImage 保证任意
+// 干净的 Linux 环境都能完成打包，国产化 rpm 产物在装有 rpmbuild 的机器上产出
+const linuxTargets = process.env.TARGET_RPM === '1' ? ['deb', 'AppImage', 'rpm'] : ['deb', 'AppImage']
 
 export default {
   appId: `cn.shellplatform.${flavor.id}`,
   productName: flavor.name,
   // 不显式指定会落到 package.json 的 name(@app/shell)，产物变成 "@appshell"
   executableName: flavor.id,
-  artifactName: `${flavor.id}-\${version}-\${arch}.\${ext}`,
+  artifactName: `${flavor.id}-\${version}-${targetOs}-${targetArch}.\${ext}`,
   directories: {
     output: `release/${flavor.id}`,
     buildResources: 'build',
   },
 
   files: ['out/**'],
+  // 拆包钩子：app.asar 重写为 KB 级 ESM 引导器，完整产物改名 app.core.asar；
+  // koffi 原生依赖与 resources 版本标记随整包落 resources/（热更包禁止携带 .node）
+  afterPack: './scripts/after-pack.cjs',
 
   extraResources: [
     // 产品形态清单：组合根打包态读取 resources/flavor.json
@@ -43,25 +68,26 @@ export default {
   ],
 
   win: {
-    target: [{ target: 'nsis', arch: ['x64'] }],
-    // 国产化平台按需追加：electron 不支持的架构走 remote 形态（PlatformCapability 已声明）
+    target: [{ target: 'nsis', arch }],
+    // win32-arm64 走同一 NSIS 配置；国产化 CPU 由 linux 侧承担，见 docs/release.md
   },
 
   nsis: {
     oneClick: false,
-    // 静默参数（/S）由 Win32Installer 默认命令拉起，供整包更新退出后安装
+    // 静默参数（/S --updated）由 Win32Installer 拉起，--updated 触发 electron-builder 的
+    // KeepShortcuts：覆盖安装不重建用户已删除的快捷方式，也不改动固定身份
     allowToChangeInstallationDirectory: false,
     perMachine: true,
     deleteAppDataOnUninstall: false,
   },
 
   mac: {
-    target: 'dmg',
+    target: [{ target: 'dmg', arch }],
     category: 'public.app-category.business',
   },
 
   linux: {
-    target: ['deb', 'AppImage'],
+    target: linuxTargets.map(target => ({ target, arch })),
     category: 'Utility',
   },
 }

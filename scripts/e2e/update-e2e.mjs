@@ -1,6 +1,7 @@
 /**
  * 更新链路端到端：真实 HTTP 清单服务 + 真实文件系统 + 真实三通道与三平台策略实现类。
- * 覆盖 dist-hot（免重启热更）/ asar-hot（原子换+回滚）/ full-package（按平台策略整包落地），
+ * 覆盖 dist-hot（userData 版本化目录 + apps-current 指针）/ asar-hot（包内自描述 +
+ * 版本化终名 + pending 指针）/ full-package（按平台策略整包落地），
  * 以及共用清单缺段调度、平台条目缺失、清单命令注入无效、origin 白名单、sha256 篡改、中断兜底。
  *
  * 运行：pnpm test:e2e:update
@@ -28,8 +29,10 @@ const {
   LinuxInstaller,
   UpdateCenter,
   Win32Installer,
-  collectAppVersions,
-  finalizeAsarUpdate,
+  collectEffectiveAppVersions,
+  hasPendingAsarUpdate,
+  readAppsPointer,
+  readPending,
 } = await import('@shell/update')
 
 const work = mkdtempSync(join(tmpdir(), 'shell-e2e-'))
@@ -44,8 +47,20 @@ writeFileSync(join(v2Dir, 'index.html'), '<h1>demo-packaged v2.0.0</h1>')
 writeFileSync(join(v2Dir, 'version.json'), JSON.stringify({ version: '2.0.0' }))
 const zipPath = join(work, 'demo-packaged-2.0.0.zip')
 execFileSync('zip', ['-j', zipPath, 'index.html', 'version.json'], { cwd: v2Dir })
-const asarPath = join(work, 'app-2.0.1.asar')
-writeFileSync(asarPath, 'ASAR-v2.0.1')
+
+// asar 热更包是 zip：包内 update.json 自描述版本 / 条目名 / asar 的 sha256，
+// 清单里的 sha256 校验 zip 容器，两层校验缺一不可（对应 boot/bundle.ts）
+const asarBundleDir = join(work, 'asar-bundle')
+mkdirSync(asarBundleDir)
+writeFileSync(join(asarBundleDir, 'core.asar'), 'ASAR-v2.0.1')
+const asarEntrySha = createHash('sha256').update('ASAR-v2.0.1').digest('hex')
+writeFileSync(join(asarBundleDir, 'update.json'), JSON.stringify({
+  version: '2.0.1',
+  file: 'core.asar',
+  sha256: asarEntrySha,
+}))
+const asarZipPath = join(work, 'app-2.0.1.zip')
+execFileSync('zip', ['-j', asarZipPath, 'update.json', 'core.asar'], { cwd: asarBundleDir })
 const installerPath = join(work, 'shell-2.0.1.bin')
 writeFileSync(installerPath, 'INSTALLER-v2.0.1')
 
@@ -55,7 +70,7 @@ let tampered = false
 
 const files = {
   '/demo-packaged-2.0.0.zip': zipPath,
-  '/app-2.0.1.asar': asarPath,
+  '/app-2.0.1.zip': asarZipPath,
   '/shell-2.0.1.exe': installerPath,
   '/shell-2.0.1.deb': installerPath,
   '/shell-2.0.1.AppImage': installerPath,
@@ -73,7 +88,7 @@ function pkgEntry(name, extra = {}) {
 function manifest() {
   return {
     apps: { 'demo-packaged': { version: '2.0.0', url: `${base}/demo-packaged-2.0.0.zip`, sha256: tampered ? badSha : sha(zipPath) } },
-    asar: { version: '2.0.1', url: `${base}/app-2.0.1.asar`, sha256: tampered ? badSha : sha(asarPath) },
+    asar: { version: '2.0.1', url: `${base}/app-2.0.1.zip`, sha256: tampered ? badSha : sha(asarZipPath) },
     package: {
       version: '2.0.1',
       artifacts: { win32: pkgEntry('exe'), linux: pkgEntry('deb'), darwin: pkgEntry('dmg') },
@@ -152,67 +167,68 @@ async function step(name, fn) {
 
 process.stdout.write(`\n更新链路 e2e  ${base}\n\n`)
 
-const dist = new DistHotChannel({ appsRoot, manifestUrl, allowedOrigins })
-const asar = new AsarHotChannel({ resourcesDir, manifestUrl, allowedOrigins })
+const dist = new DistHotChannel({ manifestUrl, allowedOrigins })
+const asar = new AsarHotChannel({ manifestUrl, allowedOrigins })
+const effectiveApps = () => collectEffectiveAppVersions(appsRoot, readAppsPointer())
 
-await step('dist-hot: 1.0.0 → 2.0.0 原子替换，免重启', async () => {
-  const current = { ...matrix, apps: collectAppVersions(appsRoot) }
-  const plan = await dist.check(current)
+await step('dist-hot: 1.0.0 → 2.0.0 落 userData 版本化目录，免重启', async () => {
+  const plan = await dist.check({ ...matrix, apps: effectiveApps() })
   assert.equal(plan?.channel, 'dist-hot')
   assert.equal(plan?.targetVersion, '2.0.0')
   const result = await dist.apply(plan)
   assert.equal(result.ok, true)
   assert.equal(result.requiresRestart, false)
-  assert.match(readFileSync(join(appsRoot, 'demo-packaged', 'index.html'), 'utf-8'), /v2\.0\.0/)
-  assert.deepEqual(collectAppVersions(appsRoot), { 'demo-packaged': '2.0.0' })
-  assert.equal(existsSync(join(appsRoot, '.staging-demo-packaged')), false)
-  assert.equal(existsSync(join(appsRoot, '.bak-demo-packaged')), false)
+  const pointer = readAppsPointer()['demo-packaged']
+  assert.equal(pointer.version, '2.0.0')
+  assert.match(pointer.dir, /-2\.0\.0$/)
+  assert.match(readFileSync(join(pointer.dir, 'index.html'), 'utf-8'), /v2\.0\.0/)
+  assert.equal(effectiveApps()['demo-packaged'], '2.0.0')
+  assert.equal(readFileSync(join(appsRoot, 'demo-packaged', 'index.html'), 'utf-8'), 'demo-packaged v1.0.0', '安装目录保持只读基线')
 })
 
-await step('dist-hot: 热更后版本矩阵刷新，不重复更新', async () => {
-  assert.equal(await dist.check({ ...matrix, apps: collectAppVersions(appsRoot) }), null)
+await step('dist-hot: 生效版本矩阵刷新，不重复更新', async () => {
+  assert.equal(await dist.check({ ...matrix, apps: effectiveApps() }), null)
 })
 
-await step('dist-hot: sha256 篡改被拒，正式位保持可运行版本', async () => {
+await step('dist-hot: sha256 篡改被拒，生效指针保持可运行版本', async () => {
   tampered = true
   try {
     const plan = await dist.check({ ...matrix, apps: { 'demo-packaged': '1.0.0' } })
     const result = await dist.apply(plan)
     assert.equal(result.ok, false)
     assert.match(result.error ?? '', /sha256 mismatch/)
-    assert.match(readFileSync(join(appsRoot, 'demo-packaged', 'index.html'), 'utf-8'), /v2\.0\.0/)
-    assert.equal(existsSync(join(appsRoot, '.staging-demo-packaged')), false)
+    const pointer = readAppsPointer()['demo-packaged']
+    assert.match(readFileSync(join(pointer.dir, 'index.html'), 'utf-8'), /v2\.0\.0/)
   }
   finally {
     tampered = false
   }
 })
 
-await step('asar-hot: 下载标记 → finalize 原子换 → 二次 finalize 清 .bak', async () => {
+await step('asar-hot: 包内自描述校验 → 版本化终名 → pending 指针', async () => {
   const plan = await asar.check(matrix)
   assert.equal(plan?.channel, 'asar-hot')
   const result = await asar.apply(plan)
   assert.equal(result.ok, true)
   assert.equal(result.requiresRestart, true)
-  const marker = join(updaterDir, 'pending.asar.json')
-  assert.match(readFileSync(marker, 'utf-8'), /"stage":"downloaded"/)
-  assert.equal(finalizeAsarUpdate(resourcesDir).ok, true)
-  assert.equal(readFileSync(join(resourcesDir, 'app.asar'), 'utf-8'), 'ASAR-v2.0.1')
-  assert.equal(existsSync(join(resourcesDir, 'app.asar.bak')), true)
-  assert.match(readFileSync(marker, 'utf-8'), /"stage":"swapped"/)
-  assert.equal(finalizeAsarUpdate(resourcesDir).ok, true)
-  assert.equal(existsSync(join(resourcesDir, 'app.asar.bak')), false)
-  assert.equal(existsSync(marker), false)
+  const pending = readPending()
+  assert.equal(pending.version, '2.0.1')
+  assert.equal(pending.file, 'core-2.0.1.asar')
+  assert.equal(readFileSync(join(updaterDir, pending.file), 'utf-8'), 'ASAR-v2.0.1')
+  assert.equal(hasPendingAsarUpdate(), true)
+  assert.equal(readFileSync(join(resourcesDir, 'app.asar'), 'utf-8'), 'ASAR-v2.0.0-alpha.0', '运行中绝不替换 app.asar')
 })
 
-await step('asar-hot: sha256 篡改被拒，坏 pending.asar 不残留', async () => {
+await step('asar-hot: sha256 篡改被拒，不写 pending 指针', async () => {
+  rmSync(join(updaterDir, 'pending.json'), { force: true })
+  rmSync(join(updaterDir, 'core-2.0.1.asar'), { force: true })
   tampered = true
   try {
     const plan = await asar.check(matrix)
     const result = await asar.apply(plan)
     assert.equal(result.ok, false)
-    assert.equal(existsSync(join(updaterDir, 'pending.asar')), false)
-    assert.equal(existsSync(join(updaterDir, 'pending.asar.json')), false)
+    assert.equal(existsSync(join(updaterDir, 'pending.json')), false)
+    assert.equal(existsSync(join(updaterDir, 'core-2.0.1.asar')), false)
   }
   finally {
     tampered = false
@@ -230,7 +246,7 @@ await step('win32 策略: .exe 暂存 + NSIS /S 命令 + 退出只拉起一次',
   assert.equal(readFileSync(staged, 'utf-8'), 'INSTALLER-v2.0.1')
   const cmd = await new Win32Installer().prepare(staged, { url: plan.downloadUrl, sha256: '' })
   assert.equal(cmd.command, staged)
-  assert.deepEqual(cmd.args, ['/S'])
+  assert.deepEqual(cmd.args, ['/S', '--updated'])
   assert.equal(cmd.detached, true)
   const errors = []
   assert.equal(win.installOnQuit(err => errors.push(err.message)), true)
@@ -315,8 +331,8 @@ await step('共用清单缺 apps 段: 调度跳过 dist-hot 命中 asar-hot（�
   const emitted = []
   const center = new UpdateCenter({
     channels: [
-      new DistHotChannel({ appsRoot, manifestUrl: onlyAsar, allowedOrigins }),
-      new AsarHotChannel({ resourcesDir, manifestUrl: onlyAsar, allowedOrigins }),
+      new DistHotChannel({ manifestUrl: onlyAsar, allowedOrigins }),
+      new AsarHotChannel({ manifestUrl: onlyAsar, allowedOrigins }),
       new FullPackageChannel({ manifestUrl: onlyAsar, allowedOrigins, installer: new Win32Installer() }),
     ],
     events: { emit: (type, payload) => emitted.push({ type, payload }) },
@@ -328,25 +344,47 @@ await step('共用清单缺 apps 段: 调度跳过 dist-hot 命中 asar-hot（�
 })
 
 await step('origin 白名单: 清单与整包地址非授信源站直接拒绝', async () => {
-  const evil = new DistHotChannel({ appsRoot, manifestUrl: 'http://evil.example/manifest.json', allowedOrigins })
+  const evil = new DistHotChannel({ manifestUrl: 'http://evil.example/manifest.json', allowedOrigins })
   await assert.rejects(() => evil.check(matrix), /origin not allowed/)
   const cross = new FullPackageChannel({ manifestUrl: `${base}/manifest-cross-origin.json`, allowedOrigins, installer: new Win32Installer() })
   await assert.rejects(() => cross.check(matrix), /origin not allowed/)
 })
 
-await step('asar finalize 异常兜底: 返回 ok:false 而非抛错拖垮启动', async () => {
-  const brokenDir = join(work, 'resources-broken')
-  mkdirSync(brokenDir, { recursive: true })
-  writeFileSync(join(brokenDir, 'app.asar'), 'LIVE')
-  mkdirSync(join(brokenDir, 'app.asar.bak', 'child'), { recursive: true })
-  const marker = join(updaterDir, 'pending.asar.json')
-  writeFileSync(marker, JSON.stringify({ stage: 'swapped' }))
-  const result = finalizeAsarUpdate(brokenDir)
-  assert.equal(result.ok, false)
-  assert.match(result.error ?? '', /EISDIR|ENOTEMPTY|ERR_FS/)
-  assert.equal(readFileSync(join(brokenDir, 'app.asar'), 'utf-8'), 'LIVE')
-  rmSync(marker, { force: true })
-  rmSync(join(brokenDir, 'app.asar.bak'), { recursive: true, force: true })
+await step('引导层指针: pending → current → 首启未存活自动回滚内置包', async () => {
+  const { MARKS } = await import('../../apps/shell/electron/launcher/marks.mjs')
+  const { bootSequence } = await import('../../apps/shell/electron/launcher/sequence.mjs')
+  const bootDir = mkdtempSync(join(tmpdir(), 'shell-launcher-e2e-'))
+  try {
+    writeFileSync(join(bootDir, 'core-2.0.1.asar'), 'HOT')
+    writeFileSync(join(bootDir, MARKS.pending), JSON.stringify({ version: '2.0.1', file: 'core-2.0.1.asar', sha256: 'x' }))
+    const loaded = []
+    const first = await bootSequence({
+      dir: bootDir,
+      builtinRoot: '/builtin-core.asar',
+      builtinVersion: '2.0.0',
+      loadCore: async (candidate) => { loaded.push(candidate.label) },
+      log: () => {},
+    })
+    assert.equal(first.label, 'hot')
+    assert.equal(JSON.parse(readFileSync(join(bootDir, MARKS.current), 'utf-8')).version, '2.0.1')
+    assert.equal(existsSync(join(bootDir, MARKS.pending)), false)
+    assert.equal(existsSync(join(bootDir, MARKS.firstRun)), true)
+
+    const second = await bootSequence({
+      dir: bootDir,
+      builtinRoot: '/builtin-core.asar',
+      builtinVersion: '2.0.0',
+      loadCore: async (candidate) => { loaded.push(candidate.label) },
+      log: () => {},
+    })
+    assert.equal(second.label, 'builtin', '首启未存活 60s 应回滚内置包')
+    assert.deepEqual(loaded, ['hot', 'builtin'])
+    assert.equal(existsSync(join(bootDir, MARKS.current)), false)
+    assert.equal(existsSync(join(bootDir, 'core-2.0.1.asar')), false)
+  }
+  finally {
+    rmSync(bootDir, { recursive: true, force: true })
+  }
 })
 
 await step('全通道已是最新: 三个 check 都返回 null', async () => {
