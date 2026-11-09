@@ -1,0 +1,21 @@
+{
+  "id": "diagnostics",
+  "name": "系统功能检测",
+  "mode": "desktop",
+  "chrome": "platform",
+  "defaultAppId": "diagnostics",
+  "diagnostics": true,
+  "apps": [
+    {
+      "id": "diagnostics",
+      "name": "系统功能检测",
+      "version": "2.0.0-alpha.0",
+      "type": "internal",
+      "entry": { "kind": "embedded", "route": "/diagnostics" },
+      "devices": ["capture", "idcard", "iccard", "signature", "scanner", "print"],
+      "permissions": []
+    }
+  ],
+  "branding": { "accent": "#0d9488" },
+  "update": { "allowedOrigins": [] }
+}

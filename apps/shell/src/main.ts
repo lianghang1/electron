@@ -1,4 +1,4 @@
-import { bootstrapAppearance, registerEmbeddedApp, ShellApp } from '@shell/ui'
+import { bootstrapAppearance, DiagnosticsApp, registerEmbeddedApp, ShellApp } from '@shell/ui'
 import { createApp, defineComponent, h } from 'vue'
 import DemoTable from './demo/DemoTable.vue'
 import '@shell/ui/styles.css'
@@ -59,6 +59,8 @@ for (const page of DEMO_PAGES) {
     render: () => h(DemoTable, page),
   }))
 }
+
+registerEmbeddedApp('/diagnostics', DiagnosticsApp)
 
 /**
  * kiosk 看门狗恢复模式：连续崩溃后 WindowSystem 以 #/recovery 进入，

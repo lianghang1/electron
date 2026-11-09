@@ -58,9 +58,9 @@ function run(label, cmd, args, opts = {}) {
 }
 
 // dev 解析阶段：只验证「模块能解析、构建能起」，不要求 Electron 窗口真的显示（无显示器环境）
-function devResolve() {
+function devResolve(script = 'dev', label = 'dev-resolve') {
   const t0 = Date.now()
-  const r = spawnSync('timeout', ['--signal=TERM', '25s', 'pnpm', 'dev'], {
+  const r = spawnSync('timeout', ['--signal=TERM', '25s', 'pnpm', script], {
     cwd: WORK,
     encoding: 'utf8',
     timeout: 60000,
@@ -69,7 +69,7 @@ function devResolve() {
   const fail = /Rolldown failed|failed to resolve|Error:\s*\[vite\]/i.test(out)
   const resolved = /modules transformed|Local:\s*http|ready in|VITE.*ready/i.test(out)
   const ok = !fail && resolved
-  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${'dev-resolve'.padEnd(16)} ${((Date.now() - t0) / 1000).toFixed(1)}s  (解析=${resolved ? 'ok' : 'n/a'}, 报错=${fail ? 'yes' : 'no'})`)
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(16)} ${((Date.now() - t0) / 1000).toFixed(1)}s  (解析=${resolved ? 'ok' : 'n/a'}, 报错=${fail ? 'yes' : 'no'})`)
   if (!ok) { console.log(out.split('\n').slice(-25).map(l => `        ${l}`).join('\n')) }
   return { ok, out }
 }
@@ -96,9 +96,12 @@ function main() {
   results.push(['e2e:force-gate', run('e2e:force-gate', 'pnpm', ['test:e2e:force-gate'], { show: true })])
   results.push(['e2e:apps-source', run('e2e:apps-source', 'pnpm', ['test:e2e:apps-source'], { show: true })])
   results.push(['e2e:session', run('e2e:session', 'pnpm', ['test:e2e:session'], { show: true })])
+  results.push(['e2e:caller', run('e2e:caller', 'pnpm', ['test:e2e:caller'], { show: true })])
+  results.push(['e2e:diagnostics', run('e2e:diagnostics', 'pnpm', ['test:e2e:diagnostics'], { show: true })])
   results.push(['build', run('build', 'pnpm', ['build'], { show: true })])
   results.push(['design:css', run('design:css', 'pnpm', ['check:design:css'], { show: true })])
   results.push(['dev-resolve', devResolve()])
+  results.push(['dev:diagnostics', devResolve('dev:diagnostics', 'dev:diagnostics')])
 
   // 构建后不得重新出现中间 dist（源码直引约定的反向证明）
   const distCount = existsSync(join(WORK, 'packages'))

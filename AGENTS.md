@@ -29,6 +29,7 @@
 | 应用会话容器 | AppSessionRegistry（`persist:app-<id>` 分区 + cookie 快照） | 每应用一个 session、cookie 垫片 |
 | 设备域 | Domain | module、feature |
 | 产品形态 | Flavor | app、edition |
+| 验机形态 | diagnostics Flavor（`diagnostics: true`） | 调试模式、dev 开关 |
 | 构建目标平台 | BuildPlatform（win32 / darwin / linux） | 与 Platform（硬件能力平台）混用 |
 | 整包落地策略 | PackageInstaller（组合根按平台注入） | 通道内写死 `.exe` / `/S` / spawn |
 | 窗口创建 | 目的命名函数（createShellWindow / openCaptureOverlay...） | 裸 new BrowserWindow |
@@ -57,7 +58,7 @@
 
 ## 验证纪律
 
-- 结论以机器退出码为准，不以"沙箱里能跑"为准。`pnpm verify` 复制 `git ls-files` 的入库文件到干净目录（排除一切 gitignore 产物），跑 install → guard → lint → typecheck → test → e2e → build → dev 解析阶段，任一失败即退出非零。
+- 结论以机器退出码为准，不以"沙箱里能跑"为准。`pnpm verify` 复制 `git ls-files` 的入库文件到干净目录（排除一切 gitignore 产物），跑 install → guard → lint → typecheck → test → e2e → build → dev 解析阶段（含 `dev:diagnostics` 验机入口），任一失败即退出非零。
 - 验证环境与交付条件必须一致：禁止在存在 `dist/out/resources/devices` 的工作树里宣称"全绿"。
 - 构建后不得出现逐包 `dist`（源码直引的机器证明）。
 
@@ -81,3 +82,4 @@
 - 界面文字只用 `text-ui-*` 阶梯，禁止任意字号；`--ui-font-size` 是唯一缩放输入。
 - 业务侧只经 `@shell/ui` 门面消费组件；壳内组件可用 `@ui/components/ui`。
 - `pnpm check:design` / `pnpm check:design:css` 把 `DESIGN.md` 的禁令变成机器退出码，`pnpm verify` 会执行。
+- 调试台方法只从 `DIAGNOSTIC_CATALOG` 取，禁止在 UI 里另写一份方法名；`pnpm test:e2e:diagnostics` 双向比对其与真实 `defineDomain` 定义，并用默认入参跑真实 zod schema。

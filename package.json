@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev",
+    "dev:diagnostics": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev:diagnostics",
     "build": "pnpm --filter @app/shell build",
     "build:win": "pnpm --filter @app/shell build:win",
     "build:mac": "pnpm --filter @app/shell build:mac",
@@ -30,6 +31,8 @@
     "test:e2e:force-gate": "node --import tsx scripts/e2e/force-gate-e2e.mjs",
     "test:e2e:apps-source": "node --import tsx scripts/e2e/apps-source-e2e.mjs",
     "test:e2e:session": "node --import tsx scripts/e2e/session-e2e.mjs",
+    "test:e2e:caller": "node --import tsx scripts/e2e/caller-e2e.mjs",
+    "test:e2e:diagnostics": "node --import tsx scripts/e2e/diagnostics-e2e.mjs",
     "typecheck": "pnpm -r typecheck",
     "postinstall": "node scripts/ensure-electron.mjs"
   },

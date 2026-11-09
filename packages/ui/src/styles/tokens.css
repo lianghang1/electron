@@ -31,6 +31,8 @@
   --dt-accent-soft: color-mix(in srgb, var(--dt-accent) 14%, transparent);
   --dt-accent-hover: color-mix(in srgb, var(--dt-accent) 88%, #000);
   --dt-on-accent: #ffffff;
+  /* 强调底上的文字色：深色主题单独提亮，避免与半透明强调底撞色 */
+  --dt-accent-ink: var(--dt-accent);
   --dt-hover: rgba(148, 163, 199, 0.14);
   --dt-ok: #22c55e;
   --dt-warn: #f59e0b;
@@ -63,7 +65,7 @@
   --muted: var(--dt-surface-hover);
   --muted-foreground: var(--dt-text-2);
   --accent: var(--dt-accent-soft);
-  --accent-foreground: var(--dt-accent);
+  --accent-foreground: var(--dt-accent-ink);
   --destructive: var(--dt-danger);
   --destructive-foreground: var(--dt-on-accent);
   --border: var(--dt-line);
@@ -95,6 +97,8 @@
   --dt-text-2: #a0aab5;
   --dt-text-3: #6e7681;
   --dt-hover: rgba(139, 148, 158, 0.16);
+  --dt-accent-soft: color-mix(in srgb, var(--dt-accent) 24%, transparent);
+  --dt-accent-ink: color-mix(in srgb, var(--dt-accent) 40%, #ffffff);
   --dt-ok: #3fb950;
   --dt-warn: #d29922;
   --dt-danger: #f85149;
