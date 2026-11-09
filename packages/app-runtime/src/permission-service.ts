@@ -25,6 +25,8 @@ export interface PermissionDecision {
 export interface PermissionStore {
   get: (key: string) => Promise<PermissionVerdict | undefined>
   set: (key: string, verdict: PermissionVerdict) => Promise<void>
+  /** 撤销已持久化的运行时决策 */
+  delete?: (key: string) => Promise<void>
 }
 
 /** 可注入的授权浮层；未注入时 prompt 判定一律拒绝 */
@@ -84,6 +86,55 @@ export class PermissionService {
       if (!allowed) { return false }
     }
     return true
+  }
+
+  /**
+   * 应用主动请求运行时授权：绕过策略表，读持久化结论或经浮层询问。
+   * 超时与缺省拒绝由浮层宿主承担（master requestRuntime/respond 的重构表达）。
+   */
+  async requestRuntime(request: PermissionRequest): Promise<boolean> {
+    const key = decisionKey(request.appId, request.permission)
+    const stored = await this.options.store?.get(key).catch(() => undefined)
+    if (stored === 'allow' || stored === 'deny') {
+      const allowed = stored === 'allow'
+      this.options.audit?.({ request, verdict: allowed ? 'allow' : 'deny', source: 'store' })
+      return allowed
+    }
+    const granted = this.options.prompt
+      ? await this.options.prompt.ask(request).catch(() => false)
+      : false
+    const verdict: PermissionVerdict = granted ? 'allow' : 'deny'
+    if (this.options.store) {
+      await this.options.store.set(key, verdict).catch(() => {})
+    }
+    this.options.audit?.({ request, verdict, source: 'prompt' })
+    return granted
+  }
+
+  /** 只查询判定，不触发授权浮层（master ipc/permission.ts 的 check 语义） */
+  async check(request: PermissionRequest): Promise<PermissionVerdict> {
+    const key = decisionKey(request.appId, request.permission)
+    const verdict = this.rules.get(key) ?? 'deny'
+    if (verdict !== 'prompt') { return verdict }
+    const stored = await this.options.store?.get(key).catch(() => undefined)
+    return stored ?? 'prompt'
+  }
+
+  /** 应用的权限声明与策略判定快照，供工作台展示 */
+  listStates(appId: string): { permission: string, verdict: PermissionVerdict }[] {
+    const prefix = `${appId}|`
+    return [...this.rules.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, verdict]) => ({ permission: key.slice(prefix.length), verdict }))
+  }
+
+  /** 撤销运行时授权：清除该权限在所有应用上的持久化结论 */
+  async resetRuntime(permission: string): Promise<void> {
+    const remove = this.options.store?.delete
+    if (!remove) { return }
+    for (const key of [...this.rules.keys()]) {
+      if (key.endsWith(`|${permission}`)) { await remove(key).catch(() => {}) }
+    }
   }
 
   private async resolve(request: PermissionRequest, key: string): Promise<boolean> {

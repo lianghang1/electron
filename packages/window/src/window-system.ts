@@ -10,6 +10,13 @@ import { createDesktopMode, createKioskMode } from './modes'
 import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
 
+/** 消息窗内容宽度与透明窗阴影余量：透明窗会硬裁超出位图的内容 */
+const PANEL_WIDTH = 320
+const SHADOW = 12
+const SCREEN_MARGIN = 8
+/** Shell 顶栏高度：消息窗从顶栏之下开始，不遮挡顶部导航 */
+const TOPBAR_HEIGHT = 44
+
 /**
  * WindowSystem：全仓库唯一 new BrowserWindow 的地方。
  * 对外只暴露目的命名 API——读调用处即读产品动作。
@@ -189,7 +196,9 @@ export class WindowSystem implements Startable, ViewHost {
 
   /** 通用宿主入口：会话/授权服务按种类取窗、带参数开窗、收场；新增浮层只改策略表 */
   openOverlay(kind: OverlayKind, params?: Readonly<Record<string, string>>): BrowserWindow {
-    return this.overlays.open(kind, params)
+    const win = this.overlays.open(kind, params)
+    this.showOverlay(kind)
+    return win
   }
 
   getOverlay(kind: OverlayKind): BrowserWindow | undefined {
@@ -197,7 +206,7 @@ export class WindowSystem implements Startable, ViewHost {
   }
 
   dismissOverlay(kind: OverlayKind): void {
-    this.overlays.dismiss(kind)
+    this.hideOverlay(kind)
   }
 
   get(id: number): BrowserWindow | undefined {
@@ -206,18 +215,34 @@ export class WindowSystem implements Startable, ViewHost {
 
   /** 自绘标题栏的窗口控制通道：动作只作用于发起方自己的窗口（按 sender 定位，天然多窗安全） */
   registerWindowControls(): void {
+    const own = (sender: Electron.WebContents) => BrowserWindow.fromWebContents(sender)
     ipcMain.handle('window:minimize', (event) => {
-      BrowserWindow.fromWebContents(event.sender)?.minimize()
+      own(event.sender)?.minimize()
     })
     ipcMain.handle('window:toggle-maximize', (event) => {
-      const win = BrowserWindow.fromWebContents(event.sender)
+      const win = own(event.sender)
       if (!win) { return }
       if (win.isMaximized()) { win.unmaximize() }
       else { win.maximize() }
     })
-    ipcMain.handle('window:close', (event) => {
-      BrowserWindow.fromWebContents(event.sender)?.close()
+    ipcMain.handle('window:is-maximized', event => own(event.sender)?.isMaximized() ?? false)
+    ipcMain.handle('window:restore', (event) => {
+      const win = own(event.sender)
+      if (!win) { return }
+      if (win.isMinimized()) { win.restore() }
+      win.show()
+      win.focus()
     })
+    ipcMain.handle('window:set-always-on-top', (event, flag: boolean) => {
+      own(event.sender)?.setAlwaysOnTop(Boolean(flag))
+    })
+    ipcMain.handle('window:flash', (event, flag: boolean) => {
+      own(event.sender)?.flashFrame(Boolean(flag))
+    })
+    ipcMain.handle('window:close', (event) => {
+      own(event.sender)?.close()
+    })
+    ipcMain.handle('window:quit', () => app.quit())
   }
 
   /** 平台事件广播：EventBus 全量事件转发给所有存活窗口的渲染层（渲染层经 bridge.onEvent 订阅） */
@@ -231,21 +256,128 @@ export class WindowSystem implements Startable, ViewHost {
 
   private createOverlay(policy: OverlayPolicy<OverlayKind>, params: Readonly<Record<string, string>>): BrowserWindow {
     const parent = policy.parent?.()
+    const initial = policy.bounds === 'fullscreen'
+      ? (parent ? parent.getContentBounds() : { x: 0, y: 0, width: policy.width || 800, height: policy.height || 600 })
+      : (parent ? this.anchorPanel(parent, policy.height) : { x: 0, y: 0, width: policy.width, height: policy.height })
     const win = new BrowserWindow({
       ...overlayBase,
-      width: policy.width,
-      height: policy.height,
+      x: initial.x,
+      y: initial.y,
+      width: initial.width,
+      height: initial.height,
+      hasShadow: false,
+      skipTaskbar: true,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
       ...(parent ? { parent } : {}),
+      webPreferences: {
+        ...overlayBase.webPreferences,
+        preload: join(this.rendererDir, '../preload/index.cjs'),
+        // 独立分区：Shell / Web 容器的权限 handler 不放行摄像头，拍摄浮层需要自己的 guard
+        partition: 'persist:overlay-window',
+        backgroundThrottling: false,
+        additionalArguments: [
+          `--shell-accent=${this.flavor.branding.accent}`,
+          `--shell-theme=${this.initialTheme}`,
+          `--overlay-kind=${policy.kind}`,
+        ],
+      },
     })
+    win.setMenu(null)
     const extra = new URLSearchParams(params).toString()
     const hash = extra ? `${policy.route}&${extra}` : policy.route
     const devUrl = process.env.ELECTRON_RENDERER_URL
     if (devUrl) { void win.loadURL(`${devUrl}/${hash}`) }
-    else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash }) }
-    win.once('ready-to-show', () => win.show())
-    this.track(win, { appId: SHELL_APP_ID, instanceId: policy.kind, kind: 'overlay' })
+    else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash: hash.replace(/^#/, '') }) }
+    this.track(win, { appId: SHELL_APP_ID, instanceId: `overlay-${policy.kind}`, kind: 'overlay' })
     this.installPermissionGate(win.webContents)
     return win
+  }
+
+  /** 消息区右下角锚定：顶部让出 Shell 顶栏，高度钳制在主窗内容区内 */
+  private anchorPanel(parent: BrowserWindow, height: number): Electron.Rectangle {
+    const content = parent.getContentBounds()
+    const width = PANEL_WIDTH + SHADOW * 2
+    return {
+      x: Math.round(content.x + content.width - width - SCREEN_MARGIN),
+      y: Math.round(content.y + TOPBAR_HEIGHT + SCREEN_MARGIN),
+      width,
+      height: Math.round(Math.min(height, content.height - TOPBAR_HEIGHT - SCREEN_MARGIN * 2)),
+    }
+  }
+
+  /** 常驻浮层窗预创建：页面提前加载，首次弹出无加载延迟；全部保持隐藏直到 showOverlay */
+  prewarmOverlays(): void {
+    for (const policy of DEFAULT_OVERLAY_POLICIES) { this.overlays.open(policy.kind) }
+  }
+
+  /** 数据先行：页面加载完成后再显窗，避免首帧空白窗；消息区不抢焦点并整窗穿透 */
+  showOverlay(kind: OverlayKind): void {
+    const win = this.overlays.get(kind)
+    if (!win || win.isDestroyed()) { return }
+    const policy = this.overlays.policy(kind)
+    const reveal = () => {
+      if (win.isDestroyed()) { return }
+      this.applyOverlayBounds(kind)
+      if (policy.focus) {
+        win.show()
+        win.focus()
+      }
+      else {
+        win.setIgnoreMouseEvents(policy.mouseIgnore, { forward: true })
+        win.showInactive()
+        win.moveTop()
+      }
+      this.events?.emit('overlay.opened', { kind })
+    }
+    if (win.webContents.isLoading()) { win.webContents.once('did-finish-load', reveal) }
+    else { reveal() }
+  }
+
+  hideOverlay(kind: OverlayKind): void {
+    this.overlays.hide(kind)
+    this.events?.emit('overlay.closed', { kind })
+  }
+
+  applyOverlayBounds(kind: OverlayKind): void {
+    const win = this.overlays.get(kind)
+    const parent = this.shellWindow
+    if (!win || win.isDestroyed() || !parent) { return }
+    const policy = this.overlays.policy(kind)
+    win.setBounds(policy.bounds === 'fullscreen' ? parent.getContentBounds() : this.anchorPanel(parent, win.getBounds().height))
+  }
+
+  /** 消息区页面量高回报：重设窗口高度，保持右下角锚定 */
+  resizePanel(senderId: number, height: number): void {
+    const win = this.overlays.get('panel')
+    if (!win || win.isDestroyed() || win.webContents.id !== senderId || !Number.isFinite(height) || height <= 0) { return }
+    const parent = this.shellWindow
+    if (parent) { win.setBounds(this.anchorPanel(parent, height)) }
+  }
+
+  setPanelMouseIgnore(senderId: number, ignore: boolean): void {
+    const win = this.overlays.get('panel')
+    if (win && !win.isDestroyed() && win.webContents.id === senderId) {
+      win.setIgnoreMouseEvents(ignore, { forward: true })
+    }
+  }
+
+  sendToOverlay(kind: OverlayKind, channel: string, payload: unknown): void {
+    const win = this.overlays.get(kind)
+    if (win && !win.isDestroyed()) { win.webContents.send(channel, payload) }
+  }
+
+  isOverlaySender(kind: OverlayKind, senderId: number): boolean {
+    return this.overlays.ownerOf(senderId) === kind
+  }
+
+  overlayKindOf(senderId: number): OverlayKind | undefined {
+    return this.overlays.ownerOf(senderId)
+  }
+
+  overlayParamsOf(senderId: number): Readonly<Record<string, string>> {
+    return this.overlays.paramsOf(senderId)
   }
 
   private track(win: BrowserWindow, caller: { appId: string, instanceId: string, kind: 'shell' | 'view' | 'overlay' }): void {
@@ -291,6 +423,15 @@ export class WindowSystem implements Startable, ViewHost {
     })
     webContents.setWindowOpenHandler(({ url }) => {
       return { action: this.isOriginAllowed(url, spec.allowedOrigins) ? 'allow' : 'deny' }
+    })
+    // HTML5 全屏：原生 view 铺满主窗内容区，退出后回到 Shell 上报的工作区矩形
+    webContents.on('enter-html-full-screen', () => {
+      view.setBounds(win.getContentBounds())
+      this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'fullscreen' })
+    })
+    webContents.on('leave-html-full-screen', () => {
+      view.setBounds(this.contentRect)
+      this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'work-area' })
     })
     // 崩溃自愈：Chrome 式 Tab 恢复（渲染层感知后按退避策略重开实例）
     webContents.on('render-process-gone', (_event, details) => {
@@ -338,9 +479,16 @@ export class WindowSystem implements Startable, ViewHost {
     if (this.activeViewId === instanceId) { this.activeViewId = undefined }
   }
 
+  /** Tab 细粒度：重载指定实例；全屏进出由 WebContentsView 的 HTML5 fullscreen 事件接管 */
+  reload(instanceId: string): void {
+    this.views.get(instanceId)?.webContents.reload()
+    this.events?.emit('tabs.state-changed', { instanceId, action: 'reload' })
+  }
+
   setContentRect(rect: { x: number, y: number, width: number, height: number }): void {
     this.contentRect = rect
     if (this.activeViewId) { this.views.get(this.activeViewId)?.setBounds(rect) }
+    this.events?.emit('tabs.state-changed', { instanceId: this.activeViewId ?? '', action: 'work-area' })
   }
 
   /** 活跃视图实例（供组合根做 JSAPI origin 校验等） */

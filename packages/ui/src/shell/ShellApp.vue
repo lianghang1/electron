@@ -1,19 +1,11 @@
 <script setup lang="ts">
 import { desktop } from '@shell/bridge/client'
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Separator, Tooltip } from '@ui/components/ui'
+import { Button, Separator, Tooltip } from '@ui/components/ui'
 import { AppWindow, Minus, Plus, Settings, Square, X } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EmptyState from '../apps/pages/EmptyState.vue'
 import { resolveEmbeddedRoute } from '../apps/registry'
-import CommandPalette from './CommandPalette.vue'
-import DownloadBar from './DownloadBar.vue'
 import ForceGate from './ForceGate.vue'
-import SettingsDialog from './SettingsDialog.vue'
-
-interface RestartRequired {
-  channel: string
-  version: string
-}
 
 interface ShellTab {
   key: string
@@ -38,24 +30,15 @@ const activeKey = ref('')
 const chrome = ref<'platform' | 'solo'>('platform')
 const mode = ref<'desktop' | 'kiosk'>('desktop')
 const appList = ref<AppSummary[]>([])
-const showSettings = ref(false)
-const showPalette = ref(false)
 const recentIds = ref<string[]>([])
 const contentEl = ref<HTMLElement | null>(null)
 const tabStripEl = ref<HTMLElement | null>(null)
-const restart = ref<RestartRequired | null>(null)
 const forceRequiredVersion = ref<string | null>(null)
 
-let offRestartRequired: (() => void) | undefined
 let offForceRequired: (() => void) | undefined
+let offOverlayClosed: (() => void) | undefined
 
 /** 跨进程载荷不可信：形状不符就忽略，不渲染脏数据 */
-function isRestartRequired(value: unknown): value is RestartRequired {
-  if (!value || typeof value !== 'object') { return false }
-  const record = value as Record<string, unknown>
-  return typeof record.channel === 'string' && typeof record.version === 'string'
-}
-
 function isForceRequired(value: unknown): value is { requiredVersion: string } {
   if (!value || typeof value !== 'object') { return false }
   return typeof (value as Record<string, unknown>).requiredVersion === 'string'
@@ -63,11 +46,18 @@ function isForceRequired(value: unknown): value is { requiredVersion: string } {
 
 const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
 
-const paletteItems = computed(() => appList.value.map(a => ({
-  id: a.manifest.id,
-  name: a.manifest.name,
-  kind: a.manifest.entry.kind,
-})))
+// 命令面板与设置走原生浮层窗：WebContentsView 会盖住壳内 DOM 浮层
+const paletteOpen = ref(false)
+
+function togglePalette() {
+  paletteOpen.value = !paletteOpen.value
+  if (paletteOpen.value) { void desktop().overlay.open('command-palette') }
+  else { void desktop().overlay.dismiss('command-palette') }
+}
+
+function openSettings() {
+  void desktop().overlay.open('settings')
+}
 
 let resizeObserver: ResizeObserver | undefined
 
@@ -111,7 +101,8 @@ async function openApp(appId: string) {
     ?? tabs.value.find(t => t.appId === appId && t.kind === 'embedded')
   rememberRecent(appId)
   if (target) {
-    showPalette.value = false
+    paletteOpen.value = false
+    void desktop().overlay.dismiss('command-palette')
     activate(target)
     return
   }
@@ -125,7 +116,8 @@ async function openApp(appId: string) {
     appId,
   }
   tabs.value.push(tab)
-  showPalette.value = false
+  paletteOpen.value = false
+  void desktop().overlay.dismiss('command-palette')
   activate(tab)
 }
 
@@ -215,10 +207,10 @@ function onGlobalKeydown(e: KeyboardEvent) {
 
   if (e.key.toLowerCase() === 'k') {
     e.preventDefault()
-    showPalette.value = !showPalette.value
+    togglePalette()
     return
   }
-  if (showPalette.value) { return }
+  if (paletteOpen.value) { return }
 
   if (e.key === 'Tab' && tabs.value.length > 1) {
     e.preventDefault()
@@ -244,11 +236,11 @@ onMounted(async () => {
   window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onGlobalKeydown)
 
-  offRestartRequired = desktop().onEvent('update.restart-required', (payload) => {
-    if (isRestartRequired(payload)) { restart.value = payload }
-  })
   offForceRequired = desktop().onEvent('update.force-required', (payload) => {
     if (isForceRequired(payload)) { forceRequiredVersion.value = payload.requiredVersion }
+  })
+  offOverlayClosed = desktop().onEvent('overlay.closed', (payload) => {
+    if ((payload as { kind?: string }).kind === 'command-palette') { paletteOpen.value = false }
   })
 
   try {
@@ -270,8 +262,8 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onGlobalKeydown)
-  offRestartRequired?.()
   offForceRequired?.()
+  offOverlayClosed?.()
 })
 </script>
 
@@ -324,12 +316,12 @@ onBeforeUnmount(() => {
               </button>
             </div>
           </div>
-          <Button variant="ghost" size="icon-sm" aria-label="打开应用" @click="showPalette = true">
+          <Button variant="ghost" size="icon-sm" aria-label="打开应用" @click="togglePalette()">
             <Plus :size="15" />
           </Button>
         </div>
         <span class="shrink-0 text-ui-sm text-foreground-subtle">⌘K</span>
-        <Button variant="ghost" size="icon-sm" aria-label="设置" @click="showSettings = true">
+        <Button variant="ghost" size="icon-sm" aria-label="设置" @click="openSettings()">
           <Settings :size="16" />
         </Button>
         <Separator orientation="vertical" class="mx-1 h-4" />
@@ -403,37 +395,6 @@ onBeforeUnmount(() => {
           </template>
         </main>
       </div>
-
-      <DownloadBar v-if="chrome === 'platform'" />
-
-      <CommandPalette
-        v-if="chrome === 'platform'"
-        v-model:open="showPalette"
-        :items="paletteItems"
-        :recent-ids="recentIds"
-        @select="openApp"
-      />
-
-      <SettingsDialog v-if="chrome === 'platform'" v-model:open="showSettings" />
-
-      <Dialog :open="restart !== null" @update:open="restart = null">
-        <DialogContent class="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>更新已就绪</DialogTitle>
-            <DialogDescription>
-              新版本 {{ restart?.version }} 已下载完成，重启应用后生效。
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="ghost" @click="restart = null">
-              稍后
-            </Button>
-            <Button @click="desktop().shell.relaunch()">
-              立即重启
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   </div>
 </template>

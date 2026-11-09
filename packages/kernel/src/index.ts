@@ -1,3 +1,6 @@
 export * from './event-bus'
 export * from './kernel'
 export * from './lifecycle'
+export * from './platform/app-kv'
+export * from './platform/notification'
+export * from './platform/retention'

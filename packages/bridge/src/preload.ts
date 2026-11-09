@@ -73,7 +73,12 @@ export const desktop = {
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),
     toggleMaximize: () => ipcRenderer.invoke('window:toggle-maximize'),
+    isMaximized: () => ipcRenderer.invoke('window:is-maximized') as Promise<boolean>,
+    restore: () => ipcRenderer.invoke('window:restore'),
+    setAlwaysOnTop: (flag: boolean) => ipcRenderer.invoke('window:set-always-on-top', flag),
+    flash: (flag: boolean) => ipcRenderer.invoke('window:flash', flag),
     close: () => ipcRenderer.invoke('window:close'),
+    quit: () => ipcRenderer.invoke('window:quit'),
   },
 
   /** 壳信息：版本 / 直达目标 / chrome 档位 / 平台能力（渲染层按档位决定挂不挂壳界面） */
@@ -122,8 +127,80 @@ export const desktop = {
     clearSiteData: (appId: string) => ipcRenderer.invoke('session:clear-site', appId),
   },
 
+  /** 应用隔离 KV：身份由主进程账本反查，页面无法读写别的应用 */
+  storage: {
+    get: (key: string) => ipcRenderer.invoke('storage:get', key),
+    set: (key: string, value: unknown) => ipcRenderer.invoke('storage:set', key, value),
+    remove: (key: string) => ipcRenderer.invoke('storage:remove', key),
+    clear: () => ipcRenderer.invoke('storage:clear'),
+    keys: () => ipcRenderer.invoke('storage:keys'),
+    snapshot: () => ipcRenderer.invoke('storage:snapshot'),
+  },
+
+  /** 统一消息通道：toast / 通知中心 / 下载卡共用一份 TTL */
+  notifications: {
+    show: (input: { title: string, body?: string, level?: string, ttlMs?: number }) =>
+      ipcRenderer.invoke('notification:show', input) as Promise<string>,
+    dismiss: (id: string) => ipcRenderer.invoke('notification:dismiss', id),
+    list: () => ipcRenderer.invoke('notification:list'),
+  },
+
+  /** 更新状态查询 / 取消 / 安装（渲染层不再只能被动收事件） */
+  update: {
+    state: () => ipcRenderer.invoke('update:state'),
+    cancel: () => ipcRenderer.invoke('update:cancel'),
+    install: () => ipcRenderer.invoke('update:install'),
+  },
+
+  /** 运行时权限：应用主动查询 / 请求 / 重置 */
+  permissions: {
+    query: (permission: string) => ipcRenderer.invoke('permission:query', permission) as Promise<boolean>,
+    /** 主动请求运行时授权：打开原生浮层，结论持久化后不再反复打扰 */
+    request: (permission: string) => ipcRenderer.invoke('permission:request', permission) as Promise<boolean>,
+    list: () => ipcRenderer.invoke('permission:list'),
+    reset: (permission: string) => ipcRenderer.invoke('permission:reset', permission),
+  },
+
+  /** Tab 细粒度控制 */
+  tabs: {
+    reload: (instanceId: string) => ipcRenderer.invoke('tabs:reload', instanceId),
+    setWorkArea: (rect: { x: number, y: number, width: number, height: number }) =>
+      ipcRenderer.send('view:content-rect', rect),
+  },
+
+  /** 原生浮层宿主：所有要盖过应用 view 的 UI 统一从这里开窗 */
+  overlay: {
+    sync: () => ipcRenderer.invoke('overlay:sync'),
+    open: (kind: string, params?: Record<string, string>) => ipcRenderer.invoke('overlay:open', kind, params),
+    dismiss: (kind: string) => ipcRenderer.invoke('overlay:dismiss', kind),
+    action: (action: unknown) => ipcRenderer.invoke('overlay:action', action),
+    resize: (height: number) => ipcRenderer.invoke('overlay:resize', height),
+    mouseIgnore: (ignore: boolean) => ipcRenderer.invoke('overlay:mouse-ignore', ignore),
+    onUpdated: (handler: (state: unknown) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, state: unknown) => handler(state)
+      ipcRenderer.on('overlay:updated', listener)
+      return () => ipcRenderer.removeListener('overlay:updated', listener)
+    },
+  },
+
   /** 启动打点回传（渲染层 T4 首帧） */
   markFirstPaint: () => ipcRenderer.send('launch-mark:t4'),
+
+  /** 拍摄浮层会话：发起方开/关会话，浮层窗内预览与结果回传 */
+  captureDialog: {
+    open: (input: unknown) => ipcRenderer.invoke('capture:open-dialog', input),
+    close: () => ipcRenderer.invoke('capture:close-dialog'),
+    startPreview: (deviceId: string, resolutionNum?: number) =>
+      ipcRenderer.invoke('capture:dialog-preview-start', { deviceId, resolutionNum }),
+    stopPreview: () => ipcRenderer.invoke('capture:dialog-preview-stop'),
+    snap: (opts?: { dataUrl?: string, meta?: Record<string, unknown> }) => ipcRenderer.invoke('capture:dialog-snap', opts ?? {}),
+    confirm: (results: unknown[]) => ipcRenderer.invoke('capture:dialog-confirm', results),
+    onFrame: (handler: (frame: { deviceId: string, base64: string }) => void) => {
+      const listener = (_e: Electron.IpcRendererEvent, frame: { deviceId: string, base64: string }) => handler(frame)
+      ipcRenderer.on('capture:frameReceived', listener)
+      return () => ipcRenderer.removeListener('capture:frameReceived', listener)
+    },
+  },
 }
 
 export type DesktopBridge = typeof desktop

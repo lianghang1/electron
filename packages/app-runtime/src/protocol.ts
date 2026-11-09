@@ -40,8 +40,20 @@ const MIME: Record<string, string> = {
   '.webm': 'video/webm',
 }
 
-/** 注册协议处理器：appsRoot = 应用 dist 的根目录 */
-export function registerAppProtocol(session: Session, appsRoot: string): void {
+/**
+ * 应用目录解析：root 是父目录，dir 是应用目录名。
+ * 热更后指针可能把 appId 映射到 userData 下的版本化目录，协议必须跟随指针，
+ * 与 dist-hot 的写入同源；内置应用走 resources/apps/<appId>。
+ */
+export interface AppRoot {
+  root: string
+  dir: string
+}
+
+export type AppRootResolver = (appId: string) => AppRoot
+
+/** 注册协议处理器：resolve 由组合根注入，协议层不认识 userData 指针 */
+export function registerAppProtocol(session: Session, resolve: AppRootResolver): void {
   session.protocol.handle(APP_SCHEME, (request) => {
     const url = new URL(request.url)
     // app://<appId>/<path...>
@@ -51,9 +63,11 @@ export function registerAppProtocol(session: Session, appsRoot: string): void {
     }
 
     const relative = decodeURIComponent(url.pathname).replace(/^\//, '')
-    const resolved = normalize(join(appsRoot, appId, relative))
+    const { root, dir } = resolve(appId)
+    const base = join(root, dir)
+    const resolved = normalize(join(base, relative))
     // 路径穿越防护：归一化结果必须仍位于该应用目录内
-    if (!resolved.startsWith(join(appsRoot, appId) + sep)) {
+    if (!resolved.startsWith(base + sep)) {
       return new Response('forbidden', { status: 403 })
     }
 

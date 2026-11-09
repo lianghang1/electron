@@ -9,4 +9,5 @@ export { buildAppPermissionRules, buildPlatformPermissionRules } from './permiss
 export { PermissionService } from './permission-service'
 export type { PermissionDecision, PermissionPrompt, PermissionRequest, PermissionRule, PermissionServiceOptions, PermissionStore, PermissionVerdict } from './permission-service'
 export { APP_SCHEME, registerAppProtocol, registerAppScheme } from './protocol'
+export type { AppRoot, AppRootResolver } from './protocol'
 export type { ViewHost, ViewSpec } from './view-host'

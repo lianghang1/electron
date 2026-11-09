@@ -1,4 +1,4 @@
-import { bootstrapAppearance, DiagnosticsApp, registerEmbeddedApp, ShellApp } from '@shell/ui'
+import { bootstrapAppearance, DiagnosticsApp, OverlayApp, registerEmbeddedApp, ShellApp } from '@shell/ui'
 import { createApp, defineComponent, h } from 'vue'
 import DemoTable from './demo/DemoTable.vue'
 import '@shell/ui/styles.css'
@@ -70,6 +70,11 @@ function isRecoveryMode(): boolean {
   return window.location.hash === '#/recovery'
 }
 
+/** 原生浮层窗复用同一份 index.html：按 hash 区分形态，避免多入口产物 */
+function isOverlayMode(): boolean {
+  return window.location.hash.startsWith('#/overlay')
+}
+
 function mountRecovery() {
   createApp({
     render: () => h('div', {
@@ -86,6 +91,14 @@ function mountRecovery() {
 
 if (isRecoveryMode()) {
   mountRecovery()
+}
+else if (isOverlayMode()) {
+  // 浮层窗背景透明：splash 与 T4 首帧打点属于工作台，浮层只挂自己的 UI
+  document.getElementById('splash')?.remove()
+  document.body.style.background = 'transparent'
+  document.documentElement.style.background = 'transparent'
+  document.body.classList.add('ready')
+  createApp(OverlayApp).mount('#app')
 }
 else {
   // Vue 挂载完成即撤启动层（内联 splash 见 index.html），并回传 T4 首帧打点

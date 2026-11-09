@@ -17,6 +17,14 @@ export interface PlatformEvents {
   'update.applied': { channel: string, version: string }
   'update.failed': { channel: string, reason: string }
   'update.restart-required': { channel: string, version: string }
+  /** 更新状态快照：渲染层查询进度与取消按钮的推送源 */
+  'update.state-changed': {
+    status: 'idle' | 'checking' | 'downloading' | 'applying' | 'pending-restart' | 'failed' | 'cancelled'
+    channel?: string
+    version?: string
+    error?: string
+    checkedAt?: number
+  }
   /** 门禁从放行转为阻断时发一次；渲染层据此切换门禁页 */
   'update.force-required': { requiredVersion: string }
   // 窗口
@@ -44,6 +52,27 @@ export interface PlatformEvents {
   // 会话容器
   'session.cleared': { appId: string, scope: 'cache' | 'site-data' }
   'session.cookies-restored': { appId: string, count: number }
+  // 统一消息通道：toast / 下载卡 / 通知中心共用一份快照
+  'notification.updated': {
+    items: {
+      id: string
+      title: string
+      body?: string
+      level: 'info' | 'success' | 'warning' | 'error'
+      createdAt: number
+      ttlMs: number
+    }[]
+  }
+  // 过期产物清理报告
+  'retention.cleaned': { reports: { producer: string, removed: number, bytes: number }[] }
+  // 原生浮层宿主
+  'overlay.opened': { kind: string }
+  'overlay.closed': { kind: string }
+  // 运行时授权：弹窗入列与决策完成
+  'permission.pending': { requestId: string, appId: string, permission: string, origin: string }
+  'permission.resolved': { requestId: string, granted: boolean }
+  // Tab 细粒度状态
+  'tabs.state-changed': { instanceId: string, action: 'reload' | 'fullscreen' | 'work-area' }
 }
 
 export type PlatformEventName = keyof PlatformEvents

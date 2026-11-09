@@ -1,6 +1,7 @@
 export { registerEmbeddedApp, resolveEmbeddedRoute } from './apps/registry'
 export * from './components'
 export { default as DiagnosticsApp } from './diagnostics/DiagnosticsApp.vue'
+export { default as OverlayApp } from './overlay/OverlayApp.vue'
 export { default as CommandPalette } from './shell/CommandPalette.vue'
 export { default as ForceGate } from './shell/ForceGate.vue'
 export { default as SettingsDialog } from './shell/SettingsDialog.vue'
