@@ -84,7 +84,8 @@ function* vueFiles(dir) {
 
 function ruleBody(css, cls) {
   const esc = cls.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const m = new RegExp(`\\.${esc}\\s*\\{([^}]*)\\}`).exec(css)
+  // Tailwind v4 把同族变体并入一条联合选择器（.bg-background, .bg-background\/95{...}）
+  const m = new RegExp(`\\.${esc}(?:\\s*,\\s*\\.[^{}]+)*\\s*\\{([^}]*)\\}`).exec(css)
   return m ? m[1] : null
 }
 
