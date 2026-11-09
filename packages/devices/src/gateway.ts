@@ -4,6 +4,7 @@ import type { DomainDefinition } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
 import type { DomainDeps } from './domain-kit'
 import type { CaptureSystem } from './domains/capture'
+import type { CaptureOverlayHost } from './domains/capture/overlay-host'
 import type { IcCardSystem } from './domains/iccard'
 import type { IdCardSystem } from './domains/idcard'
 import type { PrintSystem } from './domains/print'
@@ -13,6 +14,7 @@ import type { DriverResolver } from './drivers'
 import { join } from 'node:path'
 import { overridesStore } from './domain-kit'
 import { createCaptureSystem } from './domains/capture'
+import { CaptureDialogSessionService } from './domains/capture/dialog-session'
 import { createCaptureDomain } from './domains/capture/domain'
 import { createIcCardSystem } from './domains/iccard'
 import { createIccardDomain } from './domains/iccard/domain'
@@ -58,10 +60,14 @@ export interface DeviceGatewayOptions {
   diagnostics: boolean
   /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁，避免进程常驻 */
   getParent?: () => BrowserWindow | undefined
+  /** 拍摄浮层宿主：由组合根注入窗口系统实现，域内不认识 BrowserWindow 归属 */
+  captureOverlay?: CaptureOverlayHost
 }
 
 export interface DeviceGateway {
   domains: DomainDefinition[]
+  /** 拍摄浮层会话服务：注入宿主后才创建，组合根据此注册会话通道 */
+  captureDialog?: CaptureDialogSessionService
   /** 预热守护进程（含 koffi 加载）；完成即打 t2DeviceHostReady */
   warmup: (onReady: () => void) => Promise<void>
   /** 工作台窗口就绪后调用：scanner 键盘观察挂到窗口（域方法不依赖窗口时序） */
@@ -114,6 +120,10 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     logger: options.logger.scope('devices:signature'),
   })
 
+  const captureDialog = options.captureOverlay
+    ? new CaptureDialogSessionService({ capture, overlay: options.captureOverlay })
+    : undefined
+
   const deps: DomainDeps = { events: options.events, diagnostics: options.diagnostics }
 
   // 域注册 = 数据表：新增域 = 加一行工厂，平台代码零分支
@@ -128,6 +138,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
 
   return {
     domains,
+    captureDialog,
 
     warmup(onReady) {
       return host.warmup().then(() => {

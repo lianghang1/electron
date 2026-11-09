@@ -1,7 +1,8 @@
-import type { DomainCallContext } from '@shell/shared'
+import type { AppRootResolver, PermissionRule } from '@shell/app-runtime'
+import type { CaptureDialogRequest, CaptureResult, DomainCallContext } from '@shell/shared'
 import type { PackageInstaller } from '@shell/update'
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import process from 'node:process'
 import {
   AppService,
@@ -16,22 +17,49 @@ import {
   RemoteOpener,
 } from '@shell/app-runtime'
 import { createDeviceGateway, createDomainRouter, createDriverResolver, detectDevicePlatform, DomainRouteError, resolvePlatformCapability } from '@shell/devices'
-import { createKernel } from '@shell/kernel'
+import { AppKvStore, createKernel, NotificationCenter, RetentionRegistry } from '@shell/kernel'
 import { AuditLog } from '@shell/kernel/audit'
 import { DownloadManager } from '@shell/kernel/download'
 import { createRootLogger } from '@shell/kernel/logger'
 import { AppSessionRegistry } from '@shell/kernel/session'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, cookiesDir, filesDir, logsDir, migrateLegacyLayout, platformDataRoot } from '@shell/kernel/storage'
-import { assertSafeSegment, CallerRegistry, flavorManifestSchema, matchesOrigin } from '@shell/shared'
-import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, ForceUpdateGate, FullPackageChannel, hasPendingAsarUpdate, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
-import { ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
+import { assertSafeSegment, CallerRegistry, flavorManifestSchema, matchesOrigin, SHELL_APP_ID } from '@shell/shared'
+import {
+  AsarHotChannel,
+  collectEffectiveAppVersions,
+  DarwinInstaller,
+  DistHotChannel,
+  effectiveVersion,
+  ForceUpdateGate,
+  FullPackageChannel,
+  hasPendingAsarUpdate,
+  hotAppsDir,
+  LinuxInstaller,
+  markGracefulExit,
+  readAppsPointer,
+  UpdateCenter,
+  Win32Installer,
+} from '@shell/update'
+import { OverlayService, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
 import { app, ipcMain, session } from 'electron'
 
 /**
  * 组合根：全仓库唯一的组装现场。
  * 读本文件 = 读产品目录；除此之外任何模块不得创建跨系统对象。
+ *
+ * 打包态由 app.asar 引导层在 app ready 前加载并调用 boot(context)：
+ * artifactRoot 指向真正被加载的 asar（内置包或 userData 热更包），
+ * 所有产物路径从此显式注入，不再从 __dirname 推断。
  */
+export interface BootContext {
+  artifactRoot: string
+  builtinRoot: string
+  builtinVersion: string
+  effectiveVersion: string
+  resourcesVersion: string | null
+  updaterDir: string
+}
 
 // 旧布局一次性迁移必须先于任何写盘；失败仅告警不阻断启动
 migrateLegacyLayout()
@@ -48,10 +76,14 @@ const InstallerCtor = INSTALLERS[process.platform]
 if (!InstallerCtor) { logger.error('未支持的构建平台，整包更新通道不注册', { platform: process.platform }) }
 const packageInstaller = InstallerCtor ? new InstallerCtor() : undefined
 
-// asar 热更落盘切换（三段状态机 finalize）：必须早于任何模块加载 app.asar 内容；
-// 切换失败只记录不抛出——Windows 文件锁下保留现场，下次启动重试
-const asarFinalize = finalizeAsarUpdate(process.resourcesPath ?? '.')
-if (!asarFinalize.ok) { logger.warn('asar 热更切换失败，下次启动重试', { error: asarFinalize.error }) }
+// 平台自身桥面权限：工作台代表平台，不与第三方应用共用声明式隔离
+const PLATFORM_SELF_PERMISSIONS: readonly PermissionRule[] = [
+  'storage',
+  'notification',
+  'update',
+  'tabs',
+  'permissions',
+].map(permission => ({ app: SHELL_APP_ID, permission, verdict: 'allow' as const }))
 
 // app:// 协议的特权声明必须在 app ready 前（Electron 时序硬约束）
 registerAppScheme()
@@ -81,7 +113,7 @@ else {
   app.on('second-instance', () => focusShell?.())
 }
 
-async function main(): Promise<void> {
+async function main(context: BootContext): Promise<void> {
   // 持久化设置的启动副作用（开机自启可能被安装器重置，启动即纠正）
   applySettingsSideEffects()
   const flavor = loadFlavor()
@@ -89,17 +121,31 @@ async function main(): Promise<void> {
   // 档位约束：solo/kiosk 容器隐形档必须有直达目标，否则窗口无内容可铺
   if (flavor.chrome === 'solo' && !flavor.defaultAppId && flavor.apps.length > 0) { logger.warn('flavor chrome=solo 但未配置 defaultAppId，启动将无应用直出', { flavor: flavor.id }) }
 
+  // 产物根由引导层注入：热更包位于 userData 时 __dirname 指向薄壳，那里没有 renderer/preload/device-host
+  const outDir = join(context.artifactRoot, 'out')
+  const rendererDir = join(outDir, 'renderer')
+  const preloadDir = join(outDir, 'preload')
+  const mainDir = join(outDir, 'main')
+  const builtinVersion = context.builtinVersion
+  const version = () => effectiveVersion(builtinVersion)
+
   const theme = (settingsSnapshot().values.appearance?.theme as 'light' | 'dark' | 'system' | undefined) ?? 'system'
-  const windows = new WindowSystem(flavor, join(__dirname, '../renderer'), theme)
+  const windows = new WindowSystem(flavor, rendererDir, theme)
   const callers = new CallerRegistry()
   const kernel = createKernel(flavor, [windows])
 
-  // 应用 dist 根：打包态必须在 asar 外（extraResources 已把 resources/apps 复制到
-  // <resources>/apps），asar 内不可写——dist-hot 通道的原子替换写的就是这个目录；
-  // dev 态从仓库目录解析。app:// 协议读取与 dist-hot 写入必须同源（见 protocol.ts）
-  const appsRoot = app.isPackaged
+  // 内置应用 dist 根：asar 外的 extraResources 落点（<resources>/apps），只读基线。
+  // dist-hot 产物落 userData，app:// 协议按 apps-current.json 指针取目录，读写同源。
+  const builtinAppsRoot = app.isPackaged
     ? join(process.resourcesPath ?? '.', 'apps')
     : join(app.getAppPath(), 'resources/apps')
+  const resolveAppRoot: AppRootResolver = (appId) => {
+    const entry = readAppsPointer()[appId]
+    if (entry?.dir && existsSync(entry.dir)) {
+      return { root: hotAppsDir(), dir: basename(entry.dir) }
+    }
+    return { root: builtinAppsRoot, dir: appId }
+  }
 
   // 更新中心：通道按 flavor.update 配置装配，整包落地策略由组合根注入
   const updateManifestUrl = flavor.update.manifestUrl ?? ''
@@ -112,26 +158,25 @@ async function main(): Promise<void> {
     }
     updateCenter = new UpdateCenter({
       channels: [
-        new DistHotChannel({ appsRoot, manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
-        new AsarHotChannel({ resourcesDir: process.resourcesPath ?? '.', manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
+        new DistHotChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
+        new AsarHotChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins, resourcesVersion: context.resourcesVersion }),
         ...(fullPackage ? [fullPackage] : []),
       ],
       events: kernel.ctx.events,
-      // 版本矩阵由组合根提供：app 版本读 appsRoot 下各应用 version.json（dist-hot 换目录后自动刷新），
-      // asar 与 shell 同版本（asar 就是壳本身）
+      // 薄壳的 app.getVersion() 恒为出厂版本：生效版本一律读 current.json 指针
       versionMatrix: async () => ({
-        shell: app.getVersion(),
-        asar: app.getVersion(),
-        apps: collectAppVersions(appsRoot),
+        shell: version(),
+        asar: version(),
+        apps: collectEffectiveAppVersions(builtinAppsRoot, readAppsPointer()),
       }),
     })
     void kernel.register(updateCenter)
 
-    // 强制更新门禁：清单 minVersion 低于当前版本即阻断，决策快照经 shell:info 下发
+    // 强制更新门禁：清单 minVersion 低于生效版本即阻断，决策快照经 shell:info 下发
     const gate = new ForceUpdateGate({
       manifestUrl: updateManifestUrl,
       allowedOrigins: flavor.update.allowedOrigins,
-      currentVersion: () => app.getVersion(),
+      currentVersion: version,
       events: kernel.ctx.events,
     })
     void kernel.register({
@@ -144,6 +189,36 @@ async function main(): Promise<void> {
   windows.bindEvents(kernel.ctx.events)
 
   // 平台能力一次探测，处处消费：能力表 → 驱动寻址策略 / 路由闸门 / 渲染层下发
+  // 统一消息通道、应用隔离 KV、过期产物清理、原生浮层宿主由内核统一持有生命周期
+  const notifications = new NotificationCenter({ events: kernel.ctx.events })
+  void kernel.register(notifications)
+  const appKv = new AppKvStore(join(configDir(), 'app-storage'))
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const retention = new RetentionRegistry({ events: kernel.ctx.events })
+  for (const domain of ['capture', 'print', 'signature']) {
+    retention.register({ id: `product:${domain}`, dir: () => join(filesDir(), domain), maxAgeMs: 7 * DAY_MS })
+  }
+  retention.register({ id: 'audit-log', dir: () => join(logsDir(), 'audit'), maxAgeMs: 30 * DAY_MS })
+  void kernel.register(retention)
+
+  // WebContentsView 是原生合成层：弹窗、通知、菜单、更新提示统一走原生窗，避免被应用视图遮挡
+  let cancelCaptureDialog: (() => void) | undefined
+  const overlays = new OverlayService({
+    windows,
+    events: kernel.ctx.events,
+    notifications,
+    onCaptureClose: () => cancelCaptureDialog?.(),
+  })
+  void kernel.register(overlays)
+
+  kernel.ctx.events.on('update.restart-required', ({ version }) => overlays.showUpdatePrompt(version))
+  kernel.ctx.events.on('update.failed', ({ channel, reason }) => {
+    notifications.push({ title: `更新失败（${channel}）`, body: reason, level: 'error' })
+  })
+  kernel.ctx.events.on('download.completed', ({ filename }) => {
+    notifications.push({ title: '下载完成', body: filename, level: 'success' })
+  })
+
   const capability = resolvePlatformCapability(detectDevicePlatform().id, process.arch)
   // 声明格式是 devices/<域>/...，故资源根 = 包含 devices/ 的那个父目录。
   // dev/打包差异只在此处解析一次（唯一组装现场），域内部零感知。
@@ -157,13 +232,20 @@ async function main(): Promise<void> {
   const devices = createDeviceGateway({
     logger,
     events: kernel.ctx.events,
-    hostEntryPath: join(__dirname, 'device-host.js'),
+    hostEntryPath: join(mainDir, 'device-host.js'),
     driver,
     paths: { storageRoot: configDir(), filesRoot: filesDir() },
     allowedOrigins: flavor.update.allowedOrigins,
     diagnostics: flavor.diagnostics,
     getParent: () => windows.shellWindow,
+    captureOverlay: {
+      pushCaptureSession: session => overlays.pushCaptureDialog(session),
+      getCaptureWindow: () => windows.getOverlay('capture') ?? null,
+      dismissCaptureSession: () => overlays.closeCapture(),
+    },
   })
+
+  cancelCaptureDialog = () => devices.captureDialog?.cancelByOverlay()
 
   // 设备系统并入内核生命周期：start = 守护进程预热（打 t2），stop = 全域 dispose
   void kernel.register({
@@ -197,11 +279,23 @@ async function main(): Promise<void> {
   // 目录写权限须由部署侧管控；未声明的权限一律拒绝
   const externalApps = loadAppsJson(configDir(), logger, { excludeIds: flavor.apps.map(a => a.id) })
   const catalog = [...flavor.apps, ...externalApps]
+
   const permissions = new PermissionService({
     rules: [
       ...buildAppPermissionRules(catalog),
       ...buildPlatformPermissionRules(capability.availableDomains),
+      ...PLATFORM_SELF_PERMISSIONS,
     ],
+    // 运行时授权结论落在平台 KV：同一 appId|permission 不再反复弹窗
+    store: {
+      get: async (key) => {
+        const stored = appKv.get(SHELL_APP_ID, `permission:${key}`)
+        return stored === 'allow' || stored === 'deny' || stored === 'prompt' ? stored : undefined
+      },
+      set: async (key, verdict) => { appKv.set(SHELL_APP_ID, `permission:${key}`, verdict) },
+      delete: async (key) => { appKv.remove(SHELL_APP_ID, `permission:${key}`) },
+    },
+    prompt: { ask: request => overlays.requestPermission(request) },
     audit: (decision) => {
       kernel.ctx.events.emit('permission.decided', {
         appId: decision.request.appId,
@@ -245,7 +339,7 @@ async function main(): Promise<void> {
     events: kernel.ctx.events,
     cookiesDir: cookiesDir(),
     onSessionCreated: (ses, appId) => {
-      registerAppProtocol(ses, appsRoot)
+      registerAppProtocol(ses, resolveAppRoot)
       downloads.attach(ses, appId)
     },
   })
@@ -259,8 +353,8 @@ async function main(): Promise<void> {
     manifest => permissions.allowsApp(manifest),
     [
       new EmbeddedOpener(),
-      new PackagedOpener(windows, appsRoot),
-      new RemoteOpener(windows, join(__dirname, '../preload/jsapi.cjs')),
+      new PackagedOpener(windows, builtinAppsRoot),
+      new RemoteOpener(windows, join(preloadDir, 'jsapi.cjs')),
     ],
     kernel.ctx.events,
   )
@@ -340,7 +434,7 @@ async function main(): Promise<void> {
   // 壳信息（渲染层按 chrome 档位决定挂不挂壳界面）
   ipcMain.handle('shell:info', () => ({
     name: flavor.name,
-    version: app.getVersion(),
+    version: version(),
     defaultAppId: flavor.defaultAppId,
     chrome: flavor.mode === 'kiosk' ? 'solo' : flavor.chrome,
     mode: flavor.mode,
@@ -356,6 +450,7 @@ async function main(): Promise<void> {
   }))
   // 重启壳：quit 会触发 before-quit，把暂存的整包安装执行掉，再以新版本拉起
   ipcMain.handle('shell:relaunch', () => {
+    markGracefulExit()
     app.relaunch()
     app.quit()
   })
@@ -398,6 +493,131 @@ async function main(): Promise<void> {
     })
   })
 
+  // 桥面通道统一从账本反查身份：页面不能伪造 appId
+  const callerOf = (senderId: number) => {
+    const caller = callers.tryResolve(senderId)
+    if (!caller) { throw new Error('调用方未登记') }
+    return caller
+  }
+  const authorized = async (senderId: number, permission: string): Promise<string> => {
+    const caller = callerOf(senderId)
+    const allowed = await permissions.decide({
+      appId: caller.appId,
+      origin: `app://${caller.appId}`,
+      permission,
+    })
+    if (!allowed) { throw new Error(`PERMISSION_DENIED: ${permission}`) }
+    return caller.appId
+  }
+
+  // App 隔离 KV：master ipc/storage.ts 的解析身份 + 校验 storage 权限，按 appId 分文件
+  ipcMain.handle('storage:get', async (e, key: string) => appKv.get(await authorized(e.sender.id, 'storage'), key))
+  ipcMain.handle('storage:set', async (e, key: string, value: unknown) => { appKv.set(await authorized(e.sender.id, 'storage'), key, value) })
+  ipcMain.handle('storage:remove', async (e, key: string) => { appKv.remove(await authorized(e.sender.id, 'storage'), key) })
+  ipcMain.handle('storage:clear', async (e) => { appKv.clear(await authorized(e.sender.id, 'storage')) })
+  ipcMain.handle('storage:keys', async e => appKv.keys(await authorized(e.sender.id, 'storage')))
+  ipcMain.handle('storage:snapshot', async e => appKv.snapshot(await authorized(e.sender.id, 'storage')))
+
+  // 统一消息通道：toast / 通知中心 / 下载卡共用一份 TTL
+  ipcMain.handle('notification:show', async (e, input: { title: string, body?: string, level?: string, ttlMs?: number }) => {
+    await authorized(e.sender.id, 'notification')
+    const level = input.level === 'success' || input.level === 'warning' || input.level === 'error' ? input.level : 'info'
+    return notifications.push({ title: String(input.title), body: input.body, level, ttlMs: input.ttlMs })
+  })
+  ipcMain.handle('notification:dismiss', async (e, id: string) => {
+    await authorized(e.sender.id, 'notification')
+    notifications.dismiss(id)
+  })
+  ipcMain.handle('notification:list', async (e) => {
+    await authorized(e.sender.id, 'notification')
+    return notifications.list()
+  })
+
+  // 更新状态机：install 对齐 master ipc/update.ts——仅工作台可调用，pending 优先重启
+  ipcMain.handle('update:state', () => updateCenter?.getState() ?? { status: 'idle' })
+  ipcMain.handle('update:cancel', () => updateCenter?.cancel())
+  ipcMain.handle('update:install', async (e) => {
+    if (callerOf(e.sender.id).appId !== SHELL_APP_ID) { throw new Error('仅工作台可安装更新') }
+    if (updateCenter?.hasPendingRestart()) {
+      markGracefulExit()
+      app.relaunch()
+      app.quit()
+      return
+    }
+    await updateCenter?.checkAndApply()
+  })
+
+  // 权限查询只做展示不弹窗；重置授权是工作台的管理动作
+  ipcMain.handle('permission:query', (e, permission: string) => {
+    const caller = callerOf(e.sender.id)
+    return permissions.check({ appId: caller.appId, origin: `app://${caller.appId}`, permission })
+  })
+  ipcMain.handle('permission:list', (e, appId?: string) => permissions.listStates(appId ?? callerOf(e.sender.id).appId))
+  ipcMain.handle('permission:reset', async (e, permission: string) => {
+    if (callerOf(e.sender.id).appId !== SHELL_APP_ID) { throw new Error('仅工作台可重置授权') }
+    await permissions.resetRuntime(permission)
+  })
+
+  // Tab 细粒度：重载指定实例；全屏进出由 WebContentsView 的 HTML5 fullscreen 事件接管
+  ipcMain.handle('tabs:reload', (e, instanceId: string) => {
+    callerOf(e.sender.id)
+    windows.reload(instanceId)
+  })
+
+  // 运行时授权：应用主动请求 → 原生浮层询问 → 结论持久化
+  ipcMain.handle('permission:request', (e, permission: string) => {
+    const caller = callerOf(e.sender.id)
+    return permissions.requestRuntime({ appId: caller.appId, origin: `app://${caller.appId}`, permission })
+  })
+
+  // 拍摄浮层会话（master ipc/capture.ts）：发起方身份从账本反查，浮层内操作按窗口归属校验
+  const captureDialog = devices.captureDialog
+  const pickString = (value: unknown): string | undefined =>
+    typeof value === 'string' && value.trim() ? value.trim() : undefined
+  const dialogRequest = (input: unknown): CaptureDialogRequest => {
+    const raw = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
+    const resolutionNum = Number(raw.resolutionNum)
+    const maxCount = Number(raw.maxCount)
+    return {
+      deviceId: pickString(raw.deviceId),
+      deviceLabel: pickString(raw.deviceLabel),
+      title: pickString(raw.title),
+      resolutionNum: Number.isInteger(resolutionNum) && resolutionNum >= 0 ? resolutionNum : undefined,
+      maxCount: Number.isInteger(maxCount) && maxCount >= 1 ? maxCount : undefined,
+      format: raw.format === 'jpg' || raw.format === 'png' || raw.format === 'bmp' ? raw.format : undefined,
+    }
+  }
+  const confirmResults = (input: unknown): CaptureResult[] => {
+    if (!Array.isArray(input)) { return [] }
+    return input.filter((item): item is CaptureResult => {
+      const r = item as Partial<CaptureResult> | null
+      return !!r && typeof r.imagePath === 'string' && r.imagePath.length > 0
+    })
+  }
+  if (captureDialog) {
+    ipcMain.handle('capture:open-dialog', (event, input: unknown) => {
+      const caller = callerOf(event.sender.id)
+      const appName = apps.list().find(r => r.manifest.id === caller.appId)?.manifest.name ?? caller.appId
+      return captureDialog.open(dialogRequest(input), {
+        wc: event.sender,
+        tabId: caller.instanceId,
+        appId: caller.appId,
+        appName,
+      })
+    })
+    ipcMain.handle('capture:close-dialog', (event) => {
+      const caller = callerOf(event.sender.id)
+      captureDialog.cancelByCaller({ appId: caller.appId, tabId: caller.instanceId })
+    })
+    ipcMain.handle('capture:dialog-preview-start', (event, input: { deviceId?: string, resolutionNum?: number }) =>
+      captureDialog.startPreview(event.sender, String(input?.deviceId ?? ''), typeof input?.resolutionNum === 'number' ? { resolutionNum: input.resolutionNum } : undefined))
+    ipcMain.handle('capture:dialog-preview-stop', event => captureDialog.stopPreview(event.sender))
+    ipcMain.handle('capture:dialog-snap', (event, opts?: { dataUrl?: string, meta?: Record<string, unknown> }) =>
+      captureDialog.capture(event.sender, opts))
+    ipcMain.handle('capture:dialog-confirm', (event, results: unknown) =>
+      captureDialog.confirm(event.sender, confirmResults(results)))
+  }
+
   // 设置通道（schema 驱动）
   registerSettingsIpc(ipcMain)
 
@@ -417,7 +637,7 @@ async function main(): Promise<void> {
   await kernel.start()
 
   // 应用 dist 分区协议：主 Session 注册（packaged 形态）
-  registerAppProtocol(session.defaultSession, appsRoot)
+  registerAppProtocol(session.defaultSession, resolveAppRoot)
 
   windows.createShellWindow()
   focusShell = () => {
@@ -434,13 +654,31 @@ async function main(): Promise<void> {
   // 韧性接线：更新择优依赖闭包注入——整包看通道实例状态，asar 看暂存标记
   resilience.attach(flavor.resilience ?? {}, () => windows.shellWindow, {
     hasStagedPackage: () => fullPackage?.hasPendingInstall ?? false,
-    hasPendingAsar: () => hasPendingAsarUpdate(process.resourcesPath ?? '.'),
+    hasPendingAsar: () => hasPendingAsarUpdate(),
   })
 
-  // 整包更新排程：退出前拉起安装器（状态在通道实例上，只拉起一次）
+  // 退出屏障：引导层据此区分「新版本冷启动判活失败」与「同版本内主动重启」；
+  // 整包安装器在应用退出后拉起，与设备守护进程的 kernel.stop() 同属一次退出流程
   app.on('before-quit', () => {
+    markGracefulExit()
     fullPackage?.installOnQuit(err => logger.warn('整包安装器拉起失败', { error: String(err) }))
   })
 }
 
-void app.whenReady().then(() => main())
+/** 引导层在 app ready 前 import 本模块后调用；dev 态无引导层时由下方自行构造上下文 */
+export async function boot(context: BootContext): Promise<void> {
+  await app.whenReady()
+  await main(context)
+}
+
+if (!app.isPackaged) {
+  const devRoot = app.getAppPath()
+  void boot({
+    artifactRoot: devRoot,
+    builtinRoot: devRoot,
+    builtinVersion: app.getVersion(),
+    effectiveVersion: app.getVersion(),
+    resourcesVersion: null,
+    updaterDir: join(app.getPath('userData'), 'desktop-updater'),
+  })
+}
