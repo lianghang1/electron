@@ -94,6 +94,7 @@ function main() {
   results.push(['e2e:permission', run('e2e:permission', 'pnpm', ['test:e2e:permission'], { show: true })])
   results.push(['e2e:resilience', run('e2e:resilience', 'pnpm', ['test:e2e:resilience'], { show: true })])
   results.push(['e2e:force-gate', run('e2e:force-gate', 'pnpm', ['test:e2e:force-gate'], { show: true })])
+  results.push(['e2e:apps-source', run('e2e:apps-source', 'pnpm', ['test:e2e:apps-source'], { show: true })])
   results.push(['build', run('build', 'pnpm', ['build'], { show: true })])
   results.push(['design:css', run('design:css', 'pnpm', ['check:design:css'], { show: true })])
   results.push(['dev-resolve', devResolve()])

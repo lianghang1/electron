@@ -1,4 +1,3 @@
-import type { PermissionRule } from '@shell/app-runtime'
 import type { DomainCallContext } from '@shell/shared'
 import type { PackageInstaller } from '@shell/update'
 import { existsSync, readFileSync } from 'node:fs'
@@ -6,7 +5,9 @@ import { join } from 'node:path'
 import process from 'node:process'
 import {
   AppService,
+  buildAppPermissionRules,
   EmbeddedOpener,
+  loadAppsJson,
   PackagedOpener,
   PermissionService,
   registerAppProtocol,
@@ -186,15 +187,12 @@ async function main(): Promise<void> {
   const resilience = new ResilienceSystem(kernel.ctx.events, logger)
   void kernel.register(resilience)
 
-  // 权限策略：flavor 声明哪些应用能用哪些域/平台权限，未声明一律拒绝
-  const allow = (appId: string, permission: string): PermissionRule => ({ app: appId, permission, verdict: 'allow' })
-  const permissionRules: PermissionRule[] = flavor.apps.flatMap(appManifest => [
-    allow(appManifest.id, 'app.open'),
-    ...appManifest.devices.map(device => allow(appManifest.id, `domain.${device}`)),
-    ...appManifest.permissions.map(permission => allow(appManifest.id, permission)),
-  ])
+  // apps.json 与 flavor 同为受信任部署输入：能写配置目录即可注册应用并声明权限，
+  // 目录写权限须由部署侧管控；未声明的权限一律拒绝
+  const externalApps = loadAppsJson(configDir(), logger, { excludeIds: flavor.apps.map(a => a.id) })
+  const catalog = [...flavor.apps, ...externalApps]
   const permissions = new PermissionService({
-    rules: permissionRules,
+    rules: buildAppPermissionRules(catalog),
     audit: decision => logger.scope('permission').info('decision', {
       appId: decision.request.appId,
       permission: decision.request.permission,
@@ -214,6 +212,7 @@ async function main(): Promise<void> {
     kernel.ctx.events,
   )
   for (const appManifest of flavor.apps) { apps.register(appManifest, 'flavor') }
+  for (const appManifest of externalApps) { apps.register(appManifest, 'apps.json') }
 
   // ── IPC 接线 ─────────────────────────────────────────────
   windows.registerWindowControls()

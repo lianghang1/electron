@@ -28,6 +28,7 @@
     "test:e2e:permission": "node --import tsx scripts/e2e/permission-e2e.mjs",
     "test:e2e:resilience": "node --import tsx scripts/e2e/resilience-e2e.mjs",
     "test:e2e:force-gate": "node --import tsx scripts/e2e/force-gate-e2e.mjs",
+    "test:e2e:apps-source": "node --import tsx scripts/e2e/apps-source-e2e.mjs",
     "typecheck": "pnpm -r typecheck",
     "postinstall": "node scripts/ensure-electron.mjs"
   },

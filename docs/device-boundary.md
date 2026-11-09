@@ -11,6 +11,7 @@
 | 更新链路 e2e | `pnpm test:e2e:update` 15/15，含命令注入对抗用例 |
 | 浮层宿主 e2e | `pnpm test:e2e:overlay` 9/9 |
 | 权限模型 e2e | `pnpm test:e2e:permission` 10/10 |
+| apps.json 本地应用源 | `pnpm test:e2e:apps-source` 8/8，规则表经生产函数 `buildAppPermissionRules()` 验证 |
 | 干净 clone 全链路 | `pnpm verify` 12 阶段全绿，构建后无中间 `dist` |
 | Linux 打包 | `pnpm build:linux` 产出 AppImage + deb |
 | Windows 打包 | `pnpm build:win` 产出 win-unpacked（交叉打包） |
@@ -42,6 +43,11 @@
 
 - `UpdateManifest` 由服务端下发，需要真实服务端提供含 `package.artifacts`（按 `BuildPlatform` 分组）的清单做端到端演练。
 - 恶意 zip / 畸形清单 / 非白名单源站已由单测与 e2e 覆盖对抗逻辑，但真实网络环境下的下载中断续传需真机复验。
+
+### 本地扩展应用（apps.json）
+
+- **信任边界**：`<配置目录>/apps.json` 与 flavor 内置清单同构，且同为受信任部署输入——能写该文件即可注册应用并声明 `devices` / `permissions`，权限策略表按其声明放行。配置目录写权限必须由部署侧管控；现场免重打包只增加应用清单，不替换打包资源。
+- **真机待验**：已部署环境丢入 apps.json 后重启生效、与内置应用重名时的跳过告警、kiosk 形态下扩展应用的直达配置。
 
 ## 已知未完成（不冒充完成）
 
