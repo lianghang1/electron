@@ -107,6 +107,21 @@ export const desktop = {
     set: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
   },
 
+  /** 下载任务：按 taskId 间接寻址，页面无法用任意路径触达文件系统 */
+  downloads: {
+    list: () => ipcRenderer.invoke('download:list'),
+    cancel: (taskId: string) => ipcRenderer.invoke('download:cancel', taskId),
+    open: (taskId: string) => ipcRenderer.invoke('download:open', taskId),
+    reveal: (taskId: string) => ipcRenderer.invoke('download:reveal', taskId),
+    dismiss: (taskId: string) => ipcRenderer.invoke('download:dismiss', taskId),
+  },
+
+  /** 应用会话数据：清缓存不影响登录态，清站点数据等于该应用登出 */
+  sessions: {
+    clearCache: (appId: string) => ipcRenderer.invoke('session:clear-cache', appId),
+    clearSiteData: (appId: string) => ipcRenderer.invoke('session:clear-site', appId),
+  },
+
   /** 启动打点回传（渲染层 T4 首帧） */
   markFirstPaint: () => ipcRenderer.send('launch-mark:t4'),
 }

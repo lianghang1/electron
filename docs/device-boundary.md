@@ -12,10 +12,11 @@
 | 浮层宿主 e2e | `pnpm test:e2e:overlay` 9/9 |
 | 权限模型 e2e | `pnpm test:e2e:permission` 10/10 |
 | apps.json 本地应用源 | `pnpm test:e2e:apps-source` 8/8，规则表经生产函数 `buildAppPermissionRules()` 验证 |
-| 干净 clone 全链路 | `pnpm verify` 12 阶段全绿，构建后无中间 `dist` |
+| 应用会话 / 下载 / 审计 | `pnpm test:e2e:session` 10/10（纯策略 + 真实 `AuditLog` 落盘：白名单、退订、过期清理） |
+| 干净 clone 全链路 | `pnpm verify` 16 阶段全绿，构建后无中间 `dist` |
 | Linux 打包 | `pnpm build:linux` 产出 AppImage + deb |
 | Windows 打包 | `pnpm build:win` 产出 win-unpacked（交叉打包） |
-| UI 渲染 | 六张 Playwright 实机渲染截图（platform/solo/命令面板/设置/深色）人工核对 |
+| UI 渲染 | 八张 Playwright 实机渲染截图（platform/solo/命令面板/设置/深色/下载横幅/应用数据），人工核对无白屏与控制台错误 |
 
 ## 必须真机确认
 
@@ -48,6 +49,14 @@
 
 - **信任边界**：`<配置目录>/apps.json` 与 flavor 内置清单同构，且同为受信任部署输入——能写该文件即可注册应用并声明 `devices` / `permissions`，权限策略表按其声明放行。配置目录写权限必须由部署侧管控；现场免重打包只增加应用清单，不替换打包资源。
 - **真机待验**：已部署环境丢入 apps.json 后重启生效、与内置应用重名时的跳过告警、kiosk 形态下扩展应用的直达配置。
+
+### 应用会话与下载（三平台通用）
+
+- **cookie 快照退出时序**：`will-quit` 阻止退出 → 落盘 → 再次 `quit` 的可靠性，以及会话 cookie 跨重启是否真的保住登录态，只有真机能确认。
+- **分区清理的影响面**：`clearCache` 与 `clearSiteData` 对真实站点登录态的作用，清空后旧快照是否确实不复活。
+- **下载门控真实链路**：真实网络下 `will-download` 的进度/中断、拒绝后部分文件清理，以及 `shell.openPath` / `showItemInFolder` 的系统关联。
+- **审计落盘**：`userData/platform/logs/audit/` 的写入权限、跨天分文件与 30 天保留清理，在真实部署环境的行为。
+- **协议分区**：packaged 应用改用 `persist:app-<id>` 分区后，组合根为该分区注册的 `app://` 是否真实生效（沙箱只证明代码接线与构建通过）。
 
 ## 已知未完成（不冒充完成）
 

@@ -26,6 +26,7 @@
 | 浮层窗 | Overlay（Capture/Permission/Menu/AppCenter/Settings） | popup |
 | 应用定义 | AppManifest（entry: embedded/packaged/remote 三形态） | app config |
 | 运行中应用 | AppInstance | session、context |
+| 应用会话容器 | AppSessionRegistry（`persist:app-<id>` 分区 + cookie 快照） | 每应用一个 session、cookie 垫片 |
 | 设备域 | Domain | module、feature |
 | 产品形态 | Flavor | app、edition |
 | 构建目标平台 | BuildPlatform（win32 / darwin / linux） | 与 Platform（硬件能力平台）混用 |

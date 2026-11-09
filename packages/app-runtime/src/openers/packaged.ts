@@ -4,8 +4,7 @@ import type { ViewHost } from '../view-host'
 
 /**
  * packaged 形态：打包好的 dist（resources/apps/<dir>/），经 app:// 协议服务。
- * 协议注册在组合根完成（registerAppScheme + registerAppProtocol），
- * 本 opener 只负责创建视图容器。
+ * 协议由组合根在该应用的会话分区注册，本 opener 只负责创建视图容器。
  */
 export class PackagedOpener implements AppOpener {
   readonly kind = 'packaged'
@@ -27,6 +26,7 @@ export class PackagedOpener implements AppOpener {
       instanceId: instance.instanceId,
       appId: manifest.id,
       url: `app://${host}/index.html`,
+      partition: `persist:app-${manifest.id}`,
       // standard+secure 协议的 origin = app://<host>，精确匹配，不用尾点前缀
       allowedOrigins: [`app://${host}`],
     })

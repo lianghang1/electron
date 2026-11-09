@@ -6,6 +6,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EmptyState from '../apps/pages/EmptyState.vue'
 import { resolveEmbeddedRoute } from '../apps/registry'
 import CommandPalette from './CommandPalette.vue'
+import DownloadBar from './DownloadBar.vue'
 import ForceGate from './ForceGate.vue'
 import SettingsDialog from './SettingsDialog.vue'
 
@@ -402,6 +403,8 @@ onBeforeUnmount(() => {
           </template>
         </main>
       </div>
+
+      <DownloadBar v-if="chrome === 'platform'" />
 
       <CommandPalette
         v-if="chrome === 'platform'"

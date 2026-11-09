@@ -1,3 +1,5 @@
+import type { DownloadTask } from './download'
+
 /**
  * 平台事件名（过去式，结果导向）。
  * 事件总线是类型化的：emit/on 的事件名必须是本表的 key。
@@ -27,6 +29,21 @@ export interface PlatformEvents {
   // 崩溃与自愈
   'crash.renderer-gone': { windowId: number, reason: string, restartCount: number }
   'watchdog.recovery-mode': { reason: string }
+  // 权限决策：审计落盘与运行日志共用同一事实源
+  'permission.decided': {
+    appId: string
+    permission: string
+    verdict: 'allow' | 'deny'
+    source: 'policy' | 'store' | 'prompt' | 'default'
+  }
+  // 下载：tasks-changed 推全量快照给横幅，终态事件供审计留痕
+  'download.tasks-changed': { tasks: DownloadTask[] }
+  'download.completed': { taskId: string, appId: string, filename: string }
+  'download.cancelled': { taskId: string, appId: string, reason: 'user' | 'policy' | 'interrupted' }
+  'download.failed': { taskId: string, appId: string, reason: string }
+  // 会话容器
+  'session.cleared': { appId: string, scope: 'cache' | 'site-data' }
+  'session.cookies-restored': { appId: string, count: number }
 }
 
 export type PlatformEventName = keyof PlatformEvents

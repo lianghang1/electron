@@ -9,6 +9,7 @@ export * from './devices/scanner'
 
 export * from './devices/signature'
 export * from './domain'
+export * from './download'
 export * from './errors'
 export * from './events'
 export * from './force-update'

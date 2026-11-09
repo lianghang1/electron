@@ -7,7 +7,10 @@
     ".": "./src/index.ts",
     "./logger": "./src/logger/index.ts",
     "./settings": "./src/settings/index.ts",
-    "./storage": "./src/storage/app-paths.ts"
+    "./storage": "./src/storage/app-paths.ts",
+    "./session": "./src/session/index.ts",
+    "./download": "./src/download/index.ts",
+    "./audit": "./src/audit/index.ts"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",

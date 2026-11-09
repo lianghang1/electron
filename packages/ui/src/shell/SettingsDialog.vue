@@ -8,14 +8,40 @@ import { applyTheme } from '../styles/appearance'
 const props = defineProps<{ open: boolean, isKiosk?: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 
+interface AppSummary {
+  manifest: { id: string, name: string }
+}
+
 const schema = ref<SettingGroup[]>([])
 const values = ref<SettingsValues>({})
+const apps = ref<AppSummary[]>([])
+const busy = ref(false)
+const actionError = ref('')
 
 onMounted(async () => {
   const snap = await desktop().settings.all() as { schema: SettingGroup[], values: SettingsValues }
   schema.value = snap.schema
   values.value = snap.values
+  try {
+    apps.value = await desktop().apps.list() as AppSummary[]
+  }
+  catch {
+    apps.value = []
+  }
 })
+
+async function clearAppData(appId: string, scope: 'cache' | 'site-data'): Promise<void> {
+  busy.value = true
+  actionError.value = ''
+  try {
+    if (scope === 'cache') { await desktop().sessions.clearCache(appId) }
+    else { await desktop().sessions.clearSiteData(appId) }
+  }
+  catch (err) {
+    actionError.value = err instanceof Error ? err.message : String(err)
+  }
+  finally { busy.value = false }
+}
 
 function fieldValue(group: string, field: SettingField): unknown {
   return values.value[group]?.[field.key] ?? field.default
@@ -89,6 +115,42 @@ function visibleFields(group: SettingGroup) {
             />
           </div>
         </div>
+      </div>
+
+      <div>
+        <p class="mb-2 text-ui-sm font-medium text-foreground-subtle">
+          应用数据
+        </p>
+        <div class="overflow-hidden rounded-md border border-border">
+          <div
+            v-for="app in apps"
+            :key="app.manifest.id"
+            class="flex items-center justify-between gap-4 border-b border-border px-3.5 py-3 last:border-b-0"
+          >
+            <div class="min-w-0">
+              <p class="truncate text-ui-base text-foreground">
+                {{ app.manifest.name }}
+              </p>
+              <p class="mt-0.5 truncate text-ui-xs text-foreground-subtle">
+                {{ app.manifest.id }}
+              </p>
+            </div>
+            <div class="flex shrink-0 gap-1">
+              <Button size="xs" variant="outline" :disabled="busy" @click="clearAppData(app.manifest.id, 'cache')">
+                清缓存
+              </Button>
+              <Button size="xs" variant="outline" :disabled="busy" @click="clearAppData(app.manifest.id, 'site-data')">
+                清站点数据
+              </Button>
+            </div>
+          </div>
+          <p v-if="apps.length === 0" class="px-3.5 py-3 text-ui-sm text-foreground-subtle">
+            暂无已注册应用
+          </p>
+        </div>
+        <p v-if="actionError" class="mt-1.5 text-ui-xs text-destructive">
+          {{ actionError }}
+        </p>
       </div>
     </DialogContent>
   </Dialog>

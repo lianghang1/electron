@@ -16,9 +16,12 @@ import {
 } from '@shell/app-runtime'
 import { createDeviceGateway, createDomainRouter, createDriverResolver, detectDevicePlatform, DomainRouteError, resolvePlatformCapability } from '@shell/devices'
 import { createKernel } from '@shell/kernel'
+import { AuditLog } from '@shell/kernel/audit'
+import { DownloadManager } from '@shell/kernel/download'
 import { createRootLogger } from '@shell/kernel/logger'
+import { AppSessionRegistry } from '@shell/kernel/session'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
-import { configDir, filesDir, migrateLegacyLayout, platformDataRoot } from '@shell/kernel/storage'
+import { configDir, cookiesDir, filesDir, logsDir, migrateLegacyLayout, platformDataRoot } from '@shell/kernel/storage'
 import { assertSafeSegment, flavorManifestSchema, matchesOrigin } from '@shell/shared'
 import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, ForceUpdateGate, FullPackageChannel, hasPendingAsarUpdate, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
 import { ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
@@ -193,13 +196,50 @@ async function main(): Promise<void> {
   const catalog = [...flavor.apps, ...externalApps]
   const permissions = new PermissionService({
     rules: buildAppPermissionRules(catalog),
-    audit: decision => logger.scope('permission').info('decision', {
-      appId: decision.request.appId,
-      permission: decision.request.permission,
-      verdict: decision.verdict,
-      source: decision.source,
-    }),
+    audit: (decision) => {
+      kernel.ctx.events.emit('permission.decided', {
+        appId: decision.request.appId,
+        permission: decision.request.permission,
+        verdict: decision.verdict,
+        source: decision.source,
+      })
+    },
   })
+
+  // 下载门控走同一张权限策略表：未声明 download 权限即拒绝。
+  // 决策允许异步返回，期间下载照常进行；拒绝时取消并清理部分文件。
+  const downloads = new DownloadManager({
+    events: kernel.ctx.events,
+    logger,
+    gate: ({ appId, url }) => {
+      let origin = url
+      try {
+        origin = new URL(url).origin
+      }
+      catch {
+        // blob:/data: 等非标准 URL，原值仅作审计线索
+      }
+      return permissions.decide({ appId, origin, permission: 'download' })
+        .then(allowed => (allowed ? 'allow' : 'deny'))
+    },
+    downloadsDir: app.getPath('downloads'),
+  })
+
+  // 每个应用一个会话分区：协议与下载门控在创建时由组合根接线，
+  // 视图只声明 partition，窗口系统不认识应用会话策略。
+  const appSessions = new AppSessionRegistry({
+    logger,
+    events: kernel.ctx.events,
+    cookiesDir: cookiesDir(),
+    onSessionCreated: (ses, appId) => {
+      registerAppProtocol(ses, appsRoot)
+      downloads.attach(ses, appId)
+    },
+  })
+  const auditLog = new AuditLog({ events: kernel.ctx.events, logger, dir: join(logsDir(), 'audit') })
+  void kernel.register(auditLog)
+  void kernel.register(appSessions)
+  void kernel.register(downloads)
 
   // 应用运行时：openers 在此装配，AppService 只认 SPI
   const apps = new AppService(
@@ -213,6 +253,15 @@ async function main(): Promise<void> {
   )
   for (const appManifest of flavor.apps) { apps.register(appManifest, 'flavor') }
   for (const appManifest of externalApps) { apps.register(appManifest, 'apps.json') }
+
+  // 非 embedded 应用先建分区：窗口系统按 partition 取到的就是已注册协议与门控的 Session
+  for (const manifest of catalog) {
+    if (manifest.entry.kind !== 'embedded') { appSessions.forApp(manifest.id) }
+  }
+
+  function assertRegisteredApp(appId: string): void {
+    if (!apps.list().some(r => r.manifest.id === appId)) { throw new Error(`应用未注册：${appId}`) }
+  }
 
   // ── IPC 接线 ─────────────────────────────────────────────
   windows.registerWindowControls()
@@ -247,6 +296,23 @@ async function main(): Promise<void> {
   })
   ipcMain.handle('app:close', (_e, instanceId: string) => apps.close(instanceId))
   ipcMain.handle('app:activate', (_e, instanceId: string) => windows.activate(instanceId))
+
+  // 下载任务与会话数据：只有壳渲染层持有完整桥面，应用视图拿不到这些通道
+  ipcMain.handle('download:list', () => downloads.list())
+  ipcMain.handle('download:cancel', (_e, taskId: string) => downloads.cancel(taskId))
+  ipcMain.handle('download:open', (_e, taskId: string) => downloads.open(taskId))
+  ipcMain.handle('download:reveal', (_e, taskId: string) => downloads.reveal(taskId))
+  ipcMain.handle('download:dismiss', (_e, taskId: string) => downloads.dismiss(taskId))
+  ipcMain.handle('session:clear-cache', async (_e, appId: string) => {
+    assertRegisteredApp(appId)
+    await appSessions.clearCache(appId)
+    kernel.ctx.events.emit('session.cleared', { appId, scope: 'cache' })
+  })
+  ipcMain.handle('session:clear-site', async (_e, appId: string) => {
+    assertRegisteredApp(appId)
+    await appSessions.clearSiteData(appId)
+    kernel.ctx.events.emit('session.cleared', { appId, scope: 'site-data' })
+  })
 
   // 壳信息（渲染层按 chrome 档位决定挂不挂壳界面）
   ipcMain.handle('shell:info', () => ({
