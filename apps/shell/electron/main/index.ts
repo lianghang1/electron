@@ -6,6 +6,7 @@ import process from 'node:process'
 import {
   AppService,
   buildAppPermissionRules,
+  buildPlatformPermissionRules,
   EmbeddedOpener,
   loadAppsJson,
   PackagedOpener,
@@ -22,7 +23,7 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { AppSessionRegistry } from '@shell/kernel/session'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, cookiesDir, filesDir, logsDir, migrateLegacyLayout, platformDataRoot } from '@shell/kernel/storage'
-import { assertSafeSegment, flavorManifestSchema, matchesOrigin } from '@shell/shared'
+import { assertSafeSegment, CallerRegistry, flavorManifestSchema, matchesOrigin } from '@shell/shared'
 import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, ForceUpdateGate, FullPackageChannel, hasPendingAsarUpdate, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
 import { ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
 import { app, ipcMain, session } from 'electron'
@@ -90,6 +91,7 @@ async function main(): Promise<void> {
 
   const theme = (settingsSnapshot().values.appearance?.theme as 'light' | 'dark' | 'system' | undefined) ?? 'system'
   const windows = new WindowSystem(flavor, join(__dirname, '../renderer'), theme)
+  const callers = new CallerRegistry()
   const kernel = createKernel(flavor, [windows])
 
   // 应用 dist 根：打包态必须在 asar 外（extraResources 已把 resources/apps 复制到
@@ -159,6 +161,7 @@ async function main(): Promise<void> {
     driver,
     paths: { storageRoot: configDir(), filesRoot: filesDir() },
     allowedOrigins: flavor.update.allowedOrigins,
+    diagnostics: flavor.diagnostics,
     getParent: () => windows.shellWindow,
   })
 
@@ -195,7 +198,10 @@ async function main(): Promise<void> {
   const externalApps = loadAppsJson(configDir(), logger, { excludeIds: flavor.apps.map(a => a.id) })
   const catalog = [...flavor.apps, ...externalApps]
   const permissions = new PermissionService({
-    rules: buildAppPermissionRules(catalog),
+    rules: [
+      ...buildAppPermissionRules(catalog),
+      ...buildPlatformPermissionRules(capability.availableDomains),
+    ],
     audit: (decision) => {
       kernel.ctx.events.emit('permission.decided', {
         appId: decision.request.appId,
@@ -205,6 +211,13 @@ async function main(): Promise<void> {
       })
     },
   })
+
+  // 身份账本与系统权限闸门同源：窗口/视图创建时登记 webContents → appId，
+  // 系统权限请求（摄像头/剪贴板等）按真实调用方查同一张策略表，页面无法伪造身份
+  windows.bindCallerRegistry(
+    callers,
+    (appId, permission) => permissions.decide({ appId, origin: `app://${appId}`, permission }),
+  )
 
   // 下载门控走同一张权限策略表：未声明 download 权限即拒绝。
   // 决策允许异步返回，期间下载照常进行；拒绝时取消并清理部分文件。
@@ -267,18 +280,28 @@ async function main(): Promise<void> {
   windows.registerWindowControls()
   windows.attachEventBroadcast(kernel.ctx.events)
 
-  // 域方法调用（能力矩阵闸门：不在本平台 availableDomains 的域调用在路由层即拒绝）
-  const router = createDomainRouter(devices.domains, logger, capability.availableDomains)
+  // 域方法调用：身份从账本反查（页面无法伪造），授权与能力闸门在路由层统一判定
+  const router = createDomainRouter(devices.domains, logger, {
+    availableDomains: capability.availableDomains,
+    authorize: (grant, ctx) => permissions.decide({
+      appId: ctx.appId,
+      origin: `app://${ctx.appId}`,
+      permission: grant,
+    }),
+  })
   ipcMain.handle('domain-call', (event, method: string, input: unknown) => {
+    const caller = callers.tryResolve(event.sender.id)
+    if (!caller) { throw new DomainRouteError('PERMISSION_DENIED', '调用方未登记') }
     const ctx: DomainCallContext = {
-      appId: 'shell',
-      instanceId: String(event.sender.id),
-      log: message => logger.scope('domain').info(message, { method }),
+      appId: caller.appId,
+      instanceId: caller.instanceId,
+      log: message => logger.scope('domain').info(message, { method, appId: caller.appId }),
     }
     return router.call(method, input, ctx).catch((err: unknown) => {
       const code = err instanceof DomainRouteError ? err.code : 'DOMAIN_ERROR'
       logger.warn('domain call failed', { method, code, err })
-      throw err
+      // 错误码编进 message：IPC 边界只可靠保留 Error.message，调试台据此展示结构化原因
+      throw new Error(`[${code}] ${err instanceof Error ? err.message : String(err)}`)
     })
   })
 
@@ -341,8 +364,11 @@ async function main(): Promise<void> {
   ipcMain.on('view:content-rect', (_e, rect: { x: number, y: number, width: number, height: number }) =>
     windows.setContentRect(rect))
 
-  // JSAPI 受控桥（remote 页面）：origin 白名单 + manifest.devices 声明双重过滤
+  // JSAPI 受控桥（remote 页面）：账本身份 + origin 白名单双重校验，
+  // 域级放行交给路由层授权闸门，不在桥里另写一份 devices 判定
   ipcMain.handle('jsapi:call', (event, method: string, input: unknown) => {
+    const caller = callers.tryResolve(event.sender.id)
+    if (!caller) { throw new DomainRouteError('PERMISSION_DENIED', '调用方未登记') }
     const frameUrl = event.senderFrame?.url ?? ''
     let origin: string
     try {
@@ -353,24 +379,21 @@ async function main(): Promise<void> {
     }
     const found = apps.list().find((r) => {
       const entry = r.manifest.entry
-      return entry.kind === 'remote' && matchesOrigin(frameUrl, (entry as { origins: string[] }).origins)
+      return r.manifest.id === caller.appId
+        && entry.kind === 'remote'
+        && matchesOrigin(frameUrl, entry.origins)
     })
     if (!found) {
-      logger.warn('jsapi rejected: origin not allowed', { origin, method })
+      logger.warn('jsapi rejected: origin not allowed', { origin, appId: caller.appId, method })
       throw new DomainRouteError('METHOD_NOT_FOUND', 'origin 未授权')
     }
-    const domain = method.split('.')[0] ?? ''
-    if (!found.manifest.devices.includes(domain)) {
-      logger.warn('jsapi rejected: domain not declared', { appId: found.manifest.id, method })
-      throw new DomainRouteError('METHOD_NOT_FOUND', `未声明的设备能力：${domain}`)
-    }
     const ctx: DomainCallContext = {
-      appId: found.manifest.id,
-      instanceId: origin,
-      log: message => logger.scope('jsapi').info(message, { method, appId: found.manifest.id }),
+      appId: caller.appId,
+      instanceId: caller.instanceId,
+      log: message => logger.scope('jsapi').info(message, { method, appId: caller.appId }),
     }
     return router.call(method, input, ctx).catch((err: unknown) => {
-      logger.warn('jsapi call failed', { method, appId: found.manifest.id, err })
+      logger.warn('jsapi call failed', { method, appId: caller.appId, err })
       throw err
     })
   })

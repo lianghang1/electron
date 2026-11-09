@@ -1,10 +1,10 @@
 import type { ViewHost, ViewSpec } from '@shell/app-runtime'
 import type { EventBus, Startable } from '@shell/kernel'
-import type { FlavorManifest } from '@shell/shared'
+import type { CallerRegistry, FlavorManifest } from '@shell/shared'
 import type { OverlayKind, OverlayPolicy } from './overlay-host'
 import { join } from 'node:path'
 import process from 'node:process'
-import { matchesOrigin } from '@shell/shared'
+import { matchesOrigin, sessionToPlatformPermission, SHELL_APP_ID } from '@shell/shared'
 import { app, BrowserWindow, ipcMain, WebContentsView } from 'electron'
 import { createDesktopMode, createKioskMode } from './modes'
 import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
@@ -30,6 +30,9 @@ export class WindowSystem implements Startable, ViewHost {
   /** 通用浮层宿主：新增浮层 = 注册一条策略，本类零分发 */
   readonly overlays: OverlayHost<OverlayKind>
 
+  private callers?: CallerRegistry
+  private permissionGate?: (appId: string, permission: string) => Promise<boolean>
+
   constructor(
     flavor: FlavorManifest,
     rendererDir: string,
@@ -48,6 +51,31 @@ export class WindowSystem implements Startable, ViewHost {
   /** 注入事件总线（组合根在 createKernel 之后调用；崩溃事件经它广播） */
   bindEvents(events: EventBus): void {
     this.events = events
+  }
+
+  /**
+   * 身份账本与系统权限闸门由组合根注入：窗口/视图创建时登记 webContents → appId，
+   * 系统权限请求按调用方身份查权限策略表，页面无法伪造身份。
+   */
+  bindCallerRegistry(callers: CallerRegistry, gate: (appId: string, permission: string) => Promise<boolean>): void {
+    this.callers = callers
+    this.permissionGate = gate
+  }
+
+  /** Chromium 系统权限（摄像头/剪贴板/位置等）：映射成平台权限后走同一张策略表 */
+  private installPermissionGate(wc: Electron.WebContents): void {
+    wc.session.setPermissionRequestHandler((requesting, chromiumPermission, callback) => {
+      const caller = this.callers?.tryResolve(requesting.id)
+      const permission = sessionToPlatformPermission(chromiumPermission)
+      const gate = this.permissionGate
+      if (!caller || !permission || !gate) {
+        callback(false)
+        return
+      }
+      void gate(caller.appId, permission)
+        .then(allowed => callback(allowed))
+        .catch(() => callback(false))
+    })
   }
 
   async start(): Promise<void> {}
@@ -89,7 +117,8 @@ export class WindowSystem implements Startable, ViewHost {
     else { void win.loadFile(join(this.rendererDir, 'index.html')) }
 
     win.once('ready-to-show', () => win.show())
-    this.track(win)
+    this.track(win, { appId: SHELL_APP_ID, instanceId: 'shell', kind: 'shell' })
+    this.installPermissionGate(win.webContents)
     this.shellWindowId = win.id
     if (this.flavor.mode === 'kiosk') { this.installKioskWatchdog(win) }
     return win
@@ -214,13 +243,19 @@ export class WindowSystem implements Startable, ViewHost {
     if (devUrl) { void win.loadURL(`${devUrl}/${hash}`) }
     else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash }) }
     win.once('ready-to-show', () => win.show())
-    this.track(win)
+    this.track(win, { appId: SHELL_APP_ID, instanceId: policy.kind, kind: 'overlay' })
+    this.installPermissionGate(win.webContents)
     return win
   }
 
-  private track(win: BrowserWindow): void {
+  private track(win: BrowserWindow, caller: { appId: string, instanceId: string, kind: 'shell' | 'view' | 'overlay' }): void {
+    const wcId = win.webContents.id
     this.windows.set(win.id, win)
-    win.on('closed', () => this.windows.delete(win.id))
+    this.callers?.register(wcId, caller)
+    win.on('closed', () => {
+      this.windows.delete(win.id)
+      this.callers?.unregister(wcId)
+    })
     // 全部窗口关闭即退出
     if (this.windows.size === 1) { app.on('window-all-closed', () => app.quit()) }
   }
@@ -246,6 +281,8 @@ export class WindowSystem implements Startable, ViewHost {
     view.setVisible(false)
 
     const { webContents } = view
+    this.callers?.register(webContents.id, { appId: spec.appId, instanceId: spec.instanceId, kind: 'view' })
+    this.installPermissionGate(webContents)
     void webContents.loadURL(spec.url)
 
     // origin 白名单强制：导航出白名单即拦截回退
@@ -254,10 +291,6 @@ export class WindowSystem implements Startable, ViewHost {
     })
     webContents.setWindowOpenHandler(({ url }) => {
       return { action: this.isOriginAllowed(url, spec.allowedOrigins) ? 'allow' : 'deny' }
-    })
-    // 权限请求（摄像头/麦克风等）默认拒绝——kiosk 场景由设备域承接，不经页面授权
-    webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => {
-      callback(false)
     })
     // 崩溃自愈：Chrome 式 Tab 恢复（渲染层感知后按退避策略重开实例）
     webContents.on('render-process-gone', (_event, details) => {
@@ -316,6 +349,7 @@ export class WindowSystem implements Startable, ViewHost {
   }
 
   private removeView(view: Electron.WebContentsView): void {
+    this.callers?.unregister(view.webContents.id)
     this.shellWindow?.contentView.removeChildView(view)
     view.webContents.close()
   }

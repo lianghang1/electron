@@ -24,7 +24,7 @@ export function createScannerDomain(scanner: ScannerSystem, deps: DomainDeps): D
       input: simulateInput,
       output: z.unknown(),
       handler: ({ code }) => {
-        if (deps.isPackaged) { throw new DomainRouteError('INVALID_INPUT', 'scanner.simulate 仅限开发环境') }
+        if (!deps.diagnostics) { throw new DomainRouteError('INVALID_INPUT', 'scanner.simulate 仅限验机形态') }
         return scanner.simulate(code)
       },
     },

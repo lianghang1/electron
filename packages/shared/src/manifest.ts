@@ -68,6 +68,11 @@ export const flavorManifestSchema = z.object({
   chrome: z.enum(['platform', 'solo']).default('platform'),
   /** 内置应用清单（apps.json 同构，也可远程下发） */
   apps: z.array(appManifestSchema).default([]),
+  /**
+   * 验机形态：声明后放行诊断专用域方法（扫码模拟等），生产形态一律禁用。
+   * 与打包状态无关——现场验机跑的就是打包产物。
+   */
+  diagnostics: z.boolean().default(false),
   branding: z
     .object({
       icon: z.string().optional(),

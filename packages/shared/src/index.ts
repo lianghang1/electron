@@ -1,3 +1,4 @@
+export * from './caller'
 export * from './capability'
 export * from './devices/capture'
 export * from './devices/iccard'
@@ -8,6 +9,7 @@ export * from './devices/scanner'
 /* ---------------- 设备域类型（idcard / iccard / print / scanner / capture / signature） ---------------- */
 
 export * from './devices/signature'
+export * from './diagnostics'
 export * from './domain'
 export * from './download'
 export * from './errors'

@@ -11,7 +11,6 @@ import type { ScannerSystem } from './domains/scanner'
 import type { SignatureSystem } from './domains/signature'
 import type { DriverResolver } from './drivers'
 import { join } from 'node:path'
-import { app } from 'electron'
 import { overridesStore } from './domain-kit'
 import { createCaptureSystem } from './domains/capture'
 import { createCaptureDomain } from './domains/capture/domain'
@@ -55,6 +54,8 @@ export interface DeviceGatewayOptions {
   paths: DeviceGatewayPaths
   /** 打印 URL 负载允许的源站（组合根注入）；空 = 拒绝远程下载，防 SSRF */
   allowedOrigins: readonly string[]
+  /** 验机形态：放行诊断专用域方法，生产形态恒 false */
+  diagnostics: boolean
   /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁，避免进程常驻 */
   getParent?: () => BrowserWindow | undefined
 }
@@ -113,7 +114,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     logger: options.logger.scope('devices:signature'),
   })
 
-  const deps: DomainDeps = { events: options.events, isPackaged: app.isPackaged }
+  const deps: DomainDeps = { events: options.events, diagnostics: options.diagnostics }
 
   // 域注册 = 数据表：新增域 = 加一行工厂，平台代码零分支
   const domains: DomainDefinition[] = [
