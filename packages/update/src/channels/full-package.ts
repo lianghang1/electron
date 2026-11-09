@@ -26,6 +26,11 @@ export class FullPackageChannel implements UpdateChannel {
 
   constructor(private readonly options: FullPackageOptions) {}
 
+  /** 整包已下载校验并排程安装，等待退出时机落地 */
+  get hasPendingInstall(): boolean {
+    return this.pending !== null
+  }
+
   async check(current: VersionMatrix): Promise<UpdatePlan | null> {
     const manifest = await fetchUpdateManifest(this.options.manifestUrl, this.options.allowedOrigins)
     const pkg = manifest.package

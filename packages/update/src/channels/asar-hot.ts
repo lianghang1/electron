@@ -84,6 +84,21 @@ export interface FinalizeResult {
   error?: string
 }
 
+/** asar 热更已下载校验、等重启由 finalize 就位（定时重启择优的判断依据） */
+export function hasPendingAsarUpdate(resourcesDir: string): boolean {
+  const updaterDir = join(app.getPath('userData'), UPDATER_DIR)
+  const markerPath = join(updaterDir, MARKER)
+  if (!existsSync(markerPath)) { return false }
+  let stage: Stage = 'downloaded'
+  try {
+    stage = (JSON.parse(readFileSync(markerPath, 'utf-8')) as { stage: Stage }).stage
+  }
+  catch {
+    // 标记损坏按 downloaded 处理，与 finalize 的保守策略一致
+  }
+  return stage === 'downloaded' && existsSync(join(updaterDir, 'pending.asar'))
+}
+
 export function finalizeAsarUpdate(resourcesDir: string): FinalizeResult {
   const updaterDir = join(app.getPath('userData'), UPDATER_DIR)
   const markerPath = join(updaterDir, MARKER)

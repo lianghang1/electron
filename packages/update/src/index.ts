@@ -1,4 +1,4 @@
-export { AsarHotChannel, finalizeAsarUpdate } from './channels/asar-hot'
+export { AsarHotChannel, finalizeAsarUpdate, hasPendingAsarUpdate } from './channels/asar-hot'
 export type { FinalizeResult } from './channels/asar-hot'
 export { DistHotChannel } from './channels/dist-hot'
 export { FullPackageChannel } from './channels/full-package'

@@ -19,8 +19,8 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, filesDir, migrateLegacyLayout, platformDataRoot } from '@shell/kernel/storage'
 import { assertSafeSegment, flavorManifestSchema, matchesOrigin } from '@shell/shared'
-import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
-import { TraySystem, WindowSystem } from '@shell/window'
+import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, hasPendingAsarUpdate, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
+import { ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
 import { app, ipcMain, session } from 'electron'
 
 /**
@@ -164,6 +164,10 @@ async function main(): Promise<void> {
       },
     ))
   }
+
+  // 运行韧性：flavor 声明才启用，全部默认关闭；attach 在主窗创建后调用
+  const resilience = new ResilienceSystem(kernel.ctx.events, logger)
+  void kernel.register(resilience)
 
   // 权限策略：flavor 声明哪些应用能用哪些域/平台权限，未声明一律拒绝
   const allow = (appId: string, permission: string): PermissionRule => ({ app: appId, permission, verdict: 'allow' })
@@ -317,6 +321,12 @@ async function main(): Promise<void> {
   // 扫码枪键盘观察挂到工作台窗口
   devices.attachShellWindow(windows.shellWindow!)
   kernel.ctx.marks.t3WindowShown = Date.now()
+
+  // 韧性接线：更新择优依赖闭包注入——整包看通道实例状态，asar 看暂存标记
+  resilience.attach(flavor.resilience ?? {}, () => windows.shellWindow, {
+    hasStagedPackage: () => fullPackage?.hasPendingInstall ?? false,
+    hasPendingAsar: () => hasPendingAsarUpdate(process.resourcesPath ?? '.'),
+  })
 
   // 整包更新排程：退出前拉起安装器（状态在通道实例上，只拉起一次）
   app.on('before-quit', () => {

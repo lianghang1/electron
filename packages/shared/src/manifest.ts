@@ -83,6 +83,27 @@ export const flavorManifestSchema = z.object({
       allowedOrigins: z.array(z.string()).default([]),
     })
     .default({ allowedOrigins: [] }),
+  /**
+   * 运行韧性（无人值守形态如 kiosk 才配；未声明即全关）：
+   * crashReload 仅 desktop 形态生效，kiosk 自带 relaunch 看门狗，两者互斥
+   */
+  resilience: z
+    .object({
+      /** 渲染进程崩溃自动重载，指数退避 + 滑动窗口熔断 */
+      crashReload: z.boolean().default(false),
+      /** 开机自启，仅打包态生效 */
+      autoLaunch: z.boolean().default(false),
+      /** 拦截用户发起的窗口关闭（Alt+F4 等），程序退出不受影响 */
+      exitGuard: z.boolean().default(false),
+      /** 每日定时重启，默认 03:00；动作按更新状态择优 */
+      scheduledRestart: z
+        .object({
+          hour: z.number().int().min(0).max(23).default(3),
+          minute: z.number().int().min(0).max(59).default(0),
+        })
+        .optional(),
+    })
+    .optional(),
 })
 
 export type FlavorManifest = z.infer<typeof flavorManifestSchema>

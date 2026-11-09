@@ -92,6 +92,7 @@ function main() {
   results.push(['e2e', run('e2e:update', 'pnpm', ['test:e2e:update'], { show: true })])
   results.push(['e2e:overlay', run('e2e:overlay', 'pnpm', ['test:e2e:overlay'], { show: true })])
   results.push(['e2e:permission', run('e2e:permission', 'pnpm', ['test:e2e:permission'], { show: true })])
+  results.push(['e2e:resilience', run('e2e:resilience', 'pnpm', ['test:e2e:resilience'], { show: true })])
   results.push(['build', run('build', 'pnpm', ['build'], { show: true })])
   results.push(['design:css', run('design:css', 'pnpm', ['check:design:css'], { show: true })])
   results.push(['dev-resolve', devResolve()])
