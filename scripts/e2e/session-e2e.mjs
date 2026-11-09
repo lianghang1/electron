@@ -11,7 +11,7 @@ import { join } from 'node:path'
 import process from 'node:process'
 import { buildAppPermissionRules } from '../../packages/app-runtime/src/permission-rules.ts'
 import { AUDIT_EVENTS, auditFileName, AuditLog, isAuditExpired } from '../../packages/kernel/src/audit/audit-log.ts'
-import { applyProgress, progressPercent, pruneTasks, resolvePolicyDenial, resolveTerminal, safeFilename, shouldPushProgress } from '../../packages/kernel/src/download/download-policy.ts'
+import { applyProgress, progressPercent, pruneTasks, resolveCompletedPath, resolvePolicyDenial, resolveTerminal, safeFilename, shouldPushProgress } from '../../packages/kernel/src/download/download-policy.ts'
 import { EventBus } from '../../packages/kernel/src/event-bus.ts'
 import { cookieUrl, parseCookieSnapshot, serializeCookie } from '../../packages/kernel/src/session/cookie-snapshot.ts'
 
@@ -121,6 +121,16 @@ await step('pruneTasks：过期终态裁剪、进行中永不裁掉', () => {
   ]
   const kept = pruneTasks(tasks, 100_000, 2, 30_000)
   assert.deepEqual(kept.map(t => t.id), ['p1', 'p2'])
+})
+
+await step('resolveCompletedPath：saveAs 自选目录可用，未完成任务与缺失文件拒绝', () => {
+  const exists = p => p === '/custom/dir/report.pdf'
+  assert.equal(
+    resolveCompletedPath(task({ status: 'completed', path: '/custom/dir/report.pdf' }), exists),
+    '/custom/dir/report.pdf',
+  )
+  assert.throws(() => resolveCompletedPath(task(), exists), /未完成/)
+  assert.throws(() => resolveCompletedPath(task({ status: 'completed', path: '/missing/x.pdf' }), exists), /不存在/)
 })
 
 await step('审计文件名与过期判定，白名单排除高频快照', () => {

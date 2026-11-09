@@ -2,10 +2,11 @@ import type { DownloadTask } from '@shell/shared'
 import type { EventBus } from '../event-bus'
 import type { Startable } from '../lifecycle'
 import type { Logger } from '../logger'
+import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { join, resolve, sep } from 'node:path'
+import { join } from 'node:path'
 import { shell } from 'electron'
-import { applyProgress, progressPercent, pruneTasks, resolvePolicyDenial, resolveTerminal, safeFilename, shouldPushProgress } from './download-policy'
+import { applyProgress, progressPercent, pruneTasks, resolveCompletedPath, resolvePolicyDenial, resolveTerminal, safeFilename, shouldPushProgress } from './download-policy'
 
 export type DownloadGate = (ctx: { appId: string, url: string, filename: string }) => 'allow' | 'deny' | Promise<'allow' | 'deny'>
 
@@ -24,7 +25,7 @@ export interface DownloadManagerOptions {
 
 /**
  * 下载管理：按应用会话分区挂 will-download 门控，任务账本经事件总线推全量快照。
- * 文件操作只按 taskId 间接寻址且校验路径在受管下载目录内，页面无法用任意路径触达文件系统。
+ * 文件操作只按 taskId 间接寻址，路径取自主进程账本，页面无法用任意路径触达文件系统。
  */
 export class DownloadManager implements Startable {
   readonly name = 'downloads'
@@ -112,12 +113,7 @@ export class DownloadManager implements Startable {
   }
 
   private completedPath(taskId: string): string {
-    const task = this.tasks.get(taskId)
-    if (!task || task.status !== 'completed') { throw new Error('下载任务未完成') }
-    const root = resolve(this.options.downloadsDir)
-    const target = resolve(task.path)
-    if (!target.startsWith(root + sep)) { throw new Error('下载路径不在受管目录内') }
-    return target
+    return resolveCompletedPath(this.tasks.get(taskId), existsSync)
   }
 
   private beginTask(appId: string, item: Electron.DownloadItem, filename: string): DownloadTask {

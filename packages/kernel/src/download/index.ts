@@ -4,6 +4,7 @@ export {
   applyProgress,
   progressPercent,
   pruneTasks,
+  resolveCompletedPath,
   resolvePolicyDenial,
   resolveTerminal,
   safeFilename,

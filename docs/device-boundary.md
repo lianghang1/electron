@@ -12,7 +12,7 @@
 | 浮层宿主 e2e | `pnpm test:e2e:overlay` 9/9 |
 | 权限模型 e2e | `pnpm test:e2e:permission` 10/10 |
 | apps.json 本地应用源 | `pnpm test:e2e:apps-source` 8/8，规则表经生产函数 `buildAppPermissionRules()` 验证 |
-| 应用会话 / 下载 / 审计 | `pnpm test:e2e:session` 10/10（纯策略 + 真实 `AuditLog` 落盘：白名单、退订、过期清理） |
+| 应用会话 / 下载 / 审计 | `pnpm test:e2e:session` 11/11（纯策略 + 真实 `AuditLog` 落盘：白名单、退订、过期清理） |
 | 干净 clone 全链路 | `pnpm verify` 16 阶段全绿，构建后无中间 `dist` |
 | Linux 打包 | `pnpm build:linux` 产出 AppImage + deb |
 | Windows 打包 | `pnpm build:win` 产出 win-unpacked（交叉打包） |

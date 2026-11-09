@@ -1,4 +1,5 @@
 import type { DownloadTask, DownloadTaskStatus } from '@shell/shared'
+import { resolve } from 'node:path'
 
 /** Content-Disposition 的文件名来自服务器：去掉目录段与控制字符，杜绝路径穿越 */
 export function safeFilename(raw: string): string {
@@ -22,6 +23,17 @@ export function shouldPushProgress(lastAt: number, now: number, throttleMs: numb
 export function applyProgress(task: DownloadTask, received: number, total: number): DownloadTask {
   const effectiveTotal = total > 0 ? total : task.total
   return { ...task, received, total: effectiveTotal, percent: progressPercent(received, effectiveTotal) }
+}
+
+/**
+ * 任务账本 → 可打开的文件路径。调用方只能传 taskId，路径不来自渲染层；
+ * 不限制在默认下载目录内，saveAs 自选目录同样可用。
+ */
+export function resolveCompletedPath(task: DownloadTask | undefined, exists: (path: string) => boolean): string {
+  if (!task || task.status !== 'completed') { throw new Error('下载任务未完成') }
+  const target = resolve(task.path)
+  if (!exists(target)) { throw new Error('下载文件不存在') }
+  return target
 }
 
 export function resolveTerminal(task: DownloadTask, status: DownloadTaskStatus, now: number, reason?: string): DownloadTask {
