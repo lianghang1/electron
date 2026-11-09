@@ -16,6 +16,8 @@ export interface UpdateManifest {
     version: string
     artifacts: Partial<Record<BuildPlatform, PackageArtifact>>
   }
+  /** 最低可用版本：当前壳版本低于它则强制更新（见 ForceUpdateGate） */
+  minVersion?: string
 }
 
 /** 清单结构校验：服务端下发的版本/地址/摘要必须齐全且形状正确，杜绝畸形值进入落地链路。 */
@@ -31,6 +33,7 @@ const updateManifestSchema = z.object({
     version: z.string().min(1),
     artifacts: z.record(z.string(), packageArtifactSchema),
   }).optional(),
+  minVersion: z.string().min(1).optional(),
 }).passthrough()
 
 export function parseUpdateManifest(raw: unknown, allowedOrigins: readonly string[]): UpdateManifest {

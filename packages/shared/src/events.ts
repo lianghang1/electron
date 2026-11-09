@@ -15,6 +15,8 @@ export interface PlatformEvents {
   'update.applied': { channel: string, version: string }
   'update.failed': { channel: string, reason: string }
   'update.restart-required': { channel: string, version: string }
+  /** 门禁从放行转为阻断时发一次；渲染层据此切换门禁页 */
+  'update.force-required': { requiredVersion: string }
   // 窗口
   'window.created': { profile: string, id: number }
   'window.closed': { id: number }

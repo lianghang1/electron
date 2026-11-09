@@ -19,7 +19,7 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { applySettingsSideEffects, registerSettingsIpc, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, filesDir, migrateLegacyLayout, platformDataRoot } from '@shell/kernel/storage'
 import { assertSafeSegment, flavorManifestSchema, matchesOrigin } from '@shell/shared'
-import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, FullPackageChannel, hasPendingAsarUpdate, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
+import { AsarHotChannel, collectAppVersions, DarwinInstaller, DistHotChannel, finalizeAsarUpdate, ForceUpdateGate, FullPackageChannel, hasPendingAsarUpdate, LinuxInstaller, UpdateCenter, Win32Installer } from '@shell/update'
 import { ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
 import { app, ipcMain, session } from 'electron'
 
@@ -98,11 +98,13 @@ async function main(): Promise<void> {
   // 更新中心：通道按 flavor.update 配置装配，整包落地策略由组合根注入
   const updateManifestUrl = flavor.update.manifestUrl ?? ''
   let fullPackage: FullPackageChannel | undefined
+  let updateCenter: UpdateCenter | undefined
+  let forceGate: ForceUpdateGate | undefined
   if (updateManifestUrl) {
     if (packageInstaller) {
       fullPackage = new FullPackageChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins, installer: packageInstaller })
     }
-    void kernel.register(new UpdateCenter({
+    updateCenter = new UpdateCenter({
       channels: [
         new DistHotChannel({ appsRoot, manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
         new AsarHotChannel({ resourcesDir: process.resourcesPath ?? '.', manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
@@ -116,7 +118,22 @@ async function main(): Promise<void> {
         asar: app.getVersion(),
         apps: collectAppVersions(appsRoot),
       }),
-    }))
+    })
+    void kernel.register(updateCenter)
+
+    // 强制更新门禁：清单 minVersion 低于当前版本即阻断，决策快照经 shell:info 下发
+    const gate = new ForceUpdateGate({
+      manifestUrl: updateManifestUrl,
+      allowedOrigins: flavor.update.allowedOrigins,
+      currentVersion: () => app.getVersion(),
+      events: kernel.ctx.events,
+    })
+    void kernel.register({
+      name: 'force-gate',
+      start: () => gate.start(),
+      stop: () => gate.stop(),
+    })
+    forceGate = gate
   }
   windows.bindEvents(kernel.ctx.events)
 
@@ -239,6 +256,8 @@ async function main(): Promise<void> {
     defaultAppId: flavor.defaultAppId,
     chrome: flavor.mode === 'kiosk' ? 'solo' : flavor.chrome,
     mode: flavor.mode,
+    // 门禁快照：渲染层启动即知是否阻断，后续变化经 update.force-required 事件推送
+    forceUpdate: forceGate?.snapshot,
     // 能力矩阵下发：业务页按 availableDomains 决定功能可用性，无需自行判断平台
     capabilities: {
       platform: capability.platform,
@@ -252,6 +271,8 @@ async function main(): Promise<void> {
     app.relaunch()
     app.quit()
   })
+  // 门禁页主动更新入口：巡检并应用；需重启时经 update.restart-required 事件回传
+  ipcMain.handle('shell:update-now', () => updateCenter?.checkAndApply())
   ipcMain.on('view:content-rect', (_e, rect: { x: number, y: number, width: number, height: number }) =>
     windows.setContentRect(rect))
 

@@ -6,6 +6,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EmptyState from '../apps/pages/EmptyState.vue'
 import { resolveEmbeddedRoute } from '../apps/registry'
 import CommandPalette from './CommandPalette.vue'
+import ForceGate from './ForceGate.vue'
 import SettingsDialog from './SettingsDialog.vue'
 
 interface RestartRequired {
@@ -42,14 +43,21 @@ const recentIds = ref<string[]>([])
 const contentEl = ref<HTMLElement | null>(null)
 const tabStripEl = ref<HTMLElement | null>(null)
 const restart = ref<RestartRequired | null>(null)
+const forceRequiredVersion = ref<string | null>(null)
 
 let offRestartRequired: (() => void) | undefined
+let offForceRequired: (() => void) | undefined
 
 /** 跨进程载荷不可信：形状不符就忽略，不渲染脏数据 */
 function isRestartRequired(value: unknown): value is RestartRequired {
   if (!value || typeof value !== 'object') { return false }
   const record = value as Record<string, unknown>
   return typeof record.channel === 'string' && typeof record.version === 'string'
+}
+
+function isForceRequired(value: unknown): value is { requiredVersion: string } {
+  if (!value || typeof value !== 'object') { return false }
+  return typeof (value as Record<string, unknown>).requiredVersion === 'string'
 }
 
 const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
@@ -238,6 +246,9 @@ onMounted(async () => {
   offRestartRequired = desktop().onEvent('update.restart-required', (payload) => {
     if (isRestartRequired(payload)) { restart.value = payload }
   })
+  offForceRequired = desktop().onEvent('update.force-required', (payload) => {
+    if (isForceRequired(payload)) { forceRequiredVersion.value = payload.requiredVersion }
+  })
 
   try {
     recentIds.value = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[]
@@ -249,6 +260,7 @@ onMounted(async () => {
   const info = await desktop().shell.info()
   chrome.value = info.chrome
   mode.value = info.mode
+  if (info.forceUpdate?.blocked) { forceRequiredVersion.value = info.forceUpdate.requiredVersion ?? '' }
   if (info.defaultAppId && appList.value.some(a => a.manifest.id === info.defaultAppId)) { void openApp(info.defaultAppId) }
   await nextTick(updateTabFade)
 })
@@ -258,12 +270,14 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onGlobalKeydown)
   offRestartRequired?.()
+  offForceRequired?.()
 })
 </script>
 
 <template>
   <div class="shell h-screen w-screen overflow-hidden bg-background">
-    <div class="shell-window relative flex h-full w-full flex-col rounded-window bg-glass shadow-window backdrop-blur-xl backdrop-saturate-150">
+    <ForceGate v-if="forceRequiredVersion !== null" class="h-full w-full" />
+    <div v-else class="shell-window relative flex h-full w-full flex-col rounded-window bg-glass shadow-window backdrop-blur-xl backdrop-saturate-150">
       <header
         v-if="chrome === 'platform'"
         class="flex h-11 items-center gap-2 border-b border-border px-3"

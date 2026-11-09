@@ -84,6 +84,8 @@ export const desktop = {
       defaultAppId?: string
       chrome: 'platform' | 'solo'
       mode: 'desktop' | 'kiosk'
+      /** 强制更新门禁快照（清单 minVersion 与当前版本比对的结果） */
+      forceUpdate?: { blocked: boolean, requiredVersion?: string }
       capabilities: {
         platform: string
         availableDomains: string[]
@@ -95,6 +97,8 @@ export const desktop = {
     appearance: () => bootAppearance,
     /** 重启壳：先 relaunch 再 quit，before-quit 钩子会执行暂存的整包安装 */
     relaunch: () => ipcRenderer.invoke('shell:relaunch') as Promise<void>,
+    /** 立即巡检并应用更新（门禁页主动更新入口），结果经事件回传 */
+    updateNow: () => ipcRenderer.invoke('shell:update-now') as Promise<void>,
   },
 
   /** 设置（schema 驱动） */

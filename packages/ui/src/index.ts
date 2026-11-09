@@ -1,6 +1,7 @@
 export { registerEmbeddedApp, resolveEmbeddedRoute } from './apps/registry'
 export * from './components'
 export { default as CommandPalette } from './shell/CommandPalette.vue'
+export { default as ForceGate } from './shell/ForceGate.vue'
 export { default as SettingsDialog } from './shell/SettingsDialog.vue'
 export { default as ShellApp } from './shell/ShellApp.vue'
 export { applyAccent, applyTheme, bootstrapAppearance, currentTheme } from './styles/appearance'
