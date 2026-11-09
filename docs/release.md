@@ -19,7 +19,7 @@
 
 ## 逐端构建
 
-在**对应操作系统的机器**上执行（macOS 公证与 Windows NSIS 无法在 Linux 上等价完成）：
+Linux 双架构可在任意机器交叉产出；macOS 公证与 Windows NSIS 需要对应平台工具链（见下）在 Linux 上不等价：
 
 ```bash
 FLAVOR=cemetery pnpm build:win                       # win32 / x64
@@ -69,18 +69,25 @@ resources/devices/                     驱动资产
 
 ## 真机验证清单
 
-| 项 | Linux x64（沙箱） | Windows x64/arm64 | macOS x64/arm64 | Linux arm64（飞腾/鲲鹏） |
+| 项 | Linux x64（沙箱） | Linux arm64（沙箱交叉编译） | Windows x64/arm64 | macOS x64/arm64 |
 |---|---|---|---|---|
-| 干净 clone `pnpm verify` | 已通过 | 待真机 | 待真机 | 待真机 |
-| 打包产物生成 | 已通过（deb + AppImage） | 待真机 | 待真机 | 待真机 |
-| 引导层加载 core asar 并启动 | 已通过（实包） | 待真机 | 待真机 | 待真机 |
+| 干净 clone `pnpm verify` | 已通过（19 阶段） | 同一份源码，逻辑层不随架构分叉 | 待真机 | 待真机 |
+| 打包产物生成 | 已通过（deb + AppImage） | 已通过（deb + AppImage，x86 交叉产出） | 待真机 | 待真机 |
+| deb 包名 / 依赖元数据 | 已通过（实装 `dpkg -i` 成功） | 已通过（`Package: cemetery`，`Architecture: arm64`） | — | — |
+| 引导层加载 core asar 并启动 | 已通过（安装目录实包，`launcher.log` 为证） | 同一引导代码路径 | 待真机 | 待真机 |
+| 整包安装与退出交接 | 已通过（`graceful-exit.json` 落盘） | 同一引导代码路径 | 待真机 | 待真机 |
 | 厂商 DLL / 驱动调用 | 不在沙箱范围 | 待真机 | 待真机 | 待真机 |
 | 原生浮层遮挡与焦点 | 逻辑 e2e 已覆盖 | 待真机 | 待真机 | 待真机 |
-| 整包安装与退出交接 | 未验证 | 待真机 | 待真机 | 待真机 |
-| 热更指针切换 + 60s 判活回滚 | e2e 已覆盖 | 待真机 | 待真机 | 待真机 |
-| 签名 / 公证 / GPG | 未启用 | 发布前补齐 | 发布前补齐 | 发布前补齐 |
+| 热更指针切换 + 60s 判活回滚 | e2e 已覆盖 | e2e 已覆盖 | 待真机 | 待真机 |
+| 签名 / 公证 / GPG | 未启用 | 未启用 | 发布前补齐 | 发布前补齐 |
 
-沙箱结论只覆盖 Linux x64 打包与启动链路、以及全部纯逻辑 e2e；其余一律记为真机待验，不冒充已完成。
+沙箱已实证的部分：
+
+- `BUILD_MATRIX` 非法组合机器验证：`sunos/x64`、`linux/riscv64` 抛错拦截，`win32/arm64` 合法放行。
+- Linux arm64 为交叉编译产物（`--arm64` 标志），运行时行为（真机启动、驱动）仍待真机，不冒充。
+- 已修复并在实装中发现的缺陷：deb/rpm `Package` 字段曾用中文产品名，Debian 要求以字母数字开头导致 `dpkg -i` 拒装，已改用 `flavor.id`；另发现 `electron-builder --linux deb` 显式指定 target 会丢弃配置 arch 数组，交叉打包必须同时传 `--arm64`。
+
+仍需真机/证书的部分（不冒充）：Windows/macOS 系统级启动冒烟、厂商 DLL、浮层视觉遮挡、签名/公证/GPG。
 
 ## 明确不做
 

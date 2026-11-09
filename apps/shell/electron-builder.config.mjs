@@ -41,7 +41,7 @@ await ensureDriverAssets()
 // 干净的 Linux 环境都能完成打包，国产化 rpm 产物在装有 rpmbuild 的机器上产出
 const linuxTargets = process.env.TARGET_RPM === '1' ? ['deb', 'AppImage', 'rpm'] : ['deb', 'AppImage']
 
-export default {
+const config = {
   appId: `cn.shellplatform.${flavor.id}`,
   productName: flavor.name,
   // 不显式指定会落到 package.json 的 name(@app/shell)，产物变成 "@appshell"
@@ -91,3 +91,10 @@ export default {
     category: 'Utility',
   },
 }
+
+// deb/rpm 的包名字段要求以字母数字开头：产品名（中文）只进桌面元数据，
+// 包身份用 flavor.id，多 flavor 同机安装互不冲突（顶层键，schema 在 linux 之外）
+config.deb = { packageName: flavor.id }
+config.rpm = { packageName: flavor.id }
+
+export default config
