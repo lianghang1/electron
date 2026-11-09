@@ -37,7 +37,7 @@ export async function ensureDriverAssets(root = REPO_ROOT) {
   process.stdout.write(`[driver-assets] staged ${files} files → resources/devices/\n`)
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   ensureDriverAssets().catch((err) => {
     process.stderr.write(`[driver-assets] ${String(err)}\n`)
     process.exitCode = 1

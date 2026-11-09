@@ -90,6 +90,7 @@ function main() {
   results.push(['typecheck', run('typecheck', 'pnpm', ['typecheck'])])
   results.push(['test', run('test', 'pnpm', ['test'], { show: true })])
   results.push(['e2e', run('e2e:update', 'pnpm', ['test:e2e:update'], { show: true })])
+  results.push(['e2e:capture-dialog', run('e2e:capture-dialog', 'pnpm', ['test:e2e:capture-dialog'], { show: true })])
   results.push(['e2e:overlay', run('e2e:overlay', 'pnpm', ['test:e2e:overlay'], { show: true })])
   results.push(['e2e:permission', run('e2e:permission', 'pnpm', ['test:e2e:permission'], { show: true })])
   results.push(['e2e:resilience', run('e2e:resilience', 'pnpm', ['test:e2e:resilience'], { show: true })])

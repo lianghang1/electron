@@ -52,20 +52,34 @@ function step(name, fn) {
 
 process.stdout.write('\n浮层宿主 e2e\n\n')
 
-step('默认策略表覆盖四类，差异全是数据', () => {
-  assert.equal(DEFAULT_OVERLAY_POLICIES.length, 4)
-  assert.deepEqual(DEFAULT_OVERLAY_POLICIES.map(p => p.kind), ['capture', 'permission', 'app-center', 'settings'])
+step('默认策略表覆盖十类，差异全是数据', () => {
+  assert.equal(DEFAULT_OVERLAY_POLICIES.length, 10)
+  assert.deepEqual(DEFAULT_OVERLAY_POLICIES.map(p => p.kind), [
+    'panel',
+    'dialog',
+    'menu',
+    'capture',
+    'permission',
+    'config',
+    'app-center',
+    'settings',
+    'command-palette',
+    'update-prompt',
+  ])
   for (const policy of DEFAULT_OVERLAY_POLICIES) {
     host.register(policy)
     assert.ok(policy.route.includes(`kind=${policy.kind}`))
-    assert.ok(policy.width > 0 && policy.height > 0)
+    assert.ok(policy.singleton && typeof policy.width === 'number' && typeof policy.height === 'number')
+    assert.ok(policy.bounds === 'fullscreen' || policy.bounds === 'anchored')
+    assert.equal(typeof policy.focus, 'boolean')
+    assert.equal(typeof policy.mouseIgnore, 'boolean')
   }
 })
 
 step('开窗按策略创建，策略与参数透传给工厂', () => {
   const win = host.open('permission', { requestId: 'r1' })
   assert.equal(win.policy.kind, 'permission')
-  assert.equal(win.policy.width, 480)
+  assert.equal(win.policy.bounds, 'fullscreen')
   assert.deepEqual(win.params, { requestId: 'r1' })
 })
 
@@ -95,7 +109,7 @@ step('按种类收场：dismiss 后取窗为空，其他种类不受影响', () 
 })
 
 step('新增浮层只改策略表：注册自定义种类即可开窗，非单例每次新窗', () => {
-  host.register({ kind: 'audit', width: 320, height: 240, route: '#/overlay?kind=audit', singleton: false })
+  host.register({ kind: 'audit', width: 320, height: 240, route: '#/overlay?kind=audit', singleton: false, bounds: 'fullscreen', focus: true, mouseIgnore: false })
   const a = host.open('audit')
   const b = host.open('audit')
   assert.notEqual(a, b)
