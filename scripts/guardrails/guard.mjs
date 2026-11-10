@@ -10,8 +10,14 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const BASELINE = join(ROOT, '.guardrails-baseline.json')
+const GLOSSARY = join(ROOT, 'packages/devices/src/contracts/glossary.json')
 const SCAN_EXT = new Set(['.ts', '.tsx', '.vue', '.mjs'])
 const SKIP_DIR = new Set(['node_modules', 'dist', 'out', 'release', 'resources', '.git', 'guardrails'])
+
+// 命名护栏词表来自术语表（唯一事实源），guard 与 TS 侧读同一份 JSON。
+const G = JSON.parse(readFileSync(GLOSSARY, 'utf8'))
+const FILENAME_TERMS = new Set(G.forbiddenFilenameTerms)
+const STRUCTURE_TERMS = new Set(G.forbiddenStructureTerms)
 
 // 依赖层：数字越大越靠外。底层禁止 import 高层；渲染层（ui）只允许 bridge + shared。
 const LAYER = {
@@ -145,6 +151,74 @@ function scanPackages() {
   return v
 }
 
+// 设备骨架护栏：规则只作用于 packages/devices/src/domains，全部机器可精确判定。
+// 存量违规由 baseline 冻结（即 P2 施工清单）；六域搬迁消除后重新收紧到零。
+const DEVICE_DOMAINS = ['print', 'capture', 'idcard', 'iccard', 'scanner', 'signature']
+const REQUIRED_DOMAIN_FILES = ['domain.ts', 'methods.ts', 'index.ts', 'channels/registry.ts']
+const DUAL_TRACK_RE = /@deprecated|别名导出|待迁移|TODO 迁移/
+
+/** 文件名按分隔符拆词，命中零信息量词即报（如 domain-kit / channel-types）。 */
+function bannedFilenameHit(filename) {
+  const stem = filename.replace(/\.(ts|tsx|vue|mjs)$/, '')
+  return stem.split(/[-_.]/).find(w => FILENAME_TERMS.has(w.toLowerCase()))
+}
+
+/** 导出结构名里出现被禁同义结构词（setting/adapter/override）。 */
+function bannedStructureHit(line) {
+  const m = line.match(/export\s+(?:interface|type|class|enum|const)\s+([A-Za-z][A-Za-z0-9]*)/)
+  if (!m) { return undefined }
+  const words = m[1].replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().split(/[\s_]+/)
+  return words.find(w => STRUCTURE_TERMS.has(w))
+}
+
+function scanDeviceRules() {
+  const v = []
+  const domainsRoot = join(ROOT, 'packages/devices/src/domains')
+  // 目录形状：每个能力域必须具备定稿四文件
+  for (const domain of DEVICE_DOMAINS) {
+    for (const file of REQUIRED_DOMAIN_FILES) {
+      const target = join(domainsRoot, domain, file)
+      if (!existsSync(target)) {
+        push(v, 'device/structure', target, 0, `缺少 ${domain}/${file}`)
+      }
+    }
+  }
+  // 逐文件逐行：平台分支 / 自建机制 / 双轨 / 命名禁用词
+  for (const f of walk(domainsRoot)) {
+    const r = rel(f)
+    if (r.endsWith('.test.ts')) { continue }
+    const isPlatformData = r.includes('/domains/platform/')
+    const fileHit = bannedFilenameHit(f.split('/').pop() ?? '')
+    if (fileHit) { push(v, 'device/banned-filename', f, 0, `文件名含禁用词：${fileHit}`) }
+    const lines = readFileSync(f, 'utf8').split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      if (!isPlatformData && /process\.platform|process\.env\.OS/.test(line)) {
+        push(v, 'device/platform-branch', f, i + 1, line)
+      }
+      if (/class\s+\w*Error\w*\s+(?:extends|implements)\s+Error|extends Error/.test(line)) {
+        push(v, 'device/duplicate-error', f, i + 1, line)
+      }
+      if (/with-timeout|withTimeout/.test(line)) {
+        push(v, 'device/duplicate-timeout', f, i + 1, line)
+      }
+      if (/overridesStore\(/.test(line)) {
+        push(v, 'device/duplicate-store', f, i + 1, line)
+      }
+      if (DUAL_TRACK_RE.test(line)) {
+        push(v, 'device/dual-track', f, i + 1, line)
+      }
+      const structHit = bannedStructureHit(line)
+      if (structHit) { push(v, 'device/banned-structure-name', f, i + 1, `结构名含禁用词：${structHit} :: ${line.trim().slice(0, 80)}`) }
+    }
+  }
+  return v
+}
+
+function allViolations() {
+  return [...scanSource(), ...scanPackages(), ...scanDeviceRules()]
+}
+
 function changedFiles() {
   try {
     const base = execFileSync('git', ['merge-base', 'HEAD', 'master'], { cwd: ROOT, encoding: 'utf8' }).trim()
@@ -166,7 +240,7 @@ function loadBaseline() {
 function cmdCheck() {
   const changed = process.argv.includes('--changed') ? changedFiles() : null
   const baseline = loadBaseline()
-  const all = [...scanSource(), ...scanPackages()]
+  const all = allViolations()
   const scoped = changed ? all.filter(v => changed.has(v.file)) : all
   const fresh = scoped.filter(v => !baseline.has(v.fp))
   const seen = new Set(all.map(v => v.fp))
@@ -183,7 +257,7 @@ function cmdCheck() {
 }
 
 function cmdBaseline() {
-  const all = [...scanSource(), ...scanPackages()]
+  const all = allViolations()
   const fps = [...new Set(all.map(v => v.fp))].sort()
   writeFileSync(BASELINE, `${JSON.stringify({ version: 1, generatedBy: 'pnpm guard:baseline', fingerprints: fps }, null, 2)}\n`)
   console.log(`[guard] 基线已写入 ${fps.length} 条指纹 -> ${rel(BASELINE)}`)
@@ -209,11 +283,23 @@ function cmdDead() {
 
 // 全量违规明细：机器可消费，用于存量清账；只报告、不判定成败
 function cmdList() {
-  const all = [...scanSource(), ...scanPackages()]
+  const all = allViolations()
   for (const v of all) {
     console.log(`${v.rule.padEnd(28)} ${v.file}:${v.line}  ${v.text.slice(0, 140)}`)
   }
   console.log(`\n[guard:list] 共 ${all.length} 条`)
+}
+
+// 设备骨架专项清单：只报告、不判定成败，供 P2 搬迁逐项销账。
+function cmdDevices() {
+  const all = scanDeviceRules()
+  const byRule = new Map()
+  for (const v of all) {
+    byRule.set(v.rule, (byRule.get(v.rule) ?? 0) + 1)
+  }
+  console.log(`[guard:devices] 设备骨架违规 ${all.length} 条：`)
+  for (const [rule, n] of [...byRule].sort()) { console.log(`  ${rule.padEnd(30)} ${n}`) }
+  for (const v of all) { console.log(`  ${v.rule.padEnd(30)} ${v.file}:${v.line}`) }
 }
 
 const cmd = process.argv[2] || 'check'
@@ -229,4 +315,7 @@ else if (cmd === 'dead') {
 else if (cmd === 'list') {
   cmdList()
 }
-else { console.error(`用法: guard.mjs check [--changed] | baseline | dead | list`); process.exit(2) }
+else if (cmd === 'devices') {
+  cmdDevices()
+}
+else { console.error(`用法: guard.mjs check [--changed] | baseline | dead | list | devices`); process.exit(2) }

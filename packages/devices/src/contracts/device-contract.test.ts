@@ -10,10 +10,18 @@ import {
   CAPABILITIES,
   collectMethodSchemas,
   CONTRACT_PHASE,
+  FIELD_RENAME_MAP,
   RENAME_MAP,
 } from './device-contract'
+import { FORBIDDEN_BARE_PARAMS, FORBIDDEN_METHOD_VERBS } from './glossary'
 
 const schemas = collectMethodSchemas()
+
+/** 驼峰首词（动词）与整名分段，用于动宾结构与禁用词校验。 */
+function wordsOf(name: string): string[] {
+  const action = name.split('.')[1] ?? name
+  return action.replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[\s_]+/).filter(Boolean)
+}
 
 describe('设备对外能力契约基线', () => {
   it('恰好 38 项能力，id 唯一、方法名唯一', () => {
@@ -34,6 +42,31 @@ describe('设备对外能力契约基线', () => {
     const actual = [...schemas.keys()].sort()
     const expected = CAPABILITIES.map(c => activeName(c)).sort()
     expect(actual).toEqual(expected)
+  })
+
+  describe('定稿名命名规范（2.5：动宾结构、看得懂、禁用词）', () => {
+    it('38 个定稿方法名均为动宾结构（至少动词 + 宾语两段）', () => {
+      for (const c of CAPABILITIES) {
+        expect(wordsOf(c.targetName).length, `${c.targetName} 不是动宾结构`).toBeGreaterThanOrEqual(2)
+      }
+    })
+
+    it('定稿方法名不以空动词开头，且不含被禁结构同义词', () => {
+      for (const c of CAPABILITIES) {
+        const words = wordsOf(c.targetName)
+        expect(FORBIDDEN_METHOD_VERBS, `${c.targetName} 用了空动词`).not.toContain(words[0])
+        for (const w of words) {
+          expect(FORBIDDEN_BARE_PARAMS, `${c.targetName} 含裸通用词 ${w}`).not.toContain(w)
+        }
+      }
+    })
+
+    it('参数定稿名不使用裸通用词、缩写或单字母', () => {
+      for (const [legacy, target] of Object.entries(FIELD_RENAME_MAP)) {
+        expect(FORBIDDEN_BARE_PARAMS, `字段 ${legacy}→${target} 是裸通用词`).not.toContain(target)
+        expect(target.length, `字段 ${legacy}→${target} 是单字母`).toBeGreaterThan(1)
+      }
+    })
   })
 
   for (const c of CAPABILITIES) {

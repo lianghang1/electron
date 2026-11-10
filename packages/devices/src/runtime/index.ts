@@ -1,0 +1,10 @@
+export * from './channel'
+export * from './config-store'
+export * from './device-state'
+/** 设备运行时：共用机制的单一入口。能力域只依赖本模块，不再各自实现横切逻辑。 */
+export * from './errors'
+export * from './invocation'
+export * from './platform-profiles'
+export * from './registry'
+export * from './session'
+export * from './telemetry'

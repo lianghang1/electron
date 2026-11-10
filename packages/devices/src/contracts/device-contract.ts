@@ -52,7 +52,7 @@ export const CAPABILITIES: readonly CapabilityContract[] = [
   { id: 'capture:setConfig', legacyName: 'capture.setConfig', targetName: 'capture.setConfig', accepted: [{ id: 'd1', overrides: { displayName: 'cam' } }], rejected: [{ id: '', overrides: {} }] },
   { id: 'capture:getDefaultDevice', legacyName: 'capture.getDefaultDevice', targetName: 'capture.getDefaultDevice', accepted: [NO_INPUT] },
   { id: 'capture:setDefaultDevice', legacyName: 'capture.setDefaultDevice', targetName: 'capture.setDefaultDevice', accepted: [{ id: 'd1' }, { id: null }], rejected: [{ id: 3 }] },
-  { id: 'capture:resolveDefaultDevice', legacyName: 'capture.resolveDefaultDevice', targetName: 'capture.resolveDefaultDevice', accepted: [NO_INPUT] },
+  { id: 'capture:resolveDefaultDevice', legacyName: 'capture.resolveDefaultDevice', targetName: 'capture.findDefaultDevice', accepted: [NO_INPUT] },
   { id: 'capture:captureImage', legacyName: 'capture.capture', targetName: 'capture.captureImage', accepted: [{}, { deviceId: 'd1', format: 'jpg', resolutionNum: 300 }], rejected: [{ format: 'gif' }] },
   { id: 'capture:saveCapturedImage', legacyName: 'capture.saveDataUrl', targetName: 'capture.saveCapturedImage', accepted: [{ dataUrl: 'data:image/png;base64,AA', ext: 'png' }], rejected: [{ dataUrl: '' }] },
   { id: 'capture:startPreview', legacyName: 'capture.startPreview', targetName: 'capture.startPreview', accepted: [{}, { deviceId: 'd1' }] },

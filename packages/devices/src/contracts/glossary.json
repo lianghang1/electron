@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "canonicalTerms": {
+    "device": "设备：一台可被探测、打开、执行动作、关闭的物理或仿真实体",
+    "capability": "能力：设备对外提供的一类动作集合（print/capture/...），稳定 API 面",
+    "channel": "实现：一家厂商 + 一种接入方式，可插拔替换（DLL/WS/IPP/仿真）",
+    "platform": "平台：win32/darwin/linux/国产化等运行环境，数据表声明",
+    "state": "状态：设备当前可用性（unavailable/ready/busy/degraded）+ 原因码",
+    "config": "配置：出厂默认值 defaults + 现场覆盖 overrides，经 config-store 读写",
+    "session": "会话：应用 × 设备的一次占用，带租约与超时回收",
+    "invocation": "调用：一次 <能力,方法,入参> 的执行，经统一管线"
+  },
+  "forbiddenStructureTerms": ["setting", "adapter", "override"],
+  "forbiddenFilenameTerms": ["kit", "util", "helper", "manager", "common", "types", "normalizer", "normalizers", "unified", "base", "misc"],
+  "forbiddenMethodVerbs": ["resolve", "handle", "process", "do", "run", "manage", "execute"],
+  "forbiddenBareParams": ["data", "info", "context", "options", "payload"]
+}

@@ -10,21 +10,28 @@ export const driverDeployments = ['bundled', 'system', 'manual'] as const
 
 export interface PlatformCapability {
   platform: Platform
-  /** 此平台可用的硬件域（如 ['print']）；不在清单内的域 UI 直接灰置 */
+  /** 此平台开放的能力 id 清单（如 ['print']）；不在清单内的能力 UI 直接灰置 */
   availableDomains: readonly string[]
   driverDeployment: (typeof driverDeployments)[number]
-  /** 平台级备注（如 loongarch 仅支持纯 web 接入形态） */
+  /** 是否有原生库对接面（Windows DLL / mac dylib / linux so） */
+  nativeSupported: boolean
+  /** 是否支持 winspool 打印机能力探测（纸型/硬件默认值，仅 Windows） */
+  winspoolSupported: boolean
+  /** 平台级备注（说明未开放能力的原因，供诊断台展示） */
   notes?: string
 }
 
-/** 各平台能力表（唯一事实源：新增信创平台 = 加一行，零业务代码改动） */
+/**
+ * 各平台能力表（唯一事实源：新增信创平台 = 加一行，零业务代码改动）。
+ * 底座三维求交、UI 灰置、诊断台原因码都从这一份数据推导，不另立事实源。
+ */
 export const PLATFORM_CAPABILITIES: Record<Platform, PlatformCapability> = {
-  'win32': { platform: 'win32', availableDomains: ['idcard', 'print', 'iccard', 'scanner', 'capture', 'signature'], driverDeployment: 'bundled' },
-  'darwin': { platform: 'darwin', availableDomains: ['print'], driverDeployment: 'system' },
-  'linux': { platform: 'linux', availableDomains: ['print'], driverDeployment: 'system' },
-  'linux-cn': { platform: 'linux-cn', availableDomains: ['print'], driverDeployment: 'manual' },
-  'linux-arm64': { platform: 'linux-arm64', availableDomains: ['print'], driverDeployment: 'manual' },
-  'loongarch64': { platform: 'loongarch64', availableDomains: [], driverDeployment: 'manual', notes: '无官方 electron 产物时仅支持 remote 形态接入' },
+  'win32': { platform: 'win32', availableDomains: ['print', 'capture', 'idcard', 'iccard', 'scanner', 'signature'], driverDeployment: 'bundled', nativeSupported: true, winspoolSupported: true },
+  'darwin': { platform: 'darwin', availableDomains: ['print'], driverDeployment: 'system', nativeSupported: false, winspoolSupported: false, notes: '厂商未提供 macOS 原生 SDK，非打印能力不可用' },
+  'linux': { platform: 'linux', availableDomains: ['print'], driverDeployment: 'system', nativeSupported: false, winspoolSupported: false, notes: '厂商未提供 Linux 原生 SDK，非打印能力不可用' },
+  'linux-cn': { platform: 'linux-cn', availableDomains: ['print'], driverDeployment: 'manual', nativeSupported: false, winspoolSupported: false, notes: '统信 UOS / 银河麒麟：厂商驱动需现场部署' },
+  'linux-arm64': { platform: 'linux-arm64', availableDomains: ['print'], driverDeployment: 'manual', nativeSupported: false, winspoolSupported: false, notes: 'ARM 架构信创平台：厂商驱动需现场部署' },
+  'loongarch64': { platform: 'loongarch64', availableDomains: [], driverDeployment: 'manual', nativeSupported: false, winspoolSupported: false, notes: '龙芯架构：无官方 Electron 产物，仅支持 remote 形态接入' },
 }
 
 /**
