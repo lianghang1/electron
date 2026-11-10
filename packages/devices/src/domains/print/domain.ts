@@ -1,50 +1,9 @@
 import type { DomainDefinition } from '@shell/shared'
 import type { PrintSystem } from './index'
 import { defineDomain } from '@shell/shared'
-import { z } from 'zod'
-import { jobIdInput, listJobsInput, noInput, printSubmitInput } from '../input-schemas'
+import { createPrintMethods } from './methods'
 
 /** print 域：统一打印（任务簿 + 归档 + 重打）。 */
 export function createPrintDomain(print: PrintSystem): DomainDefinition {
-  return defineDomain('print', {
-    submitPrintJob: {
-      input: printSubmitInput,
-      output: z.unknown(),
-      // 对外契约 printContent/printOptions → PrintRequest payload/options：边界一次转换
-      handler: ({ printContent, printOptions }) => print.submit({
-        payload: printContent,
-        options: printOptions,
-      }),
-    },
-    listDevices: {
-      input: noInput,
-      output: z.unknown(),
-      handler: () => print.listPrinters(),
-    },
-    getJobStatus: {
-      input: jobIdInput,
-      output: z.unknown(),
-      handler: ({ printJobId }) => print.status(printJobId),
-    },
-    listPrintJobs: {
-      input: listJobsInput,
-      output: z.unknown(),
-      handler: input => print.listJobs(input?.maxCount),
-    },
-    removePrintJob: {
-      input: jobIdInput,
-      output: z.boolean(),
-      handler: ({ printJobId }) => print.removeJob(printJobId),
-    },
-    clearPrintJobs: {
-      input: noInput,
-      output: z.number(),
-      handler: () => print.clearJobs(),
-    },
-    reprintJob: {
-      input: jobIdInput,
-      output: z.unknown(),
-      handler: ({ printJobId }) => print.reprint(printJobId),
-    },
-  })
+  return defineDomain('print', createPrintMethods(print))
 }
