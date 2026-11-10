@@ -16,28 +16,28 @@ export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
     readSector: {
       input: iccardReadInput,
       output: z.unknown(),
-      handler: async (input) => {
-        const deviceId = input.deviceId
+      handler: async ({ deviceId: requested, sectorKey, keyType, sectorNumber }) => {
+        const deviceId = requested
           ?? await pickReady(await iccard.listReaders(), 'IC 卡读写器')
-        return iccard.readIc({ ...input, deviceId })
+        return iccard.readIc({ deviceId, key: sectorKey, keyType, sector: sectorNumber })
       },
     },
     writeSector: {
       input: iccardWriteInput,
       output: z.unknown(),
-      handler: async (input) => {
-        const deviceId = input.deviceId
+      handler: async ({ deviceId: requested, blockNumber, blockData, sectorKey, keyType }) => {
+        const deviceId = requested
           ?? await pickReady(await iccard.listReaders(), 'IC 卡读写器')
-        return iccard.writeIc({ ...input, deviceId })
+        return iccard.writeIc({ deviceId, block: blockNumber, data: blockData, key: sectorKey, keyType })
       },
     },
     writeTextBlocks: {
       input: iccardWriteTextsInput,
       output: z.unknown(),
-      handler: async (input) => {
-        const deviceId = input.deviceId
+      handler: async ({ deviceId: requested, sectorNumber, textBlocks, sectorKey, keyType }) => {
+        const deviceId = requested
           ?? await pickReady(await iccard.listReaders(), 'IC 卡读写器')
-        return iccard.writeIcTexts({ ...input, deviceId })
+        return iccard.writeIcTexts({ deviceId, sector: sectorNumber, texts: textBlocks, key: sectorKey, keyType })
       },
     },
     getConfig: {
@@ -48,7 +48,7 @@ export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
     setConfig: {
       input: iccardConfigInput,
       output: z.unknown(),
-      handler: ({ id, overrides }) => iccard.setConfig(id, overrides),
+      handler: ({ deviceProfileId, overrides }) => iccard.setConfig(deviceProfileId, overrides),
     },
   })
 }

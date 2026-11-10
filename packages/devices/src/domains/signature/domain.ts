@@ -42,7 +42,7 @@ export function createSignatureDomain(signature: SignatureSystem, deps: DomainDe
     setConfig: {
       input: signatureConfigInput,
       output: z.unknown(),
-      handler: ({ id, overrides }) => signature.setConfig(id, overrides),
+      handler: ({ deviceProfileId, overrides }) => signature.setConfig(deviceProfileId, overrides),
     },
   })
 }

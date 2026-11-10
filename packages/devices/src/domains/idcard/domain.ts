@@ -30,7 +30,7 @@ export function createIdcardDomain(idcard: IdCardSystem): DomainDefinition {
     setConfig: {
       input: idcardConfigInput,
       output: z.unknown(),
-      handler: ({ id, overrides }) => idcard.setConfig(id, overrides),
+      handler: ({ deviceProfileId, overrides }) => idcard.setConfig(deviceProfileId, overrides),
     },
   })
 }

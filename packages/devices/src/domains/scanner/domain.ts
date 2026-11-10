@@ -17,15 +17,20 @@ export function createScannerDomain(scanner: ScannerSystem, deps: DomainDeps): D
     setConfig: {
       input: scannerConfigInput,
       output: z.unknown(),
-      handler: input => scanner.setConfig(input),
+      handler: ({ enabled, activeProfileId, deviceId, overrides }) => scanner.setConfig({
+        enabled,
+        activeId: activeProfileId,
+        deviceId,
+        overrides,
+      }),
     },
     simulateScan: {
       // 诊断工具不进生产 API 面（与旧域通道同策略）
       input: simulateInput,
       output: z.unknown(),
-      handler: ({ code }) => {
+      handler: ({ scannedCode }) => {
         if (!deps.diagnostics) { throw new DomainRouteError('INVALID_INPUT', 'scanner.simulateScan 仅限验机形态') }
-        return scanner.simulate(code)
+        return scanner.simulate(scannedCode)
       },
     },
   })

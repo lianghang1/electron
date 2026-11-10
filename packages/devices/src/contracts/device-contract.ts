@@ -38,23 +38,23 @@ const NO_INPUT = undefined
  */
 export const CAPABILITIES: readonly CapabilityContract[] = [
   // print
-  { id: 'print:submit', legacyName: 'print.submit', targetName: 'print.submitPrintJob', accepted: [{ payload: { kind: 'html', html: '<p>a</p>' }, options: { paper: 'A4' } }], rejected: [{ payload: { kind: 'file', path: 'a\u0000b' }, options: { paper: 'A4' } }, { payload: { kind: 'html', html: '' }, options: { paper: 'A4' } }] },
+  { id: 'print:submit', legacyName: 'print.submit', targetName: 'print.submitPrintJob', accepted: [{ printContent: { kind: 'html', html: '<p>a</p>' }, printOptions: { paper: 'A4' } }], rejected: [{ printContent: { kind: 'file', path: 'a\u0000b' }, printOptions: { paper: 'A4' } }, { printContent: { kind: 'html', html: '' }, printOptions: { paper: 'A4' } }] },
   { id: 'print:listDevices', legacyName: 'print.listPrinters', targetName: 'print.listDevices', accepted: [NO_INPUT] },
-  { id: 'print:getJobStatus', legacyName: 'print.status', targetName: 'print.getJobStatus', accepted: [{ jobId: 'j1' }], rejected: [{ jobId: '' }] },
-  { id: 'print:listJobs', legacyName: 'print.listJobs', targetName: 'print.listPrintJobs', accepted: [NO_INPUT, { limit: 5 }], rejected: [{ limit: 0 }] },
-  { id: 'print:removeJob', legacyName: 'print.removeJob', targetName: 'print.removePrintJob', accepted: [{ jobId: 'j1' }], rejected: [{ jobId: '' }] },
+  { id: 'print:getJobStatus', legacyName: 'print.status', targetName: 'print.getJobStatus', accepted: [{ printJobId: 'j1' }], rejected: [{ printJobId: '' }] },
+  { id: 'print:listJobs', legacyName: 'print.listJobs', targetName: 'print.listPrintJobs', accepted: [NO_INPUT, { maxCount: 5 }], rejected: [{ maxCount: 0 }] },
+  { id: 'print:removeJob', legacyName: 'print.removeJob', targetName: 'print.removePrintJob', accepted: [{ printJobId: 'j1' }], rejected: [{ printJobId: '' }] },
   { id: 'print:clearJobs', legacyName: 'print.clearJobs', targetName: 'print.clearPrintJobs', accepted: [NO_INPUT] },
-  { id: 'print:reprintJob', legacyName: 'print.reprint', targetName: 'print.reprintJob', accepted: [{ jobId: 'j1' }], rejected: [{ jobId: '' }] },
+  { id: 'print:reprintJob', legacyName: 'print.reprint', targetName: 'print.reprintJob', accepted: [{ printJobId: 'j1' }], rejected: [{ printJobId: '' }] },
 
   // capture
   { id: 'capture:listDevices', legacyName: 'capture.listDevices', targetName: 'capture.listDevices', accepted: [NO_INPUT] },
   { id: 'capture:listConfigs', legacyName: 'capture.getConfigs', targetName: 'capture.listDeviceConfigs', accepted: [NO_INPUT] },
-  { id: 'capture:setConfig', legacyName: 'capture.setConfig', targetName: 'capture.setConfig', accepted: [{ id: 'd1', overrides: { displayName: 'cam' } }], rejected: [{ id: '', overrides: {} }] },
+  { id: 'capture:setConfig', legacyName: 'capture.setConfig', targetName: 'capture.setConfig', accepted: [{ deviceProfileId: 'd1', overrides: { displayName: 'cam' } }], rejected: [{ deviceProfileId: '', overrides: {} }] },
   { id: 'capture:getDefaultDevice', legacyName: 'capture.getDefaultDevice', targetName: 'capture.getDefaultDevice', accepted: [NO_INPUT] },
-  { id: 'capture:setDefaultDevice', legacyName: 'capture.setDefaultDevice', targetName: 'capture.setDefaultDevice', accepted: [{ id: 'd1' }, { id: null }], rejected: [{ id: 3 }] },
+  { id: 'capture:setDefaultDevice', legacyName: 'capture.setDefaultDevice', targetName: 'capture.setDefaultDevice', accepted: [{ deviceId: 'd1' }, { deviceId: null }], rejected: [{ deviceId: 3 }] },
   { id: 'capture:resolveDefaultDevice', legacyName: 'capture.resolveDefaultDevice', targetName: 'capture.findDefaultDevice', accepted: [NO_INPUT] },
-  { id: 'capture:captureImage', legacyName: 'capture.capture', targetName: 'capture.captureImage', accepted: [{}, { deviceId: 'd1', format: 'jpg', resolutionNum: 300 }], rejected: [{ format: 'gif' }] },
-  { id: 'capture:saveCapturedImage', legacyName: 'capture.saveDataUrl', targetName: 'capture.saveCapturedImage', accepted: [{ dataUrl: 'data:image/png;base64,AA', ext: 'png' }], rejected: [{ dataUrl: '' }] },
+  { id: 'capture:captureImage', legacyName: 'capture.capture', targetName: 'capture.captureImage', accepted: [{}, { deviceId: 'd1', imageFormat: 'jpg', resolutionIndex: 300 }], rejected: [{ imageFormat: 'gif' }] },
+  { id: 'capture:saveCapturedImage', legacyName: 'capture.saveDataUrl', targetName: 'capture.saveCapturedImage', accepted: [{ imageDataUrl: 'blockData:image/png;base64,AA', imageExtension: 'png' }], rejected: [{ imageDataUrl: '' }] },
   { id: 'capture:startPreview', legacyName: 'capture.startPreview', targetName: 'capture.startPreview', accepted: [{}, { deviceId: 'd1' }] },
   { id: 'capture:stopPreview', legacyName: 'capture.stopPreview', targetName: 'capture.stopPreview', accepted: [{ deviceId: 'd1' }], rejected: [{ deviceId: '' }] },
   { id: 'capture:listDeviceCameras', legacyName: 'capture.listCameras', targetName: 'capture.listDeviceCameras', accepted: [{}, { deviceId: 'd1' }] },
@@ -63,20 +63,20 @@ export const CAPABILITIES: readonly CapabilityContract[] = [
   { id: 'idcard:listDevices', legacyName: 'idcard.listReaders', targetName: 'idcard.listDevices', accepted: [NO_INPUT] },
   { id: 'idcard:readCard', legacyName: 'idcard.read', targetName: 'idcard.readCard', accepted: [{}, { deviceId: 'r1' }] },
   { id: 'idcard:getConfig', legacyName: 'idcard.getConfig', targetName: 'idcard.getConfig', accepted: [NO_INPUT] },
-  { id: 'idcard:setConfig', legacyName: 'idcard.setConfig', targetName: 'idcard.setConfig', accepted: [{ id: 'r1', overrides: { displayName: 'reader' } }], rejected: [{ id: '', overrides: {} }] },
+  { id: 'idcard:setConfig', legacyName: 'idcard.setConfig', targetName: 'idcard.setConfig', accepted: [{ deviceProfileId: 'r1', overrides: { displayName: 'reader' } }], rejected: [{ deviceProfileId: '', overrides: {} }] },
 
   // iccard
   { id: 'iccard:listDevices', legacyName: 'iccard.listReaders', targetName: 'iccard.listDevices', accepted: [NO_INPUT] },
-  { id: 'iccard:readSector', legacyName: 'iccard.readIc', targetName: 'iccard.readSector', accepted: [{ sector: 1 }, { deviceId: 'r1', sector: 15, key: 'ffffffffffff', keyType: 'A' }], rejected: [{ sector: 16 }, { key: 'zzzzzzzzzzzz' }] },
-  { id: 'iccard:writeSector', legacyName: 'iccard.writeIc', targetName: 'iccard.writeSector', accepted: [{ block: 4, data: '0'.repeat(32) }], rejected: [{ block: 64, data: '0'.repeat(32) }, { block: 4, data: 'abc' }] },
-  { id: 'iccard:writeTextBlocks', legacyName: 'iccard.writeIcTexts', targetName: 'iccard.writeTextBlocks', accepted: [{ sector: 1, texts: ['hello'] }], rejected: [{ sector: 16, texts: ['x'] }, { sector: 1, texts: [] }] },
+  { id: 'iccard:readSector', legacyName: 'iccard.readIc', targetName: 'iccard.readSector', accepted: [{ sectorNumber: 1 }, { deviceId: 'r1', sectorNumber: 15, sectorKey: 'ffffffffffff', keyType: 'A' }], rejected: [{ sectorNumber: 16 }, { sectorKey: 'zzzzzzzzzzzz' }] },
+  { id: 'iccard:writeSector', legacyName: 'iccard.writeIc', targetName: 'iccard.writeSector', accepted: [{ blockNumber: 4, blockData: '0'.repeat(32) }], rejected: [{ blockNumber: 64, blockData: '0'.repeat(32) }, { blockNumber: 4, blockData: 'abc' }] },
+  { id: 'iccard:writeTextBlocks', legacyName: 'iccard.writeIcTexts', targetName: 'iccard.writeTextBlocks', accepted: [{ sectorNumber: 1, textBlocks: ['hello'] }], rejected: [{ sectorNumber: 16, textBlocks: ['x'] }, { sectorNumber: 1, textBlocks: [] }] },
   { id: 'iccard:getConfig', legacyName: 'iccard.getConfig', targetName: 'iccard.getConfig', accepted: [NO_INPUT] },
-  { id: 'iccard:setConfig', legacyName: 'iccard.setConfig', targetName: 'iccard.setConfig', accepted: [{ id: 'r1', overrides: {} }], rejected: [{ id: '', overrides: {} }] },
+  { id: 'iccard:setConfig', legacyName: 'iccard.setConfig', targetName: 'iccard.setConfig', accepted: [{ deviceProfileId: 'r1', overrides: {} }], rejected: [{ deviceProfileId: '', overrides: {} }] },
 
   // scanner
   { id: 'scanner:getConfig', legacyName: 'scanner.getConfig', targetName: 'scanner.getConfig', accepted: [NO_INPUT] },
-  { id: 'scanner:setConfig', legacyName: 'scanner.setConfig', targetName: 'scanner.setConfig', accepted: [{ enabled: true, activeId: 'a1', deviceId: 'd1', overrides: { minLength: 4 } }], rejected: [{ enabled: 'yes', activeId: 'a1', deviceId: 'd1', overrides: {} }] },
-  { id: 'scanner:simulateScan', legacyName: 'scanner.simulate', targetName: 'scanner.simulateScan', accepted: [{ code: 'EAN-1' }], rejected: [{ code: '' }] },
+  { id: 'scanner:setConfig', legacyName: 'scanner.setConfig', targetName: 'scanner.setConfig', accepted: [{ enabled: true, activeProfileId: 'a1', deviceId: 'd1', overrides: { minLength: 4 } }], rejected: [{ enabled: 'yes', activeProfileId: 'a1', deviceId: 'd1', overrides: {} }] },
+  { id: 'scanner:simulateScan', legacyName: 'scanner.simulate', targetName: 'scanner.simulateScan', accepted: [{ scannedCode: 'EAN-1' }], rejected: [{ scannedCode: '' }] },
 
   // signature
   { id: 'signature:listDevices', legacyName: 'signature.listDevices', targetName: 'signature.listDevices', accepted: [NO_INPUT] },
@@ -85,7 +85,7 @@ export const CAPABILITIES: readonly CapabilityContract[] = [
   { id: 'signature:clearSignature', legacyName: 'signature.clear', targetName: 'signature.clearSignature', accepted: [NO_INPUT] },
   { id: 'signature:cancelSigning', legacyName: 'signature.cancel', targetName: 'signature.cancelSigning', accepted: [NO_INPUT] },
   { id: 'signature:getConfig', legacyName: 'signature.getConfig', targetName: 'signature.getConfig', accepted: [NO_INPUT] },
-  { id: 'signature:setConfig', legacyName: 'signature.setConfig', targetName: 'signature.setConfig', accepted: [{ id: 's1', overrides: {} }], rejected: [{ id: '', overrides: {} }] },
+  { id: 'signature:setConfig', legacyName: 'signature.setConfig', targetName: 'signature.setConfig', accepted: [{ deviceProfileId: 's1', overrides: {} }], rejected: [{ deviceProfileId: '', overrides: {} }] },
 ]
 
 export function activeName(c: CapabilityContract, phase: ContractPhase = CONTRACT_PHASE): string {
@@ -96,36 +96,29 @@ export const RENAME_MAP: Readonly<Record<string, string>> = Object.fromEntries(
   CAPABILITIES.map(c => [c.legacyName, c.targetName]),
 )
 
-/** 参数改名表：schema 字段名 → 定稿字段名。P2 执行全量切换。 */
+/**
+ * 参数改名表：schema 字段名 → 定稿字段名（P2-b 已全量切换）。
+ * 同一个 `id` 在不同方法语义不同：setConfig 的 id 是配置档案 id（→ deviceProfileId），
+ * setDefaultDevice 的 id 是设备 id（→ deviceId），由各方法 schema 分别定名，不能用扁平表一刀切。
+ * overrides 内部的配置档案字段属厂商协议薄层，沿用其既有命名，不在此表。
+ */
 export const FIELD_RENAME_MAP: Readonly<Record<string, string>> = {
-  'payload': 'printContent',
-  'options': 'printOptions',
-  'resolutionNum': 'resolution',
-  'key': 'sectorKey',
-  'block': 'blockNumber',
-  'data': 'blockData',
-  'camId': 'cameraId',
-  'wake.command': 'wakeCommand',
-  'endKey': 'terminatorKey',
-  'requirePrefix': 'prefixRequired',
-  'activeId': 'activeProfileId',
-  'dataUrl': 'imageDataUrl',
-  'ext': 'imageExtension',
-  'code': 'scannedCode',
-  'texts': 'textBlocks',
-  'path': 'filePath',
-  'html': 'htmlContent',
-  'url': 'sourceUrl',
-  'paper': 'paperName',
-  'format': 'imageFormat',
-  'limit': 'maxCount',
-  'jobId': 'printJobId',
-  'sector': 'sectorNumber',
-  'deviceId': 'deviceId',
-  'overrides': 'overrides',
-  'id': 'deviceId',
-  'displayName': 'displayName',
-  'enabled': 'enabled',
+  payload: 'printContent',
+  options: 'printOptions',
+  jobId: 'printJobId',
+  limit: 'maxCount',
+  format: 'imageFormat',
+  resolutionNum: 'resolutionIndex',
+  dataUrl: 'imageDataUrl',
+  ext: 'imageExtension',
+  key: 'sectorKey',
+  sector: 'sectorNumber',
+  block: 'blockNumber',
+  data: 'blockData',
+  texts: 'textBlocks',
+  code: 'scannedCode',
+  activeId: 'activeProfileId',
+  id: 'deviceProfileId',
 }
 
 /** 用无害桩构造六个域定义：只需要方法表与 schema，不触发任何设备调用。 */

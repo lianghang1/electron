@@ -114,12 +114,12 @@ await step('$input 的 json 字段作为整个入参对象，非字符串键正�
   assert.deepEqual(input, { a: 1 })
   const mixed = buildDiagnosticInput(
     [
-      { key: 'sector', label: '扇区', kind: 'number', default: 1 },
-      { key: 'texts', label: '文本', kind: 'json', default: '["a"]' },
+      { key: 'sectorNumber', label: '扇区', kind: 'number', default: 1 },
+      { key: 'textBlocks', label: '文本', kind: 'json', default: '["a"]' },
     ],
-    { sector: 3, texts: '["a","b"]' },
+    { sectorNumber: 3, textBlocks: '["a","b"]' },
   )
-  assert.deepEqual(mixed, { sector: 3, texts: ['a', 'b'] })
+  assert.deepEqual(mixed, { sectorNumber: 3, textBlocks: ['a', 'b'] })
 })
 
 await step('无字段方法返回 undefined（与 noInput schema 一致）', () => {

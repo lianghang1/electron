@@ -10,7 +10,11 @@ export function createPrintDomain(print: PrintSystem): DomainDefinition {
     submitPrintJob: {
       input: printSubmitInput,
       output: z.unknown(),
-      handler: input => print.submit(input),
+      // 对外契约 printContent/printOptions → PrintRequest payload/options：边界一次转换
+      handler: ({ printContent, printOptions }) => print.submit({
+        payload: printContent,
+        options: printOptions,
+      }),
     },
     listDevices: {
       input: noInput,
@@ -20,17 +24,17 @@ export function createPrintDomain(print: PrintSystem): DomainDefinition {
     getJobStatus: {
       input: jobIdInput,
       output: z.unknown(),
-      handler: ({ jobId }) => print.status(jobId),
+      handler: ({ printJobId }) => print.status(printJobId),
     },
     listPrintJobs: {
       input: listJobsInput,
       output: z.unknown(),
-      handler: input => print.listJobs(input?.limit),
+      handler: input => print.listJobs(input?.maxCount),
     },
     removePrintJob: {
       input: jobIdInput,
       output: z.boolean(),
-      handler: ({ jobId }) => print.removeJob(jobId),
+      handler: ({ printJobId }) => print.removeJob(printJobId),
     },
     clearPrintJobs: {
       input: noInput,
@@ -40,7 +44,7 @@ export function createPrintDomain(print: PrintSystem): DomainDefinition {
     reprintJob: {
       input: jobIdInput,
       output: z.unknown(),
-      handler: ({ jobId }) => print.reprint(jobId),
+      handler: ({ printJobId }) => print.reprint(printJobId),
     },
   })
 }

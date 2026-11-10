@@ -30,7 +30,7 @@ export function createCaptureDomain(capture: CaptureSystem, deps: DomainDeps): D
     setConfig: {
       input: captureConfigInput,
       output: z.unknown(),
-      handler: ({ id, overrides }) => capture.setConfig(id, overrides),
+      handler: ({ deviceProfileId, overrides }) => capture.setConfig(deviceProfileId, overrides),
     },
     getDefaultDevice: {
       input: noInput,
@@ -40,7 +40,7 @@ export function createCaptureDomain(capture: CaptureSystem, deps: DomainDeps): D
     setDefaultDevice: {
       input: nullableIdInput,
       output: z.unknown(),
-      handler: ({ id }) => capture.setDefaultDevice(id),
+      handler: ({ deviceId }) => capture.setDefaultDevice(deviceId),
     },
     findDefaultDevice: {
       input: noInput,
@@ -50,12 +50,16 @@ export function createCaptureDomain(capture: CaptureSystem, deps: DomainDeps): D
     captureImage: {
       input: captureRequestInput,
       output: z.unknown(),
-      handler: input => capture.capture(input),
+      handler: ({ deviceId, imageFormat, resolutionIndex }) => capture.capture({
+        deviceId,
+        format: imageFormat,
+        resolutionNum: resolutionIndex,
+      }),
     },
     saveCapturedImage: {
       input: dataUrlInput,
       output: z.unknown(),
-      handler: ({ dataUrl, ext }) => capture.saveDataUrl(dataUrl, ext),
+      handler: ({ imageDataUrl, imageExtension }) => capture.saveDataUrl(imageDataUrl, imageExtension),
     },
     startPreview: {
       input: optionalDeviceInput,
