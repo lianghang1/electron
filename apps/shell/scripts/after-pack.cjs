@@ -15,7 +15,10 @@ const process = require('node:process')
  *   resources/node_modules/koffi            原生依赖，随整包落地，热更包禁止携带
  */
 exports.default = async function afterPack(context) {
-  const resourcesDir = path.join(context.appOutDir, 'resources')
+  // Linux/Windows：resources 在 appOutDir 顶层；macOS：藏在 <App>.app/Contents/Resources
+  const resourcesDir = context.electronPlatformName === 'darwin'
+    ? path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`, 'Contents', 'Resources')
+    : path.join(context.appOutDir, 'resources')
   const asarPath = path.join(resourcesDir, 'app.asar')
   const corePath = path.join(resourcesDir, 'app.core.asar')
   const launcherSource = path.join(__dirname, '..', 'electron', 'launcher')
