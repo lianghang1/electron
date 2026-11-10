@@ -5,8 +5,10 @@
     <title>壳平台</title>
     <style>
       html, body, #app { margin: 0; width: 100%; height: 100%; }
-      /* 内联启动层：纯 CSS，不依赖任何 JS——白屏物理消失。
-         --dt-accent 由 preload 从 flavor.branding.accent 同步注入（零闪烁）。 */
+      /* 内联启动层：纯 CSS + 少量内联 JS，白屏物理消失。
+         --dt-accent 由 preload 从 flavor.branding.accent 同步注入（零闪烁）。
+         logo 形状 / 动画 / 撤层时序逐字对齐 ZCode（packages/desktop/src/renderer/index.html）。
+         ★ 更换 logo：只改 <body> 里 .startup-logo 内的 SVG（或 <img>）与壳底色即可，其余不用动。 */
       #splash {
         position: fixed; inset: 0; z-index: 2147483647;
         display: flex; align-items: center; justify-content: center;
@@ -14,23 +16,89 @@
         transition: opacity 0.16s ease;
       }
       body.ready #splash { pointer-events: none; opacity: 0; }
-      .splash-logo {
-        width: 88px; height: 88px; border-radius: 24px;
-        background: linear-gradient(135deg, var(--dt-accent), color-mix(in srgb, var(--dt-accent) 45%, #fff));
-        box-shadow: 0 20px 40px color-mix(in srgb, var(--dt-accent) 28%, transparent);
+      .startup-logo-shell {
+        position: relative; display: flex;
+        width: 96px; height: 96px;
+        align-items: center; justify-content: center;
+        border-radius: 24px;
+        background: linear-gradient(180deg, #000000 0%, #151718 100%);
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.2);
+        transform: scale(0.72); opacity: 0;
         animation: splash-pop 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        opacity: 0; transform: scale(0.72);
+        transform-origin: center;
       }
+      .startup-logo-shell::before {
+        position: absolute; inset: 0; pointer-events: none; content: "";
+        /* 修复原因（沿 ZCode）：启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重 */
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: inherit;
+      }
+      .startup-logo { width: 56px; height: auto; color: #ffffff; }
       @keyframes splash-pop {
         0% { opacity: 0; transform: scale(0.72); }
-        60% { opacity: 1; transform: scale(1.04); }
+        38% { opacity: 1; transform: scale(1.045); }
+        58% { transform: scale(0.985); }
+        76% { transform: scale(1.008); }
         100% { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .startup-logo-shell { opacity: 1; transform: scale(1); animation: none; }
       }
     </style>
   </head>
   <body>
-    <div id="splash"><div class="splash-logo"></div></div>
+    <div id="splash">
+      <div class="startup-logo-shell">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="118"
+          height="100"
+          fill="none"
+          viewBox="0 0 256 218"
+          class="startup-logo"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M134.4 0.130152L116.48 25.6022C113.665 29.5699 109.054 32.0019 104.064 32.0019H6.3999V0C6.3999 0.130149 134.4 0.130152 134.4 0.130152Z"
+          />
+          <path fill="currentColor" d="M256 0.130127L102.401 217.732H0L153.599 0.130127H256Z" />
+          <path
+            fill="currentColor"
+            d="M121.601 217.732L139.65 192.134C142.465 188.166 147.076 185.734 152.067 185.734H249.604V217.736H121.601V217.732Z"
+          />
+        </svg>
+      </div>
+    </div>
     <div id="app"></div>
+    <script>
+      // 启动层双门闩（对齐 ZCode）：logo 动画播完（或 1s 兜底）且应用挂载完成，两个条件都满足才淡出。
+      // 有意不做「挂载超时兜底撤层」：应用挂载失败时宁可停在 logo（运维能看出异常），
+      // 也不露出无提示的破碎白屏——与 ZCode 的 3s 兜底是刻意分歧。
+      const splash = document.getElementById('splash')
+      const shell = document.querySelector('.startup-logo-shell')
+      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      let finished = false
+      let animationDone = false
+      let appReady = false
+      const tryFinish = () => {
+        if (finished || !animationDone || !appReady || !splash) { return }
+        finished = true
+        document.body.classList.add('ready')
+        window.setTimeout(() => splash.remove(), 500)
+      }
+      const markAnimationDone = () => { animationDone = true; tryFinish() }
+      const markAppReady = () => { appReady = true; tryFinish() }
+      // 应用侧（apps/shell/src/main.ts）在 Vue 挂载 + 首帧 rAF 后派发
+      window.addEventListener('shell-app-ready', markAppReady, { once: true })
+      if (reduceMotion || !shell) {
+        markAnimationDone()
+      }
+      else {
+        shell.addEventListener('animationend', markAnimationDone, { once: true })
+        window.setTimeout(markAnimationDone, 1000)
+      }
+    </script>
     <script type="module" src="/main.ts"></script>
   </body>
 </html>

@@ -101,10 +101,11 @@ else if (isOverlayMode()) {
   createApp(OverlayApp).mount('#app')
 }
 else {
-  // Vue 挂载完成即撤启动层（内联 splash 见 index.html），并回传 T4 首帧打点
+  // Vue 挂载完成后只派发 shell-app-ready（撤层双门闩见 index.html 内联脚本：
+  // 等 logo 动画播完且应用就绪才淡出），并回传 T4 首帧打点
   createApp(ShellApp).mount('#app')
   requestAnimationFrame(() => {
-    document.body.classList.add('ready')
     window.desktop?.markFirstPaint()
+    window.dispatchEvent(new Event('shell-app-ready'))
   })
 }
