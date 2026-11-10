@@ -76,7 +76,7 @@ export type CaptureErrorCode
 
 /** 采集成功结果（失败以 IpcRemoteError 抛出，code 见 CaptureErrorCode） */
 export interface CaptureResult {
-  /** 采集产出的图片文件绝对路径（可直接喂给 print.submit image 负载） */
+  /** 采集产出的图片文件绝对路径（可直接喂给 print.submitPrintJob image 负载） */
   imagePath: string
   /** 缩略图 dataURL（UI 预览用，免 file:// 权限问题） */
   thumbDataUrl?: string

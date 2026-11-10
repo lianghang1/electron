@@ -120,12 +120,12 @@ const probes: Probe[] = [
   {
     id: 'invalid-input',
     label: '非法入参',
-    description: 'print.submit 传空对象，预期 zod 校验拒绝',
+    description: 'print.submitPrintJob 传空对象，预期 zod 校验拒绝',
     icon: ShieldAlert,
     expectReject: true,
     run: async () => {
       try {
-        await desktop().invoke('print.submit', {})
+        await desktop().invoke('print.submitPrintJob', {})
         return { ok: false, detail: '意外成功：非法入参不应放行' }
       }
       catch (err) {

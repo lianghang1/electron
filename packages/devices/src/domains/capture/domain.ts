@@ -22,7 +22,7 @@ export function createCaptureDomain(capture: CaptureSystem, deps: DomainDeps): D
       output: z.unknown(),
       handler: () => capture.listDevices(),
     },
-    getConfigs: {
+    listDeviceConfigs: {
       input: noInput,
       output: z.unknown(),
       handler: () => capture.getConfigs(),
@@ -42,17 +42,17 @@ export function createCaptureDomain(capture: CaptureSystem, deps: DomainDeps): D
       output: z.unknown(),
       handler: ({ id }) => capture.setDefaultDevice(id),
     },
-    resolveDefaultDevice: {
+    findDefaultDevice: {
       input: noInput,
       output: z.unknown(),
       handler: () => capture.resolveDefaultDevice(),
     },
-    capture: {
+    captureImage: {
       input: captureRequestInput,
       output: z.unknown(),
       handler: input => capture.capture(input),
     },
-    saveDataUrl: {
+    saveCapturedImage: {
       input: dataUrlInput,
       output: z.unknown(),
       handler: ({ dataUrl, ext }) => capture.saveDataUrl(dataUrl, ext),
@@ -73,7 +73,7 @@ export function createCaptureDomain(capture: CaptureSystem, deps: DomainDeps): D
       output: z.unknown(),
       handler: ({ deviceId }) => capture.stopPreview(deviceId),
     },
-    listCameras: {
+    listDeviceCameras: {
       input: optionalDeviceInput,
       output: z.unknown(),
       handler: async ({ deviceId }) => {

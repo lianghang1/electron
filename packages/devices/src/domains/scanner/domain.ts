@@ -19,12 +19,12 @@ export function createScannerDomain(scanner: ScannerSystem, deps: DomainDeps): D
       output: z.unknown(),
       handler: input => scanner.setConfig(input),
     },
-    simulate: {
+    simulateScan: {
       // 诊断工具不进生产 API 面（与旧域通道同策略）
       input: simulateInput,
       output: z.unknown(),
       handler: ({ code }) => {
-        if (!deps.diagnostics) { throw new DomainRouteError('INVALID_INPUT', 'scanner.simulate 仅限验机形态') }
+        if (!deps.diagnostics) { throw new DomainRouteError('INVALID_INPUT', 'scanner.simulateScan 仅限验机形态') }
         return scanner.simulate(code)
       },
     },

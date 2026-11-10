@@ -16,7 +16,7 @@ import { createScannerDomain } from '../domains/scanner/domain'
 import { createSignatureDomain } from '../domains/signature/domain'
 
 /** legacy = 现状对外名；target = 定稿名。切换只改这一处常量。 */
-export const CONTRACT_PHASE = 'legacy' as const
+export const CONTRACT_PHASE = 'target' as const
 export type ContractPhase = 'legacy' | 'target'
 
 export interface CapabilityContract {

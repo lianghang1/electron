@@ -94,6 +94,6 @@ export function assertContractAtPhase(phase: 'legacy' | 'target', c: CapabilityC
   for (const input of c.rejected ?? []) { expect(schema.safeParse(input).success).toBe(false) }
 }
 
-it('契约阶段常量在 P0 为 legacy', () => {
-  expect(CONTRACT_PHASE).toBe('legacy')
+it('契约阶段常量在 P2 已切到 target', () => {
+  expect(CONTRACT_PHASE).toBe('target')
 })

@@ -44,7 +44,7 @@ function injectBootAppearance(): void {
 injectBootAppearance()
 
 export const desktop = {
-  /** 通用域方法调用端：invoke('idcard.read', input) */
+  /** 通用域方法调用端：invoke('idcard.readCard', input) */
   invoke: (method: string, input: unknown) => ipcRenderer.invoke('domain-call', method, input),
 
   /** 平台事件订阅（事件名与载荷契约见 @shell/shared events） */

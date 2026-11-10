@@ -13,23 +13,23 @@ export function createSignatureDomain(signature: SignatureSystem, deps: DomainDe
       output: z.unknown(),
       handler: () => signature.listDevices(),
     },
-    start: {
+    startSigning: {
       input: optionalDeviceInput.optional(),
       output: z.unknown(),
       handler: input => signature.start(input, point =>
         deps.events.emit('signature.stroke', { point })),
     },
-    stop: {
+    stopSigning: {
       input: noInput,
       output: z.unknown(),
       handler: () => signature.stop(),
     },
-    clear: {
+    clearSignature: {
       input: noInput,
       output: z.unknown(),
       handler: () => signature.clear(),
     },
-    cancel: {
+    cancelSigning: {
       input: noInput,
       output: z.unknown(),
       handler: () => signature.cancel(),

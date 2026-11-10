@@ -91,7 +91,7 @@ await step('每个方法的默认入参都通过真实 zod schema', () => {
 
 await step('危险操作已标注，只读操作无 dangerous 标记', () => {
   const dangerous = DIAGNOSTIC_CATALOG.flatMap(d => d.methods.filter(m => m.dangerous).map(m => `${d.name}.${m.name}`))
-  assert.deepEqual(dangerous.sort(), ['iccard.writeIc', 'iccard.writeIcTexts', 'print.clearJobs', 'print.removeJob'])
+  assert.deepEqual(dangerous.sort(), ['iccard.writeSector', 'iccard.writeTextBlocks', 'print.clearPrintJobs', 'print.removePrintJob'])
   for (const domain of DIAGNOSTIC_CATALOG) {
     for (const method of domain.methods) {
       if (method.readOnly) { assert.equal(method.dangerous, undefined, `${domain.name}.${method.name} 只读却标了危险`) }

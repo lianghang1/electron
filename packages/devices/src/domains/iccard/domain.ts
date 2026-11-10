@@ -8,12 +8,12 @@ import { iccardConfigInput, iccardReadInput, iccardWriteInput, iccardWriteTextsI
 /** iccard 域：M1 IC 卡读写。 */
 export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
   return defineDomain('iccard', {
-    listReaders: {
+    listDevices: {
       input: noInput,
       output: z.unknown(),
       handler: () => iccard.listReaders(),
     },
-    readIc: {
+    readSector: {
       input: iccardReadInput,
       output: z.unknown(),
       handler: async (input) => {
@@ -22,7 +22,7 @@ export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
         return iccard.readIc({ ...input, deviceId })
       },
     },
-    writeIc: {
+    writeSector: {
       input: iccardWriteInput,
       output: z.unknown(),
       handler: async (input) => {
@@ -31,7 +31,7 @@ export function createIccardDomain(iccard: IcCardSystem): DomainDefinition {
         return iccard.writeIc({ ...input, deviceId })
       },
     },
-    writeIcTexts: {
+    writeTextBlocks: {
       input: iccardWriteTextsInput,
       output: z.unknown(),
       handler: async (input) => {
