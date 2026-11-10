@@ -27,6 +27,9 @@
 ```bash
 pnpm install
 pnpm dev                 # 默认 cemetery 形态
+pnpm dev:platform        # 平台日常态演示（业务登记/档案查询/设备台账）
+pnpm dev:solo            # 单应用客户端形态
+pnpm dev:kiosk           # 自助终端（kiosk）形态
 pnpm dev:diagnostics     # 验机形态（硬件自检台）
 pnpm verify              # 干净目录里的完整验证
 ```
@@ -37,12 +40,12 @@ pnpm verify              # 干净目录里的完整验证
 
 | 命令 | 用途 |
 |---|---|
-| `pnpm dev` / `pnpm dev:diagnostics` | 开发启动（源码直引，零前置构建） |
+| `pnpm dev` / `pnpm dev:<形态>` | 开发启动（源码直引，零前置构建）；形态可选 cemetery / platform / solo / kiosk / diagnostics |
 | `pnpm guard` | 注释词表、类型逃逸、依赖边界、幽灵依赖零容忍检查 |
 | `pnpm check:design` | 把 DESIGN.md 的界面禁令变成退出码 |
 | `pnpm lint` / `pnpm typecheck` / `pnpm test` | 静态检查与单测 |
 | `pnpm test:e2e:*` | 纯 Node 机器证据（更新 / 浮层 / 权限 / 韧性 / 门禁 / 应用源 / 会话 / 调用方 / 验机 / 拍摄会话） |
-| `pnpm build:win` / `pnpm build:mac` / `pnpm build:linux` | 逐端打包，见 [release.md](./docs/release.md) |
+| `pnpm build:win` / `pnpm build:mac` / `pnpm build:linux` | 逐端打包，见 [release.md](./docs/release.md)；换形态打包加环境变量，如 `FLAVOR=platform-demo pnpm build:linux` |
 | `pnpm verify` | 干净 clone 可复现验证 |
 
 ## 关键约定
