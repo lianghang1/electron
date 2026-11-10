@@ -1,6 +1,17 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { createRequire } from 'node:module'
 import { compareVersions, logLine, MARKS, readMark, removeMark, writeMark } from './marks.mjs'
+
+/**
+ * Electron 把 *.asar 路径挂进虚拟文件系统并呈现为「目录」，
+ * 引导层删除热更 asar 文件（回滚/坏包清理）必须走 original-fs，
+ * 否则 rmSync 报 EISDIR，坏包与陈旧热更包永远残留。
+ * 纯 Node 环境（e2e）没有 original-fs，回退 node:fs。
+ */
+let realFs = fs
+try { realFs = createRequire(import.meta.url)('original-fs') }
+catch { /* node test env */ }
 
 /** 新版本替换后存活满该时长视为稳定；判定只看进程内定时器，对系统时钟回拨免疫 */
 export const STABLE_MS = 60_000
@@ -21,7 +32,7 @@ export function settleOrRollback(dir, log = message => logLine(dir, message)) {
   }
   const current = readMark(dir, MARKS.current)
   try {
-    if (current?.file) { fs.rmSync(path.join(dir, current.file), { force: true }) }
+    if (current?.file) { realFs.rmSync(path.join(dir, current.file), { force: true }) }
     removeMark(dir, MARKS.current)
     removeMark(dir, MARKS.firstRun)
     log(`hot core rollback applied (startedAt=${firstRun.startedAt})`)
@@ -68,7 +79,7 @@ export function planCandidates(dir, builtinRoot, builtinVersion, log = message =
   let current = readMark(dir, MARKS.current)
   if (current?.version && compareVersions(builtinVersion, current.version) > 0) {
     try {
-      if (current.file) { fs.rmSync(path.join(dir, current.file), { force: true }) }
+      if (current.file) { realFs.rmSync(path.join(dir, current.file), { force: true }) }
       removeMark(dir, MARKS.current)
       removeMark(dir, MARKS.firstRun)
       log(`stale hot core ${current.version} < builtin ${builtinVersion}, cleaned`)
@@ -115,7 +126,7 @@ export async function bootSequence({ dir, builtinRoot, builtinVersion, loadCore,
       log(`failed to load ${candidate.label} core: ${error}`)
       if (candidate.label === 'hot') {
         try {
-          fs.rmSync(candidate.root, { force: true })
+          realFs.rmSync(candidate.root, { force: true })
           removeMark(dir, MARKS.current)
           removeMark(dir, MARKS.firstRun)
           log('broken hot core removed, falling back to builtin')
