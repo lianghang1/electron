@@ -53,7 +53,7 @@ pnpm verify              # 干净目录里的完整验证
 - **组合根**：跨系统对象只在 `apps/shell/electron/main/index.ts` 创建，其余模块只经构造函数接收依赖。
 - **源码直引**：`packages/*` 的 `exports` 指向 `src/*.ts`，electron-vite 用 `externalizeDeps: false` 内联进 bundle；asar 内无 `node_modules`。
 - **浮层统一宿主**：WebContentsView 是原生合成层，会盖住壳内 DOM 浮层。弹窗、通知、菜单、命令面板、设置、拍摄会话、更新提示一律走原生浮层窗。
-- **更新双模型**：热更参考 `master` 的薄壳 + core asar + 指针 + 判活回滚；整包参考 ZCode 的多目标矩阵。详见 [update-server.md](./docs/update-server.md)。
+- **更新双模型**：热更走薄壳 + core asar + 指针 + 判活回滚；整包走六端多目标矩阵（`update/<platform>/<arch>/`）。详见 [update-server.md](./docs/update-server.md)。
 - **护栏**：`pnpm guard` 对全仓零容忍，`.guardrails-baseline.json` 为空指纹集；新增规则需先做反向验证。
 - **无 CI**：验证收敛到本地 `pnpm verify`，逐端发布在对应平台机器上人工执行。
 

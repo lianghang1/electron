@@ -5,15 +5,8 @@
     <title>壳平台</title>
     <style>
       html, body, #app { margin: 0; width: 100%; height: 100%; }
-      /* 内联启动层：纯 CSS + 少量内联 JS，白屏物理消失。
-         --dt-accent 由 preload 从 flavor.branding.accent 同步注入（零闪烁）。
-         品牌 logo：单色硬边几何「上开口」方块——45° 斜缝从顶边切入，到中线停，
-         手法对齐 ZCode（斜切基因 / 负空间 / 无渐变），形状为壳平台自有品牌。
-         透明遮罩逐字对齐 ZCode（packages/desktop/src/renderer/index.html）：
-         #splash 无背景色——动画全程透出桌面/系统材质（mac vibrancy / win acrylic /
-         linux 透明窗，见 packages/window/src/presets.ts），logo 悬浮其上；
-         #app 由 opacity 0 淡入，撤层时与遮罩淡出交叉，不存在整屏底色切换。
-         ★ 更换 logo：只改 <body> 里 .startup-logo 内的 SVG（或 <img>）与壳底色即可，其余不用动。 */
+      /* 启动层：遮罩无底色，动画期透出窗口材质；#app 淡入与遮罩淡出交叉。
+         --dt-accent 由 preload 同步注入（零闪烁）。换 logo 只改下面 .startup-logo 内的 SVG。 */
       #app { opacity: 0; transition: opacity 0.16s ease; }
       body.ready #app { opacity: 1; }
       #splash {
@@ -35,7 +28,7 @@
       }
       .startup-logo-shell::before {
         position: absolute; inset: 0; pointer-events: none; content: "";
-        /* 修复原因（沿 ZCode）：启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重 */
+        /* 启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重 */
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: inherit;
       }
@@ -71,9 +64,9 @@
     </div>
     <div id="app"></div>
     <script>
-      // 启动层双门闩（对齐 ZCode）：logo 动画播完（或 1s 兜底）且应用挂载完成，两个条件都满足才淡出。
+      // 启动层双门闩：logo 动画播完（或 1s 兜底）且应用挂载完成，两个条件都满足才淡出。
       // 有意不做「挂载超时兜底撤层」：应用挂载失败时宁可停在 logo（运维能看出异常），
-      // 也不露出无提示的破碎白屏——与 ZCode 的 3s 兜底是刻意分歧。
+      // 也不露出无提示的破碎白屏。
       const splash = document.getElementById('splash')
       const shell = document.querySelector('.startup-logo-shell')
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches

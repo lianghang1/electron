@@ -16,8 +16,7 @@ const flavorId = process.env.FLAVOR ?? 'cemetery'
 const flavor = JSON.parse(readFileSync(new URL(`../../apps/flavors/${flavorId}/flavor.json`, import.meta.url), 'utf-8'))
 
 /**
- * 构建目标矩阵（源码依据 ZCode docs/desktop/oss-cdn-multi-target-migration.md 的
- * update/<platform>/<arch> 契约）：win/mac/linux × x64/arm64 共 6 端，
+ * 构建目标矩阵（update/<platform>/<arch> 契约）：win/mac/linux × x64/arm64 共 6 端，
  * 飞腾/鲲鹏落 arm64，兆芯/海光落 x64。龙芯/申威无 Electron 官方二进制，不在矩阵内。
  * 不做 CI：逐端由 TARGET_OS / TARGET_ARCH 指定，在对应平台机器上构建并人工核对产物。
  */

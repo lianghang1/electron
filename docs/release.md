@@ -2,7 +2,7 @@
 
 ## 六端目标矩阵
 
-构建目标（BuildPlatform × arch）与硬件能力平台（Platform，含国产化细分）不是同一维度，勿混用。矩阵依据 ZCode `docs/desktop/oss-cdn-multi-target-migration.md` 的 `update/<platform>/<arch>` 契约。
+构建目标（BuildPlatform × arch）与硬件能力平台（Platform，含国产化细分）不是同一维度，勿混用。矩阵遵循 `update/<platform>/<arch>` 产物目录契约。
 
 | 构建目标 | 架构 | 对应设备 | 产物 |
 |---|---|---|---|
@@ -31,7 +31,7 @@ FLAVOR=cemetery TARGET_ARCH=arm64 pnpm build:linux  # linux / arm64
 FLAVOR=cemetery TARGET_RPM=1 pnpm build:linux       # 追加 rpm（需 rpmbuild）
 ```
 
-产物名 `<flavor>-<version>-<os>-<arch>.<ext>`，输出目录 `release/<flavor>/`。带平台与架构信息后，同一版本六端产物不会互相覆盖，也便于按 ZCode 契约组织 `update/<platform>/<arch>/` 目录。
+产物名 `<flavor>-<version>-<os>-<arch>.<ext>`，输出目录 `release/<flavor>/`。带平台与架构信息后，同一版本六端产物不会互相覆盖，也便于按 `update/<platform>/<arch>/` 契约组织目录。
 
 打包链路：`pnpm run build`（typecheck + electron-vite 构建）→ `electron-builder --config electron-builder.config.mjs`。CI 已删除，逐端产物由人工核对。
 
