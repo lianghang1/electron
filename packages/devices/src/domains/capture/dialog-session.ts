@@ -50,7 +50,7 @@ export class CaptureDialogSessionService {
       throw captureError('DEVICE_BUSY', '拍摄浮层已打开，请先完成或关闭当前拍摄')
     }
     // 显式预选优先；缺省按域默认设备自动定位（就绪才注入，否则浮层内自选兜底）
-    const preselect = req.deviceId?.trim() || await this.deps.capture.resolveDefaultDevice()
+    const preselect = req.deviceId?.trim() || await this.deps.capture.findDefaultDevice()
     // 解析默认设备存在异步窗口，落位前复检互斥（并发 open 只放行一个）
     if (this.session) {
       throw captureError('DEVICE_BUSY', '拍摄浮层已打开，请先完成或关闭当前拍摄')
@@ -130,13 +130,13 @@ export class CaptureDialogSessionService {
       throw captureError('VALIDATION_FAILED', '拍摄会话未开启')
     }
     if (opts?.dataUrl) {
-      const imagePath = await this.deps.capture.saveDataUrl(opts.dataUrl, session.format === 'png' ? 'png' : 'jpg')
+      const imagePath = await this.deps.capture.saveCapturedImage(opts.dataUrl, session.format === 'png' ? 'png' : 'jpg')
       return { imagePath, thumbDataUrl: opts.dataUrl, meta: opts.meta }
     }
     if (!session.deviceId) {
       throw captureError('VALIDATION_FAILED', '未选择采集设备')
     }
-    return this.deps.capture.capture({
+    return this.deps.capture.captureImage({
       deviceId: session.deviceId,
       resolutionNum: session.resolutionNum,
       format: session.format,

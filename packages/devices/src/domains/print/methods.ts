@@ -11,7 +11,7 @@ export function createPrintMethods(print: PrintSystem): DomainDefinition['method
       input: printSubmitInput,
       output: z.unknown(),
       // 对外契约 printContent/printOptions → PrintRequest payload/options：边界一次转换
-      handler: ({ printContent, printOptions }) => print.submit({
+      handler: ({ printContent, printOptions }) => print.submitPrintJob({
         payload: printContent,
         options: printOptions,
       }),
@@ -19,32 +19,32 @@ export function createPrintMethods(print: PrintSystem): DomainDefinition['method
     listDevices: {
       input: noInput,
       output: z.unknown(),
-      handler: () => print.listPrinters(),
+      handler: () => print.listDevices(),
     },
     getJobStatus: {
       input: jobIdInput,
       output: z.unknown(),
-      handler: ({ printJobId }) => print.status(printJobId),
+      handler: ({ printJobId }) => print.getJobStatus(printJobId),
     },
     listPrintJobs: {
       input: listJobsInput,
       output: z.unknown(),
-      handler: input => print.listJobs(input?.maxCount),
+      handler: input => print.listPrintJobs(input?.maxCount),
     },
     removePrintJob: {
       input: jobIdInput,
       output: z.boolean(),
-      handler: ({ printJobId }) => print.removeJob(printJobId),
+      handler: ({ printJobId }) => print.removePrintJob(printJobId),
     },
     clearPrintJobs: {
       input: noInput,
       output: z.number(),
-      handler: () => print.clearJobs(),
+      handler: () => print.clearPrintJobs(),
     },
     reprintJob: {
       input: jobIdInput,
       output: z.unknown(),
-      handler: ({ printJobId }) => print.reprint(printJobId),
+      handler: ({ printJobId }) => print.reprintJob(printJobId),
     },
   }
 }

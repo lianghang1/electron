@@ -13,9 +13,9 @@ export interface IdCardSystemOptions {
 }
 
 export interface IdCardSystem {
-  listReaders: () => Promise<IdReaderDevice[]>
+  listDevices: () => Promise<IdReaderDevice[]>
   /** 读身份证（寻卡认证读取全程锁定）；失败抛 IdCardError */
-  read: (req: { deviceId: string }) => Promise<IdCardData>
+  readCard: (req: { deviceId: string }) => Promise<IdCardData>
   /** 设备档案（ws/dll 双路线）管理：读全量 / 按档案 id 白名单覆盖（IPC 层 sanitize 后落盘） */
   getConfig: () => IdcardConfig
   setConfig: (id: string, overrides: IdcardDeviceOverrides) => IdcardConfig
@@ -26,8 +26,8 @@ export interface IdCardSystem {
 export function createIdCardSystem(options: IdCardSystemOptions): IdCardSystem {
   const service = new IdCardService(options.resourcesRoot, options.host, options.logger)
   return {
-    listReaders: () => service.listReaders(),
-    read: req => service.read(req),
+    listDevices: () => service.listDevices(),
+    readCard: req => service.readCard(req),
     getConfig: () => service.getConfig(),
     setConfig: (id, overrides) => service.setConfig(id, overrides),
     destroy: () => service.destroy(),

@@ -69,7 +69,7 @@ export class PrintService {
     this.spoolQueue = createTaskQueue(SPOOL_CONCURRENCY)
   }
 
-  async submit(req: PrintRequest): Promise<PrintResult> {
+  async submitPrintJob(req: PrintRequest): Promise<PrintResult> {
     const jobId = randomUUID()
     const jobName = req?.options?.jobName?.trim() || `${req?.payload?.kind ?? 'print'}-${Date.now()}`
     // 先登记任务簿：任何阶段失败（含通道路由/打印机解析/校验）都有任务可查，status 语义一致
@@ -131,7 +131,7 @@ export class PrintService {
   }
 
   /** 查询任务状态；任务不存在返回 null。顺带检出卡住任务并回读通道级状态。 */
-  async status(jobId: string): Promise<JobStatus | null> {
+  async getJobStatus(jobId: string): Promise<JobStatus | null> {
     this.jobs.detectStuck(STUCK_THRESHOLD_MS)
     const current = this.jobs.status(jobId)
     if (!current) { return null }
@@ -148,7 +148,7 @@ export class PrintService {
   }
 
   /** 最近任务列表（任务中心数据源），创建时间倒序 */
-  listJobs(limit = 50): JobStatus[] {
+  listPrintJobs(limit = 50): JobStatus[] {
     this.jobs.detectStuck(STUCK_THRESHOLD_MS)
     return this.jobs.list(limit)
   }
@@ -161,22 +161,22 @@ export class PrintService {
   }
 
   /** 删除单条任务记录（连带删除归档 PDF） */
-  async removeJob(jobId: string): Promise<boolean> {
+  async removePrintJob(jobId: string): Promise<boolean> {
     return this.jobs.remove(jobId)
   }
 
   /** 清空全部任务记录（连带删除归档 PDF），返回清除条数 */
-  async clearJobs(): Promise<number> {
+  async clearPrintJobs(): Promise<number> {
     return this.jobs.clear()
   }
 
   /** 统一打印机列表（系统 + 网络直连合并） */
-  listPrinters(): Promise<UnifiedPrinter[]> {
+  listDevices(): Promise<UnifiedPrinter[]> {
     return this.registry.list()
   }
 
   /** 重打：优先用 PDF 存档（版式完全一致，保持原通道）；文件负载任务原样重提交 */
-  async reprint(jobId: string): Promise<PrintResult> {
+  async reprintJob(jobId: string): Promise<PrintResult> {
     const rec = this.jobs.get(jobId)
     if (!rec) {
       throw printError('VALIDATION_FAILED', `任务不存在: ${jobId}`)
@@ -184,7 +184,7 @@ export class PrintService {
     const p = rec.request.payload
     const archived = rec.result?.archivedPdfPath
     if (p.kind === 'html' && archived && existsSync(archived)) {
-      return this.submit({
+      return this.submitPrintJob({
         payload: { kind: 'file', path: archived },
         options: {
           ...rec.request.options,
@@ -192,7 +192,7 @@ export class PrintService {
         },
       })
     }
-    return this.submit(rec.request)
+    return this.submitPrintJob(rec.request)
   }
 
   /** 确定性通道路由：显式 channel > preview > dryRun > auto；业务代码零平台/通道分支。 */

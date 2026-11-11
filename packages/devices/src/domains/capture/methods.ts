@@ -25,7 +25,7 @@ export function createCaptureMethods(capture: CaptureSystem, deps: DomainDeps): 
     listDeviceConfigs: {
       input: noInput,
       output: z.unknown(),
-      handler: () => capture.getConfigs(),
+      handler: () => capture.listDeviceConfigs(),
     },
     setConfig: {
       input: captureConfigInput,
@@ -45,12 +45,12 @@ export function createCaptureMethods(capture: CaptureSystem, deps: DomainDeps): 
     findDefaultDevice: {
       input: noInput,
       output: z.unknown(),
-      handler: () => capture.resolveDefaultDevice(),
+      handler: () => capture.findDefaultDevice(),
     },
     captureImage: {
       input: captureRequestInput,
       output: z.unknown(),
-      handler: ({ deviceId, imageFormat, resolutionIndex }) => capture.capture({
+      handler: ({ deviceId, imageFormat, resolutionIndex }) => capture.captureImage({
         deviceId,
         format: imageFormat,
         resolutionNum: resolutionIndex,
@@ -59,14 +59,14 @@ export function createCaptureMethods(capture: CaptureSystem, deps: DomainDeps): 
     saveCapturedImage: {
       input: dataUrlInput,
       output: z.unknown(),
-      handler: ({ imageDataUrl, imageExtension }) => capture.saveDataUrl(imageDataUrl, imageExtension),
+      handler: ({ imageDataUrl, imageExtension }) => capture.saveCapturedImage(imageDataUrl, imageExtension),
     },
     startPreview: {
       input: optionalDeviceInput,
       output: z.unknown(),
       handler: async (input) => {
         const resolved = input.deviceId
-          ?? (await capture.resolveDefaultDevice() as { id?: string } | undefined)?.id
+          ?? (await capture.findDefaultDevice() as { id?: string } | undefined)?.id
         if (!resolved) { throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备') }
         return capture.startPreview(resolved, frame =>
           deps.events.emit('capture.frame', { deviceId: resolved, frame }))
@@ -82,9 +82,9 @@ export function createCaptureMethods(capture: CaptureSystem, deps: DomainDeps): 
       output: z.unknown(),
       handler: async ({ deviceId }) => {
         const resolved = deviceId
-          ?? (await capture.resolveDefaultDevice() as { id?: string } | undefined)?.id
+          ?? (await capture.findDefaultDevice() as { id?: string } | undefined)?.id
         if (!resolved) { throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备') }
-        return capture.listCameras(resolved)
+        return capture.listDeviceCameras(resolved)
       },
     },
   }

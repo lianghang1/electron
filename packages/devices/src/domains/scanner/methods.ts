@@ -32,7 +32,7 @@ export function createScannerMethods(scanner: ScannerSystem, deps: DomainDeps): 
         if (!deps.demoMode.enabled) {
           throw new DomainRouteError('INVALID_INPUT', '扫码演示模式未开启，请在设备配置页启用')
         }
-        return scanner.simulate(scannedCode)
+        return scanner.simulateScan(scannedCode)
       },
     },
   }

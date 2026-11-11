@@ -11,15 +11,15 @@ export function createIdcardMethods(idcard: IdCardSystem): DomainDefinition['met
     listDevices: {
       input: noInput,
       output: z.unknown(),
-      handler: () => idcard.listReaders(),
+      handler: () => idcard.listDevices(),
     },
     readCard: {
       input: idcardReadInput,
       output: z.unknown(),
       handler: async (input) => {
         const deviceId = input.deviceId
-          ?? await pickReady(await idcard.listReaders(), '身份证阅读器')
-        return idcard.read({ deviceId })
+          ?? await pickReady(await idcard.listDevices(), '身份证阅读器')
+        return idcard.readCard({ deviceId })
       },
     },
     getConfig: {

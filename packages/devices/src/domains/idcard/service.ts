@@ -113,12 +113,12 @@ export class IdCardService {
     return this.getConfig()
   }
 
-  async listReaders(): Promise<IdReaderDevice[]> {
+  async listDevices(): Promise<IdReaderDevice[]> {
     const groups = await Promise.all([...this.channels.values()].map(a => a.listReaders().catch(() => [])))
     return groups.flat()
   }
 
-  async read(req: { deviceId: string }): Promise<IdCardData> {
+  async readCard(req: { deviceId: string }): Promise<IdCardData> {
     try {
       const located = await this.locate(req?.deviceId)
       return await this.locks.run(deviceLockKey(located.device), () => located.channel.read(located.device))

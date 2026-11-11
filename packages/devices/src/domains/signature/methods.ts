@@ -16,23 +16,23 @@ export function createSignatureMethods(signature: SignatureSystem, deps: DomainD
     startSigning: {
       input: optionalDeviceInput.optional(),
       output: z.unknown(),
-      handler: input => signature.start(input, point =>
+      handler: input => signature.startSigning(input, point =>
         deps.events.emit('signature.stroke', { point })),
     },
     stopSigning: {
       input: noInput,
       output: z.unknown(),
-      handler: () => signature.stop(),
+      handler: () => signature.stopSigning(),
     },
     clearSignature: {
       input: noInput,
       output: z.unknown(),
-      handler: () => signature.clear(),
+      handler: () => signature.clearSignature(),
     },
     cancelSigning: {
       input: noInput,
       output: z.unknown(),
-      handler: () => signature.cancel(),
+      handler: () => signature.cancelSigning(),
     },
     getConfig: {
       input: noInput,

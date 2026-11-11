@@ -15,11 +15,11 @@ export interface SignatureSystemOptions {
 export interface SignatureSystem {
   listDevices: () => Promise<SignDevice[]>
   /** 开始签名会话；onStroke = 发起方的实时笔迹回调（ipc 层绑定 webContents.send 推送） */
-  start: (req: { deviceId?: string } | undefined, onStroke: (point: SignStrokePoint) => void) => Promise<SignStartResult>
+  startSigning: (req: { deviceId?: string } | undefined, onStroke: (point: SignStrokePoint) => void) => Promise<SignStartResult>
   /** 结束会话并回收完整笔迹点集（签名图由渲染层自绘） */
-  stop: () => Promise<SignSessionResult>
-  clear: () => Promise<void>
-  cancel: () => Promise<void>
+  stopSigning: () => Promise<SignSessionResult>
+  clearSignature: () => Promise<void>
+  cancelSigning: () => Promise<void>
   /** 设备档案（ws/dll 双路线）管理：读全量 / 按档案 id 白名单覆盖（IPC 层 sanitize 后落盘） */
   getConfig: () => SignatureConfig
   setConfig: (id: string, overrides: SignatureDeviceOverrides) => SignatureConfig
@@ -31,10 +31,10 @@ export function createSignatureSystem(options: SignatureSystemOptions): Signatur
   const service = new SignatureService(options.host, options.resourcesRoot, options.logger)
   return {
     listDevices: () => service.listDevices(),
-    start: (req, onStroke) => service.start(req, onStroke),
-    stop: () => service.stop(),
-    clear: () => service.clear(),
-    cancel: () => service.cancel(),
+    startSigning: (req, onStroke) => service.startSigning(req, onStroke),
+    stopSigning: () => service.stopSigning(),
+    clearSignature: () => service.clearSignature(),
+    cancelSigning: () => service.cancelSigning(),
     getConfig: () => service.getConfig(),
     setConfig: (id, overrides) => service.setConfig(id, overrides),
     destroy: () => service.destroy(),

@@ -21,7 +21,7 @@ export interface ScannerSystem {
   /** 提交域级开关/激活指向 + 单档案白名单覆盖（档案 id 必须为出厂预设项），写穿持久化 */
   setConfig: (input: ScannerSetInput) => ScannerConfig
   /** 模拟一条扫码（诊断/演示：走与真枪完全相同的缓冲 → 广播链路） */
-  simulate: (code: string) => ScanResult
+  simulateScan: (code: string) => ScanResult
   destroy: () => void
 }
 
@@ -33,7 +33,7 @@ export function createScannerSystem(options: ScannerSystemOptions = {}): Scanner
     attachWindow: win => service.attachWindow(win),
     getConfig: () => service.getConfig(),
     setConfig: input => service.setConfig(input),
-    simulate: code => service.simulate(code),
+    simulateScan: code => service.simulateScan(code),
     destroy: () => service.destroy(),
   }
 }

@@ -11,16 +11,16 @@ export * from './paper'
 
 /** 打印系统句柄：平台与打印模块的唯一交互面 */
 export interface PrintSystem {
-  submit: (request: PrintRequest) => Promise<PrintResult>
-  listPrinters: () => Promise<UnifiedPrinter[]>
-  status: (jobId: string) => Promise<JobStatus | null>
+  submitPrintJob: (request: PrintRequest) => Promise<PrintResult>
+  listDevices: () => Promise<UnifiedPrinter[]>
+  getJobStatus: (jobId: string) => Promise<JobStatus | null>
   /** 最近任务列表（创建时间倒序），任务中心数据源 */
-  listJobs: (limit?: number) => Promise<JobStatus[]>
+  listPrintJobs: (limit?: number) => Promise<JobStatus[]>
   /** 删除单条任务记录（连带删除其归档 PDF） */
-  removeJob: (jobId: string) => Promise<boolean>
+  removePrintJob: (jobId: string) => Promise<boolean>
   /** 清空全部任务记录（连带删除归档 PDF），返回清除条数 */
-  clearJobs: () => Promise<number>
-  reprint: (jobId: string) => Promise<PrintResult>
+  clearPrintJobs: () => Promise<number>
+  reprintJob: (jobId: string) => Promise<PrintResult>
   /** 启动清扫：删除超过保留期且无在册任务引用的归档 PDF，返回删除数（createPrintSystem 内自动执行一次） */
   cleanupArchive: () => Promise<number>
   /** app 退出前调用：销毁隐藏渲染窗口 */
@@ -62,13 +62,13 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
   })
 
   const system: PrintSystem = {
-    submit: request => service.submit(mergePrintDefaults(request, options.defaultOptions?.())),
-    listPrinters: () => registry.list(),
-    status: jobId => service.status(jobId),
-    listJobs: async limit => service.listJobs(limit),
-    removeJob: jobId => service.removeJob(jobId),
-    clearJobs: () => service.clearJobs(),
-    reprint: jobId => service.reprint(jobId),
+    submitPrintJob: request => service.submitPrintJob(mergePrintDefaults(request, options.defaultOptions?.())),
+    listDevices: () => registry.list(),
+    getJobStatus: jobId => service.getJobStatus(jobId),
+    listPrintJobs: async limit => service.listPrintJobs(limit),
+    removePrintJob: jobId => service.removePrintJob(jobId),
+    clearPrintJobs: () => service.clearPrintJobs(),
+    reprintJob: jobId => service.reprintJob(jobId),
     cleanupArchive: () => service.cleanupArchive(),
     destroy: () => windows.destroyAll(),
   }

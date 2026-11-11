@@ -119,7 +119,7 @@ export class SignatureService {
   }
 
   /** 开始会话：deviceId 缺省自动选第一个就绪设备；onStroke = 发起方的实时笔迹回调 */
-  async start(req: { deviceId?: string } | undefined, onStroke: (point: SignStrokePoint) => void): Promise<SignStartResult> {
+  async startSigning(req: { deviceId?: string } | undefined, onStroke: (point: SignStrokePoint) => void): Promise<SignStartResult> {
     try {
       const devices = await this.listDevices()
       const deviceId = req?.deviceId ?? devices.find(d => d.status === 'ready')?.id
@@ -158,7 +158,7 @@ export class SignatureService {
   }
 
   /** 结束会话并回收完整笔迹（无会话抛 SESSION_NOT_ACTIVE） */
-  async stop(): Promise<SignSessionResult> {
+  async stopSigning(): Promise<SignSessionResult> {
     const channel = this.activeChannel()
     if (!channel) {
       throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
@@ -175,7 +175,7 @@ export class SignatureService {
     }
   }
 
-  async clear(): Promise<void> {
+  async clearSignature(): Promise<void> {
     const channel = this.activeChannel()
     if (!channel) {
       throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
@@ -183,7 +183,7 @@ export class SignatureService {
     await channel.clear()
   }
 
-  async cancel(): Promise<void> {
+  async cancelSigning(): Promise<void> {
     const channel = this.activeChannel()
     if (!channel) {
       throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')

@@ -19,7 +19,7 @@ function scannerStub(calls: string[]): ScannerSystem {
     attachWindow: () => {},
     getConfig: () => SCANNER_DEFAULTS,
     setConfig: () => SCANNER_DEFAULTS,
-    simulate: (code: string) => {
+    simulateScan: (code: string) => {
       calls.push(code)
       return { code, prefix: null, rawCode: code, timestamp: 1 }
     },

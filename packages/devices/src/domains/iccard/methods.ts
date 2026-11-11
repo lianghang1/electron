@@ -11,15 +11,15 @@ export function createIccardMethods(iccard: IcCardSystem): DomainDefinition['met
     listDevices: {
       input: noInput,
       output: z.unknown(),
-      handler: () => iccard.listReaders(),
+      handler: () => iccard.listDevices(),
     },
     readSector: {
       input: iccardReadInput,
       output: z.unknown(),
       handler: async ({ deviceId: requested, sectorKey, keyType, sectorNumber }) => {
         const deviceId = requested
-          ?? await pickReady(await iccard.listReaders(), 'IC 卡读写器')
-        return iccard.readIc({ deviceId, key: sectorKey, keyType, sector: sectorNumber })
+          ?? await pickReady(await iccard.listDevices(), 'IC 卡读写器')
+        return iccard.readSector({ deviceId, key: sectorKey, keyType, sector: sectorNumber })
       },
     },
     writeSector: {
@@ -27,8 +27,8 @@ export function createIccardMethods(iccard: IcCardSystem): DomainDefinition['met
       output: z.unknown(),
       handler: async ({ deviceId: requested, blockNumber, blockData, sectorKey, keyType }) => {
         const deviceId = requested
-          ?? await pickReady(await iccard.listReaders(), 'IC 卡读写器')
-        return iccard.writeIc({ deviceId, block: blockNumber, data: blockData, key: sectorKey, keyType })
+          ?? await pickReady(await iccard.listDevices(), 'IC 卡读写器')
+        return iccard.writeSector({ deviceId, block: blockNumber, data: blockData, key: sectorKey, keyType })
       },
     },
     writeTextBlocks: {
@@ -36,8 +36,8 @@ export function createIccardMethods(iccard: IcCardSystem): DomainDefinition['met
       output: z.unknown(),
       handler: async ({ deviceId: requested, sectorNumber, textBlocks, sectorKey, keyType }) => {
         const deviceId = requested
-          ?? await pickReady(await iccard.listReaders(), 'IC 卡读写器')
-        return iccard.writeIcTexts({ deviceId, sector: sectorNumber, texts: textBlocks, key: sectorKey, keyType })
+          ?? await pickReady(await iccard.listDevices(), 'IC 卡读写器')
+        return iccard.writeTextBlocks({ deviceId, sector: sectorNumber, texts: textBlocks, key: sectorKey, keyType })
       },
     },
     getConfig: {

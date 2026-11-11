@@ -126,17 +126,6 @@ function migrateScannerConfig(stored?: ScannerOverrides): ScannerConfig {
   return { enabled, activeId, devices }
 }
 
-export interface ScannerSystem {
-  /** 窗口接入：before-input-event 观察键盘（不消费，人工输入不受影响），结果广播到所有窗口 */
-  attachWindow: (win: BrowserWindow) => void
-  getConfig: () => ScannerConfig
-  /** 提交域级开关/激活指向 + 单档案白名单覆盖（档案 id 必须为出厂预设项），写穿持久化 */
-  setConfig: (input: ScannerSetInput) => ScannerConfig
-  /** 模拟一条扫码（诊断/演示：走与真枪完全相同的缓冲 → 广播链路） */
-  simulate: (code: string) => ScanResult
-  destroy: () => void
-}
-
 /**
  * ScanService = 扫码枪域统一 API。
  * 精华在 before-input-event：键盘事件在到达页面前被"观察"（不 preventDefault），
@@ -223,7 +212,7 @@ export class ScanService {
     return { enabled: this.config.enabled, activeId: this.config.activeId, devices: this.config.devices.map(overridesOf) }
   }
 
-  simulate(code: string): ScanResult {
+  simulateScan(code: string): ScanResult {
     // 诊断注入走当前通道的过滤链（HID/键盘同规则），与真枪链路一致
     const target = this.hid ?? this.scanner
     target.processComplete(code)

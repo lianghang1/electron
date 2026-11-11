@@ -167,7 +167,7 @@ export class CaptureService {
     this.channels = this.buildChannels()
   }
 
-  getConfigs(): CaptureDeviceConfig[] {
+  listDeviceConfigs(): CaptureDeviceConfig[] {
     return this.configs.slice()
   }
 
@@ -186,7 +186,7 @@ export class CaptureService {
    * 默认设备解析：配置的默认设备且处于就绪状态才返回其 id，否则 undefined
    * （调用方回落「第一个就绪设备」或自选）。探测异常静默回落，不影响调用链。
    */
-  async resolveDefaultDevice(): Promise<string | undefined> {
+  async findDefaultDevice(): Promise<string | undefined> {
     const preferred = this.getDefaultDeviceId?.()
     if (!preferred) {
       return undefined
@@ -228,7 +228,7 @@ export class CaptureService {
   }
 
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo，不占用摄像头） */
-  async listCameras(deviceId: string): Promise<CaptureCameraInfo[]> {
+  async listDeviceCameras(deviceId: string): Promise<CaptureCameraInfo[]> {
     const channel = this.previewChannel(deviceId)
     return channel.listCameras!(deviceId)
   }
@@ -244,10 +244,10 @@ export class CaptureService {
   }
 
   /** 采集：路由到设备所属通道执行；同一设备串行化（硬件一次一格）。失败抛 CaptureError */
-  async capture(req: CaptureRequest): Promise<CaptureResult> {
+  async captureImage(req: CaptureRequest): Promise<CaptureResult> {
     try {
       // 显式 deviceId 优先；缺省按域默认设备自动定位（就绪才生效），仍无则显式报错
-      const deviceId = req?.deviceId || await this.resolveDefaultDevice()
+      const deviceId = req?.deviceId || await this.findDefaultDevice()
       if (!deviceId) {
         throw captureError('VALIDATION_FAILED', '缺少 deviceId 且无就绪的默认设备')
       }
@@ -294,7 +294,7 @@ export class CaptureService {
   }
 
   /** UVC 路线落盘：渲染层 getUserMedia 拍到的 dataURL → 图片文件（返回绝对路径，供 showItemInFolder 等使用） */
-  async saveDataUrl(dataUrl: string, ext: 'jpg' | 'png' = 'jpg'): Promise<string> {
+  async saveCapturedImage(dataUrl: string, ext: 'jpg' | 'png' = 'jpg'): Promise<string> {
     const m = /^data:image\/(?:png|jpeg);base64,(.+)$/.exec(dataUrl)
     if (!m) {
       throw captureError('VALIDATION_FAILED', 'dataURL 格式不合法（应为 image/png 或 image/jpeg base64）')

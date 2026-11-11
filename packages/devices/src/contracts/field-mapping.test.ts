@@ -17,14 +17,14 @@ import { createSignatureDomain } from '../domains/signature/domain'
 
 interface Call { name: string, args: unknown[] }
 
-/** 记录所有 System 方法调用；listReaders/resolveDefaultDevice 给出让 handler 走通的最小返回值。 */
+/** 记录所有 System 方法调用；listDevices/findDefaultDevice 给出让 handler 走通的最小返回值。 */
 function recorder(): { stub: unknown, calls: Call[] } {
   const calls: Call[] = []
   const stub = new Proxy({}, {
     get: (_target, name: string) => (...args: unknown[]) => {
       calls.push({ name, args })
-      if (name === 'listReaders') { return Promise.resolve([{ id: 'r1', status: 'ready' }]) }
-      if (name === 'resolveDefaultDevice') { return Promise.resolve(undefined) }
+      if (name === 'listDevices') { return Promise.resolve([{ id: 'r1', status: 'ready' }]) }
+      if (name === 'findDefaultDevice') { return Promise.resolve(undefined) }
       return Promise.resolve({})
     },
   })
@@ -63,7 +63,7 @@ describe('对外字段 → 内部请求类型贯通', () => {
     const printContent = { kind: 'html', html: '<p>x</p>' }
     const printOptions = { paper: 'A4' }
     await def.methods.submitPrintJob.handler({ printContent, printOptions }, ctx)
-    expect(argsOf(calls, 'submit')[0]).toEqual({ payload: printContent, options: printOptions })
+    expect(argsOf(calls, 'submitPrintJob')[0]).toEqual({ payload: printContent, options: printOptions })
   })
 
   it('print 任务类方法：printJobId/maxCount 以值传递', async () => {
@@ -73,24 +73,24 @@ describe('对外字段 → 内部请求类型贯通', () => {
     await def.methods.listPrintJobs.handler({ maxCount: 5 }, ctx)
     await def.methods.removePrintJob.handler({ printJobId: 'j2' }, ctx)
     await def.methods.reprintJob.handler({ printJobId: 'j3' }, ctx)
-    expect(argsOf(calls, 'status')[0]).toBe('j1')
-    expect(argsOf(calls, 'listJobs')[0]).toBe(5)
-    expect(argsOf(calls, 'removeJob')[0]).toBe('j2')
-    expect(argsOf(calls, 'reprint')[0]).toBe('j3')
+    expect(argsOf(calls, 'getJobStatus')[0]).toBe('j1')
+    expect(argsOf(calls, 'listPrintJobs')[0]).toBe(5)
+    expect(argsOf(calls, 'removePrintJob')[0]).toBe('j2')
+    expect(argsOf(calls, 'reprintJob')[0]).toBe('j3')
   })
 
   it('capture.captureImage：imageFormat/resolutionIndex → format/resolutionNum', async () => {
     const { stub, calls } = recorder()
     const def = captureDomain(stub)
     await def.methods.captureImage.handler({ deviceId: 'd1', imageFormat: 'jpg', resolutionIndex: 2 }, ctx)
-    expect(argsOf(calls, 'capture')[0]).toEqual({ deviceId: 'd1', format: 'jpg', resolutionNum: 2 })
+    expect(argsOf(calls, 'captureImage')[0]).toEqual({ deviceId: 'd1', format: 'jpg', resolutionNum: 2 })
   })
 
   it('capture.saveCapturedImage：imageDataUrl/imageExtension 以值传递', async () => {
     const { stub, calls } = recorder()
     const def = captureDomain(stub)
     await def.methods.saveCapturedImage.handler({ imageDataUrl: 'data:image/png;base64,AA', imageExtension: 'png' }, ctx)
-    expect(argsOf(calls, 'saveDataUrl')).toEqual(['data:image/png;base64,AA', 'png'])
+    expect(argsOf(calls, 'saveCapturedImage')).toEqual(['data:image/png;base64,AA', 'png'])
   })
 
   it('capture.setDefaultDevice：deviceId 以值传递', async () => {
@@ -128,7 +128,7 @@ describe('对外字段 → 内部请求类型贯通', () => {
     const { stub, calls } = recorder()
     const def = iccardDomain(stub)
     await def.methods.readSector.handler({ sectorNumber: 1, sectorKey: 'ffffffffffff', keyType: 'A' }, ctx)
-    expect(argsOf(calls, 'readIc')[0]).toEqual({
+    expect(argsOf(calls, 'readSector')[0]).toEqual({
       deviceId: 'r1',
       key: 'ffffffffffff',
       keyType: 'A',
@@ -141,7 +141,7 @@ describe('对外字段 → 内部请求类型贯通', () => {
     const def = iccardDomain(stub)
     const blockData = '0'.repeat(32)
     await def.methods.writeSector.handler({ blockNumber: 4, blockData }, ctx)
-    expect(argsOf(calls, 'writeIc')[0]).toEqual({
+    expect(argsOf(calls, 'writeSector')[0]).toEqual({
       deviceId: 'r1',
       block: 4,
       data: blockData,
@@ -154,7 +154,7 @@ describe('对外字段 → 内部请求类型贯通', () => {
     const { stub, calls } = recorder()
     const def = iccardDomain(stub)
     await def.methods.writeTextBlocks.handler({ sectorNumber: 1, textBlocks: ['hello'] }, ctx)
-    expect(argsOf(calls, 'writeIcTexts')[0]).toEqual({
+    expect(argsOf(calls, 'writeTextBlocks')[0]).toEqual({
       deviceId: 'r1',
       sector: 1,
       texts: ['hello'],
@@ -184,6 +184,6 @@ describe('对外字段 → 内部请求类型贯通', () => {
     const { stub, calls } = recorder()
     const def = scannerDomain(stub)
     await def.methods.simulateScan.handler({ scannedCode: 'EAN-1' }, ctx)
-    expect(argsOf(calls, 'simulate')).toEqual(['EAN-1'])
+    expect(argsOf(calls, 'simulateScan')).toEqual(['EAN-1'])
   })
 })

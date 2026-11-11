@@ -67,12 +67,12 @@ function htmlRequest(extra: Partial<PrintOptions> = {}): PrintRequest {
 describe('统一打印服务全链路', () => {
   it('preview 模式只出 PDF 不送打，任务状态可回读', async () => {
     const service = makeService()
-    const result = await service.submit(htmlRequest({ preview: true }))
+    const result = await service.submitPrintJob(htmlRequest({ preview: true }))
     expect(result.channel).toBe('preview')
     expect(result.mode).toBe('preview')
     expect(result.archivedPdfPath).toBeTruthy()
     expect(existsSync(result.archivedPdfPath ?? '')).toBe(true)
-    const status = await service.status(result.jobId)
+    const status = await service.getJobStatus(result.jobId)
     expect(status?.state).toBe('done')
     expect(status?.result?.mode).toBe('preview')
     expect(typeof status?.elapsedMs).toBe('number')
@@ -80,7 +80,7 @@ describe('统一打印服务全链路', () => {
 
   it('dryRun 模式回传将送打参数快照', async () => {
     const service = makeService()
-    const result = await service.submit(htmlRequest({ dryRun: true }))
+    const result = await service.submitPrintJob(htmlRequest({ dryRun: true }))
     expect(result.mode).toBe('dry-run')
     const detail = result.detail as { willSpool: boolean, spoolPlan: { targetChannel: string } }
     expect(detail.willSpool).toBe(false)
@@ -90,7 +90,7 @@ describe('统一打印服务全链路', () => {
 
   it('simulated 通道可切换送打，落审计并回报 done', async () => {
     const service = makeService()
-    const result = await service.submit(htmlRequest({ channel: 'simulated' }))
+    const result = await service.submitPrintJob(htmlRequest({ channel: 'simulated' }))
     expect(result.channel).toBe('simulated')
     expect(result.mode).toBe('simulated')
     expect(result.remoteJob?.state).toBe('done')
@@ -98,21 +98,21 @@ describe('统一打印服务全链路', () => {
     expect(existsSync(detail.auditFile)).toBe(true)
     const audit = JSON.parse(readFileSync(detail.auditFile, 'utf8')) as { jobId: string }
     expect(audit.jobId).toBe(result.jobId)
-    const status = await service.status(result.jobId)
+    const status = await service.getJobStatus(result.jobId)
     expect(status?.remoteState).toBe('done')
   })
 
   it('显式 channel 优先于便捷开关', async () => {
     const service = makeService()
-    const result = await service.submit(htmlRequest({ channel: 'simulated', preview: true, dryRun: true }))
+    const result = await service.submitPrintJob(htmlRequest({ channel: 'simulated', preview: true, dryRun: true }))
     expect(result.channel).toBe('simulated')
     expect(result.mode).toBe('simulated')
   })
 
   it('system 通道在无系统打印机时明确报错并落失败任务簿', async () => {
     const service = makeService()
-    await expect(service.submit(htmlRequest({ channel: 'system' }))).rejects.toThrow(/打印机/)
-    const jobs = service.listJobs()
+    await expect(service.submitPrintJob(htmlRequest({ channel: 'system' }))).rejects.toThrow(/打印机/)
+    const jobs = service.listPrintJobs()
     expect(jobs).toHaveLength(1)
     expect(jobs[0].state).toBe('failed')
     expect(jobs[0].error?.code).toBe('PRINTER_DEFAULT_MISSING')
@@ -120,24 +120,24 @@ describe('统一打印服务全链路', () => {
 
   it('未知通道给出明确错误', async () => {
     const service = makeService()
-    await expect(service.submit(htmlRequest({ channel: 'nope' as PrintOptions['channel'] }))).rejects.toThrow(/未知通道/)
+    await expect(service.submitPrintJob(htmlRequest({ channel: 'nope' as PrintOptions['channel'] }))).rejects.toThrow(/未知通道/)
   })
 
   it('并发提交多个 preview 全部完成且任务号唯一', async () => {
     const service = makeService()
     const results = await Promise.all(
-      Array.from({ length: 5 }, (_, i) => service.submit(htmlRequest({ preview: true, jobName: `p-${i}` }))),
+      Array.from({ length: 5 }, (_, i) => service.submitPrintJob(htmlRequest({ preview: true, jobName: `p-${i}` }))),
     )
     expect(new Set(results.map(r => r.jobId)).size).toBe(5)
     for (const r of results) {
       expect(r.mode).toBe('preview')
       expect(existsSync(r.archivedPdfPath ?? '')).toBe(true)
     }
-    expect(service.listJobs()).toHaveLength(5)
+    expect(service.listPrintJobs()).toHaveLength(5)
   })
 
   it('不存在的任务状态返回 null', async () => {
     const service = makeService()
-    expect(await service.status('missing')).toBeNull()
+    expect(await service.getJobStatus('missing')).toBeNull()
   })
 })

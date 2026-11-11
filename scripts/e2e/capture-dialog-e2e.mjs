@@ -29,11 +29,11 @@ function makeDeps() {
   const captureWc = new FakeWebContents(99)
   const events = { sessions: [], frames: [], dismissed: 0 }
   const capture = {
-    resolveDefaultDevice: async () => 'dev-1',
+    findDefaultDevice: async () => 'dev-1',
     startPreview: async (deviceId, onFrame) => { events.frames.push({ deviceId, onFrame }) },
     stopPreview: async () => {},
-    capture: async () => ({ imagePath: '/files/capture/sdk.jpg' }),
-    saveDataUrl: async () => '/files/capture/uvc.jpg',
+    captureImage: async () => ({ imagePath: '/files/capture/sdk.jpg' }),
+    saveCapturedImage: async () => '/files/capture/uvc.jpg',
   }
   const overlay = {
     pushCaptureSession: session => events.sessions.push(session),

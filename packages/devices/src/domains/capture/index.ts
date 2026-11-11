@@ -7,7 +7,7 @@ export { BUILT_IN_CAPTURE_CONFIGS } from './configs'
 
 export interface CaptureSystem {
   listDevices: () => Promise<CaptureDevice[]>
-  getConfigs: () => Promise<CaptureDeviceConfig[]>
+  listDeviceConfigs: () => Promise<CaptureDeviceConfig[]>
   setConfig: (id: string, overrides: CaptureDeviceOverrides) => void
   /** 域默认设备 id（未配置返回 undefined） */
   getDefaultDevice: () => string | undefined
@@ -17,15 +17,15 @@ export interface CaptureSystem {
    * 默认设备解析：配置的默认设备且就绪才返回其 id，否则 undefined
    * （snap/openCaptureDialog 缺省定位共用，失败静默回落）
    */
-  resolveDefaultDevice: () => Promise<string | undefined>
-  capture: (req: CaptureRequest) => Promise<CaptureResult>
+  findDefaultDevice: () => Promise<string | undefined>
+  captureImage: (req: CaptureRequest) => Promise<CaptureResult>
   /** UVC 路线（渲染层 getUserMedia）拍到的 dataURL 落盘为图片文件 */
-  saveDataUrl: (dataUrl: string, ext?: 'jpg' | 'png') => Promise<string>
+  saveCapturedImage: (dataUrl: string, ext?: 'jpg' | 'png') => Promise<string>
   /** 实时预览（ws/camsdk）：预览帧经 onFrame 回调（由 IPC 层转发发起窗口）；失败抛 CaptureError */
   startPreview: (deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }) => Promise<void>
   stopPreview: (deviceId: string) => Promise<void>
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo） */
-  listCameras: (deviceId: string) => Promise<CaptureCameraInfo[]>
+  listDeviceCameras: (deviceId: string) => Promise<CaptureCameraInfo[]>
   destroy: () => void
 }
 
@@ -54,16 +54,16 @@ export function createCaptureSystem(options: CaptureSystemOptions): CaptureSyste
   const service = new CaptureService({ ...options, logger: log })
   return {
     listDevices: () => service.listDevices(),
-    getConfigs: async () => service.getConfigs(),
+    listDeviceConfigs: async () => service.listDeviceConfigs(),
     setConfig: (id, overrides) => service.setConfig(id, overrides),
     getDefaultDevice: () => service.getDefaultDevice(),
     setDefaultDevice: id => service.setDefaultDevice(id),
-    resolveDefaultDevice: () => service.resolveDefaultDevice(),
-    capture: req => service.capture(req),
-    saveDataUrl: (dataUrl, ext) => service.saveDataUrl(dataUrl, ext),
+    findDefaultDevice: () => service.findDefaultDevice(),
+    captureImage: req => service.captureImage(req),
+    saveCapturedImage: (dataUrl, ext) => service.saveCapturedImage(dataUrl, ext),
     startPreview: (deviceId, onFrame, opts) => service.startPreview(deviceId, onFrame, opts),
     stopPreview: deviceId => service.stopPreview(deviceId),
-    listCameras: deviceId => service.listCameras(deviceId),
+    listDeviceCameras: deviceId => service.listDeviceCameras(deviceId),
     destroy: () => service.destroy(),
   }
 }

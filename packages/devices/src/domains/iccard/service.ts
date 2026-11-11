@@ -142,7 +142,7 @@ export class IcCardService {
     return this.getConfig()
   }
 
-  async listReaders(): Promise<IcReaderDevice[]> {
+  async listDevices(): Promise<IcReaderDevice[]> {
     const groups = await Promise.all([...this.channels.values()].map(a => a.listReaders().catch(() => [])))
     return groups.flat()
   }
@@ -151,7 +151,7 @@ export class IcCardService {
    * 读 IC 卡一个扇区：读块后派生字符串组 texts（数据块按 0x00 截断解码为 UTF-8、尾部空块不返回，
    * 与 writeIcTexts 的 texts 互逆），与原始块数据同一次会话返回。
    */
-  async readIc(req: IcCardReadRequest & { deviceId: string }): Promise<IcCardReadResult> {
+  async readSector(req: IcCardReadRequest & { deviceId: string }): Promise<IcCardReadResult> {
     try {
       const located = await this.locate(req?.deviceId)
       const data = await this.locks.run(deviceLockKey(located.device), () => located.channel.readIc(located.device, req))
@@ -169,7 +169,7 @@ export class IcCardService {
   }
 
   /** 写 IC 卡单块：与读共用设备锁串行；写卡是覆盖性操作，驱动层强制拒绝密钥控制块/厂商块 */
-  async writeIc(req: IcCardWriteRequest & { deviceId: string }): Promise<void> {
+  async writeSector(req: IcCardWriteRequest & { deviceId: string }): Promise<void> {
     try {
       const located = await this.locate(req?.deviceId)
       if (!located.device.capabilities.includes('iccard-write')) {
@@ -186,7 +186,7 @@ export class IcCardService {
    * 写扇区字符串组：texts 按序占用数据块，未占用的数据块清零，保证读取结果与写入一致。
    * 整扇区写入在同一设备锁内完成；中途失败（如密钥认证不过）可能留下部分写入，重试即整扇区覆盖修复。
    */
-  async writeIcTexts(req: IcCardTextsWriteRequest & { deviceId: string }): Promise<void> {
+  async writeTextBlocks(req: IcCardTextsWriteRequest & { deviceId: string }): Promise<void> {
     try {
       const { sector, texts } = req ?? {}
       if (!Number.isInteger(sector) || sector < 0 || sector > 15) {
