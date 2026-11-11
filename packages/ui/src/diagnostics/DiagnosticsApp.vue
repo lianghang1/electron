@@ -3,6 +3,7 @@ import { desktop } from '@shell/bridge/client'
 import { DIAGNOSTIC_CATALOG } from '@shell/shared'
 import { Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui'
 import {
+  Activity,
   Camera,
   CreditCard,
   IdCard,
@@ -13,6 +14,7 @@ import {
   ScanLine,
 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
+import DeviceInsights from './DeviceInsights.vue'
 import EventStream from './EventStream.vue'
 import MethodRunner from './MethodRunner.vue'
 import PlatformPanel from './PlatformPanel.vue'
@@ -104,6 +106,9 @@ onMounted(loadInfo)
         <TabsTrigger value="platform">
           <MonitorCog :size="14" class="mr-1.5 inline" />平台自检
         </TabsTrigger>
+        <TabsTrigger value="insights">
+          <Activity :size="14" class="mr-1.5 inline" />运行观测
+        </TabsTrigger>
       </TabsList>
 
       <div class="flex min-h-0 flex-1">
@@ -135,6 +140,10 @@ onMounted(loadInfo)
 
           <TabsContent value="platform" class="p-0">
             <PlatformPanel />
+          </TabsContent>
+
+          <TabsContent value="insights" class="p-0">
+            <DeviceInsights />
           </TabsContent>
         </div>
 

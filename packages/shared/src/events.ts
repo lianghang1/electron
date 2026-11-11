@@ -34,6 +34,27 @@ export interface PlatformEvents {
   'scanner.scanned': { code: string }
   'signature.stroke': { point: unknown }
   'capture.frame': { deviceId: string, frame: unknown }
+  // 设备运行时观测：域调用打点与汇总快照推给诊断台
+  'devices.call-recorded': {
+    capabilityId: string
+    methodName: string
+    appId: string
+    ok: boolean
+    durationMs: number
+    at: number
+    errorCode?: string
+  }
+  'devices.telemetry-changed': {
+    calls: number
+    failures: number
+    totalDurationMs: number
+    byCapability: Record<string, {
+      calls: number
+      failures: number
+      totalDurationMs: number
+      lastErrorCode?: string
+    }>
+  }
   // 崩溃与自愈
   'crash.renderer-gone': { windowId: number, reason: string, restartCount: number }
   'watchdog.recovery-mode': { reason: string }

@@ -16,3 +16,13 @@ export type { DriverDeployment, DriverResolver, DriverRoots, PlatformCapability 
 export { createDeviceGateway, createDomainRouter, DomainRouteError } from './gateway'
 export type { DeviceGateway, DeviceGatewayOptions, DomainRouter } from './gateway'
 export { collectAssetDeclarations, collectAssetSources } from './host/asset-audit'
+export type { DeviceStatus, UnavailableReason } from './runtime/device-state'
+export { createDeviceTelemetry } from './runtime/telemetry'
+export type {
+  CapabilityStats,
+  DeviceCallRecord,
+  DeviceObservation,
+  DeviceObservationSink,
+  DeviceTelemetry,
+  TelemetrySnapshot,
+} from './runtime/telemetry'

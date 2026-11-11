@@ -6,6 +6,7 @@ import type { DomainDeps } from './domain-kit'
 import type { CaptureSystem } from './domains/capture'
 import type { CaptureOverlayHost } from './domains/capture/overlay-host'
 import type { DriverResolver } from './drivers'
+import type { DeviceStatus } from './runtime/device-state'
 import { join } from 'node:path'
 import { overridesStore } from './domain-kit'
 import { createCaptureSystem } from './domains/capture'
@@ -23,6 +24,10 @@ import { createScannerDomain } from './domains/scanner/domain'
 import { createSignatureSystem } from './domains/signature'
 import { createSignatureDomain } from './domains/signature/domain'
 import { DeviceHost } from './host/device-host'
+import { createChannelRegistry } from './runtime/channel'
+import { buildDeviceStatuses } from './runtime/device-status'
+import { CAPABILITY_DESCRIPTORS, registerStandardCatalog } from './runtime/platform-profiles'
+import { createDeviceRegistry } from './runtime/registry'
 
 export { createDomainRouter, DomainRouteError } from './domain-kit'
 export type { DomainRouter } from './domain-kit'
@@ -54,6 +59,10 @@ export interface DeviceGatewayOptions {
   allowedOrigins: readonly string[]
   /** 验机形态：放行诊断专用域方法，生产形态恒 false */
   diagnostics: boolean
+  /** 当前平台 id（六端能力表键），用于三维求交与状态原因码 */
+  platformId: string
+  /** 该平台开放的能力清单，组合根按能力矩阵闸门下发 */
+  availableDomains: readonly string[]
   /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁，避免进程常驻 */
   getParent?: () => BrowserWindow | undefined
   /** 拍摄浮层宿主：由组合根注入窗口系统实现，域内不认识 BrowserWindow 归属 */
@@ -62,6 +71,8 @@ export interface DeviceGatewayOptions {
 
 export interface DeviceGateway {
   domains: DomainDefinition[]
+  /** 六域设备状态（state + 原因码），诊断台与灰置逻辑的唯一数据源 */
+  readonly deviceStatuses: readonly DeviceStatus[]
   /** 拍摄浮层会话服务：注入宿主后才创建，组合根据此注册会话通道 */
   captureDialog?: CaptureDialogSessionService
   /** 预热守护进程（含 koffi 加载）；完成即打 t2DeviceHostReady */
@@ -207,8 +218,20 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     ? new CaptureDialogSessionService({ capture, overlay: options.captureOverlay })
     : undefined
 
+  // 三维注册表与平台档案求交，产出六域状态与原因码；诊断台读同一份结果
+  const deviceRegistry = createDeviceRegistry(createChannelRegistry())
+  registerStandardCatalog(deviceRegistry)
+  const resolutions = deviceRegistry.resolveAll(options.platformId, false)
+  const deviceStatuses = buildDeviceStatuses(
+    CAPABILITY_DESCRIPTORS,
+    resolutions,
+    options.availableDomains,
+    options.platformId,
+  )
+
   return {
     domains,
+    deviceStatuses,
     captureDialog,
 
     warmup(onReady) {

@@ -16,7 +16,7 @@ import {
   registerAppScheme,
   RemoteOpener,
 } from '@shell/app-runtime'
-import { createDeviceGateway, createDomainRouter, createDriverResolver, detectDevicePlatform, DomainRouteError, resolvePlatformCapability } from '@shell/devices'
+import { createDeviceGateway, createDeviceTelemetry, createDomainRouter, createDriverResolver, detectDevicePlatform, DomainRouteError, resolvePlatformCapability } from '@shell/devices'
 import { AppKvStore, createKernel, NotificationCenter, RetentionRegistry } from '@shell/kernel'
 import { AuditLog } from '@shell/kernel/audit'
 import { DownloadManager } from '@shell/kernel/download'
@@ -237,6 +237,8 @@ async function main(context: BootContext): Promise<void> {
     paths: { storageRoot: configDir(), filesRoot: filesDir() },
     allowedOrigins: flavor.update.allowedOrigins,
     diagnostics: flavor.diagnostics,
+    platformId: capability.platform,
+    availableDomains: capability.availableDomains,
     getParent: () => windows.shellWindow,
     captureOverlay: {
       pushCaptureSession: session => overlays.pushCaptureDialog(session),
@@ -375,6 +377,7 @@ async function main(context: BootContext): Promise<void> {
   windows.attachEventBroadcast(kernel.ctx.events)
 
   // 域方法调用：身份从账本反查（页面无法伪造），授权与能力闸门在路由层统一判定
+  const telemetry = createDeviceTelemetry()
   const router = createDomainRouter(devices.domains, logger, {
     availableDomains: capability.availableDomains,
     authorize: (grant, ctx) => permissions.decide({
@@ -382,6 +385,25 @@ async function main(context: BootContext): Promise<void> {
       origin: `app://${ctx.appId}`,
       permission: grant,
     }),
+    telemetry,
+    observation: {
+      publish(observation) {
+        if (observation.kind === 'call') {
+          kernel.ctx.events.emit('devices.call-recorded', {
+            capabilityId: observation.record.capabilityId,
+            methodName: observation.record.methodName,
+            appId: observation.record.appId,
+            ok: observation.record.ok,
+            durationMs: observation.record.durationMs,
+            at: observation.record.startedAt,
+            errorCode: observation.record.errorCode,
+          })
+        }
+        else {
+          kernel.ctx.events.emit('devices.telemetry-changed', observation.snapshot)
+        }
+      },
+    },
   })
   ipcMain.handle('domain-call', (event, method: string, input: unknown) => {
     const caller = callers.tryResolve(event.sender.id)
@@ -447,6 +469,8 @@ async function main(context: BootContext): Promise<void> {
       driverDeployment: capability.driverDeployment,
       notes: capability.notes,
     },
+    deviceStatus: devices.deviceStatuses,
+    deviceTelemetry: telemetry.snapshot(),
   }))
   // 重启壳：quit 会触发 before-quit，把暂存的整包安装执行掉，再以新版本拉起
   ipcMain.handle('shell:relaunch', () => {
