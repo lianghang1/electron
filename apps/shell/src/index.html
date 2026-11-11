@@ -7,7 +7,8 @@
       html, body, #app { margin: 0; width: 100%; height: 100%; }
       /* 内联启动层：纯 CSS + 少量内联 JS，白屏物理消失。
          --dt-accent 由 preload 从 flavor.branding.accent 同步注入（零闪烁）。
-         logo 形状 / 动画 / 撤层时序逐字对齐 ZCode（packages/desktop/src/renderer/index.html）。
+         品牌 logo：单色硬边几何「上开口」方块——45° 斜缝从顶边切入，到中线停，
+         手法对齐 ZCode（斜切基因 / 负空间 / 无渐变），形状为壳平台自有品牌。
          ★ 更换 logo：只改 <body> 里 .startup-logo 内的 SVG（或 <img>）与壳底色即可，其余不用动。 */
       #splash {
         position: fixed; inset: 0; z-index: 2147483647;
@@ -51,22 +52,15 @@
       <div class="startup-logo-shell">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="118"
-          height="100"
+          width="56"
+          height="56"
           fill="none"
-          viewBox="0 0 256 218"
+          viewBox="0 0 48 48"
           class="startup-logo"
           aria-hidden="true"
         >
-          <path
-            fill="currentColor"
-            d="M134.4 0.130152L116.48 25.6022C113.665 29.5699 109.054 32.0019 104.064 32.0019H6.3999V0C6.3999 0.130149 134.4 0.130152 134.4 0.130152Z"
-          />
-          <path fill="currentColor" d="M256 0.130127L102.401 217.732H0L153.599 0.130127H256Z" />
-          <path
-            fill="currentColor"
-            d="M121.601 217.732L139.65 192.134C142.465 188.166 147.076 185.734 152.067 185.734H249.604V217.736H121.601V217.732Z"
-          />
+          <!-- 品牌标「上开口」：方形剪影 + 顶部 45° 斜槽（设备插入平台的端口意象） -->
+          <path fill="currentColor" d="M6 6h15l14 14h6L27 6h15v36H6Z" />
         </svg>
       </div>
     </div>
