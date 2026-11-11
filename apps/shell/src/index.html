@@ -9,11 +9,16 @@
          --dt-accent 由 preload 从 flavor.branding.accent 同步注入（零闪烁）。
          品牌 logo：单色硬边几何「上开口」方块——45° 斜缝从顶边切入，到中线停，
          手法对齐 ZCode（斜切基因 / 负空间 / 无渐变），形状为壳平台自有品牌。
+         透明遮罩逐字对齐 ZCode（packages/desktop/src/renderer/index.html）：
+         #splash 无背景色——动画全程透出桌面/系统材质（mac vibrancy / win acrylic /
+         linux 透明窗，见 packages/window/src/presets.ts），logo 悬浮其上；
+         #app 由 opacity 0 淡入，撤层时与遮罩淡出交叉，不存在整屏底色切换。
          ★ 更换 logo：只改 <body> 里 .startup-logo 内的 SVG（或 <img>）与壳底色即可，其余不用动。 */
+      #app { opacity: 0; transition: opacity 0.16s ease; }
+      body.ready #app { opacity: 1; }
       #splash {
         position: fixed; inset: 0; z-index: 2147483647;
         display: flex; align-items: center; justify-content: center;
-        background: linear-gradient(180deg, var(--dt-surface-hover, #eaf1fc) 0%, var(--dt-page, #dde7f8) 100%);
         transition: opacity 0.16s ease;
       }
       body.ready #splash { pointer-events: none; opacity: 0; }
