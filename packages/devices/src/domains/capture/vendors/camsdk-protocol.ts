@@ -8,7 +8,7 @@ import { captureError } from '../errors'
  * 数据红线：imgBase64/imgBase64Str 为画面与拍摄内容，不写日志。
  */
 
-/** 采集所需的最小设备 ws 配置（protocol 由 WsAdapter 分发，本模块固定 camsdk） */
+/** 采集所需的最小设备 ws 配置（protocol 由 WsChannel 分发，本模块固定 camsdk） */
 export type CamSdkConfig = NonNullable<import('@shell/shared').CaptureDeviceConfig['ws']>
 
 export interface CamSdkFrame {

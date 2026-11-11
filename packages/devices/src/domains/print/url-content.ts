@@ -6,9 +6,9 @@ import path from 'node:path'
 import { assertFetchableUrl, isPrivateHost } from '@shell/shared'
 import { net } from 'electron'
 import { printError } from './errors'
+import { withPrintDeadline } from './operation-deadline'
 import { IMAGE_MIME } from './templates'
 import { imageExt, typeFromContentType, typeFromUrlPath } from './url-type'
-import { withTimeout } from './with-timeout'
 
 /** URL 内容下载超时 */
 const DOWNLOAD_TIMEOUT_MS = 30_000
@@ -46,7 +46,7 @@ export async function downloadUrlContent(
     throw printError('VALIDATION_FAILED', `URL 指向内网地址，拒绝下载: ${target.hostname}`)
   }
 
-  const res = await withTimeout(
+  const res = await withPrintDeadline(
     net.fetch(target.href, { headers: { accept: 'application/pdf,image/*,*/*;q=0.8' } }),
     DOWNLOAD_TIMEOUT_MS,
     'RENDER_FAILED',

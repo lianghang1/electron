@@ -1,12 +1,12 @@
-import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides, CaptureLogFn, CaptureRequest, CaptureResult } from '@shell/shared'
+import type { CaptureCameraInfo, CaptureChannel, CaptureDevice, CaptureDeviceConfig, CaptureDeviceOverrides, CaptureLogFn, CaptureRequest, CaptureResult, ChannelCaptureRequest } from '@shell/shared'
 import type { DeviceHost } from '../../host/device-host'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { DllAdapter } from './adapters/dll-adapter'
-import { ServiceAdapter } from './adapters/service-adapter'
-import { WiaAdapter } from './adapters/wia-adapter'
-import { WsAdapter } from './adapters/ws-adapter'
+import { DllChannel } from './channels/dll-channel'
+import { ServiceChannel } from './channels/service-channel'
+import { WiaChannel } from './channels/wia-channel'
+import { WsChannel } from './channels/ws-channel'
 import { BUILT_IN_CAPTURE_CONFIGS } from './configs'
 import { captureError, toCaptureError } from './errors'
 
@@ -107,13 +107,13 @@ function migrateCaptureConfigs(overrides?: CaptureDeviceOverrides[]): CaptureDev
 
 /**
  * CaptureService = 统一采集 API 的实现体（与 PrintService 同构的归一化层）。
- * 多品牌 × 多接入方式：品牌差异在设备配置（数据），接入方式差异在适配器（代码）。
- * 设备配置支持运行时编辑（setConfig → persist → 热重建适配器），
- * 适配"服务地址/IP/端口变更"场景。UVC 路线在渲染进程（getUserMedia），不经本服务。
+ * 多品牌 × 多接入方式：品牌差异在设备配置（数据），接入方式差异在通道（代码）。
+ * 设备配置支持运行时编辑（setConfig → persist → 热重建通道），
+ * 接入"服务地址/IP/端口变更"场景。UVC 路线在渲染进程（getUserMedia），不经本服务。
  */
 export class CaptureService {
   private configs: CaptureDeviceConfig[]
-  private adapters: Map<string, CaptureAdapter>
+  private channels: Map<string, CaptureChannel>
   /** 同一设备串行化采集（硬件一次一格） */
   private locks = new Map<string, Promise<unknown>>()
   private readonly logger: CaptureLogFn
@@ -134,22 +134,22 @@ export class CaptureService {
     this.resourcesRoot = options.resourcesRoot
     this.host = options.host
     this.configs = migrateCaptureConfigs(options.initialOverrides)
-    this.adapters = this.buildAdapters()
+    this.channels = this.buildChannels()
   }
 
-  private buildAdapters(): Map<string, CaptureAdapter> {
-    // 热重建前销毁旧适配器持有的资源（ws 预览会话等），防连接泄漏；构造首调时 adapters 尚未初始化
-    for (const a of this.adapters?.values() ?? []) { a.destroy?.() }
-    const adapters: [string, CaptureAdapter][] = [
-      ['service', new ServiceAdapter(this.configs)],
-      ['wia', new WiaAdapter()],
-      ['dll', new DllAdapter(this.host, this.configs, this.resourcesRoot)],
-      ['ws', new WsAdapter(this.configs)],
+  private buildChannels(): Map<string, CaptureChannel> {
+    // 热重建前销毁旧通道持有的资源（ws 预览会话等），防连接泄漏；构造首调时 channels 尚未初始化
+    for (const a of this.channels?.values() ?? []) { a.destroy?.() }
+    const channels: [string, CaptureChannel][] = [
+      ['service', new ServiceChannel(this.configs)],
+      ['wia', new WiaChannel()],
+      ['dll', new DllChannel(this.host, this.configs, this.resourcesRoot)],
+      ['ws', new WsChannel(this.configs)],
     ]
-    return new Map<string, CaptureAdapter>(adapters)
+    return new Map<string, CaptureChannel>(channels)
   }
 
-  /** 运行时现场白名单覆盖：档案 id 必须为出厂预设项；覆盖 → 持久化白名单 → 热重建适配器 */
+  /** 运行时现场白名单覆盖：档案 id 必须为出厂预设项；覆盖 → 持久化白名单 → 热重建通道 */
   setConfig(id: string, overrides: CaptureDeviceOverrides): void {
     if (!this.configs.some(p => p.id === id)) {
       throw captureError('VALIDATION_FAILED', `设备档案不存在: ${id}`)
@@ -164,7 +164,7 @@ export class CaptureService {
     })
     this.configs = list
     this.persist?.(list.map(overridesOf))
-    this.adapters = this.buildAdapters()
+    this.channels = this.buildChannels()
   }
 
   getConfigs(): CaptureDeviceConfig[] {
@@ -200,20 +200,20 @@ export class CaptureService {
     }
   }
 
-  /** 设备列表：各适配器上报后按 transport 合并 */
+  /** 设备列表：各通道上报后按 transport 合并 */
   async listDevices(): Promise<CaptureDevice[]> {
-    const groups = await Promise.all([...this.adapters.values()].map(a => a.listDevices().catch(() => [])))
+    const groups = await Promise.all([...this.channels.values()].map(a => a.listDevices().catch(() => [])))
     return groups.flat()
   }
 
   /**
-   * 实时预览：路由到设备所属适配器（仅支持常驻连接的适配器，如 ws/camsdk）。
+   * 实时预览：路由到设备所属通道（仅支持常驻连接的通道，如 ws/camsdk）。
    * onFrame 回调持续收到预览帧（JPEG base64），由 IPC 层转发给发起窗口。失败抛 CaptureError。
    */
   async startPreview(deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }): Promise<void> {
     try {
-      const adapter = this.previewAdapter(deviceId)
-      await adapter.startPreview(deviceId, onFrame, opts)
+      const channel = this.previewChannel(deviceId)
+      await channel.startPreview(deviceId, onFrame, opts)
     }
     catch (err) {
       const ce = toCaptureError(err)
@@ -223,27 +223,27 @@ export class CaptureService {
   }
 
   async stopPreview(deviceId: string): Promise<void> {
-    const adapter = this.previewAdapter(deviceId)
-    await adapter.stopPreview(deviceId)
+    const channel = this.previewChannel(deviceId)
+    await channel.stopPreview(deviceId)
   }
 
   /** 枚举设备下的摄像头与分辨率（ws/camsdk GetCameraInfo，不占用摄像头） */
   async listCameras(deviceId: string): Promise<CaptureCameraInfo[]> {
-    const adapter = this.previewAdapter(deviceId)
-    return adapter.listCameras!(deviceId)
+    const channel = this.previewChannel(deviceId)
+    return channel.listCameras!(deviceId)
   }
 
-  /** 预览/枚举能力路由：按 transport 找适配器并校验可选能力已实现 */
-  private previewAdapter(deviceId: string): CaptureAdapter & Required<Pick<CaptureAdapter, 'startPreview' | 'stopPreview' | 'listCameras'>> {
+  /** 预览/枚举能力路由：按 transport 找通道并校验可选能力已实现 */
+  private previewChannel(deviceId: string): CaptureChannel & Required<Pick<CaptureChannel, 'startPreview' | 'stopPreview' | 'listCameras'>> {
     const transport = deviceId.split(':')[0]
-    const adapter = this.adapters.get(transport)
-    if (!adapter?.startPreview || !adapter.stopPreview || !adapter.listCameras) {
-      throw captureError('ADAPTER_UNAVAILABLE', `设备 ${deviceId} 不支持实时预览/摄像头枚举`)
+    const channel = this.channels.get(transport)
+    if (!channel?.startPreview || !channel.stopPreview || !channel.listCameras) {
+      throw captureError('CHANNEL_UNAVAILABLE', `设备 ${deviceId} 不支持实时预览/摄像头枚举`)
     }
-    return adapter as CaptureAdapter & Required<Pick<CaptureAdapter, 'startPreview' | 'stopPreview' | 'listCameras'>>
+    return channel as CaptureChannel & Required<Pick<CaptureChannel, 'startPreview' | 'stopPreview' | 'listCameras'>>
   }
 
-  /** 采集：路由到设备所属适配器执行；同一设备串行化（硬件一次一格）。失败抛 CaptureError */
+  /** 采集：路由到设备所属通道执行；同一设备串行化（硬件一次一格）。失败抛 CaptureError */
   async capture(req: CaptureRequest): Promise<CaptureResult> {
     try {
       // 显式 deviceId 优先；缺省按域默认设备自动定位（就绪才生效），仍无则显式报错
@@ -252,11 +252,11 @@ export class CaptureService {
         throw captureError('VALIDATION_FAILED', '缺少 deviceId 且无就绪的默认设备')
       }
       const transport = deviceId.split(':')[0]
-      const adapter = this.adapters.get(transport)
-      if (!adapter) {
-        throw captureError('ADAPTER_UNAVAILABLE', `未知接入方式: ${transport}`)
+      const channel = this.channels.get(transport)
+      if (!channel) {
+        throw captureError('CHANNEL_UNAVAILABLE', `未知接入方式: ${transport}`)
       }
-      const devices = await adapter.listDevices()
+      const devices = await channel.listDevices()
       const device = devices.find(d => d.id === deviceId)
       if (!device) {
         throw captureError('DEVICE_NOT_FOUND', `未找到设备: ${deviceId}`)
@@ -265,13 +265,13 @@ export class CaptureService {
         throw captureError('DEVICE_OFFLINE', `设备离线: ${device.displayName}`)
       }
       if (device.status === 'unavailable') {
-        throw captureError('ADAPTER_UNAVAILABLE', `设备适配器不可用: ${String(device.meta.note ?? transport)}`)
+        throw captureError('CHANNEL_UNAVAILABLE', `设备通道不可用: ${String(device.meta.note ?? transport)}`)
       }
       const prev = this.locks.get(deviceId) ?? Promise.resolve()
       // 保存目录是平台内部事务：恒注入统一根目录 files/capture/，渲染层不可指定（防任意路径写文件）
-      const reqWithDir: AdapterCaptureRequest = { ...req, deviceId, saveDir: this.defaultSaveDir }
+      const reqWithDir: ChannelCaptureRequest = { ...req, deviceId, saveDir: this.defaultSaveDir }
       // 链上已 catch（登记锁不吞结果），单分支即可
-      const task = prev.then(() => adapter.capture(reqWithDir, device))
+      const task = prev.then(() => channel.capture(reqWithDir, device))
       this.locks.set(deviceId, task.catch(() => undefined))
       this.log('info', `开始采集 ${device.displayName}`, { deviceId: device.id, transport })
       const result = await task
@@ -286,7 +286,7 @@ export class CaptureService {
   }
 
   destroy(): void {
-    for (const a of this.adapters.values()) { a.destroy?.() }
+    for (const a of this.channels.values()) { a.destroy?.() }
   }
 
   private log(level: 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>): void {

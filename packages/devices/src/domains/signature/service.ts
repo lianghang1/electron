@@ -1,11 +1,11 @@
 import type { Logger } from '@shell/kernel/logger'
 import type { SignatureConfig, SignatureDeviceOverrides, SignDeviceConfig } from '@shell/shared'
 import type { DeviceHost } from '../../host/device-host'
-import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './types'
+import type { SignChannel, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from './device-contracts'
 
 import { createDeviceStore } from '../../storage/device-store'
-import { DllSignAdapter } from './adapters/dll-adapter'
-import { WsSignAdapter } from './adapters/ws-adapter'
+import { DllSignChannel } from './channels/dll-channel'
+import { WsSignChannel } from './channels/ws-channel'
 import { BUILT_IN_SIGNATURE_CONFIGS } from './configs'
 import { signatureError, toSignatureError } from './errors'
 
@@ -60,12 +60,12 @@ function migrateConfig(raw: StoredSignatureConfig): SignDeviceConfig[] {
 
 /**
  * SignatureService = 手写签名域统一 API（与 IdCardService 同构的归一化层）。
- * 会话约束：一个签名板同时只有一个会话，由本层集中持有（适配器各自兜底校验）。
+ * 会话约束：一个签名板同时只有一个会话，由本层集中持有（通道各自兜底校验）。
  * 笔迹点只经 onStroke 回调转发给会话发起方（ipc 层绑定 webContents.send 推送），
  * 不写日志（板面笔迹视同用户输入内容）。失败统一抛 SignatureError。
  */
 export class SignatureService {
-  private readonly adapters: Map<string, SignAdapter>
+  private readonly channels: Map<string, SignChannel>
   /** 活动会话：设备 ID + 发起方的笔迹推送回调 */
   private active: { deviceId: string, onStroke: (point: SignStrokePoint) => void } | null = null
   /** 设备档案（ws/dll 双路线，见 configs.ts；写穿 device-signature.json，读侧内存直取） */
@@ -74,11 +74,11 @@ export class SignatureService {
 
   constructor(host: DeviceHost, resourcesRoot: string, private readonly logger: Logger) {
     this.configs = migrateConfig(this.configStore.load())
-    this.adapters = new Map<string, SignAdapter>([
+    this.channels = new Map<string, SignChannel>([
       // dll 路线经设备守护进程执行（崩溃隔离在 host 进程），档案驱动枚举
-      ['dll', new DllSignAdapter(host, resourcesRoot, () => this.configs)],
+      ['dll', new DllSignChannel(host, resourcesRoot, () => this.configs)],
       // ws 路线主进程直连（签名屏 PadViewer4，设备侧产位图），按档案多连接枚举
-      ['ws', new WsSignAdapter(() => this.configs)],
+      ['ws', new WsSignChannel(() => this.configs)],
     ])
   }
 
@@ -114,7 +114,7 @@ export class SignatureService {
   }
 
   async listDevices(): Promise<SignDevice[]> {
-    const groups = await Promise.all([...this.adapters.values()].map(a => a.listDevices().catch(() => [])))
+    const groups = await Promise.all([...this.channels.values()].map(a => a.listDevices().catch(() => [])))
     return groups.flat()
   }
 
@@ -126,9 +126,9 @@ export class SignatureService {
       if (!deviceId) {
         throw signatureError('DEVICE_NOT_FOUND', '无可用签名设备')
       }
-      const adapter = this.adapters.get(deviceId.split(':')[0])
-      if (!adapter) {
-        throw signatureError('ADAPTER_UNAVAILABLE', `未知接入方式: ${deviceId.split(':')[0]}`)
+      const channel = this.channels.get(deviceId.split(':')[0])
+      if (!channel) {
+        throw signatureError('CHANNEL_UNAVAILABLE', `未知接入方式: ${deviceId.split(':')[0]}`)
       }
       const device = devices.find(d => d.id === deviceId)
       if (!device) {
@@ -139,13 +139,13 @@ export class SignatureService {
       }
       if (device.status !== 'ready') {
         throw signatureError(
-          device.status === 'unavailable' ? 'ADAPTER_UNAVAILABLE' : 'DEVICE_OFFLINE',
+          device.status === 'unavailable' ? 'CHANNEL_UNAVAILABLE' : 'DEVICE_OFFLINE',
           `签名设备不可用: ${String(device.meta.note ?? device.status)}`,
         )
       }
       // 先挂会话再启动：start 期间到达的首个笔迹点不丢；失败路径回滚
       this.active = { deviceId, onStroke }
-      const result = await adapter.start(device, p => this.routeStroke(p))
+      const result = await channel.start(device, p => this.routeStroke(p))
       this.log('info', `签名会话开始 ${deviceId}`)
       return result
     }
@@ -159,12 +159,12 @@ export class SignatureService {
 
   /** 结束会话并回收完整笔迹（无会话抛 SESSION_NOT_ACTIVE） */
   async stop(): Promise<SignSessionResult> {
-    const adapter = this.activeAdapter()
-    if (!adapter) {
+    const channel = this.activeChannel()
+    if (!channel) {
       throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
     }
     try {
-      const result = await adapter.stop()
+      const result = await channel.stop()
       this.active = null
       this.log('info', `签名会话结束: ${result.strokeCount} 笔画`)
       return result
@@ -176,33 +176,33 @@ export class SignatureService {
   }
 
   async clear(): Promise<void> {
-    const adapter = this.activeAdapter()
-    if (!adapter) {
+    const channel = this.activeChannel()
+    if (!channel) {
       throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
     }
-    await adapter.clear()
+    await channel.clear()
   }
 
   async cancel(): Promise<void> {
-    const adapter = this.activeAdapter()
-    if (!adapter) {
+    const channel = this.activeChannel()
+    if (!channel) {
       throw signatureError('SESSION_NOT_ACTIVE', '无进行中的签名会话')
     }
-    await adapter.cancel()
+    await channel.cancel()
     this.active = null
     this.log('info', '签名会话取消')
   }
 
   destroy(): void {
-    for (const a of this.adapters.values()) { a.destroy?.() }
+    for (const a of this.channels.values()) { a.destroy?.() }
     this.active = null
   }
 
-  private activeAdapter(): SignAdapter | null {
+  private activeChannel(): SignChannel | null {
     if (!this.active) {
       return null
     }
-    return this.adapters.get(this.active.deviceId.split(':')[0]) ?? null
+    return this.channels.get(this.active.deviceId.split(':')[0]) ?? null
   }
 
   private routeStroke(point: SignStrokePoint): void {

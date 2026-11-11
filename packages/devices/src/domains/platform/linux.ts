@@ -1,4 +1,4 @@
-import type { DevicePlatform } from './platform-types'
+import type { DevicePlatform } from './device-platform'
 import { readFileSync } from 'node:fs'
 
 /** 国产化 Linux 发行版标识（/etc/os-release 的 ID/ID_LIKE 命中即判 linux-cn） */
@@ -14,7 +14,7 @@ function detectLinuxCn(): boolean {
   }
 }
 
-/** Linux 平台：native 对接 so，winspool 不适用；国产化发行版按适配差异扩展 */
+/** Linux 平台：native 对接 so，winspool 不适用；国产化发行版按接入差异扩展 */
 export function detectLinuxPlatform(): DevicePlatform {
   return {
     id: detectLinuxCn() ? 'linux-cn' : 'linux',

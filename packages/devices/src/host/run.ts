@@ -1,6 +1,6 @@
 import type { CaptureDevice, CaptureDeviceConfig, SignDevice } from '@shell/shared'
-import type { IcCardData, IcCardDriver, IcCardReadRequest, IcCardWriteRequest } from '../domains/iccard/types'
-import type { IdCardData, IdCardDriver, IdReaderDevice } from '../domains/idcard/types'
+import type { IcCardData, IcCardDriver, IcCardReadRequest, IcCardWriteRequest } from '../domains/iccard/device-contracts'
+import type { IdCardData, IdCardDriver, IdReaderDevice } from '../domains/idcard/device-contracts'
 import type { HostError, HostRequest, HostResponse } from './protocol'
 import { existsSync, readdirSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
@@ -86,11 +86,11 @@ function locateCardDriver<D extends { dllFile: string, dllPresent: () => boolean
   errorOf: CardErrorFactory,
 ): D {
   if (!koffiAvailable()) {
-    throw errorOf('ADAPTER_UNAVAILABLE', '未安装 koffi 依赖（npm i koffi）')
+    throw errorOf('CHANNEL_UNAVAILABLE', '未安装 koffi 依赖（npm i koffi）')
   }
   const Ctor = drivers[payload.driverName]
   if (!Ctor) {
-    throw errorOf('ADAPTER_UNAVAILABLE', `未实现品牌驱动: ${payload.driverName}`, { brand: payload.driverName })
+    throw errorOf('CHANNEL_UNAVAILABLE', `未实现品牌驱动: ${payload.driverName}`, { brand: payload.driverName })
   }
   const driver = new Ctor(payload.resourcesRoot)
   if (!driver.dllPresent()) {
@@ -210,7 +210,7 @@ registerDomainMethods('iccard', {
     const driver = locateCardDriver(p, IC_DRIVERS, icCardError)
     // 写卡为可选能力：先校验再 open（无该能力的驱动不白开一次设备）
     if (!driver.writeIcCard) {
-      throw icCardError('ADAPTER_UNAVAILABLE', `驱动 ${p.driverName} 不支持 IC 卡写入（capabilities 以 listReaders 为准）`)
+      throw icCardError('CHANNEL_UNAVAILABLE', `驱动 ${p.driverName} 不支持 IC 卡写入（capabilities 以 listReaders 为准）`)
     }
     withCardSession(driver, (d) => {
       d.writeIcCard!(p.req)
@@ -236,7 +236,7 @@ registerDomainMethods('print', {
 
 // ── capture 域：DLL 路线探测（koffi 可用性 + DLL 就位收敛进守护进程，主进程零 native 依赖） ──
 
-/** dll-adapter 发送的档案载荷：dll 段由 core 内部 DLL 注册表回填（档案本体不含，守护进程只认该形状） */
+/** dll-channel 发送的档案载荷：dll 段由 core 内部 DLL 注册表回填（档案本体不含，守护进程只认该形状） */
 type DaemonCaptureProfile = CaptureDeviceConfig & { dll?: { file: string, functions?: Record<string, string> } }
 
 /** DLL 域配置探测：平台不支持/koffi 缺失 → unavailable；DLL 缺席 → offline；就位 → ready（待厂商档案后真正可用） */
@@ -299,7 +299,7 @@ function dispatch(method: string, payload: unknown): unknown {
   const dot = method.indexOf('.')
   const handler = dot > 0 ? DOMAIN_METHODS.get(method.slice(0, dot))?.get(method) : undefined
   if (!handler) {
-    throw idCardError('ADAPTER_UNAVAILABLE', `守护进程未实现方法: ${method}`)
+    throw idCardError('CHANNEL_UNAVAILABLE', `守护进程未实现方法: ${method}`)
   }
   return handler(payload)
 }

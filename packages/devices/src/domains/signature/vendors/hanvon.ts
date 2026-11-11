@@ -1,4 +1,4 @@
-import type { SignDevice } from '../types'
+import type { SignDevice } from '../device-contracts'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 

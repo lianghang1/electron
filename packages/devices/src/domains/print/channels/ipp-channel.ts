@@ -1,5 +1,5 @@
 import type { ChannelId, UnifiedPrinter } from '@shell/shared'
-import type { PreparedJob } from './channel-types'
+import type { PreparedJob } from './prepared-job'
 import type { ChannelOutcome, PrintChannel } from './print-channel'
 import { printError } from '../errors'
 

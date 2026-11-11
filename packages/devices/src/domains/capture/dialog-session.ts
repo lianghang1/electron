@@ -201,7 +201,7 @@ export class CaptureDialogSessionService {
     const deviceId = this.previewDevice
     this.previewDevice = null
     if (deviceId) {
-      // 预览会话可能已被适配器回收（设备掉线等），清理失败不阻断关闭
+      // 预览会话可能已被通道回收（设备掉线等），清理失败不阻断关闭
       void this.deps.capture.stopPreview(deviceId).catch(() => {})
     }
   }

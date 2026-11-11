@@ -1,16 +1,16 @@
-import type { AdapterCaptureRequest, CaptureAdapter, CaptureDevice, CaptureResult } from '@shell/shared'
+import type { CaptureChannel, CaptureDevice, CaptureResult, ChannelCaptureRequest } from '@shell/shared'
 import { execFile } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import path from 'node:path'
-import process from 'node:process'
+import { isWindowsHost } from '../../platform'
 import { captureError } from '../errors'
 
 /**
- * WIA 标准驱动适配器（Windows 自带 WIA COM，高拍仪/扫描仪装驱动即可用，不绑厂商）。
+ * WIA 标准驱动通道（Windows 自带 WIA COM，高拍仪/扫描仪装驱动即可用，不绑厂商）。
  * 通过 PowerShell 脚本调用 WIA COM：枚举设备 / 无界面转存图片。
  * 未插设备 → 设备列表为空；插上 WIA 设备后无需改任何代码即可出图。
  */
-export class WiaAdapter implements CaptureAdapter {
+export class WiaChannel implements CaptureChannel {
   readonly transport = 'wia' as const
 
   private run(script: string): Promise<string> {
@@ -29,7 +29,7 @@ export class WiaAdapter implements CaptureAdapter {
   }
 
   async listDevices(): Promise<CaptureDevice[]> {
-    if (process.platform !== 'win32') { return [] }
+    if (!isWindowsHost()) { return [] }
     const script = `
       $ErrorActionPreference = 'Stop'
       try {
@@ -63,7 +63,7 @@ export class WiaAdapter implements CaptureAdapter {
     }
   }
 
-  async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
+  async capture(req: ChannelCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
     const wiaId = String(device.meta.wiaDeviceId ?? '')
     if (!wiaId) { throw captureError('VALIDATION_FAILED', '缺少 WIA DeviceID') }
 

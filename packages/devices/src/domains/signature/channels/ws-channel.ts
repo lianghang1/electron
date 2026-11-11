@@ -1,16 +1,16 @@
 import type { SignDeviceConfig, SignWsProfile } from '@shell/shared'
-import type { SignAdapter, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from '../types'
+import type { SignChannel, SignDevice, SignSessionResult, SignStartResult, SignStrokePoint } from '../device-contracts'
 import { signatureError } from '../errors'
 import { CamSdkPadSession, probeCamSdkPad } from '../vendors/camsdk-pad'
 
 /**
- * ws 路线签名适配器（CamSDK 签名屏 PadViewer4，签名域，多档案）。
+ * ws 路线签名通道（CamSDK 签名屏 PadViewer4，签名域，多档案）。
  * 一条档案 = 一条服务连接，服务下全部签名屏经该连接枚举（可用性以服务探活为准）。
  * 主进程直连 ws（纯 JSON 文本帧协议、无 native 依赖），不经设备守护进程。
  * 设备侧产位图模式：签名图/指纹图由 PadViewer 回推（strokes 恒空），笔迹点回调不使用。
  * 厂商会话协议内聚 vendors/camsdk-pad.ts（与 idcard/capture 域同构的厂商拆分）。
  */
-export class WsSignAdapter implements SignAdapter {
+export class WsSignChannel implements SignChannel {
   readonly transport = 'ws' as const
 
   /** 活动会话（签名屏一次只允许一个会话，service 层另有集中互斥） */
@@ -18,7 +18,7 @@ export class WsSignAdapter implements SignAdapter {
 
   constructor(private readonly getProfiles: () => SignDeviceConfig[]) {}
 
-  /** ws 档案子集（union 收窄：dll 档案不经本适配器） */
+  /** ws 档案子集（union 收窄：dll 档案不经本通道） */
   private wsProfiles(): SignWsProfile[] {
     return this.getProfiles().filter((p): p is SignWsProfile => p.transport === 'ws')
   }
@@ -89,7 +89,7 @@ export class WsSignAdapter implements SignAdapter {
   }
 
   async clear(): Promise<void> {
-    throw signatureError('ADAPTER_UNAVAILABLE', '签名屏不支持远程清板（请在签名屏上重写）')
+    throw signatureError('CHANNEL_UNAVAILABLE', '签名屏不支持远程清板（请在签名屏上重写）')
   }
 
   async cancel(): Promise<void> {

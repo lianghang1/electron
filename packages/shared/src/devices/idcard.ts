@@ -92,6 +92,6 @@ export type IdReaderErrorCode
   = | 'DEVICE_NOT_FOUND'
     | 'DEVICE_OFFLINE'
     | 'READ_FAILED'
-    | 'ADAPTER_UNAVAILABLE'
+    | 'CHANNEL_UNAVAILABLE'
     | 'VALIDATION_FAILED'
     | 'UNKNOWN'

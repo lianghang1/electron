@@ -1,29 +1,20 @@
-import type { IdReaderErrorCode } from './types'
+import type { IdReaderErrorCode } from './device-contracts'
 import { HostRemoteError } from '../../host/errors'
+import { DeviceError, isDeviceError } from '../../runtime/errors'
 
-/** idcard 统一错误（PII 域：错误信息不得携带证件号/照片）：适配器失败必须收敛为该类型 */
-export class IdCardError extends Error {
-  readonly code: IdReaderErrorCode
-  readonly detail?: unknown
+/** idcard 统一错误（PII 域：错误信息不得携带证件号/照片）：形状与归一逻辑共用 runtime 底座。 */
+const ERROR_NAME = 'IdCardError'
 
-  constructor(code: IdReaderErrorCode, message: string, detail?: unknown) {
-    super(message)
-    this.name = 'IdCardError'
-    this.code = code
-    this.detail = detail
-  }
+export function idCardError(code: IdReaderErrorCode, message: string, detail?: unknown): DeviceError<IdReaderErrorCode> {
+  return new DeviceError(code, message, detail, ERROR_NAME)
 }
 
-export function idCardError(code: IdReaderErrorCode, message: string, detail?: unknown): IdCardError {
-  return new IdCardError(code, message, detail)
-}
-
-export function toIdCardError(err: unknown): IdCardError {
-  if (err instanceof IdCardError) { return err }
-  // 守护进程边界错误按原码/detail 还原（HostRemoteError 仅搬运远端 name/code/message/detail，不还原会丢真实错误码）
-  if (err instanceof HostRemoteError && err.name === 'IdCardError') {
-    return new IdCardError(err.code as IdReaderErrorCode, err.message, err.detail)
+/** 未知异常 → 统一错误；守护进程边界按原 name/code/detail 还原，不丢真实错误码。 */
+export function toIdCardError(err: unknown): DeviceError<IdReaderErrorCode> {
+  if (isDeviceError<IdReaderErrorCode>(err) && err.name === ERROR_NAME) { return err }
+  if (err instanceof HostRemoteError && err.name === ERROR_NAME) {
+    return new DeviceError(err.code as IdReaderErrorCode, err.message, err.detail, ERROR_NAME)
   }
   const message = err instanceof Error ? err.message : String(err)
-  return new IdCardError('UNKNOWN', message)
+  return new DeviceError('UNKNOWN', message, undefined, ERROR_NAME)
 }

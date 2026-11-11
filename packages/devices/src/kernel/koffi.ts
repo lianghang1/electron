@@ -38,9 +38,9 @@ function packagedKoffiPresent(): boolean {
   return Boolean(packagedKoffiDir && existsSync(path.join(packagedKoffiDir, 'package.json')))
 }
 
-/** koffi 加载失败的结构化错误：code 穿越守护进程 IPC 供调用链分支（ADAPTER_UNAVAILABLE 为设备域通用码） */
+/** koffi 加载失败的结构化错误：code 穿越守护进程 IPC 供调用链分支（CHANNEL_UNAVAILABLE 为设备域通用码） */
 class KoffiUnavailableError extends Error {
-  readonly code = 'ADAPTER_UNAVAILABLE'
+  readonly code = 'CHANNEL_UNAVAILABLE'
   readonly detail?: unknown
 
   constructor(message: string, detail?: unknown) {
@@ -66,7 +66,7 @@ export function koffiAvailable(): boolean {
 
 /**
  * 运行时加载 koffi 模块（构建期零依赖）；
- * 缺失时抛 ADAPTER_UNAVAILABLE（dll-adapter 先用 koffiAvailable 预检产出设备状态，这里兜底）。
+ * 缺失时抛 CHANNEL_UNAVAILABLE（dll-channel 先用 koffiAvailable 预检产出设备状态，这里兜底）。
  */
 export function requireKoffi(detail?: unknown): KoffiModule {
   let koffi: KoffiModule

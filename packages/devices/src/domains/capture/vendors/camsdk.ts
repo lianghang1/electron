@@ -1,5 +1,5 @@
 import type { CaptureCameraInfo } from '@shell/shared'
-import type { CaptureVendor, WsEndpoint } from './vendor-types'
+import type { CaptureVendor, WsEndpoint } from './vendor-contracts'
 import { withWsSession } from '../../../kernel/channel/ws-channel'
 import { captureError } from '../errors'
 import { CamSdkPreviewSession } from './camsdk-preview'

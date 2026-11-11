@@ -2,8 +2,8 @@ import type { IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport }
 
 export type { IdCardData, IdReaderDevice, IdReaderErrorCode, IdReaderTransport }
 
-/** 读卡适配器统一接口（身份证域）—— 新接入方式 = 实现本接口。失败抛 IdCardError（code 见 IdReaderErrorCode） */
-export interface IdCardAdapter {
+/** 读卡通道统一接口（身份证域）—— 新接入方式 = 实现本接口。失败抛 IdCardError（code 见 IdReaderErrorCode） */
+export interface IdCardChannel {
   readonly transport: IdReaderTransport
   /** 仅枚举具备身份证能力的读卡器 */
   listReaders: () => Promise<IdReaderDevice[]>
@@ -15,7 +15,7 @@ export interface IdCardAdapter {
 /**
  * 品牌驱动统一低层接口（dll 路线，身份证域）—— "一个厂商 = 一个驱动类"。
  * 身份（brand/displayName）、DLL 出厂位置（dllFile）、硬件参数（port 等由实现自带）与
- * 行为（open/close + readCard）全部内聚在驱动类里；适配器只做路由 + 生命周期 + 错误统一。
+ * 行为（open/close + readCard）全部内聚在驱动类里；通道只做路由 + 生命周期 + 错误统一。
  */
 export interface IdCardDriver {
   readonly brand: string

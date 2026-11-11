@@ -1,29 +1,20 @@
 import type { CaptureErrorCode } from '@shell/shared'
 import { HostRemoteError } from '../../host/errors'
+import { DeviceError, isDeviceError } from '../../runtime/errors'
 
-/** capture 统一错误：适配器失败必须收敛为该类型 */
-export class CaptureErrorImpl extends Error {
-  readonly code: CaptureErrorCode
-  readonly detail?: unknown
+/** capture 统一错误：通道失败必须收敛为 DeviceError<CaptureErrorCode>；形状与归一逻辑共用 runtime 底座。 */
+const ERROR_NAME = 'CaptureError'
 
-  constructor(code: CaptureErrorCode, message: string, detail?: unknown) {
-    super(message)
-    this.name = 'CaptureError'
-    this.code = code
-    this.detail = detail
-  }
+export function captureError(code: CaptureErrorCode, message: string, detail?: unknown): DeviceError<CaptureErrorCode> {
+  return new DeviceError(code, message, detail, ERROR_NAME)
 }
 
-export function captureError(code: CaptureErrorCode, message: string, detail?: unknown): CaptureErrorImpl {
-  return new CaptureErrorImpl(code, message, detail)
-}
-
-export function toCaptureError(err: unknown): CaptureErrorImpl {
-  if (err instanceof CaptureErrorImpl) { return err }
-  // 守护进程边界错误按原码/detail 还原（HostRemoteError 仅搬运远端 name/code/message/detail，不还原会丢真实错误码）
-  if (err instanceof HostRemoteError && err.name === 'CaptureError') {
-    return new CaptureErrorImpl(err.code as CaptureErrorCode, err.message, err.detail)
+/** 未知异常 → 统一错误；守护进程边界按原 name/code/detail 还原，不丢真实错误码。 */
+export function toCaptureError(err: unknown): DeviceError<CaptureErrorCode> {
+  if (isDeviceError<CaptureErrorCode>(err) && err.name === ERROR_NAME) { return err }
+  if (err instanceof HostRemoteError && err.name === ERROR_NAME) {
+    return new DeviceError(err.code as CaptureErrorCode, err.message, err.detail, ERROR_NAME)
   }
   const message = err instanceof Error ? err.message : String(err)
-  return new CaptureErrorImpl('UNKNOWN', message)
+  return new DeviceError('UNKNOWN', message, undefined, ERROR_NAME)
 }

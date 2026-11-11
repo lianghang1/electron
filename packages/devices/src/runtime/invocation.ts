@@ -4,6 +4,7 @@
  */
 import type { LeaseOwner, LeaseRegistry } from './session'
 import type { DeviceTelemetry } from './telemetry'
+import { withDeadline } from './deadline'
 import { deviceError, toDeviceError } from './errors'
 
 /** 结构化入参校验契约：zod schema 天然满足，避免绑定具体库的泛型参数。 */
@@ -38,16 +39,6 @@ export interface InvocationPipeline {
   run: <I, O>(ctx: InvocationContext, input: unknown, step: InvocationStep<I, O>) => Promise<O>
 }
 
-function withTimeout<T>(task: Promise<T>, ms: number, label: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(deviceError('TIMEOUT', `调用超时：${label}`, { timeoutMs: ms })), ms)
-    task.then(
-      (value) => { clearTimeout(timer); resolve(value) },
-      (err) => { clearTimeout(timer); reject(err) },
-    )
-  })
-}
-
 export function createInvocationPipeline(options: PipelineOptions): InvocationPipeline {
   const now = options.now ?? Date.now
 
@@ -75,7 +66,7 @@ export function createInvocationPipeline(options: PipelineOptions): InvocationPi
 
         const call = Promise.resolve().then(() => step.handle(parsed.data, ctx))
         const result = step.timeoutMs
-          ? await withTimeout(call, step.timeoutMs, ctx.methodName)
+          ? await withDeadline(call, step.timeoutMs, ms => deviceError('TIMEOUT', `调用超时：${ctx.methodName}`, { timeoutMs: ms }))
           : await call
         ok = true
         return result

@@ -1,4 +1,4 @@
-import type { AdapterCaptureRequest, CaptureAdapter, CaptureDevice, CaptureDeviceConfig, CaptureResult } from '@shell/shared'
+import type { CaptureChannel, CaptureDevice, CaptureDeviceConfig, CaptureResult, ChannelCaptureRequest } from '@shell/shared'
 import type { DeviceHost } from '../../../host/device-host'
 import { CAPTURE_DLL_BINARIES } from '../configs'
 import { captureError } from '../errors'
@@ -7,14 +7,14 @@ import { captureError } from '../errors'
 type DaemonProfile = CaptureDeviceConfig & { dll?: { file: string, functions?: Record<string, string> } }
 
 /**
- * DLL 路线适配器（厂商 C 接口 SDK，配置驱动：品牌差异在设备配置数据里，不改适配器代码）。
+ * DLL 路线通道（厂商 C 接口 SDK，配置驱动：品牌差异在设备配置数据里，不改通道代码）。
  *
- * DLL 的 koffi 调用与探测全部收敛在设备守护进程内执行（本适配器仅做 host RPC 路由）：
+ * DLL 的 koffi 调用与探测全部收敛在设备守护进程内执行（本通道仅做 host RPC 路由）：
  * native 崩溃只炸守护进程，由 DeviceHost 退避重启自愈。未来厂商签名档案落地时，
- * 在守护进程侧（host/run.ts capture 域方法表）补对应方法即可，本适配器不再改动。
+ * 在守护进程侧（host/run.ts capture 域方法表）补对应方法即可，本通道不再改动。
  * DLL 路径与函数签名由 core 内部注册表持有（不进档案/持久化），发送前按档案 id 组装。
  */
-export class DllAdapter implements CaptureAdapter {
+export class DllChannel implements CaptureChannel {
   readonly transport = 'dll' as const
 
   constructor(
@@ -42,9 +42,9 @@ export class DllAdapter implements CaptureAdapter {
     })
   }
 
-  async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
+  async capture(req: ChannelCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
     throw captureError(
-      'ADAPTER_UNAVAILABLE',
+      'CHANNEL_UNAVAILABLE',
       'DLL 路线待厂商签名档案落地（拿到 SDK 文档后在守护进程内实现 capture 域方法）',
       { deviceId: device.id },
     )

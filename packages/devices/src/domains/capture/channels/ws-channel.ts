@@ -1,5 +1,5 @@
-import type { AdapterCaptureRequest, CaptureAdapter, CaptureCameraInfo, CaptureDevice, CaptureDeviceConfig, CaptureResult } from '@shell/shared'
-import type { CapturePreviewSession } from '../vendors/vendor-types'
+import type { CaptureCameraInfo, CaptureChannel, CaptureDevice, CaptureDeviceConfig, CaptureResult, ChannelCaptureRequest } from '@shell/shared'
+import type { CapturePreviewSession } from '../vendors/vendor-contracts'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -9,11 +9,11 @@ import { diagnoseCamSdkService, ensureCamSdkService } from '../vendors/camsdk-se
 import { getCaptureVendor } from '../vendors/registry'
 
 /**
- * WebSocket 本地服务适配器（厂商协议已模块化，本类只做路由与落盘）：
+ * WebSocket 本地服务通道（厂商协议已模块化，本类只做路由与落盘）：
  * 帧编解码与会话语义在 vendors/（camsdk=CamSDKServer JSON 帧、dianyipai=点易拍 BaucheSDK 二进制帧），
  * 由 config.ws.protocol 分发（缺省 dianyipai）。
  */
-export class WsAdapter implements CaptureAdapter {
+export class WsChannel implements CaptureChannel {
   readonly transport = 'ws' as const
 
   /** 常驻预览会话（deviceId → 会话）：capture 优先走会话内拍照，配置热重建时统一销毁 */
@@ -67,7 +67,7 @@ export class WsAdapter implements CaptureAdapter {
       return { value: 'offline', note: await this.offlineNote(ctx.brand, ws) }
     }
     if (!ctx.verified) {
-      return { value: 'unavailable', note: '服务在线，但该设备 ws 协议帧待真机实测，暂未适配采集' }
+      return { value: 'unavailable', note: '服务在线，但该设备 ws 协议帧待真机实测，暂未接入采集' }
     }
     const vendor = getCaptureVendor(ws.protocol)
     if (!vendor) {
@@ -88,11 +88,11 @@ export class WsAdapter implements CaptureAdapter {
     }
   }
 
-  async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
+  async capture(req: ChannelCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
     const { config, ws } = this.findConfig(device.id)
     // 协议未经验证（verified: false）：服务探活在 listDevices 可见，但绝不套用其他厂商协议采集
     if (ws.verified === false) {
-      throw captureError('ADAPTER_UNAVAILABLE', `${config.brand}设备 ws 协议帧待真机实测（不套用点易拍协议），暂未适配采集`)
+      throw captureError('CHANNEL_UNAVAILABLE', `${config.brand}设备 ws 协议帧待真机实测（不套用点易拍协议），暂未接入采集`)
     }
     // 预览会话开启时走会话内拍照（摄像头不重开）；否则按厂商协议一次性开采集
     const session = this.previews.get(device.id)
@@ -140,7 +140,7 @@ export class WsAdapter implements CaptureAdapter {
     const { config, ws } = this.findConfig(deviceId)
     const vendor = this.vendorOf(config, ws)
     if (!vendor.createPreviewSession || !vendor.listCameras) {
-      throw captureError('ADAPTER_UNAVAILABLE', `${config.brand}设备不支持实时预览/摄像头枚举`)
+      throw captureError('CHANNEL_UNAVAILABLE', `${config.brand}设备不支持实时预览/摄像头枚举`)
     }
     const { host, port } = parseWsUrl(ws.url)
     let reachable = await tcpProbe(host, port)
@@ -157,7 +157,7 @@ export class WsAdapter implements CaptureAdapter {
   private vendorOf(config: CaptureDeviceConfig, ws: NonNullable<CaptureDeviceConfig['ws']>): NonNullable<ReturnType<typeof getCaptureVendor>> {
     const vendor = getCaptureVendor(ws.protocol)
     if (!vendor) {
-      throw captureError('ADAPTER_UNAVAILABLE', `${config.brand}设备配置了未知的 ws 协议: ${String(ws.protocol)}`)
+      throw captureError('CHANNEL_UNAVAILABLE', `${config.brand}设备配置了未知的 ws 协议: ${String(ws.protocol)}`)
     }
     return vendor
   }
@@ -173,7 +173,7 @@ export class WsAdapter implements CaptureAdapter {
     return '本地服务未运行（需安装厂商 SDK 服务端）'
   }
 
-  private async saveCaptureBase64(req: AdapterCaptureRequest, profileId: string, base64: string): Promise<string> {
+  private async saveCaptureBase64(req: ChannelCaptureRequest, profileId: string, base64: string): Promise<string> {
     const dir = req.saveDir
     await mkdir(dir, { recursive: true })
     const file = path.join(dir, `ws-${profileId}-${Date.now()}.jpg`)
@@ -185,7 +185,7 @@ export class WsAdapter implements CaptureAdapter {
   private findConfig(deviceId: string): { config: CaptureDeviceConfig, ws: NonNullable<CaptureDeviceConfig['ws']> } {
     const config = this.configs.find(p => `ws:${p.id}` === deviceId)
     if (!config?.ws) {
-      throw captureError('DEVICE_NOT_FOUND', `ws 适配器下不存在设备: ${deviceId}`)
+      throw captureError('DEVICE_NOT_FOUND', `ws 通道下不存在设备: ${deviceId}`)
     }
     return { config, ws: config.ws }
   }

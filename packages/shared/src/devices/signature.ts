@@ -74,7 +74,7 @@ export interface SignStroke {
 export type SignErrorCode
   = | 'DEVICE_NOT_FOUND'
     | 'DEVICE_OFFLINE'
-    | 'ADAPTER_UNAVAILABLE'
+    | 'CHANNEL_UNAVAILABLE'
     | 'SESSION_ACTIVE'
     | 'SESSION_NOT_ACTIVE'
     | 'PROTOCOL_PENDING'

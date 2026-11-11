@@ -1,5 +1,5 @@
 import type { PaperSpec, PrintPayload } from '@shell/shared'
-import type { PreparedContent } from './channels/channel-types'
+import type { PreparedContent } from './channels/prepared-job'
 import type { UrlLogFn } from './url-content'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname } from 'node:path'
@@ -11,7 +11,7 @@ import { downloadUrlContent } from './url-content'
  * 内容归一化：三类负载（HTML/文件/URL）→ 通道可执行形态（HTML / PDF）。
  * 用判别联合的分派函数按 kind 收窄后调用，参数类型由编译器逐支检查。
  */
-export interface NormalizeContext {
+export interface PrintContentContext {
   archiveDir: string
   jobId: string
   paper: PaperSpec | undefined
@@ -20,7 +20,7 @@ export interface NormalizeContext {
   allowedOrigins: readonly string[]
 }
 
-export function normalizeContent(payload: PrintPayload, ctx: NormalizeContext): Promise<PreparedContent> | PreparedContent {
+export function preparePrintContent(payload: PrintPayload, ctx: PrintContentContext): Promise<PreparedContent> | PreparedContent {
   switch (payload.kind) {
     case 'html':
       return { type: 'html', html: payload.html }

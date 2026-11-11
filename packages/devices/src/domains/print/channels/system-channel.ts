@@ -1,17 +1,17 @@
 import type { PaperSpec, PrintOptions, UnifiedPrinter } from '@shell/shared'
 import type { HiddenWindowPool } from '../hidden-window'
-import type { PreparedJob } from './channel-types'
+import type { PreparedJob } from './prepared-job'
 import type { ChannelOutcome, PrintChannel } from './print-channel'
 import { spawn } from 'node:child_process'
-
 import { existsSync } from 'node:fs'
+
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import process from 'node:process'
+import { isWindowsHost } from '../../platform'
 import { printError } from '../errors'
 import { loadHtmlInto, webContentsPrint } from '../hidden-window'
+import { withPrintDeadline } from '../operation-deadline'
 import { paperToPdfPageSize, paperToPrintPageSize } from '../paper'
-import { withTimeout } from '../with-timeout'
 
 /**
  * 系统打印队列通道：
@@ -63,7 +63,7 @@ export class SystemChannel implements PrintChannel {
         = continuous && (m == null || m === 'default') ? 'none' : (m ?? 'default')
 
       // 1) PDF 存档（重打/审计依据）——preferCSSPageSize 让模板 @page 决定卷纸宽度
-      const pdfBuffer = await withTimeout(
+      const pdfBuffer = await withPrintDeadline(
         wc.printToPDF({
           landscape: job.options.landscape === true,
           printBackground: true,
@@ -96,7 +96,7 @@ export class SystemChannel implements PrintChannel {
         printOpts.margins = wcMarginType(effectiveMargin)
         if (pageSize) { printOpts.pageSize = pageSize }
       }
-      await withTimeout(webContentsPrint(wc, printOpts), 60000, 'JOB_FAILED', '打印提交超时（60s）')
+      await withPrintDeadline(webContentsPrint(wc, printOpts), 60000, 'JOB_FAILED', '打印提交超时（60s）')
 
       return { archivedPdfPath, detail: { deviceName: printer.id } }
     })
@@ -108,7 +108,7 @@ export class SystemChannel implements PrintChannel {
     }
     const copies = Math.max(1, job.options.copies ?? 1)
 
-    if (process.platform === 'win32') {
+    if (isWindowsHost()) {
       const sumatra = this.resolveSumatraPath()
       if (sumatra) {
         // SumatraPDF -print-settings：份数、页码范围、奇偶页、黑白、双面、纸张、纸盒、缩放
@@ -124,7 +124,7 @@ export class SystemChannel implements PrintChannel {
         if (job.options.bin) { settings.push(`bin=${job.options.bin}`) }
         settings.push(job.options.scale ?? 'fit')
         const args = ['-print-to', printer.id, '-silent', '-print-settings', settings.join(','), pdfPath]
-        await withTimeout(runProcess(sumatra, args), 90000, 'SPOOL_FAILED', `SumatraPDF 送打超时（90s）`)
+        await withPrintDeadline(runProcess(sumatra, args), 90000, 'SPOOL_FAILED', `SumatraPDF 送打超时（90s）`)
         return { archivedPdfPath: pdfPath, detail: { via: 'SumatraPDF', settings: settings.join(',') } }
       }
       // 未打包 SumatraPDF：退回 Chromium PDF 插件窗口打印（无需外部依赖）
@@ -160,7 +160,7 @@ export class SystemChannel implements PrintChannel {
     if (media) { args.unshift('-o', `media=${media}`) }
     if (job.options.scale === 'fit') { args.unshift('-o', 'fit-to-page') }
     for (const [k, v] of lpMarginOptions(job.options.margin)) { args.unshift('-o', `${k}=${v}`) }
-    await withTimeout(runProcess('lp', args), 90000, 'SPOOL_FAILED', 'lp 送打超时（90s）')
+    await withPrintDeadline(runProcess('lp', args), 90000, 'SPOOL_FAILED', 'lp 送打超时（90s）')
     return { archivedPdfPath: pdfPath, detail: { via: 'cups-lp' } }
   }
 }

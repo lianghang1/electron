@@ -1,8 +1,8 @@
 import type { PrinterDefaults, PrinterPaper } from '@shell/shared'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
-import process from 'node:process'
 import { gunzipSync } from 'node:zlib'
+import { isWindowsHost } from '../platform'
 import { queryWinspoolForms, queryWinspoolHardware } from './winspool-forms'
 
 /** 设备守护进程窄接口（结构性类型，避免模块耦合）：winspool 同步 koffi 调用经此进 utility 进程 */
@@ -51,7 +51,7 @@ export function detectSystemDefaultPrinter(): Promise<string | undefined> {
 
     let cmd: string
     let args: string[]
-    if (process.platform === 'win32') {
+    if (isWindowsHost()) {
       cmd = 'powershell'
       args = ['-NoProfile', '-Command', '(Get-CimInstance Win32_Printer -Filter \'Default=true\').Name']
     }
@@ -69,7 +69,7 @@ export function detectSystemDefaultPrinter(): Promise<string | undefined> {
       child.on('error', () => finish(undefined))
       child.on('close', (code) => {
         if (code !== 0) { return finish(undefined) }
-        if (process.platform === 'win32') {
+        if (isWindowsHost()) {
           finish(out.trim().split(/\r?\n/)[0]?.trim() || undefined)
         }
         else {
@@ -159,7 +159,7 @@ export async function detectPrinterHardware(printerName: string, host?: Winspool
     return hw
   }
 
-  if (process.platform === 'win32') {
+  if (isWindowsHost()) {
     const hw = await winspoolViaHost(host, 'print.winspoolHardware', printerName, () => queryWinspoolHardware(printerName))
     return finish(hw)
   }
@@ -213,7 +213,7 @@ export async function detectPrinterPapers(printerName: string, host?: WinspoolHo
   const cached = papersCache.get(printerName)
   if (cached && Date.now() - cached.at < PAPERS_TTL) { return Promise.resolve(cached.papers) }
 
-  if (process.platform === 'win32') {
+  if (isWindowsHost()) {
     // winspool 直调返回 null 才回落 WMI；空数组 = 驱动真实上报无表单，信任之
     const direct = await winspoolViaHost(host, 'print.winspoolForms', printerName, () => queryWinspoolForms(printerName))
     if (direct) {

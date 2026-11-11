@@ -1,5 +1,5 @@
 import type { JobStatus, PaperSpec, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter } from '@shell/shared'
-import type { PreparedContent, PreparedJob } from './channels/channel-types'
+import type { PreparedContent, PreparedJob } from './channels/prepared-job'
 import type { PrintChannel } from './channels/print-channel'
 import type { HiddenWindowPool } from './hidden-window'
 import type { PrinterRegistry } from './printer-registry'
@@ -8,10 +8,10 @@ import { existsSync } from 'node:fs'
 import { cleanupArchiveDir } from './archive-cleanup'
 import { IppChannel } from './channels/ipp-channel'
 import { SystemChannel } from './channels/system-channel'
-import { normalizeContent } from './content-normalizers'
 import { printError, toPrintError } from './errors'
 import { JobStore } from './job-store'
 import { assertPaperSupported, resolvePaper } from './paper'
+import { preparePrintContent } from './prepare-print-content'
 
 /**
  * PrintService = 统一打印 API 的实现体（归一化层）。
@@ -77,7 +77,7 @@ export class PrintService {
         jobName,
         paper,
         options: req.options,
-        content: await this.normalizeContent(req, paper, jobId),
+        content: await this.preparePrintContent(req, paper, jobId),
       }
 
       const outcome = await channel.execute(job, printer)
@@ -185,9 +185,9 @@ export class PrintService {
     }
   }
 
-  /** 内容归一委托给策略表：本类零 switch，负载形态差异收敛在 content-normalizers */
-  private normalizeContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> | PreparedContent {
-    return normalizeContent(req.payload, {
+  /** 内容归一委托给策略表：本类零 switch，负载形态差异收敛在 prepare-print-content */
+  private preparePrintContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> | PreparedContent {
+    return preparePrintContent(req.payload, {
       archiveDir: this.archiveDir,
       jobId,
       paper,

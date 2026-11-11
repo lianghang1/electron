@@ -1,7 +1,7 @@
 /* eslint-disable node/prefer-global/buffer */
 /* eslint-disable node/prefer-global/process */
 import type { KoffiFn, KoffiLib } from '../../../kernel/koffi'
-import type { IdCardData, IdCardDriver } from '../types'
+import type { IdCardData, IdCardDriver } from '../device-contracts'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { requireKoffi } from '../../../kernel/koffi'

@@ -1,4 +1,4 @@
-import type { AdapterCaptureRequest, CaptureCameraInfo, CaptureDeviceConfig } from '@shell/shared'
+import type { CaptureCameraInfo, CaptureDeviceConfig, ChannelCaptureRequest } from '@shell/shared'
 
 /** ws 接入端点（设备配置 ws 段：厂商模块统一消费的连接参数） */
 export type WsEndpoint = NonNullable<CaptureDeviceConfig['ws']>
@@ -25,7 +25,7 @@ export interface CapturePreviewSession {
 export interface CaptureVendor {
   readonly vendorId: string
   /** 一次性拍照（自建短连接 → 采集 → 释放），返回图片 base64 */
-  captureOnce: (endpoint: WsEndpoint, req: Pick<AdapterCaptureRequest, 'resolutionNum'>) => Promise<string>
+  captureOnce: (endpoint: WsEndpoint, req: Pick<ChannelCaptureRequest, 'resolutionNum'>) => Promise<string>
   /** 枚举设备下的摄像头与分辨率（可选能力：短连接，不占用摄像头） */
   listCameras?: (endpoint: WsEndpoint) => Promise<CaptureCameraInfo[]>
   /** 创建常驻预览会话（可选能力）：构造后由调用方 open */

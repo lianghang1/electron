@@ -30,7 +30,7 @@ export interface PlatformEvents {
   // 窗口
   'window.created': { profile: string, id: number }
   'window.closed': { id: number }
-  // 设备数据流（gateway 适配层把回调转为广播）
+  // 设备数据流（gateway 接入层把回调转为广播）
   'scanner.scanned': { code: string }
   'signature.stroke': { point: unknown }
   'capture.frame': { deviceId: string, frame: unknown }

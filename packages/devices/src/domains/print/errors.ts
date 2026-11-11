@@ -1,34 +1,20 @@
-import type { PrintError, PrintErrorCode } from '@shell/shared'
+import type { PrintErrorCode } from '@shell/shared'
 import { HostRemoteError } from '../../host/errors'
+import { DeviceError, isDeviceError } from '../../runtime/errors'
 
-/** 统一打印错误：所有通道/平台失败都必须收敛为该类型，禁止裸异常越过归一化层 */
-export class PrintErrorImpl extends Error implements PrintError {
-  readonly code: PrintErrorCode
-  readonly detail?: unknown
+/** 统一打印错误：所有通道/平台失败都必须收敛为 DeviceError<PrintErrorCode>；形状与归一逻辑共用 runtime 底座。 */
+const ERROR_NAME = 'PrintError'
 
-  constructor(code: PrintErrorCode, message: string, detail?: unknown) {
-    super(message)
-    this.name = 'PrintError'
-    this.code = code
-    this.detail = detail
-  }
-
-  toJSON(): PrintError {
-    return { code: this.code, message: this.message, detail: this.detail }
-  }
+export function printError(code: PrintErrorCode, message: string, detail?: unknown): DeviceError<PrintErrorCode> {
+  return new DeviceError(code, message, detail, ERROR_NAME)
 }
 
-export function printError(code: PrintErrorCode, message: string, detail?: unknown): PrintErrorImpl {
-  return new PrintErrorImpl(code, message, detail)
-}
-
-/** 未知异常 → 统一错误（保留原始信息便于排查，不向外泄漏通道特有结构） */
-export function toPrintError(err: unknown): PrintErrorImpl {
-  if (err instanceof PrintErrorImpl) { return err }
-  // 守护进程边界错误按原码/detail 还原（HostRemoteError 仅搬运远端 name/code/message/detail，不还原会丢真实错误码）
-  if (err instanceof HostRemoteError && err.name === 'PrintError') {
-    return new PrintErrorImpl(err.code as PrintErrorCode, err.message, err.detail)
+/** 未知异常 → 统一错误；守护进程边界按原 name/code/detail 还原，不丢真实错误码。 */
+export function toPrintError(err: unknown): DeviceError<PrintErrorCode> {
+  if (isDeviceError<PrintErrorCode>(err) && err.name === ERROR_NAME) { return err }
+  if (err instanceof HostRemoteError && err.name === ERROR_NAME) {
+    return new DeviceError(err.code as PrintErrorCode, err.message, err.detail, ERROR_NAME)
   }
   const message = err instanceof Error ? err.message : String(err)
-  return new PrintErrorImpl('UNKNOWN', message, err instanceof Error ? err.stack : undefined)
+  return new DeviceError('UNKNOWN', message, err instanceof Error ? err.stack : undefined, ERROR_NAME)
 }

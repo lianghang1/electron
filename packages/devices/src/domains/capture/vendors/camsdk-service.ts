@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
-import process from 'node:process'
 import { promisify } from 'node:util'
 import { parseWsUrl, tcpProbe } from '../../../kernel/channel/ws-channel'
+import { isWindowsHost, supportsServiceAutoStart } from '../../platform'
 
 const execFileAsync = promisify(execFile)
 
@@ -249,7 +249,7 @@ function discoverVendorUnits(brand: string): Promise<string[]> {
 /** 执行现场覆盖命令（命令来自本机档案配置，信任级别等同用户自行开终端执行） */
 async function runWakeCommand(command: string): Promise<boolean> {
   try {
-    if (process.platform === 'win32') {
+    if (isWindowsHost()) {
       await execFileAsync('cmd.exe', ['/d', '/s', '/c', command], { timeout: 15000, windowsHide: true })
     }
     else {
@@ -324,7 +324,7 @@ async function wakeOne(candidate: string): Promise<boolean> {
  * 15s 进程级节流防设备列表频繁刷新时重复拉起。
  */
 export async function ensureCamSdkService(ctx: CamSdkWakeContext): Promise<boolean> {
-  if ((process.platform !== 'win32' && process.platform !== 'linux') || Date.now() - lastStartAttemptAt < START_RETRY_INTERVAL_MS) {
+  if (!supportsServiceAutoStart() || Date.now() - lastStartAttemptAt < START_RETRY_INTERVAL_MS) {
     return false
   }
   lastStartAttemptAt = Date.now()
@@ -337,7 +337,7 @@ export async function ensureCamSdkService(ctx: CamSdkWakeContext): Promise<boole
     if (!brand) {
       return false
     }
-    const candidates = process.platform === 'win32'
+    const candidates = isWindowsHost()
       ? [...await discoverVendorTasks(brand), ...await discoverVendorServices(brand)]
       : await discoverVendorUnits(brand)
     for (const candidate of candidates) {
@@ -359,7 +359,7 @@ export async function ensureCamSdkService(ctx: CamSdkWakeContext): Promise<boole
  * 仅 Windows 有完整四态；非 Windows 或诊断失败返回 null，调用方维持原始提示（诊断不掩盖探活事实）。
  */
 export async function diagnoseCamSdkService(ctx: CamSdkWakeContext): Promise<string | null> {
-  if (process.platform !== 'win32') {
+  if (!isWindowsHost()) {
     return null
   }
   // 空 brand 无法发现式匹配，直接给出档案配置指引而非全量误匹配

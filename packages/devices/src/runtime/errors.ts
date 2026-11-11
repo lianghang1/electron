@@ -1,6 +1,7 @@
 /**
  * 设备统一错误：六个能力域、全部通道、守护进程边界共用一种形状与一张码表。
- * 任何异常越过调用管线前都必须归一到 DeviceError，业务层只见 code/message/detail。
+ * 泛型参数 C 允许各能力域保留自己的细粒度错误码（对外契约），同时共享
+ * name/code/detail/toJSON 与归一逻辑；默认码表为平台统一的 DeviceErrorCode。
  */
 export const DEVICE_ERROR_CODES = [
   'METHOD_NOT_FOUND',
@@ -19,33 +20,38 @@ export const DEVICE_ERROR_CODES = [
 
 export type DeviceErrorCode = typeof DEVICE_ERROR_CODES[number]
 
-export interface DeviceErrorShape {
-  readonly code: DeviceErrorCode
+export interface DeviceErrorShape<C extends string = DeviceErrorCode> {
+  readonly code: C
   readonly message: string
   readonly detail?: unknown
 }
 
-export class DeviceError extends Error implements DeviceErrorShape {
-  readonly code: DeviceErrorCode
+export class DeviceError<C extends string = DeviceErrorCode> extends Error implements DeviceErrorShape<C> {
+  readonly code: C
   readonly detail?: unknown
 
-  constructor(code: DeviceErrorCode, message: string, detail?: unknown) {
+  constructor(code: C, message: string, detail?: unknown, name = 'DeviceError') {
     super(message)
-    this.name = 'DeviceError'
+    this.name = name
     this.code = code
     this.detail = detail
   }
 
-  toJSON(): DeviceErrorShape {
+  toJSON(): DeviceErrorShape<C> {
     return { code: this.code, message: this.message, detail: this.detail }
   }
 }
 
-export function deviceError(code: DeviceErrorCode, message: string, detail?: unknown): DeviceError {
-  return new DeviceError(code, message, detail)
+export function deviceError<C extends string = DeviceErrorCode>(
+  code: C,
+  message: string,
+  detail?: unknown,
+  name?: string,
+): DeviceError<C> {
+  return new DeviceError(code, message, detail, name)
 }
 
-export function isDeviceError(err: unknown): err is DeviceError {
+export function isDeviceError<C extends string = DeviceErrorCode>(err: unknown): err is DeviceError<C> {
   return err instanceof DeviceError
 }
 

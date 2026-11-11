@@ -1,9 +1,9 @@
 /** capture 模块统一契约 —— 多品牌（华视/良田/点易拍…）× 多接入方式（dll/service/wia/uvc/stub） */
 
-/** 接入方式（适配器路线） */
+/** 接入方式（通道路线） */
 export type CaptureTransport = 'dll' | 'service' | 'wia' | 'uvc' | 'stub' | 'ws'
 
-/** 统一设备视图（各适配器上报后合并） */
+/** 统一设备视图（各通道上报后合并） */
 export interface CaptureDevice {
   /** 统一 ID："<transport>:<设备键>"，如 "stub:scanner"、"service:dianyipai-01" */
   id: string
@@ -12,7 +12,7 @@ export interface CaptureDevice {
   transport: CaptureTransport
   status: 'ready' | 'offline' | 'unavailable'
   capabilities: CaptureCaps
-  /** 平台/适配器私有信息（业务层不读） */
+  /** 平台/通道私有信息（业务层不读） */
   meta: Record<string, unknown>
 }
 
@@ -41,10 +41,10 @@ export interface CaptureRequest {
 }
 
 /**
- * 适配器内部采集请求 = 对外契约 + 平台注入的保存目录。
+ * 通道内部采集请求 = 对外契约 + 平台注入的保存目录。
  * 保存目录是平台内部事务（userData/capture），渲染层不可指定——否则等于开放任意路径写文件
  */
-export interface AdapterCaptureRequest extends CaptureRequest {
+export interface ChannelCaptureRequest extends CaptureRequest {
   saveDir: string
 }
 
@@ -69,7 +69,7 @@ export type CaptureErrorCode
     | 'DEVICE_OFFLINE'
     | 'DEVICE_BUSY'
     | 'CAPTURE_FAILED'
-    | 'ADAPTER_UNAVAILABLE'
+    | 'CHANNEL_UNAVAILABLE'
     | 'SAVE_FAILED'
     | 'VALIDATION_FAILED'
     | 'UNKNOWN'
@@ -165,15 +165,15 @@ export interface CaptureDeviceOverrides {
   service?: { baseUrl?: string, listPath?: string, capturePath?: string }
 }
 
-/** 采集适配器统一接口 —— 新接入方式 = 实现本接口并注册。失败统一抛 CaptureError（code 见 CaptureErrorCode） */
-export interface CaptureAdapter {
+/** 采集通道统一接口 —— 新接入方式 = 实现本接口并注册。失败统一抛 CaptureError（code 见 CaptureErrorCode） */
+export interface CaptureChannel {
   readonly transport: CaptureTransport
   listDevices: () => Promise<CaptureDevice[]>
-  capture: (req: AdapterCaptureRequest, device: CaptureDevice) => Promise<CaptureResult>
+  capture: (req: ChannelCaptureRequest, device: CaptureDevice) => Promise<CaptureResult>
   destroy?: () => void
   /**
    * 实时预览（可选能力）：开启后预览帧经 onFrame 持续回调（JPEG base64），
-   * 会话保持开启供 capture 走会话内拍照；仅支持常驻连接的适配器（ws/camsdk）实现。
+   * 会话保持开启供 capture 走会话内拍照；仅支持常驻连接的通道（ws/camsdk）实现。
    */
   startPreview?: (deviceId: string, onFrame: (base64: string) => void, opts?: { resolutionNum?: number }) => Promise<void>
   /** 关闭实时预览（可选能力） */

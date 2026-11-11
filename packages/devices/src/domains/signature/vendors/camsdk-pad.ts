@@ -81,7 +81,7 @@ export class CamSdkPadSession {
   private fingerArrived = false
   private waiters: PadSettle[] = []
 
-  /** 连接指定服务地址并拉起签字页（navigate('') 等 PadViewer4 ACK → startSignAndGetFingerprint；缺省出厂地址，档案制下由适配器按档案传入） */
+  /** 连接指定服务地址并拉起签字页（navigate('') 等 PadViewer4 ACK → startSignAndGetFingerprint；缺省出厂地址，档案制下由通道按档案传入） */
   open(url: string = CAMSDK_WS_PAD.url): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const ws = connectWs(url)

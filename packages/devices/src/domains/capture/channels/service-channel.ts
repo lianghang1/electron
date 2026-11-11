@@ -1,4 +1,4 @@
-import type { AdapterCaptureRequest, CaptureAdapter, CaptureDevice, CaptureDeviceConfig, CaptureResult } from '@shell/shared'
+import type { CaptureChannel, CaptureDevice, CaptureDeviceConfig, CaptureResult, ChannelCaptureRequest } from '@shell/shared'
 import { Buffer } from 'node:buffer'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -6,10 +6,10 @@ import { probeHttp } from '../../../kernel/channel/http-channel'
 import { captureError } from '../errors'
 
 /**
- * 厂商本地 HTTP 服务适配器（点易拍/良田新款等：设备驱动在本机起 HTTP/WS 服务）。
- * 品牌差异全部在设备配置里声明（baseUrl/路径/图片字段），适配器本身零品牌代码。
+ * 厂商本地 HTTP 服务通道（点易拍/良田新款等：设备驱动在本机起 HTTP/WS 服务）。
+ * 品牌差异全部在设备配置里声明（baseUrl/路径/图片字段），通道本身零品牌代码。
  */
-export class ServiceAdapter implements CaptureAdapter {
+export class ServiceChannel implements CaptureChannel {
   readonly transport = 'service' as const
 
   constructor(private readonly configs: CaptureDeviceConfig[]) {}
@@ -17,7 +17,7 @@ export class ServiceAdapter implements CaptureAdapter {
   private byId(id: string): CaptureDeviceConfig {
     const found = this.configs.find(p => `service:${p.id}` === id)
     if (!found || found.transport !== 'service' || !found.service) {
-      throw captureError('DEVICE_NOT_FOUND', `service 适配器下不存在设备: ${id}`)
+      throw captureError('DEVICE_NOT_FOUND', `service 通道下不存在设备: ${id}`)
     }
     return found
   }
@@ -38,7 +38,7 @@ export class ServiceAdapter implements CaptureAdapter {
     )
   }
 
-  async capture(req: AdapterCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
+  async capture(req: ChannelCaptureRequest, device: CaptureDevice): Promise<CaptureResult> {
     const config = this.byId(device.id)
     const svc = config.service!
     const url = `${svc.baseUrl.replace(/\/$/, '')}${svc.capturePath}`

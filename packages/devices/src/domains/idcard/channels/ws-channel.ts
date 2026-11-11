@@ -1,21 +1,21 @@
 import type { IdcardDeviceConfig, IdcardWsProfile } from '@shell/shared'
-import type { IdCardAdapter, IdCardData, IdReaderDevice } from '../types'
+import type { IdCardChannel, IdCardData, IdReaderDevice } from '../device-contracts'
 import { idCardError } from '../errors'
 import { probeCamSdkReader, readIdCardViaCamSdk } from '../vendors/camsdk-ws'
 
 /**
- * ws 路线适配器（CamSDKServer 本地服务，身份证域，多档案）：
+ * ws 路线通道（CamSDKServer 本地服务，身份证域，多档案）：
  * 一条档案 = 一条服务连接，服务下全部读卡器经该连接枚举（无读卡器枚举 API，可用性以探活为准）。
  * 主进程直连 ws（纯 JSON 文本帧协议、无 native 依赖），不经设备守护进程——
  * 与 dll 路线（koffi 调用须崩溃隔离）的装配差异即在于此。厂商协议内聚 vendors/camsdk-ws.ts。
- * 档案列表经 getter 惰性取值（域配置 setConfig 热生效，无需重建适配器）。
+ * 档案列表经 getter 惰性取值（域配置 setConfig 热生效，无需重建通道）。
  */
-export class WsIdAdapter implements IdCardAdapter {
+export class WsIdChannel implements IdCardChannel {
   readonly transport = 'ws' as const
 
   constructor(private readonly getProfiles: () => IdcardDeviceConfig[]) {}
 
-  /** ws 档案子集（union 收窄：dll 档案不经本适配器） */
+  /** ws 档案子集（union 收窄：dll 档案不经本通道） */
   private wsProfiles(): IdcardWsProfile[] {
     return this.getProfiles().filter((p): p is IdcardWsProfile => p.transport === 'ws')
   }

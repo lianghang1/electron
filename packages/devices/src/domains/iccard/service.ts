@@ -1,12 +1,12 @@
 import type { Logger } from '@shell/kernel/logger'
 import type { IccardConfig, IccardDeviceOverrides, IcReaderDeviceConfig } from '@shell/shared'
 import type { DeviceHost } from '../../host/device-host'
-import type { IcCardAdapter, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice } from './types'
+import type { IcCardChannel, IcCardReadRequest, IcCardReadResult, IcCardTextsWriteRequest, IcCardWriteRequest, IcReaderDevice } from './device-contracts'
 import { Buffer } from 'node:buffer'
 
 import { deviceLockKey, SerialLocks } from '../../kernel/serial-lock'
 import { createDeviceStore } from '../../storage/device-store'
-import { DllIcAdapter } from './adapters/dll-adapter'
+import { DllIcChannel } from './channels/dll-channel'
 import { BUILT_IN_ICCARD_CONFIGS } from './configs'
 import { icCardError, toIcCardError } from './errors'
 
@@ -96,7 +96,7 @@ function decodeBlockText(hex: string): string {
  * 异常契约：失败抛 IcCardError（code 见 IcCardErrorCode），IPC 层统一留痕后跨进程透传。
  */
 export class IcCardService {
-  private readonly adapters: Map<string, IcCardAdapter>
+  private readonly channels: Map<string, IcCardChannel>
   /** 同一读卡器同一时刻只能执行一次读写（硬件限制），按锁 key（设备或 lockGroup）串行化 */
   private readonly locks = new SerialLocks()
   /** 设备档案（ws/dll 双路线，见 configs.ts；写穿 device-iccard.json，读侧内存直取） */
@@ -105,9 +105,9 @@ export class IcCardService {
 
   constructor(resourcesRoot: string, host: DeviceHost, private readonly logger: Logger) {
     this.configs = migrateConfig(this.configStore.load())
-    this.adapters = new Map<string, IcCardAdapter>([
+    this.channels = new Map<string, IcCardChannel>([
       // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程），档案驱动枚举
-      ['dll', new DllIcAdapter(host, resourcesRoot, () => this.configs)],
+      ['dll', new DllIcChannel(host, resourcesRoot, () => this.configs)],
     ])
   }
 
@@ -143,7 +143,7 @@ export class IcCardService {
   }
 
   async listReaders(): Promise<IcReaderDevice[]> {
-    const groups = await Promise.all([...this.adapters.values()].map(a => a.listReaders().catch(() => [])))
+    const groups = await Promise.all([...this.channels.values()].map(a => a.listReaders().catch(() => [])))
     return groups.flat()
   }
 
@@ -154,7 +154,7 @@ export class IcCardService {
   async readIc(req: IcCardReadRequest & { deviceId: string }): Promise<IcCardReadResult> {
     try {
       const located = await this.locate(req?.deviceId)
-      const data = await this.locks.run(deviceLockKey(located.device), () => located.adapter.readIc(located.device, req))
+      const data = await this.locks.run(deviceLockKey(located.device), () => located.channel.readIc(located.device, req))
       const sector = req?.sector ?? 1
       const texts = Array.from({ length: SECTOR_DATA_BLOCKS }, (_, i) =>
         decodeBlockText(data.blocks[sector * SECTOR_BLOCKS + i] ?? ''))
@@ -173,9 +173,9 @@ export class IcCardService {
     try {
       const located = await this.locate(req?.deviceId)
       if (!located.device.capabilities.includes('iccard-write')) {
-        throw icCardError('ADAPTER_UNAVAILABLE', `读卡器 ${located.device.displayName} 不支持 IC 卡写入`)
+        throw icCardError('CHANNEL_UNAVAILABLE', `读卡器 ${located.device.displayName} 不支持 IC 卡写入`)
       }
-      await this.locks.run(deviceLockKey(located.device), () => located.adapter.writeIc(located.device, req))
+      await this.locks.run(deviceLockKey(located.device), () => located.channel.writeIc(located.device, req))
     }
     catch (err) {
       throw this.logFailure(req?.deviceId, err)
@@ -200,7 +200,7 @@ export class IcCardService {
       }
       const located = await this.locate(req.deviceId)
       if (!located.device.capabilities.includes('iccard-write')) {
-        throw icCardError('ADAPTER_UNAVAILABLE', `读卡器 ${located.device.displayName} 不支持 IC 卡写入`)
+        throw icCardError('CHANNEL_UNAVAILABLE', `读卡器 ${located.device.displayName} 不支持 IC 卡写入`)
       }
       const blocks = [
         ...texts.map(encodeBlockText),
@@ -208,7 +208,7 @@ export class IcCardService {
       ]
       await this.locks.run(deviceLockKey(located.device), async () => {
         for (let i = 0; i < SECTOR_DATA_BLOCKS; i++) {
-          await located.adapter.writeIc(located.device, {
+          await located.channel.writeIc(located.device, {
             block: sector * SECTOR_BLOCKS + i,
             data: blocks[i],
             key: req.key,
@@ -223,27 +223,27 @@ export class IcCardService {
   }
 
   /** 设备定位与状态校验（读写共用前置）：写卡能力在写路径单独校验（capabilities 以 listReaders 为准） */
-  private async locate(deviceId: string | undefined): Promise<{ adapter: IcCardAdapter, device: IcReaderDevice }> {
+  private async locate(deviceId: string | undefined): Promise<{ channel: IcCardChannel, device: IcReaderDevice }> {
     if (!deviceId) {
       throw icCardError('VALIDATION_FAILED', '缺少 deviceId')
     }
     const transport = deviceId.split(':')[0]
-    const adapter = this.adapters.get(transport)
-    if (!adapter) {
-      throw icCardError('ADAPTER_UNAVAILABLE', `未知接入方式: ${transport}`)
+    const channel = this.channels.get(transport)
+    if (!channel) {
+      throw icCardError('CHANNEL_UNAVAILABLE', `未知接入方式: ${transport}`)
     }
-    const readers = await adapter.listReaders()
+    const readers = await channel.listReaders()
     const device = readers.find(d => d.id === deviceId)
     if (!device) {
       throw icCardError('DEVICE_NOT_FOUND', `未找到读卡器: ${deviceId}`)
     }
     if (device.status !== 'ready') {
       throw icCardError(
-        device.status === 'unavailable' ? 'ADAPTER_UNAVAILABLE' : 'DEVICE_OFFLINE',
+        device.status === 'unavailable' ? 'CHANNEL_UNAVAILABLE' : 'DEVICE_OFFLINE',
         `读卡器不可用: ${String(device.meta.note ?? device.status)}`,
       )
     }
-    return { adapter, device }
+    return { channel, device }
   }
 
   /** 失败留痕（设备 ID + 错误码 + 驱动阶段信息，不含卡数据）后原样抛出 */
@@ -254,6 +254,6 @@ export class IcCardService {
   }
 
   destroy(): void {
-    for (const a of this.adapters.values()) { a.destroy?.() }
+    for (const a of this.channels.values()) { a.destroy?.() }
   }
 }

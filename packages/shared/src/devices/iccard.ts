@@ -25,7 +25,7 @@ interface IcReaderProfileBase {
  * - dll 路线：一条档案 = 一个设备守护进程驱动注册表驱动（档案 id = 驱动名，见 host/run.ts），
  *   运行时设备 id = "dll:<档案 id>"，DLL 由守护进程按注册表自动加载；
  * - ws 路线：一条档案 = 一条读卡器本地服务连接。
- * 当前版本 ws 路线协议适配未接入：档案可管理，对应设备在测试页显示为「未接入」（missing）。
+ * 当前版本 ws 路线协议暂未接入：档案可管理，对应设备在测试页显示为「未接入」（missing）。
  */
 export interface IcReaderDllProfile extends IcReaderProfileBase {
   transport: 'dll'
@@ -116,6 +116,6 @@ export type IcCardErrorCode
     | 'READ_FAILED'
     /** IC 卡写块失败 */
     | 'WRITE_FAILED'
-    | 'ADAPTER_UNAVAILABLE'
+    | 'CHANNEL_UNAVAILABLE'
     | 'VALIDATION_FAILED'
     | 'UNKNOWN'

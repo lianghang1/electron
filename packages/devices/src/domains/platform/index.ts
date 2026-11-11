@@ -1,10 +1,11 @@
-import type { DevicePlatform } from './platform-types'
+import type { DevicePlatform } from './device-platform'
 import process from 'node:process'
 import { detectLinuxPlatform } from './linux'
 import { macPlatform } from './mac'
 import { windowsPlatform } from './windows'
 
-export type { DevicePlatform, DevicePlatformId } from './platform-types'
+export type { DevicePlatform, DevicePlatformId } from './device-platform'
+export * from './host'
 
 let cached: DevicePlatform | undefined
 

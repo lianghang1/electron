@@ -1,11 +1,11 @@
 import type { Logger } from '@shell/kernel/logger'
 import type { IdcardConfig, IdcardDeviceConfig, IdcardDeviceOverrides } from '@shell/shared'
 import type { DeviceHost } from '../../host/device-host'
-import type { IdCardAdapter, IdCardData, IdReaderDevice } from './types'
+import type { IdCardChannel, IdCardData, IdReaderDevice } from './device-contracts'
 import { deviceLockKey, SerialLocks } from '../../kernel/serial-lock'
 import { createDeviceStore } from '../../storage/device-store'
-import { DllIdAdapter } from './adapters/dll-adapter'
-import { WsIdAdapter } from './adapters/ws-adapter'
+import { DllIdChannel } from './channels/dll-channel'
+import { WsIdChannel } from './channels/ws-channel'
 import { BUILT_IN_IDCARD_CONFIGS } from './configs'
 import { idCardError, toIdCardError } from './errors'
 
@@ -65,7 +65,7 @@ function migrateConfig(raw: StoredIdcardConfig): IdcardDeviceConfig[] {
  * 异常契约：失败抛 IdCardError（code 见 IdReaderErrorCode），IPC 层统一留痕后跨进程透传。
  */
 export class IdCardService {
-  private readonly adapters: Map<string, IdCardAdapter>
+  private readonly channels: Map<string, IdCardChannel>
   /** 同一读卡器同一时刻只能执行一次读卡（硬件限制），按锁 key（设备或 lockGroup）串行化 */
   private readonly locks = new SerialLocks()
   /** 设备档案（ws/dll 双路线，见 configs.ts；写穿 device-idcard.json，读侧内存直取） */
@@ -74,11 +74,11 @@ export class IdCardService {
 
   constructor(resourcesRoot: string, host: DeviceHost, private readonly logger: Logger) {
     this.configs = migrateConfig(this.configStore.load())
-    this.adapters = new Map<string, IdCardAdapter>([
+    this.channels = new Map<string, IdCardChannel>([
       // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程），档案驱动枚举
-      ['dll', new DllIdAdapter(host, resourcesRoot, () => this.configs)],
+      ['dll', new DllIdChannel(host, resourcesRoot, () => this.configs)],
       // ws 路线主进程直连（纯 JSON 文本帧，无 native 依赖，无需守护进程），按档案多连接枚举
-      ['ws', new WsIdAdapter(() => this.configs)],
+      ['ws', new WsIdChannel(() => this.configs)],
     ])
   }
 
@@ -114,42 +114,42 @@ export class IdCardService {
   }
 
   async listReaders(): Promise<IdReaderDevice[]> {
-    const groups = await Promise.all([...this.adapters.values()].map(a => a.listReaders().catch(() => [])))
+    const groups = await Promise.all([...this.channels.values()].map(a => a.listReaders().catch(() => [])))
     return groups.flat()
   }
 
   async read(req: { deviceId: string }): Promise<IdCardData> {
     try {
       const located = await this.locate(req?.deviceId)
-      return await this.locks.run(deviceLockKey(located.device), () => located.adapter.read(located.device))
+      return await this.locks.run(deviceLockKey(located.device), () => located.channel.read(located.device))
     }
     catch (err) {
       throw this.logFailure(req?.deviceId, err)
     }
   }
 
-  /** 设备定位与状态校验（读卡共用前置）：能力匹配由适配器判（域内驱动均具备身份证能力） */
-  private async locate(deviceId: string | undefined): Promise<{ adapter: IdCardAdapter, device: IdReaderDevice }> {
+  /** 设备定位与状态校验（读卡共用前置）：能力匹配由通道判（域内驱动均具备身份证能力） */
+  private async locate(deviceId: string | undefined): Promise<{ channel: IdCardChannel, device: IdReaderDevice }> {
     if (!deviceId) {
       throw idCardError('VALIDATION_FAILED', '缺少 deviceId')
     }
     const transport = deviceId.split(':')[0]
-    const adapter = this.adapters.get(transport)
-    if (!adapter) {
-      throw idCardError('ADAPTER_UNAVAILABLE', `未知接入方式: ${transport}`)
+    const channel = this.channels.get(transport)
+    if (!channel) {
+      throw idCardError('CHANNEL_UNAVAILABLE', `未知接入方式: ${transport}`)
     }
-    const readers = await adapter.listReaders()
+    const readers = await channel.listReaders()
     const device = readers.find(d => d.id === deviceId)
     if (!device) {
       throw idCardError('DEVICE_NOT_FOUND', `未找到读卡器: ${deviceId}`)
     }
     if (device.status !== 'ready') {
       throw idCardError(
-        device.status === 'unavailable' ? 'ADAPTER_UNAVAILABLE' : 'DEVICE_OFFLINE',
+        device.status === 'unavailable' ? 'CHANNEL_UNAVAILABLE' : 'DEVICE_OFFLINE',
         `读卡器不可用: ${String(device.meta.note ?? device.status)}`,
       )
     }
-    return { adapter, device }
+    return { channel, device }
   }
 
   /** 失败留痕（设备 ID + 错误码 + 驱动阶段信息，不含证件数据）后原样抛出 */
@@ -160,6 +160,6 @@ export class IdCardService {
   }
 
   destroy(): void {
-    for (const a of this.adapters.values()) { a.destroy?.() }
+    for (const a of this.channels.values()) { a.destroy?.() }
   }
 }

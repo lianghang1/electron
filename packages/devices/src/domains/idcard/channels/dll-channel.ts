@@ -1,15 +1,15 @@
 import type { IdcardDeviceConfig } from '@shell/shared'
 import type { DeviceHost } from '../../../host/device-host'
-import type { IdCardAdapter, IdCardData, IdReaderDevice } from '../types'
+import type { IdCardChannel, IdCardData, IdReaderDevice } from '../device-contracts'
 
 /**
- * DLL 路线适配器（主进程侧守护进程 proxy，身份证域）：
+ * DLL 路线通道（主进程侧守护进程 proxy，身份证域）：
  * 华视/科密等 C 接口 SDK 的真实调用全部在设备守护进程（utilityProcess）内执行，
- * 本适配器仅做请求转发——native 崩溃只炸守护进程，由 DeviceHost 退避重启自愈。
+ * 本通道仅做请求转发——native 崩溃只炸守护进程，由 DeviceHost 退避重启自愈。
  * 枚举为档案驱动：dll 档案列表决定列出哪些驱动（档案 id = 驱动名，见 configs.ts），
  * 守护进程驱动注册表只作在位状态源；显示信息以档案为准。
  */
-export class DllIdAdapter implements IdCardAdapter {
+export class DllIdChannel implements IdCardChannel {
   readonly transport = 'dll' as const
 
   constructor(

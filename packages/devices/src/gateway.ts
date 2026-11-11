@@ -5,11 +5,6 @@ import type { BrowserWindow } from 'electron'
 import type { DomainDeps } from './domain-kit'
 import type { CaptureSystem } from './domains/capture'
 import type { CaptureOverlayHost } from './domains/capture/overlay-host'
-import type { IcCardSystem } from './domains/iccard'
-import type { IdCardSystem } from './domains/idcard'
-import type { PrintSystem } from './domains/print'
-import type { ScannerSystem } from './domains/scanner'
-import type { SignatureSystem } from './domains/signature'
 import type { DriverResolver } from './drivers'
 import { join } from 'node:path'
 import { overridesStore } from './domain-kit'
@@ -34,7 +29,8 @@ export type { DomainRouter } from './domain-kit'
 
 /**
  * 设备网关：主进程侧的组装现场。
- * 六个域各自 defineDomain 自描述，本文件只做两件事：创建系统、按数据表收集域定义。
+ * 六个域在一张装配表里声明「从统一上下文取什么参数、产出什么域定义」；
+ * 本文件不再手工拼六种 options 形状，新增能力 = 加一行装配器。
  * 平台能力闸门在 createDomainRouter（组合根注入 availableDomains），驱动资产寻址
  * 由注入的 DriverResolver 决定——dev / 打包 / 现场部署三种根，域内部零感知。
  */
@@ -75,88 +71,156 @@ export interface DeviceGateway {
   dispose: () => void
 }
 
+/** 统一装配上下文：六个装配器面对同一份事实，各自只取所需字段。 */
+interface AssemblyContext {
+  logger: Logger
+  events: EventBus
+  host: DeviceHost
+  /** 驱动资产根（declared devices/<域>/... 直接拼接即命中） */
+  resourcesRoot: string
+  sumatraPath: string
+  storageRoot: string
+  filesRoot: string
+  allowedOrigins: readonly string[]
+  diagnostics: boolean
+  getParent?: () => BrowserWindow | undefined
+  captureOverlay?: CaptureOverlayHost
+}
+
+interface AssembledDomain {
+  readonly id: string
+  readonly definition: DomainDefinition
+  readonly dispose: () => void
+  /** 需要接工作台窗口的域（scanner 键盘观察） */
+  readonly attachWindow?: (win: BrowserWindow) => void
+  /** 需要浮层会话的域（capture 拍摄对话框） */
+  readonly capture?: CaptureSystem
+}
+
+type DomainAssembler = (ctx: AssemblyContext) => AssembledDomain
+
+function domainDeps(ctx: AssemblyContext): DomainDeps {
+  return { events: ctx.events, diagnostics: ctx.diagnostics }
+}
+
+/** 档案覆盖持久化：出厂默认 + 现场覆盖，读写共用一份存储。 */
+function overrideStore(ctx: AssemblyContext, fileName: string) {
+  return overridesStore(join(ctx.storageRoot, fileName))
+}
+
+/**
+ * 装配表 = 六个能力域的唯一登记处。
+ * 每项只负责「取参数 → 建系统 → 声明域定义与生命周期」，互不感知。
+ */
+const DOMAIN_ASSEMBLERS: readonly DomainAssembler[] = [
+  (ctx) => {
+    const system = createIdCardSystem({
+      resourcesRoot: ctx.resourcesRoot,
+      host: ctx.host,
+      logger: ctx.logger.scope('devices:idcard'),
+    })
+    return { id: 'idcard', definition: createIdcardDomain(system), dispose: () => system.destroy() }
+  },
+  (ctx) => {
+    const system = createIcCardSystem({
+      resourcesRoot: ctx.resourcesRoot,
+      host: ctx.host,
+      logger: ctx.logger.scope('devices:iccard'),
+    })
+    return { id: 'iccard', definition: createIccardDomain(system), dispose: () => system.destroy() }
+  },
+  (ctx) => {
+    const system = createPrintSystem({
+      jobsFile: join(ctx.storageRoot, 'print-jobs.json'),
+      archiveDir: join(ctx.filesRoot, 'print'),
+      sumatraPath: ctx.sumatraPath,
+      host: ctx.host,
+      getParent: ctx.getParent,
+      allowedOrigins: ctx.allowedOrigins,
+      logger: ctx.logger.scope('devices:print'),
+    })
+    return { id: 'print', definition: createPrintDomain(system), dispose: () => system.destroy() }
+  },
+  (ctx) => {
+    const store = overrideStore(ctx, 'scanner-overrides.json')
+    const system = createScannerSystem({
+      initialOverrides: store.read(),
+      persist: overrides => store.write(overrides),
+      logger: ctx.logger.scope('devices:scanner'),
+    })
+    return {
+      id: 'scanner',
+      definition: createScannerDomain(system, domainDeps(ctx)),
+      dispose: () => system.destroy(),
+      attachWindow: win => system.attachWindow(win),
+    }
+  },
+  (ctx) => {
+    const store = overrideStore(ctx, 'capture-overrides.json')
+    const system = createCaptureSystem({
+      resourcesRoot: ctx.resourcesRoot,
+      host: ctx.host,
+      initialOverrides: store.read(),
+      persist: overrides => store.write(overrides),
+      logger: ctx.logger.scope('devices:capture'),
+      defaultSaveDir: join(ctx.filesRoot, 'capture'),
+    })
+    return {
+      id: 'capture',
+      definition: createCaptureDomain(system, domainDeps(ctx)),
+      dispose: () => system.destroy(),
+      capture: system,
+    }
+  },
+  (ctx) => {
+    const system = createSignatureSystem({
+      resourcesRoot: ctx.resourcesRoot,
+      host: ctx.host,
+      logger: ctx.logger.scope('devices:signature'),
+    })
+    return { id: 'signature', definition: createSignatureDomain(system, domainDeps(ctx)), dispose: () => system.destroy() }
+  },
+]
+
 export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGateway {
   const log = options.logger.scope('devices')
   const host = new DeviceHost(options.logger, options.hostEntryPath)
-  // 资源根由策略给出：声明 devices/<域>/... 直接拼接即命中，无需域内部解析 dev/打包差异
-  const resourcesRoot = options.driver.assetRoot
-  const sumatraPath = options.driver.resolve(SUMATRA_PDF_FILE)
-
-  const idcard: IdCardSystem = createIdCardSystem({
-    resourcesRoot,
+  const ctx: AssemblyContext = {
+    logger: options.logger,
+    events: options.events,
     host,
-    logger: options.logger.scope('devices:idcard'),
-  })
-  const iccard: IcCardSystem = createIcCardSystem({
-    resourcesRoot,
-    host,
-    logger: options.logger.scope('devices:iccard'),
-  })
-  const print: PrintSystem = createPrintSystem({
-    jobsFile: join(options.paths.storageRoot, 'print-jobs.json'),
-    archiveDir: join(options.paths.filesRoot, 'print'),
-    sumatraPath,
-    host,
-    getParent: options.getParent,
+    resourcesRoot: options.driver.assetRoot,
+    sumatraPath: options.driver.resolve(SUMATRA_PDF_FILE),
+    storageRoot: options.paths.storageRoot,
+    filesRoot: options.paths.filesRoot,
     allowedOrigins: options.allowedOrigins,
-    logger: options.logger.scope('devices:print'),
-  })
-  const scanner: ScannerSystem = createScannerSystem({
-    initialOverrides: overridesStore(join(options.paths.storageRoot, 'scanner-overrides.json')).read(),
-    persist: overrides => overridesStore(join(options.paths.storageRoot, 'scanner-overrides.json')).write(overrides),
-    logger: options.logger.scope('devices:scanner'),
-  })
-  const capture: CaptureSystem = createCaptureSystem({
-    resourcesRoot,
-    host,
-    initialOverrides: overridesStore(join(options.paths.storageRoot, 'capture-overrides.json')).read(),
-    persist: overrides => overridesStore(join(options.paths.storageRoot, 'capture-overrides.json')).write(overrides),
-    logger: options.logger.scope('devices:capture'),
-    defaultSaveDir: join(options.paths.filesRoot, 'capture'),
-  })
-  const signature: SignatureSystem = createSignatureSystem({
-    resourcesRoot,
-    host,
-    logger: options.logger.scope('devices:signature'),
-  })
+    diagnostics: options.diagnostics,
+    getParent: options.getParent,
+    captureOverlay: options.captureOverlay,
+  }
 
-  const captureDialog = options.captureOverlay
+  // 查表装配：平台代码零分支，新增能力只需往 DOMAIN_ASSEMBLERS 加一行
+  const assembled = DOMAIN_ASSEMBLERS.map(assemble => assemble(ctx))
+  const domains = assembled.map(a => a.definition)
+  const capture = assembled.find(a => a.id === 'capture')?.capture
+  const captureDialog = options.captureOverlay && capture
     ? new CaptureDialogSessionService({ capture, overlay: options.captureOverlay })
     : undefined
-
-  const deps: DomainDeps = { events: options.events, diagnostics: options.diagnostics }
-
-  // 域注册 = 数据表：新增域 = 加一行工厂，平台代码零分支
-  const domains: DomainDefinition[] = [
-    createIdcardDomain(idcard),
-    createIccardDomain(iccard),
-    createPrintDomain(print),
-    createScannerDomain(scanner, deps),
-    createCaptureDomain(capture, deps),
-    createSignatureDomain(signature, deps),
-  ]
 
   return {
     domains,
     captureDialog,
 
     warmup(onReady) {
-      return host.warmup().then(() => {
-        onReady()
-      })
+      return host.warmup().then(() => { onReady() })
     },
 
     attachShellWindow(win) {
-      scanner.attachWindow(win)
+      for (const a of assembled) { a.attachWindow?.(win) }
     },
 
     dispose() {
-      idcard.destroy()
-      iccard.destroy()
-      print.destroy()
-      scanner.destroy()
-      capture.destroy()
-      signature.destroy()
+      for (const a of assembled) { a.dispose() }
       host.dispose()
       log.info('device gateway disposed')
     },
