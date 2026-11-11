@@ -25,11 +25,13 @@ export function createScannerMethods(scanner: ScannerSystem, deps: DomainDeps): 
       }),
     },
     simulateScan: {
-      // 诊断工具不进生产 API 面（与旧域通道同策略）
+      /** 正式演示能力：走与真枪相同的缓冲 → 广播链路，由平台演示模式开关放行。 */
       input: simulateInput,
       output: z.unknown(),
       handler: ({ scannedCode }) => {
-        if (!deps.diagnostics) { throw new DomainRouteError('INVALID_INPUT', 'scanner.simulateScan 仅限验机形态') }
+        if (!deps.demoMode.enabled) {
+          throw new DomainRouteError('INVALID_INPUT', '扫码演示模式未开启，请在设备配置页启用')
+        }
         return scanner.simulate(scannedCode)
       },
     },

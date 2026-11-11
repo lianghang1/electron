@@ -12,8 +12,10 @@ import {
   Printer,
   RefreshCw,
   ScanLine,
+  Settings2,
 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
+import DeviceConfigPanel from './DeviceConfigPanel.vue'
 import DeviceInsights from './DeviceInsights.vue'
 import EventStream from './EventStream.vue'
 import MethodRunner from './MethodRunner.vue'
@@ -109,6 +111,9 @@ onMounted(loadInfo)
         <TabsTrigger value="insights">
           <Activity :size="14" class="mr-1.5 inline" />运行观测
         </TabsTrigger>
+        <TabsTrigger value="config">
+          <Settings2 :size="14" class="mr-1.5 inline" />设备配置
+        </TabsTrigger>
       </TabsList>
 
       <div class="flex min-h-0 flex-1">
@@ -144,6 +149,10 @@ onMounted(loadInfo)
 
           <TabsContent value="insights" class="p-0">
             <DeviceInsights />
+          </TabsContent>
+
+          <TabsContent value="config" class="p-0">
+            <DeviceConfigPanel />
           </TabsContent>
         </div>
 

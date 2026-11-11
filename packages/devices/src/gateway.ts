@@ -1,27 +1,34 @@
 import type { EventBus } from '@shell/kernel'
 import type { Logger } from '@shell/kernel/logger'
-import type { DomainDefinition } from '@shell/shared'
+import type { DomainCallContext, DomainDefinition } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
-import type { DomainDeps } from './domain-kit'
+import type { DeviceCapabilitySpec, DeviceConfigCenter, StoredConfigDocument } from './config-center'
+import type { DemoModeState, DomainDeps } from './domain-kit'
 import type { CaptureSystem } from './domains/capture'
 import type { CaptureOverlayHost } from './domains/capture/overlay-host'
 import type { DriverResolver } from './drivers'
 import type { DeviceStatus } from './runtime/device-state'
 import { join } from 'node:path'
+import { createDeviceConfigCenter } from './config-center'
 import { overridesStore } from './domain-kit'
 import { createCaptureSystem } from './domains/capture'
+import { BUILT_IN_CAPTURE_CONFIGS } from './domains/capture/configs'
 import { CaptureDialogSessionService } from './domains/capture/dialog-session'
 import { createCaptureDomain } from './domains/capture/domain'
 import { createIcCardSystem } from './domains/iccard'
+import { BUILT_IN_ICCARD_CONFIGS } from './domains/iccard/configs'
 import { createIccardDomain } from './domains/iccard/domain'
 import { createIdCardSystem } from './domains/idcard'
+import { BUILT_IN_IDCARD_CONFIGS } from './domains/idcard/configs'
 import { createIdcardDomain } from './domains/idcard/domain'
 import { createPrintSystem } from './domains/print'
 import { createPrintDomain } from './domains/print/domain'
 import { SUMATRA_PDF_FILE } from './domains/print/sumatra'
 import { createScannerSystem } from './domains/scanner'
 import { createScannerDomain } from './domains/scanner/domain'
+import { SCANNER_DEFAULTS } from './domains/scanner/service'
 import { createSignatureSystem } from './domains/signature'
+import { BUILT_IN_SIGNATURE_CONFIGS } from './domains/signature/configs'
 import { createSignatureDomain } from './domains/signature/domain'
 import { DeviceHost } from './host/device-host'
 import { createChannelRegistry } from './runtime/channel'
@@ -57,7 +64,7 @@ export interface DeviceGatewayOptions {
   paths: DeviceGatewayPaths
   /** 打印 URL 负载允许的源站（组合根注入）；空 = 拒绝远程下载，防 SSRF */
   allowedOrigins: readonly string[]
-  /** 验机形态：放行诊断专用域方法，生产形态恒 false */
+  /** 验机形态：演示模式初始开关（可运行时切换），生产形态默认关闭 */
   diagnostics: boolean
   /** 当前平台 id（六端能力表键），用于三维求交与状态原因码 */
   platformId: string
@@ -73,6 +80,15 @@ export interface DeviceGateway {
   domains: DomainDefinition[]
   /** 六域设备状态（state + 原因码），诊断台与灰置逻辑的唯一数据源 */
   readonly deviceStatuses: readonly DeviceStatus[]
+  /** 六域参数统一底座：出厂档案 + 现场覆盖 + 恢复出厂 */
+  readonly configCenter: DeviceConfigCenter
+  /** 写入参数：更新中心文档并同步到域运行时 */
+  applyConfig: (capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) => Promise<void>
+  /** 恢复出厂：清覆盖并把出厂值写回域运行时 */
+  resetConfig: (capabilityId?: string) => Promise<void>
+  /** 演示模式状态查询与切换：仿真注入类方法据此放行 */
+  isDemoMode: () => boolean
+  setDemoMode: (enabled: boolean) => void
   /** 拍摄浮层会话服务：注入宿主后才创建，组合根据此注册会话通道 */
   captureDialog?: CaptureDialogSessionService
   /** 预热守护进程（含 koffi 加载）；完成即打 t2DeviceHostReady */
@@ -93,7 +109,9 @@ interface AssemblyContext {
   storageRoot: string
   filesRoot: string
   allowedOrigins: readonly string[]
-  diagnostics: boolean
+  demoMode: DemoModeState
+  /** 现场默认打印参数：配置中心写入时同步，打印系统提交时读取 */
+  printDefaults: { options: Record<string, unknown> }
   getParent?: () => BrowserWindow | undefined
   captureOverlay?: CaptureOverlayHost
 }
@@ -111,12 +129,77 @@ interface AssembledDomain {
 type DomainAssembler = (ctx: AssemblyContext) => AssembledDomain
 
 function domainDeps(ctx: AssemblyContext): DomainDeps {
-  return { events: ctx.events, diagnostics: ctx.diagnostics }
+  return { events: ctx.events, demoMode: ctx.demoMode }
 }
 
 /** 档案覆盖持久化：出厂默认 + 现场覆盖，读写共用一份存储。 */
 function overrideStore(ctx: AssemblyContext, fileName: string) {
   return overridesStore(join(ctx.storageRoot, fileName))
+}
+
+/** 六域可现场编辑的参数档案：出厂值来自各域代码即配置，中心只保存白名单覆盖。 */
+const CONFIG_CAPABILITIES: readonly DeviceCapabilitySpec[] = [
+  {
+    id: 'capture',
+    label: '高拍仪拍摄',
+    overridableKeys: ['displayName', 'ws', 'service'],
+    profiles: BUILT_IN_CAPTURE_CONFIGS,
+  },
+  {
+    id: 'idcard',
+    label: '身份证阅读',
+    overridableKeys: ['displayName', 'ws'],
+    profiles: BUILT_IN_IDCARD_CONFIGS,
+  },
+  {
+    id: 'iccard',
+    label: 'IC 卡读写',
+    overridableKeys: ['displayName', 'ws'],
+    profiles: BUILT_IN_ICCARD_CONFIGS,
+  },
+  {
+    id: 'signature',
+    label: '签名板',
+    overridableKeys: ['displayName', 'ws'],
+    profiles: BUILT_IN_SIGNATURE_CONFIGS,
+  },
+  {
+    id: 'scanner',
+    label: '扫码枪',
+    overridableKeys: ['displayName', 'timeout', 'minLength', 'endKey', 'prefixes', 'requirePrefix', 'hidUrl'],
+    profiles: SCANNER_DEFAULTS.devices,
+  },
+  {
+    id: 'print',
+    label: '打印',
+    overridableKeys: ['paper', 'channel', 'preview', 'dryRun', 'silent', 'copies'],
+    profiles: [{ id: 'print-default', paper: 'A4', channel: 'auto', preview: false, dryRun: false, silent: true, copies: 1 }],
+  },
+]
+
+/** 中心补丁 → 各域 setConfig 入参形状；无配置能力的域返回 undefined。 */
+function buildSetConfigInput(
+  capabilityId: string,
+  deviceProfileId: string,
+  patch: Record<string, unknown>,
+  activeId?: string,
+): Record<string, unknown> | undefined {
+  switch (capabilityId) {
+    case 'capture':
+    case 'idcard':
+    case 'iccard':
+    case 'signature':
+      return { deviceProfileId, overrides: patch }
+    case 'scanner':
+      return {
+        enabled: true,
+        activeProfileId: activeId ?? deviceProfileId,
+        deviceId: deviceProfileId,
+        overrides: patch,
+      }
+    default:
+      return undefined
+  }
 }
 
 /**
@@ -149,6 +232,7 @@ const DOMAIN_ASSEMBLERS: readonly DomainAssembler[] = [
       getParent: ctx.getParent,
       allowedOrigins: ctx.allowedOrigins,
       logger: ctx.logger.scope('devices:print'),
+      defaultOptions: () => ctx.printDefaults.options,
     })
     return { id: 'print', definition: createPrintDomain(system), dispose: () => system.destroy() }
   },
@@ -196,6 +280,8 @@ const DOMAIN_ASSEMBLERS: readonly DomainAssembler[] = [
 export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGateway {
   const log = options.logger.scope('devices')
   const host = new DeviceHost(options.logger, options.hostEntryPath)
+  const demoMode: DemoModeState = { enabled: options.diagnostics }
+  const printDefaults = { options: {} as Record<string, unknown> }
   const ctx: AssemblyContext = {
     logger: options.logger,
     events: options.events,
@@ -205,7 +291,8 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     storageRoot: options.paths.storageRoot,
     filesRoot: options.paths.filesRoot,
     allowedOrigins: options.allowedOrigins,
-    diagnostics: options.diagnostics,
+    demoMode,
+    printDefaults,
     getParent: options.getParent,
     captureOverlay: options.captureOverlay,
   }
@@ -229,10 +316,59 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     options.platformId,
   )
 
+  const configPersistence = overridesStore(join(ctx.storageRoot, 'device-config.json'))
+  const configCenter = createDeviceConfigCenter({
+    capabilities: CONFIG_CAPABILITIES,
+    read: () => configPersistence.read<StoredConfigDocument>(),
+    write: doc => configPersistence.write(doc),
+  })
+  const internalCtx: DomainCallContext = { appId: 'shell', instanceId: 'shell', log: () => {} }
+
+  /** 配置中心的打印档案同步为运行时缺省参数；启动时取回已持久化值。 */
+  function syncPrintDefaults(): void {
+    const current = configCenter.snapshot('print')[0]?.profiles[0]?.current
+    if (!current) { return }
+    printDefaults.options = Object.fromEntries(Object.entries(current).filter(([key]) => key !== 'id'))
+  }
+  syncPrintDefaults()
+
+  async function callSetConfig(capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>): Promise<void> {
+    const definition = domains.find(d => d.name === capabilityId)
+    const setConfig = definition?.methods.setConfig
+    if (!setConfig) { return }
+    let activeId: string | undefined
+    if (capabilityId === 'scanner') {
+      const current = await definition?.methods.getConfig?.handler(undefined, internalCtx)
+      if (current && typeof current === 'object' && 'activeId' in current) {
+        activeId = String((current as { activeId: unknown }).activeId)
+      }
+    }
+    const input = buildSetConfigInput(capabilityId, deviceProfileId, patch, activeId)
+    if (input) { await setConfig.handler(setConfig.input.parse(input), internalCtx) }
+  }
+
   return {
     domains,
     deviceStatuses,
+    configCenter,
     captureDialog,
+
+    async applyConfig(capabilityId, deviceProfileId, patch) {
+      configCenter.setOverrides(capabilityId, deviceProfileId, patch)
+      await callSetConfig(capabilityId, deviceProfileId, patch)
+      syncPrintDefaults()
+    },
+
+    async resetConfig(capabilityId) {
+      configCenter.resetToFactory(capabilityId)
+      for (const entry of configCenter.factoryPatches(capabilityId)) {
+        await callSetConfig(entry.capabilityId, entry.deviceProfileId, entry.patch)
+      }
+      syncPrintDefaults()
+    },
+
+    isDemoMode() { return demoMode.enabled },
+    setDemoMode(enabled) { demoMode.enabled = enabled },
 
     warmup(onReady) {
       return host.warmup().then(() => { onReady() })

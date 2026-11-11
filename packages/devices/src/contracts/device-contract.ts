@@ -131,7 +131,7 @@ export function buildDomainDefinitions(): DomainDefinition[] {
   const scanner = stub as Parameters<typeof createScannerDomain>[0]
   const signature = stub as Parameters<typeof createSignatureDomain>[0]
   const eventBus = new Proxy({}, { get: () => () => {} }) as DomainDeps['events']
-  const deps: DomainDeps = { events: eventBus, diagnostics: true }
+  const deps: DomainDeps = { events: eventBus, demoMode: { enabled: true } }
   return [
     createPrintDomain(print),
     createCaptureDomain(capture, deps),

@@ -642,6 +642,38 @@ async function main(context: BootContext): Promise<void> {
       captureDialog.confirm(event.sender, confirmResults(results)))
   }
 
+  // 设备配置中心：六域参数读写与演示模式切换，均为平台管理动作。
+  // 诊断台是验机形态的 embedded 应用（appId 非 shell），故按「平台自身 + 验机形态」放行，第三方应用一律拒绝。
+  function assertDeviceConfigCaller(senderId: number): void {
+    const appId = callerOf(senderId).appId
+    if (appId !== SHELL_APP_ID && !flavor.diagnostics) {
+      throw new Error('仅平台工作台可修改设备配置')
+    }
+  }
+  ipcMain.handle('device:config:snapshot', (e, capabilityId?: string) => {
+    assertDeviceConfigCaller(e.sender.id)
+    return devices.configCenter.snapshot(capabilityId)
+  })
+  ipcMain.handle('device:config:apply', async (e, capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) => {
+    assertDeviceConfigCaller(e.sender.id)
+    await devices.applyConfig(capabilityId, deviceProfileId, patch ?? {})
+    return devices.configCenter.snapshot(capabilityId)
+  })
+  ipcMain.handle('device:config:reset', async (e, capabilityId?: string) => {
+    assertDeviceConfigCaller(e.sender.id)
+    await devices.resetConfig(capabilityId)
+    return devices.configCenter.snapshot()
+  })
+  ipcMain.handle('device:demo-mode', (e) => {
+    assertDeviceConfigCaller(e.sender.id)
+    return devices.isDemoMode()
+  })
+  ipcMain.handle('device:demo-mode:set', (e, enabled: boolean) => {
+    assertDeviceConfigCaller(e.sender.id)
+    devices.setDemoMode(Boolean(enabled))
+    return devices.isDemoMode()
+  })
+
   // 设置通道（schema 驱动）
   registerSettingsIpc(ipcMain)
 

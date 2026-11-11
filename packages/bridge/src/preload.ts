@@ -112,6 +112,16 @@ export const desktop = {
     set: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
   },
 
+  /** 设备配置中心：六域参数快照 / 写入覆盖 / 恢复出厂 / 演示模式开关 */
+  deviceConfig: {
+    snapshot: (capabilityId?: string) => ipcRenderer.invoke('device:config:snapshot', capabilityId),
+    apply: (capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) =>
+      ipcRenderer.invoke('device:config:apply', capabilityId, deviceProfileId, patch),
+    reset: (capabilityId?: string) => ipcRenderer.invoke('device:config:reset', capabilityId),
+    demoMode: () => ipcRenderer.invoke('device:demo-mode') as Promise<boolean>,
+    setDemoMode: (enabled: boolean) => ipcRenderer.invoke('device:demo-mode:set', enabled) as Promise<boolean>,
+  },
+
   /** 下载任务：按 taskId 间接寻址，页面无法用任意路径触达文件系统 */
   downloads: {
     list: () => ipcRenderer.invoke('download:list'),

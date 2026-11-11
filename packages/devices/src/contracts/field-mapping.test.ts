@@ -34,7 +34,7 @@ function recorder(): { stub: unknown, calls: Call[] } {
 const ctx: DomainCallContext = { appId: 'test', instanceId: 'i', log() {} }
 const deps: DomainDeps = {
   events: new Proxy({}, { get: () => () => {} }) as DomainDeps['events'],
-  diagnostics: true,
+  demoMode: { enabled: true },
 }
 
 function argsOf(calls: Call[], name: string): unknown[] {

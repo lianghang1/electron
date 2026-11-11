@@ -33,7 +33,7 @@ async function step(name, fn) {
 
 // 域工厂只在构造期把方法收集进表，handler 不执行，故可传空桩拿到真实定义
 const stub = {}
-const deps = { events: { emit() {} }, diagnostics: true }
+const deps = { events: { emit() {} }, demoMode: { enabled: true } }
 const domains = [
   createIdcardDomain(stub),
   createIccardDomain(stub),

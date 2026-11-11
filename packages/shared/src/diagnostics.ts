@@ -205,7 +205,7 @@ export const DIAGNOSTIC_CATALOG: readonly DiagnosticDomain[] = [
     methods: [
       { name: 'getConfig', label: '读取配置', description: '读取扫码枪启停与前缀规则', readOnly: true, fields: noFields },
       { name: 'setConfig', label: '写入配置', description: '覆盖扫码枪配置', readOnly: false, fields: [jsonInput('配置 JSON', '{"enabled":true,"activeProfileId":"scanner","deviceId":"scanner","overrides":{}}')] },
-      { name: 'simulateScan', label: '模拟扫码', description: '注入一条扫码内容，触发 scanner.scanned 事件', readOnly: false, event: 'scanner.scanned', fields: [text('scannedCode', '扫码内容', 'PB:1234567890', { required: true })] },
+      { name: 'simulateScan', label: '模拟扫码', description: '注入一条扫码内容，触发 scanner.scanned 事件；需先在设备配置页开启演示模式', readOnly: false, event: 'scanner.scanned', fields: [text('scannedCode', '扫码内容', 'PB:1234567890', { required: true })] },
     ],
   },
   {

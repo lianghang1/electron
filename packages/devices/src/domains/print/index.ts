@@ -3,6 +3,7 @@ import type { JobStatus, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter }
 import type { BrowserWindow } from 'electron'
 import type { DeviceHost } from '../../host/device-host'
 import { HiddenWindowPool } from './hidden-window'
+import { mergePrintDefaults } from './print-defaults'
 import { PrinterRegistry } from './printer-registry'
 import { PrintService } from './service'
 
@@ -41,6 +42,8 @@ export interface PrintSystemOptions {
   allowedOrigins?: readonly string[]
   /** 结构化日志（模块内不直接 console） */
   logger?: Logger
+  /** 现场默认打印参数：请求未显式给出的字段由配置中心补齐 */
+  defaultOptions?: () => Record<string, unknown>
 }
 
 /**
@@ -59,7 +62,7 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
   })
 
   const system: PrintSystem = {
-    submit: request => service.submit(request),
+    submit: request => service.submit(mergePrintDefaults(request, options.defaultOptions?.())),
     listPrinters: () => registry.list(),
     status: jobId => service.status(jobId),
     listJobs: async limit => service.listJobs(limit),
