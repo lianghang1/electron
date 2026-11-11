@@ -3,6 +3,7 @@
   "name": "平台日常态演示",
   "mode": "desktop",
   "chrome": "platform",
+  "defaultAppId": "registration",
   "apps": [
     {
       "id": "registration",
