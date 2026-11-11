@@ -1,18 +1,23 @@
-import type { ChannelId, UnifiedPrinter } from '@shell/shared'
+import type { PrintRemoteJob, PrintResult, UnifiedPrinter } from '@shell/shared'
 import type { PreparedJob } from './prepared-job'
 import type { ChannelOutcome, PrintChannel } from './print-channel'
 import { printError } from '../errors'
 
 /**
- * IPP（互联网打印协议）通道。
- * 用途：免驱动向支持 IPP 的网络打印机提交任务、查询任务级状态（队列中/打印中/完成）。
- * 实现建议：`ipp` npm 包（纯 JS，纯协议实现），构造 PrintJob 属性包后 SubmitJob。
- * 启用时实现 PrintChannel 并在 PrintService 注册，统一 API 契约零改动。
+ * IPP 通道：面向支持互联网打印协议的网络打印机，提交任务并回读队列状态。
+ * 接入 IPP 协议实现后在本类内补齐 execute 与 pollStatus，统一打印契约不变。
  */
 export class IppChannel implements PrintChannel {
-  readonly id: ChannelId = 'ipp'
+  readonly id = 'ipp' as const
+  readonly descriptorId = 'ipp'
+  /** 网络打印机由通道自身寻址，不依赖本机已安装驱动的打印机 */
+  readonly spools = false
 
   async execute(_job: PreparedJob, _printer: UnifiedPrinter): Promise<ChannelOutcome> {
-    throw printError('CHANNEL_UNAVAILABLE', 'IPP 通道为预留扩展点，尚未启用')
+    throw printError('CHANNEL_UNAVAILABLE', 'IPP 通道尚未接入网络打印机')
+  }
+
+  async pollStatus(_result: PrintResult): Promise<PrintRemoteJob | undefined> {
+    return undefined
   }
 }

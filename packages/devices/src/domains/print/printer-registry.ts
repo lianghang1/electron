@@ -1,8 +1,11 @@
 import type { PrinterCaps, UnifiedPrinter } from '@shell/shared'
 import type { HiddenWindowPool } from './hidden-window'
 import type { WinspoolHost } from './system-default'
-import { printError } from './errors'
+import { printError, toPrintError } from './errors'
+import { canonicalPrinterName } from './printer-name'
 import { detectPrinterHardware, detectPrinterPapers, detectSystemDefaultPrinter } from './system-default'
+
+export { canonicalPrinterName, virtualPrinter } from './printer-name'
 
 /** CUPS/lpoptions 上报的选项形状随驱动变化，按键取值，不依赖 Electron 版本的具体字段声明 */
 function readPrinterOption(options: unknown, key: string): string {
@@ -38,6 +41,7 @@ export class PrinterRegistry {
         source: 'system' as const,
         isDefault: !!osDefault && osDefault === p.name,
         status: 'unknown' as const,
+        canonicalName: canonicalPrinterName(p.name),
         // 能力保守声明：纸宽未知（不设限）；纸张列表/驱动默认值由下方探测填充
         capabilities: {} as PrinterCaps,
         meta: {
@@ -66,7 +70,7 @@ export class PrinterRegistry {
   async resolve(printerId?: string): Promise<UnifiedPrinter> {
     const all = await this.list()
     if (printerId) {
-      const found = all.find(p => p.id === printerId)
+      const found = this.matchPrinter(all, printerId)
       if (!found) {
         throw printError('PRINTER_NOT_FOUND', `未找到打印机: ${printerId}`, {
           available: all.map(p => ({ id: p.id, source: p.source })),
@@ -79,5 +83,26 @@ export class PrinterRegistry {
       throw printError('PRINTER_DEFAULT_MISSING', '系统未检测到任何打印机')
     }
     return fallback
+  }
+
+  /** 无硬件通道用：有真实打印机则返回其信息，缺失时回落虚拟打印机而不报错。 */
+  async resolveOptional(printerId?: string): Promise<UnifiedPrinter | undefined> {
+    try {
+      return await this.resolve(printerId)
+    }
+    catch (err) {
+      const code = toPrintError(err).code
+      if (code === 'PRINTER_NOT_FOUND' || code === 'PRINTER_DEFAULT_MISSING') { return undefined }
+      throw err
+    }
+  }
+
+  /** 精确 id → 规范化名 → 展示名，三级匹配容忍大小写、全半角与多余空白差异。 */
+  private matchPrinter(all: UnifiedPrinter[], printerId: string): UnifiedPrinter | undefined {
+    const exact = all.find(p => p.id === printerId)
+    if (exact) { return exact }
+    const key = canonicalPrinterName(printerId)
+    return all.find(p => p.canonicalName === key)
+      ?? all.find(p => canonicalPrinterName(p.displayName) === key)
   }
 }

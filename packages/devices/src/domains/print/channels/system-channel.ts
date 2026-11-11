@@ -4,14 +4,19 @@ import type { PreparedJob } from './prepared-job'
 import type { ChannelOutcome, PrintChannel } from './print-channel'
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-
-import { mkdir, writeFile } from 'node:fs/promises'
-import path from 'node:path'
 import { isWindowsHost } from '../../platform'
 import { printError } from '../errors'
 import { loadHtmlInto, webContentsPrint } from '../hidden-window'
 import { withPrintDeadline } from '../operation-deadline'
 import { paperToPdfPageSize, paperToPrintPageSize } from '../paper'
+import {
+  PDF_EXPORT_TIMEOUT_CODE,
+  PDF_EXPORT_TIMEOUT_MESSAGE,
+  PDF_EXPORT_TIMEOUT_MS,
+  pdfMarginsInches,
+  resolveEffectiveMargin,
+  writePdfArchive,
+} from './pdf-export'
 
 /**
  * 系统打印队列通道：
@@ -21,6 +26,8 @@ import { paperToPdfPageSize, paperToPrintPageSize } from '../paper'
  */
 export class SystemChannel implements PrintChannel {
   readonly id = 'system' as const
+  readonly descriptorId = 'chromium-hidden-window'
+  readonly spools = true
 
   constructor(
     private readonly windows: HiddenWindowPool,
@@ -54,13 +61,8 @@ export class SystemChannel implements PrintChannel {
       await loadHtmlInto(win, html)
       const wc = win.webContents
 
-      // 连续纸（小票/连续标签）没有 pageSize 概念：省略后交给驱动纸卷设置；
-      // 此时"默认边距"应视为零边距（模板自带内边距），否则 Chromium 默认边距会引起回流
       const pageSize = paperToPrintPageSize(paper)
-      const continuous = pageSize === undefined
-      const m = job.options.margin
-      const effectiveMargin: PrintOptions['margin']
-        = continuous && (m == null || m === 'default') ? 'none' : (m ?? 'default')
+      const effectiveMargin = resolveEffectiveMargin(job)
 
       // 1) PDF 存档（重打/审计依据）——preferCSSPageSize 让模板 @page 决定卷纸宽度
       const pdfBuffer = await withPrintDeadline(
@@ -71,13 +73,11 @@ export class SystemChannel implements PrintChannel {
           pageSize: paperToPdfPageSize(paper),
           margins: pdfMarginsInches(effectiveMargin),
         }),
-        30000,
-        'RENDER_FAILED',
-        'PDF 存档导出超时（30s）',
+        PDF_EXPORT_TIMEOUT_MS,
+        PDF_EXPORT_TIMEOUT_CODE,
+        PDF_EXPORT_TIMEOUT_MESSAGE,
       )
-      await mkdir(this.archiveDir, { recursive: true })
-      const archivedPdfPath = path.join(this.archiveDir, `${job.jobId}.pdf`)
-      await writeFile(archivedPdfPath, pdfBuffer)
+      const archivedPdfPath = await writePdfArchive(pdfBuffer, job.jobId, this.archiveDir)
 
       // 2) 送系统打印队列
       const printOpts: Electron.WebContentsPrintOptions = {
@@ -186,18 +186,6 @@ function wcMarginType(margin: PrintOptions['margin']): Record<string, unknown> {
   if (margin == null || margin === 'none') { return { marginType: 'none' } }
   return {
     marginType: 'custom',
-    top: mmToInch(margin.topMm),
-    bottom: mmToInch(margin.bottomMm),
-    left: mmToInch(margin.leftMm),
-    right: mmToInch(margin.rightMm),
-  }
-}
-
-/** printToPDF 存档 margins（英寸）：default 省略由 Chromium 决定 */
-function pdfMarginsInches(margin: PrintOptions['margin']): Record<string, number> {
-  if (margin === 'default' || margin == null) { return { top: 9.6 / 25.4, bottom: 9.6 / 25.4, left: 9.6 / 25.4, right: 9.6 / 25.4 } }
-  if (margin === 'none') { return { top: 0, bottom: 0, left: 0, right: 0 } }
-  return {
     top: mmToInch(margin.topMm),
     bottom: mmToInch(margin.bottomMm),
     left: mmToInch(margin.leftMm),

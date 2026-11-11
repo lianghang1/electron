@@ -1,4 +1,4 @@
-import type { JobStatus, PrintError, PrintRequest, PrintResult } from '@shell/shared'
+import type { JobStatus, PrintError, PrintRemoteState, PrintRequest, PrintResult } from '@shell/shared'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -11,9 +11,13 @@ interface JobRecord {
   finishedAt?: string
   result?: PrintResult
   error?: PrintError
+  printingSince?: string
+  stuck?: boolean
+  remoteState?: PrintRemoteState
 }
 
 const MAX_RECORDS = 200
+const DEFAULT_STUCK_THRESHOLD_MS = 120_000
 
 /**
  * 任务簿：状态查询 / 任务列表 / 重打 / 审计的数据源。
@@ -78,7 +82,33 @@ export class JobStore {
 
   markPrinting(jobId: string): void {
     const rec = this.jobs.get(jobId)
-    if (rec) { rec.state = 'printing' }
+    if (!rec) { return }
+    rec.state = 'printing'
+    rec.printingSince = new Date().toISOString()
+    this.scheduleSave()
+  }
+
+  /** 扫描长时间停留在 printing 的任务并打上卡住标记，返回命中的 jobId 列表。 */
+  detectStuck(thresholdMs = DEFAULT_STUCK_THRESHOLD_MS, now = Date.now()): string[] {
+    const hit: string[] = []
+    for (const rec of this.jobs.values()) {
+      if (rec.state !== 'printing' || !rec.printingSince) { continue }
+      const since = Date.parse(rec.printingSince)
+      if (Number.isFinite(since) && now - since >= thresholdMs) {
+        rec.stuck = true
+        hit.push(rec.jobId)
+      }
+    }
+    if (hit.length > 0) { this.scheduleSave() }
+    return hit
+  }
+
+  /** 记录通道回读的任务级状态。 */
+  markRemoteState(jobId: string, state: PrintRemoteState): void {
+    const rec = this.jobs.get(jobId)
+    if (!rec) { return }
+    rec.remoteState = state
+    this.scheduleSave()
   }
 
   finish(jobId: string, result: PrintResult): void {
@@ -157,7 +187,7 @@ export class JobStore {
   }
 
   private toStatus(rec: JobRecord): JobStatus {
-    return {
+    const status: JobStatus = {
       jobId: rec.jobId,
       jobName: rec.jobName,
       state: rec.state,
@@ -166,5 +196,13 @@ export class JobStore {
       result: rec.result,
       error: rec.error,
     }
+    if (rec.stuck) { status.stuck = true }
+    if (rec.remoteState) { status.remoteState = rec.remoteState }
+    const started = Date.parse(rec.createdAt)
+    const end = rec.finishedAt ? Date.parse(rec.finishedAt) : Date.now()
+    if (Number.isFinite(started) && Number.isFinite(end)) {
+      status.elapsedMs = Math.max(0, end - started)
+    }
+    return status
   }
 }

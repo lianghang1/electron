@@ -1,26 +1,37 @@
 import type { JobStatus, PaperSpec, PrintLogFn, PrintRequest, PrintResult, UnifiedPrinter } from '@shell/shared'
+import type { TaskQueue } from '../../runtime/queue'
 import type { PreparedContent, PreparedJob } from './channels/prepared-job'
 import type { PrintChannel } from './channels/print-channel'
+import type { PrintChannelRegistry } from './channels/print-channel-registry'
 import type { HiddenWindowPool } from './hidden-window'
 import type { PrinterRegistry } from './printer-registry'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
+import { createTaskQueue } from '../../runtime/queue'
 import { cleanupArchiveDir } from './archive-cleanup'
-import { IppChannel } from './channels/ipp-channel'
-import { SystemChannel } from './channels/system-channel'
+import { buildPrintChannels } from './channels/build-print-channels'
+import { channelMode, resolveChannelPreference } from './channels/channel-selection'
+import { createPrintChannelRegistry } from './channels/print-channel-registry'
 import { printError, toPrintError } from './errors'
 import { JobStore } from './job-store'
 import { assertPaperSupported, resolvePaper } from './paper'
 import { preparePrintContent } from './prepare-print-content'
+import { virtualPrinter } from './printer-name'
+
+const PREPARE_CONCURRENCY = 4
+const SPOOL_CONCURRENCY = 1
+const STUCK_THRESHOLD_MS = 120_000
 
 /**
  * PrintService = 统一打印 API 的实现体（归一化层）。
  * 渲染进程/业务层唯一可见的打印入口；所有平台与通道差异在这里消化：
- *   submit(request) → 校验 → 解析打印机 → 内容归一 → 通道路由 → 执行 → 结果统一化
+ *   submit(request) → 通道路由 → 解析打印机 → 校验 → 内容准备队列 → 送打队列 → 结果统一化
  */
 export class PrintService {
   private readonly jobs: JobStore
-  private readonly channels: Map<string, PrintChannel>
+  private readonly channels: PrintChannelRegistry
+  private readonly prepareQueue: TaskQueue
+  private readonly spoolQueue: TaskQueue
   /** 可选日志注入（PII 域外的打印数据可记录） */
   private readonly logger: PrintLogFn
   private readonly archiveDir: string
@@ -46,24 +57,30 @@ export class PrintService {
     this.archiveDir = deps.archiveDir
     this.allowedOrigins = deps.allowedOrigins ?? []
     this.jobs = new JobStore(deps.jobsFile)
-    this.channels = new Map<string, PrintChannel>([
-      ['system', new SystemChannel(windows, deps.archiveDir, deps.sumatraPath)],
-      ['ipp', new IppChannel()],
-    ])
+    this.channels = createPrintChannelRegistry()
+    for (const channel of buildPrintChannels({
+      windows,
+      archiveDir: deps.archiveDir,
+      sumatraPath: deps.sumatraPath,
+    })) {
+      this.channels.register(channel)
+    }
+    this.prepareQueue = createTaskQueue(PREPARE_CONCURRENCY)
+    this.spoolQueue = createTaskQueue(SPOOL_CONCURRENCY)
   }
 
   async submit(req: PrintRequest): Promise<PrintResult> {
     const jobId = randomUUID()
     const jobName = req?.options?.jobName?.trim() || `${req?.payload?.kind ?? 'print'}-${Date.now()}`
-    // 先登记任务簿：任何阶段失败（含打印机解析/校验）都有任务可查，status 语义一致
+    // 先登记任务簿：任何阶段失败（含通道路由/打印机解析/校验）都有任务可查，status 语义一致
     this.jobs.create(req, jobId, jobName)
     try {
-      const printer = await this.registry.resolve(req?.options?.printerId)
+      const channel = this.pickChannel(req)
+      const printer = await this.resolvePrinter(channel, req?.options?.printerId)
       this.validate(req)
       // 纸张归一：字符串便捷写法（'a4'/'80x60'…）→ 物理尺寸，识别不了 → undefined 交驱动默认；PDF 直通豁免纸型
       const paper = req.options.paper ? resolvePaper(req.options.paper) : undefined
       if (paper) { assertPaperSupported(paper, printer.capabilities.maxWidthMm, printer.id) }
-      const channel = this.pickChannel(req, printer)
       this.jobs.markPrinting(jobId)
       const startedAt = Date.now()
       this.log('info', `提交打印任务 ${jobName}`, {
@@ -77,10 +94,11 @@ export class PrintService {
         jobName,
         paper,
         options: req.options,
-        content: await this.preparePrintContent(req, paper, jobId),
+        content: await this.prepareQueue.enqueue(() =>
+          Promise.resolve(this.preparePrintContent(req, paper, jobId))),
       }
 
-      const outcome = await channel.execute(job, printer)
+      const outcome = await this.spoolQueue.enqueue(() => channel.execute(job, printer))
       const result: PrintResult = {
         jobId,
         channel: channel.id,
@@ -88,7 +106,10 @@ export class PrintService {
         meta: req.options.meta,
         archivedPdfPath: outcome.archivedPdfPath,
         detail: outcome.detail,
+        mode: channelMode(channel.id),
+        remoteJob: outcome.remoteJob,
       }
+      if (outcome.remoteJob) { this.jobs.markRemoteState(jobId, outcome.remoteJob.state) }
       this.jobs.finish(jobId, result)
       this.log('info', `打印任务完成 ${jobName}`, {
         jobId,
@@ -109,13 +130,26 @@ export class PrintService {
     this.logger(level, `[print] ${message}`, meta)
   }
 
-  /** 查询任务状态；任务不存在返回 null */
+  /** 查询任务状态；任务不存在返回 null。顺带检出卡住任务并回读通道级状态。 */
   async status(jobId: string): Promise<JobStatus | null> {
-    return this.jobs.status(jobId) ?? null
+    this.jobs.detectStuck(STUCK_THRESHOLD_MS)
+    const current = this.jobs.status(jobId)
+    if (!current) { return null }
+    const rec = this.jobs.get(jobId)
+    const channel = rec?.result?.channel ? this.channels.get(rec.result.channel) : undefined
+    if (channel?.pollStatus && rec?.result) {
+      const remote = await channel.pollStatus(rec.result)
+      if (remote) {
+        this.jobs.markRemoteState(jobId, remote.state)
+        return { ...current, remoteState: remote.state }
+      }
+    }
+    return current
   }
 
   /** 最近任务列表（任务中心数据源），创建时间倒序 */
   listJobs(limit = 50): JobStatus[] {
+    this.jobs.detectStuck(STUCK_THRESHOLD_MS)
     return this.jobs.list(limit)
   }
 
@@ -161,28 +195,16 @@ export class PrintService {
     return this.submit(rec.request)
   }
 
-  /** 契约 §5：确定性通道路由。业务代码零平台/通道分支。 */
-  private pickChannel(req: PrintRequest, printer: UnifiedPrinter): PrintChannel {
-    const pref = req.options.channel ?? 'auto'
-    if (pref !== 'auto') {
-      const ch = this.channels.get(pref)
-      if (!ch) { throw printError('VALIDATION_FAILED', `未知通道: ${pref}`) }
-      this.assertChannelCompatible(pref, printer)
-      return ch
-    }
-
-    return this.channels.get('system')!
+  /** 确定性通道路由：显式 channel > preview > dryRun > auto；业务代码零平台/通道分支。 */
+  private pickChannel(req: PrintRequest): PrintChannel {
+    const pref = resolveChannelPreference(req.options)
+    return pref === 'auto' ? this.channels.require('system') : this.channels.require(pref)
   }
 
-  private assertChannelCompatible(pref: string, printer: UnifiedPrinter): void {
-    if (pref === 'ipp') {
-      throw printError('CHANNEL_UNAVAILABLE', 'IPP 通道为预留扩展点，尚未启用')
-    }
-    if (pref === 'system') {
-      if (printer.source !== 'system') {
-        throw printError('VALIDATION_FAILED', 'system 通道需要系统已安装驱动的打印机', { printerId: printer.id })
-      }
-    }
+  /** 真实送打要求系统打印机就位；无硬件通道有则用真实打印机信息，无则回落虚拟打印机。 */
+  private async resolvePrinter(channel: PrintChannel, printerId?: string): Promise<UnifiedPrinter> {
+    if (channel.spools) { return this.registry.resolve(printerId) }
+    return (await this.registry.resolveOptional(printerId)) ?? virtualPrinter(printerId)
   }
 
   /** 内容归一委托给策略表：本类零 switch，负载形态差异收敛在 prepare-print-content */

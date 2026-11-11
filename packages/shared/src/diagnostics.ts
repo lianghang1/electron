@@ -219,7 +219,7 @@ export const DIAGNOSTIC_CATALOG: readonly DiagnosticDomain[] = [
         label: '提交打印',
         description: '提交文件 / URL / HTML 打印任务',
         readOnly: false,
-        fields: [jsonInput('任务 JSON', '{"printContent":{"kind":"html","html":"<h1>自检测试页</h1>"},"printOptions":{"paper":"A4"}}', 'printContent.kind 支持 file / url / html')],
+        fields: [jsonInput('任务 JSON', '{"printContent":{"kind":"html","html":"<h1>自检测试页</h1>"},"printOptions":{"paper":"A4"}}', 'printContent.kind 支持 file / url / html；printOptions 可选 channel(system/simulated/preview/dry-run/ipp)、preview、dryRun')],
       },
       { name: 'listDevices', label: '打印机列表', description: '枚举系统打印机与纸张规格', readOnly: true, fields: noFields },
       { name: 'getJobStatus', label: '任务状态', description: '按 printJobId 查询打印任务状态', readOnly: true, fields: [text('printJobId', '任务 id', 'job-0001', { required: true, hint: '从任务列表复制真实 printJobId' })] },

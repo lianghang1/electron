@@ -3,8 +3,22 @@
  * 渲染进程 / preload / 主进程共用本文件，任何通道与平台差异都必须在主进程内部消化。
  */
 
-export type ChannelId = 'system' | 'ipp'
+export type ChannelId = 'system' | 'ipp' | 'simulated' | 'preview' | 'dry-run'
 export type ChannelPreference = ChannelId | 'auto'
+
+/** 打印执行方式：真实送打 / 只出预览 PDF / 只算不送打 / 无硬件仿真送打。 */
+export type PrintMode = 'spool' | 'preview' | 'dry-run' | 'simulated'
+
+/** 通道可回读的任务级状态：IPP 等异步队列上报，系统队列可缺省。 */
+export type PrintRemoteState = 'queued' | 'printing' | 'done' | 'failed' | 'unknown'
+
+export interface PrintRemoteJob {
+  /** 远端队列里的任务号（IPP job-id 等） */
+  remoteJobId?: string
+  state: PrintRemoteState
+  /** 通道私有补充信息 */
+  detail?: unknown
+}
 
 /** 内容来源 —— 统一信封 */
 export interface FilePayload {
@@ -66,6 +80,10 @@ export interface PrintOptions {
   printerId?: string
   /** 默认 auto，按确定性规则路由 */
   channel?: ChannelPreference
+  /** 只生成预览 PDF 不送打；等价于 channel='preview'，显式 channel 优先 */
+  preview?: boolean
+  /** 完整走校验/归一/路由但不送打，回传将送打的参数快照；等价于 channel='dry-run' */
+  dryRun?: boolean
   /** 打印队列里显示的任务名 */
   jobName?: string
   /** 业务追踪字段（订单号等），结果原样带回 */
@@ -118,6 +136,10 @@ export interface PrintResult {
   archivedPdfPath?: string
   /** 通道私有审计信息（如 mock 落盘路径、送打方式与参数），可读但不得用于业务分支 */
   detail?: unknown
+  /** 任务的执行方式，供任务中心展示，业务层不得据此分支 */
+  mode?: PrintMode
+  /** 通道上报的任务级状态（有则可读回） */
+  remoteJob?: PrintRemoteJob
 }
 
 /** 设备驱动上报的纸张表单（名字 + 物理尺寸），来源 winspool DeviceCapabilitiesW / CUPS lpoptions+PPD */
@@ -159,10 +181,15 @@ export interface UnifiedPrinter {
   /** 统一 ID：系统打印机 = deviceName */
   id: string
   displayName: string
-  source: 'system' | 'ipp'
+  source: 'system' | 'ipp' | 'simulated'
   isDefault: boolean
   status: 'ready' | 'offline' | 'unknown'
   capabilities: PrinterCaps
+  /**
+   * 规范化打印机名：NFKC 归一 + 折叠空白 + 大小写统一后的稳定标识。
+   * 用于跨端、跨写法匹配（大小写/全半角/多余空格），不用于界面展示（展示用 displayName）。
+   */
+  canonicalName?: string
   /** 平台原始信息放这里，业务层不读 */
   meta: Record<string, unknown>
 }
@@ -177,4 +204,10 @@ export interface JobStatus {
   result?: PrintResult
   /** 失败原因（state = failed 时存在） */
   error?: PrintError
+  /** printing 超过阈值被判为卡住；不改变 state，供任务中心提示与人工介入 */
+  stuck?: boolean
+  /** 任务已运行时长（ms；未结束为当前耗时，已结束为总耗时） */
+  elapsedMs?: number
+  /** 通道回读的任务级状态 */
+  remoteState?: PrintRemoteState
 }
