@@ -215,8 +215,74 @@ function scanDeviceRules() {
   return v
 }
 
+// ─── IPC 契约护栏：通道必须在契约内（工程规范「契约/实现/UI 同名」条款的机器判定） ───
+// typecheck 抓不到「契约声明了但主进程漏注册」（运行时黑洞）与「注册了契约外通道」（双轨），
+// 本规则族补齐这两个盲区。白名单仅限有意游离于壳设施契约外的基础设施通道，逐通道精确放行。
+
+/** 契约外字面量注册白名单：文件 → 允许的通道名集合（每处都有结构性理由，新增须先在此登记） */
+const IPC_REGISTRATION_ALLOW = new Map([
+  ['apps/shell/electron/main/index.ts', new Set(['domain-call', 'jsapi:call'])],
+  ['packages/kernel/src/settings/service.ts', new Set(['settings:all', 'settings:set'])],
+])
+
+const DOMAIN_BLOCK_RE = /defineIpcDomain\(\s*'(\w+)'\s*,\s*\{([\s\S]*?)\n\}(?:\s*,\s*\{[^}]*\})?\s*\)\s*satisfies/g
+const SHELL_REGISTER_RE = /shell(?:Handle|On)\(\s*'([\w:]+)'/g
+const LITERAL_REGISTER_RE = /\bipcMain\.(?:handle|on)\(\s*['"`]([\w:-]+)['"`]|\bipc\.handle\(\s*['"`]([\w:-]+)['"`]/g
+
+function scanIpcChannels() {
+  const v = []
+  // 1. 从契约文件派生通道全集（invoke/send 需要主进程注册；push 由业务侧发送，不入此集）
+  const contract = new Map()
+  const domainsRoot = join(ROOT, 'packages/shared/src/ipc/domains')
+  for (const f of walk(domainsRoot)) {
+    const text = readFileSync(f, 'utf8')
+    for (const m of text.matchAll(DOMAIN_BLOCK_RE)) {
+      for (const d of m[2].matchAll(/(\w+):\s*(?:invoke|send)\b/g)) {
+        contract.set(`${m[1]}:${d[1]}`, rel(f))
+      }
+    }
+  }
+  // 2. 全仓收集 shellHandle/shellOn 注册点（含行号供报错定位）
+  const registered = new Map()
+  // 3. 契约外字面量注册：仅白名单文件、且通道名逐个匹配才放行
+  for (const f of sourceFiles()) {
+    const r = rel(f)
+    const allowed = IPC_REGISTRATION_ALLOW.get(r)
+    const lines = readFileSync(f, 'utf8').split('\n')
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      for (const m of line.matchAll(SHELL_REGISTER_RE)) {
+        registered.set(m[1], { file: r, line: i + 1 })
+      }
+      for (const m of line.matchAll(LITERAL_REGISTER_RE)) {
+        const channel = m[1] ?? m[2]
+        if (!allowed || !allowed.has(channel)) {
+          push(v, 'ipc/literal-registration', f, i + 1, allowed ? `通道 ${channel} 未在白名单登记` : `契约外字面量注册 ${channel}（改用 shellHandle/shellOn 或在 guard 白名单登记理由）`)
+        }
+        else {
+          // 白名单内的注入式注册（如 kernel 经 ipc 参数）计入契约覆盖，同样受 foreign-channel 约束
+          registered.set(channel, { file: r, line: i + 1 })
+        }
+      }
+    }
+  }
+  // 4. 契约声明了但主进程漏注册 → 渲染层调用即运行时黑洞（typecheck 盲区）
+  for (const [channel, file] of contract) {
+    if (!registered.has(channel)) {
+      push(v, 'ipc/unregistered-channel', join(ROOT, file), 0, `契约通道 ${channel} 无 shellHandle/shellOn 注册`)
+    }
+  }
+  // 5. 注册了契约外通道 → 双轨桥面，契约失去唯一真源地位（基础设施白名单通道除外）
+  for (const [channel, at] of registered) {
+    if (!contract.has(channel) && !IPC_REGISTRATION_ALLOW.get(at.file)?.has(channel)) {
+      push(v, 'ipc/foreign-channel', join(ROOT, at.file), at.line, `注册的通道 ${channel} 不在任何契约域中`)
+    }
+  }
+  return v
+}
+
 function allViolations() {
-  return [...scanSource(), ...scanPackages(), ...scanDeviceRules()]
+  return [...scanSource(), ...scanPackages(), ...scanDeviceRules(), ...scanIpcChannels()]
 }
 
 function changedFiles() {

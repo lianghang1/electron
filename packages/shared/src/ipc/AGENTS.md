@@ -57,3 +57,8 @@
 2. `index.ts` 的 `shellDomains` 并集加一行
 3. 主进程在组合根用 `shellHandle('domain:method', handler)` / `shellOn` 注册
 4. 渲染层即刻获得 `desktop().domain.method()` 类型化调用，零桥面改动
+
+以上约束由 guard 的 `ipc/*` 规则族强制执行：契约声明了但漏注册（`ipc/unregistered-channel`）、
+注册了契约外通道（`ipc/foreign-channel`）、契约外字面量 `ipcMain.handle/on`（`ipc/literal-registration`）。
+有意游离于契约外的基础设施通道（如 `domain-call`、`jsapi:call`）必须在
+`scripts/guardrails/guard.mjs` 的 `IPC_REGISTRATION_ALLOW` 白名单逐通道登记并注明理由。
