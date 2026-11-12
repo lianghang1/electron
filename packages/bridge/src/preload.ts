@@ -112,7 +112,7 @@ export const desktop = {
     set: (key: string, value: unknown) => ipcRenderer.invoke('settings:set', key, value),
   },
 
-  /** 设备配置中心：六域参数快照 / 写入覆盖 / 恢复出厂 / 演示模式开关 */
+  /** 设备配置中心：各能力参数快照 / 写入覆盖 / 恢复出厂 / 演示模式开关 */
   deviceConfig: {
     snapshot: (capabilityId?: string) => ipcRenderer.invoke('device:config:snapshot', capabilityId),
     apply: (capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) =>

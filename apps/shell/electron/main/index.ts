@@ -642,7 +642,7 @@ async function main(context: BootContext): Promise<void> {
       captureDialog.confirm(event.sender, confirmResults(results)))
   }
 
-  // 设备配置中心：六域参数读写与演示模式切换，均为平台管理动作。
+  // 设备配置中心：各能力参数读写与演示模式切换，均为平台管理动作。
   // 诊断台是验机形态的 embedded 应用（appId 非 shell），故按「平台自身 + 验机形态」放行，第三方应用一律拒绝。
   function assertDeviceConfigCaller(senderId: number): void {
     const appId = callerOf(senderId).appId

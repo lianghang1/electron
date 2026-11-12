@@ -31,7 +31,7 @@ function makeCenter() {
   return { center, writes, getDoc: () => doc }
 }
 
-describe('六域配置中心', () => {
+describe('设备配置中心', () => {
   it('初始快照等于出厂档案，无覆盖字段', () => {
     const { center } = makeCenter()
     const sections = center.snapshot()

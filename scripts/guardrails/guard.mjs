@@ -152,7 +152,7 @@ function scanPackages() {
 }
 
 // 设备骨架护栏：规则只作用于 packages/devices/src/domains，全部机器可精确判定。
-// 存量违规由 baseline 冻结（即 P2 施工清单）；六域搬迁消除后重新收紧到零。
+// 存量违规由 baseline 冻结；新代码一律按当前规则判定。
 const DEVICE_DOMAINS = ['print', 'capture', 'idcard', 'iccard', 'scanner', 'signature']
 const REQUIRED_DOMAIN_FILES = ['domain.ts', 'methods.ts', 'index.ts', 'channels/registry.ts']
 const DUAL_TRACK_RE = /@deprecated|别名导出|待迁移|TODO 迁移/

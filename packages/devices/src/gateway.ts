@@ -1,33 +1,41 @@
 import type { EventBus } from '@shell/kernel'
 import type { Logger } from '@shell/kernel/logger'
-import type { DomainCallContext, DomainDefinition } from '@shell/shared'
+import type { DeviceCapabilityId, DomainCallContext, DomainDefinition } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
 import type { DeviceCapabilitySpec, DeviceConfigCenter, StoredConfigDocument } from './config-center'
 import type { DemoModeState, DomainDeps } from './domain-kit'
 import type { CaptureSystem } from './domains/capture'
 import type { CaptureOverlayHost } from './domains/capture/overlay-host'
 import type { DriverResolver } from './drivers'
+import type { ChannelDescriptor } from './runtime/channel'
 import type { DeviceStatus } from './runtime/device-state'
 import { join } from 'node:path'
+import { DEVICE_CAPABILITIES, DEVICE_CAPABILITY_IDS } from '@shell/shared'
 import { createDeviceConfigCenter } from './config-center'
 import { overridesStore } from './domain-kit'
 import { createCaptureSystem } from './domains/capture'
+import { CAPTURE_CHANNELS } from './domains/capture/channels/registry'
 import { BUILT_IN_CAPTURE_CONFIGS } from './domains/capture/configs'
 import { CaptureDialogSessionService } from './domains/capture/dialog-session'
 import { createCaptureDomain } from './domains/capture/domain'
 import { createIcCardSystem } from './domains/iccard'
+import { ICCARD_CHANNELS } from './domains/iccard/channels/registry'
 import { BUILT_IN_ICCARD_CONFIGS } from './domains/iccard/configs'
 import { createIccardDomain } from './domains/iccard/domain'
 import { createIdCardSystem } from './domains/idcard'
+import { IDCARD_CHANNELS } from './domains/idcard/channels/registry'
 import { BUILT_IN_IDCARD_CONFIGS } from './domains/idcard/configs'
 import { createIdcardDomain } from './domains/idcard/domain'
 import { createPrintSystem } from './domains/print'
+import { PRINT_CHANNELS } from './domains/print/channels/registry'
 import { createPrintDomain } from './domains/print/domain'
 import { SUMATRA_PDF_FILE } from './domains/print/sumatra'
 import { createScannerSystem } from './domains/scanner'
+import { SCANNER_CHANNELS } from './domains/scanner/channels/registry'
 import { createScannerDomain } from './domains/scanner/domain'
 import { SCANNER_DEFAULTS } from './domains/scanner/service'
 import { createSignatureSystem } from './domains/signature'
+import { SIGNATURE_CHANNELS } from './domains/signature/channels/registry'
 import { BUILT_IN_SIGNATURE_CONFIGS } from './domains/signature/configs'
 import { createSignatureDomain } from './domains/signature/domain'
 import { DeviceHost } from './host/device-host'
@@ -41,9 +49,9 @@ export type { DomainRouter } from './domain-kit'
 
 /**
  * 设备网关：主进程侧的组装现场。
- * 六个域在一张装配表里声明「从统一上下文取什么参数、产出什么域定义」；
- * 本文件不再手工拼六种 options 形状，新增能力 = 加一行装配器。
- * 平台能力闸门在 createDomainRouter（组合根注入 availableDomains），驱动资产寻址
+ * 能力目录 DOMAIN_SPECS 是唯一登记处：每项声明装配器、配置档案、setConfig 形状、
+ * 通道声明与缺省同步钩子；新增能力域只需在能力身份表加一项并补齐目录，
+ * 类型约束会拦住漏登记的域。平台能力闸门在 createDomainRouter，驱动资产寻址
  * 由注入的 DriverResolver 决定——dev / 打包 / 现场部署三种根，域内部零感知。
  */
 
@@ -66,7 +74,7 @@ export interface DeviceGatewayOptions {
   allowedOrigins: readonly string[]
   /** 验机形态：演示模式初始开关（可运行时切换），生产形态默认关闭 */
   diagnostics: boolean
-  /** 当前平台 id（六端能力表键），用于三维求交与状态原因码 */
+  /** 当前平台 id（能力表键），用于三维求交与状态原因码 */
   platformId: string
   /** 该平台开放的能力清单，组合根按能力矩阵闸门下发 */
   availableDomains: readonly string[]
@@ -78,9 +86,9 @@ export interface DeviceGatewayOptions {
 
 export interface DeviceGateway {
   domains: DomainDefinition[]
-  /** 六域设备状态（state + 原因码），诊断台与灰置逻辑的唯一数据源 */
+  /** 各能力设备状态（state + 原因码），诊断台与灰置逻辑的唯一数据源 */
   readonly deviceStatuses: readonly DeviceStatus[]
-  /** 六域参数统一底座：出厂档案 + 现场覆盖 + 恢复出厂 */
+  /** 各能力参数统一底座：出厂档案 + 现场覆盖 + 恢复出厂 */
   readonly configCenter: DeviceConfigCenter
   /** 写入参数：更新中心文档并同步到域运行时 */
   applyConfig: (capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) => Promise<void>
@@ -98,7 +106,7 @@ export interface DeviceGateway {
   dispose: () => void
 }
 
-/** 统一装配上下文：六个装配器面对同一份事实，各自只取所需字段。 */
+/** 统一装配上下文：各装配器面对同一份事实，各自只取所需字段。 */
 interface AssemblyContext {
   logger: Logger
   events: EventBus
@@ -137,145 +145,161 @@ function overrideStore(ctx: AssemblyContext, fileName: string) {
   return overridesStore(join(ctx.storageRoot, fileName))
 }
 
-/** 六域可现场编辑的参数档案：出厂值来自各域代码即配置，中心只保存白名单覆盖。 */
-const CONFIG_CAPABILITIES: readonly DeviceCapabilitySpec[] = [
-  {
-    id: 'capture',
-    label: '高拍仪拍摄',
-    overridableKeys: ['displayName', 'ws', 'service'],
-    profiles: BUILT_IN_CAPTURE_CONFIGS,
-  },
-  {
-    id: 'idcard',
-    label: '身份证阅读',
-    overridableKeys: ['displayName', 'ws'],
-    profiles: BUILT_IN_IDCARD_CONFIGS,
-  },
-  {
-    id: 'iccard',
-    label: 'IC 卡读写',
-    overridableKeys: ['displayName', 'ws'],
-    profiles: BUILT_IN_ICCARD_CONFIGS,
-  },
-  {
-    id: 'signature',
-    label: '签名板',
-    overridableKeys: ['displayName', 'ws'],
-    profiles: BUILT_IN_SIGNATURE_CONFIGS,
-  },
-  {
-    id: 'scanner',
-    label: '扫码枪',
-    overridableKeys: ['displayName', 'timeout', 'minLength', 'endKey', 'prefixes', 'requirePrefix', 'hidUrl'],
-    profiles: SCANNER_DEFAULTS.devices,
-  },
-  {
-    id: 'print',
-    label: '打印',
-    overridableKeys: ['paper', 'channel', 'preview', 'dryRun', 'silent', 'copies'],
-    profiles: [{ id: 'print-default', paper: 'A4', channel: 'auto', preview: false, dryRun: false, silent: true, copies: 1 }],
-  },
-]
-
-/** 中心补丁 → 各域 setConfig 入参形状；无配置能力的域返回 undefined。 */
-function buildSetConfigInput(
-  capabilityId: string,
-  deviceProfileId: string,
-  patch: Record<string, unknown>,
-  activeId?: string,
-): Record<string, unknown> | undefined {
-  switch (capabilityId) {
-    case 'capture':
-    case 'idcard':
-    case 'iccard':
-    case 'signature':
-      return { deviceProfileId, overrides: patch }
-    case 'scanner':
-      return {
-        enabled: true,
-        activeProfileId: activeId ?? deviceProfileId,
-        deviceId: deviceProfileId,
-        overrides: patch,
-      }
-    default:
-      return undefined
-  }
+/** 中心补丁转换所需的上下文；activeId 仅声明了 needsActiveId 的域会拿到值。 */
+interface SetConfigArgs {
+  deviceProfileId: string
+  patch: Record<string, unknown>
+  activeId?: string
 }
 
 /**
- * 装配表 = 六个能力域的唯一登记处。
- * 每项只负责「取参数 → 建系统 → 声明域定义与生命周期」，互不感知。
+ * 单条能力登记：装配器、配置档案、setConfig 形状、缺省同步钩子、通道声明集中在一处。
+ * `Record<DeviceCapabilityId, DomainSpec>` 让新增能力域漏登记任一项时编译不通过。
  */
-const DOMAIN_ASSEMBLERS: readonly DomainAssembler[] = [
-  (ctx) => {
-    const system = createIdCardSystem({
-      resourcesRoot: ctx.resourcesRoot,
-      host: ctx.host,
-      logger: ctx.logger.scope('devices:idcard'),
-    })
-    return { id: 'idcard', definition: createIdcardDomain(system), dispose: () => system.destroy() }
+interface DomainSpec {
+  /** 出厂档案来自各域代码即配置，中心只保存白名单覆盖 */
+  config: Pick<DeviceCapabilitySpec, 'overridableKeys' | 'profiles'>
+  /** 中心补丁 → 该域 setConfig 入参形状；无 setConfig 的域省略 */
+  toSetConfigInput?: (args: SetConfigArgs) => Record<string, unknown>
+  /** setConfig 前需读取当前激活档案 id */
+  needsActiveId?: boolean
+  /** 该能力声明的通道，供诊断台求交取真实 channelId */
+  channels: readonly ChannelDescriptor[]
+  /** 配置变更后把缺省参数同步进域运行时 */
+  syncDefaults?: (ctx: AssemblyContext, current: Record<string, unknown>) => void
+  assemble: DomainAssembler
+}
+
+const DEFAULT_SET_CONFIG: DomainSpec['toSetConfigInput'] = ({ deviceProfileId, patch }) => ({ deviceProfileId, overrides: patch })
+
+/** 供装配一致性断言读取；运行期只由目录派生，不外部写入。 */
+export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
+  print: {
+    config: {
+      overridableKeys: ['paper', 'channel', 'preview', 'dryRun', 'silent', 'copies'],
+      profiles: [{ id: 'print-default', paper: 'A4', channel: 'auto', preview: false, dryRun: false, silent: true, copies: 1 }],
+    },
+    channels: PRINT_CHANNELS,
+    syncDefaults: (ctx, current) => {
+      ctx.printDefaults.options = Object.fromEntries(Object.entries(current).filter(([key]) => key !== 'id'))
+    },
+    assemble: (ctx) => {
+      const system = createPrintSystem({
+        jobsFile: join(ctx.storageRoot, 'print-jobs.json'),
+        archiveDir: join(ctx.filesRoot, 'print'),
+        sumatraPath: ctx.sumatraPath,
+        host: ctx.host,
+        getParent: ctx.getParent,
+        allowedOrigins: ctx.allowedOrigins,
+        logger: ctx.logger.scope('devices:print'),
+        defaultOptions: () => ctx.printDefaults.options,
+      })
+      return { id: 'print', definition: createPrintDomain(system), dispose: () => system.destroy() }
+    },
   },
-  (ctx) => {
-    const system = createIcCardSystem({
-      resourcesRoot: ctx.resourcesRoot,
-      host: ctx.host,
-      logger: ctx.logger.scope('devices:iccard'),
-    })
-    return { id: 'iccard', definition: createIccardDomain(system), dispose: () => system.destroy() }
+  capture: {
+    config: { overridableKeys: ['displayName', 'ws', 'service'], profiles: BUILT_IN_CAPTURE_CONFIGS },
+    toSetConfigInput: DEFAULT_SET_CONFIG,
+    channels: CAPTURE_CHANNELS,
+    assemble: (ctx) => {
+      const store = overrideStore(ctx, 'capture-overrides.json')
+      const system = createCaptureSystem({
+        resourcesRoot: ctx.resourcesRoot,
+        host: ctx.host,
+        initialOverrides: store.read(),
+        persist: overrides => store.write(overrides),
+        logger: ctx.logger.scope('devices:capture'),
+        defaultSaveDir: join(ctx.filesRoot, 'capture'),
+      })
+      return {
+        id: 'capture',
+        definition: createCaptureDomain(system, domainDeps(ctx)),
+        dispose: () => system.destroy(),
+        capture: system,
+      }
+    },
   },
-  (ctx) => {
-    const system = createPrintSystem({
-      jobsFile: join(ctx.storageRoot, 'print-jobs.json'),
-      archiveDir: join(ctx.filesRoot, 'print'),
-      sumatraPath: ctx.sumatraPath,
-      host: ctx.host,
-      getParent: ctx.getParent,
-      allowedOrigins: ctx.allowedOrigins,
-      logger: ctx.logger.scope('devices:print'),
-      defaultOptions: () => ctx.printDefaults.options,
-    })
-    return { id: 'print', definition: createPrintDomain(system), dispose: () => system.destroy() }
+  idcard: {
+    config: { overridableKeys: ['displayName', 'ws'], profiles: BUILT_IN_IDCARD_CONFIGS },
+    toSetConfigInput: DEFAULT_SET_CONFIG,
+    channels: IDCARD_CHANNELS,
+    assemble: (ctx) => {
+      const system = createIdCardSystem({
+        resourcesRoot: ctx.resourcesRoot,
+        host: ctx.host,
+        logger: ctx.logger.scope('devices:idcard'),
+      })
+      return { id: 'idcard', definition: createIdcardDomain(system), dispose: () => system.destroy() }
+    },
   },
-  (ctx) => {
-    const store = overrideStore(ctx, 'scanner-overrides.json')
-    const system = createScannerSystem({
-      initialOverrides: store.read(),
-      persist: overrides => store.write(overrides),
-      logger: ctx.logger.scope('devices:scanner'),
-    })
-    return {
-      id: 'scanner',
-      definition: createScannerDomain(system, domainDeps(ctx)),
-      dispose: () => system.destroy(),
-      attachWindow: win => system.attachWindow(win),
-    }
+  iccard: {
+    config: { overridableKeys: ['displayName', 'ws'], profiles: BUILT_IN_ICCARD_CONFIGS },
+    toSetConfigInput: DEFAULT_SET_CONFIG,
+    channels: ICCARD_CHANNELS,
+    assemble: (ctx) => {
+      const system = createIcCardSystem({
+        resourcesRoot: ctx.resourcesRoot,
+        host: ctx.host,
+        logger: ctx.logger.scope('devices:iccard'),
+      })
+      return { id: 'iccard', definition: createIccardDomain(system), dispose: () => system.destroy() }
+    },
   },
-  (ctx) => {
-    const store = overrideStore(ctx, 'capture-overrides.json')
-    const system = createCaptureSystem({
-      resourcesRoot: ctx.resourcesRoot,
-      host: ctx.host,
-      initialOverrides: store.read(),
-      persist: overrides => store.write(overrides),
-      logger: ctx.logger.scope('devices:capture'),
-      defaultSaveDir: join(ctx.filesRoot, 'capture'),
-    })
-    return {
-      id: 'capture',
-      definition: createCaptureDomain(system, domainDeps(ctx)),
-      dispose: () => system.destroy(),
-      capture: system,
-    }
+  scanner: {
+    config: {
+      overridableKeys: ['displayName', 'timeout', 'minLength', 'endKey', 'prefixes', 'requirePrefix', 'hidUrl'],
+      profiles: SCANNER_DEFAULTS.devices,
+    },
+    needsActiveId: true,
+    toSetConfigInput: ({ deviceProfileId, patch, activeId }) => ({
+      enabled: true,
+      activeProfileId: activeId ?? deviceProfileId,
+      deviceId: deviceProfileId,
+      overrides: patch,
+    }),
+    channels: SCANNER_CHANNELS,
+    assemble: (ctx) => {
+      const store = overrideStore(ctx, 'scanner-overrides.json')
+      const system = createScannerSystem({
+        initialOverrides: store.read(),
+        persist: overrides => store.write(overrides),
+        logger: ctx.logger.scope('devices:scanner'),
+      })
+      return {
+        id: 'scanner',
+        definition: createScannerDomain(system, domainDeps(ctx)),
+        dispose: () => system.destroy(),
+        attachWindow: win => system.attachWindow(win),
+      }
+    },
   },
-  (ctx) => {
-    const system = createSignatureSystem({
-      resourcesRoot: ctx.resourcesRoot,
-      host: ctx.host,
-      logger: ctx.logger.scope('devices:signature'),
-    })
-    return { id: 'signature', definition: createSignatureDomain(system, domainDeps(ctx)), dispose: () => system.destroy() }
+  signature: {
+    config: { overridableKeys: ['displayName', 'ws'], profiles: BUILT_IN_SIGNATURE_CONFIGS },
+    toSetConfigInput: DEFAULT_SET_CONFIG,
+    channels: SIGNATURE_CHANNELS,
+    assemble: (ctx) => {
+      const system = createSignatureSystem({
+        resourcesRoot: ctx.resourcesRoot,
+        host: ctx.host,
+        logger: ctx.logger.scope('devices:signature'),
+      })
+      return { id: 'signature', definition: createSignatureDomain(system, domainDeps(ctx)), dispose: () => system.destroy() }
+    },
   },
-]
+}
+
+/** 配置档案从能力身份表派生，label 不再各写一份。 */
+export const CONFIG_CAPABILITIES: readonly DeviceCapabilitySpec[] = DEVICE_CAPABILITIES.map(
+  ({ id, label }) => ({ id, label, ...DOMAIN_SPECS[id].config }),
+)
+
+/** 各能力声明的通道汇总，供诊断台状态取真实 channelId。 */
+export function channelIdFor(capabilityId: string, platformId: string): string | undefined {
+  const spec = DOMAIN_SPECS[capabilityId as DeviceCapabilityId]
+  return spec?.channels.find(
+    d => d.capabilityId === capabilityId && (!d.platformIds.length || d.platformIds.includes(platformId)),
+  )?.id
+}
 
 export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGateway {
   const log = options.logger.scope('devices')
@@ -297,15 +321,15 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     captureOverlay: options.captureOverlay,
   }
 
-  // 查表装配：平台代码零分支，新增能力只需往 DOMAIN_ASSEMBLERS 加一行
-  const assembled = DOMAIN_ASSEMBLERS.map(assemble => assemble(ctx))
+  // 查表装配：平台代码零分支，能力清单由 DEVICE_CAPABILITY_IDS 统一给定
+  const assembled = DEVICE_CAPABILITY_IDS.map(id => DOMAIN_SPECS[id].assemble(ctx))
   const domains = assembled.map(a => a.definition)
-  const capture = assembled.find(a => a.id === 'capture')?.capture
+  const capture = assembled.find(a => a.capture)?.capture
   const captureDialog = options.captureOverlay && capture
     ? new CaptureDialogSessionService({ capture, overlay: options.captureOverlay })
     : undefined
 
-  // 三维注册表与平台档案求交，产出六域状态与原因码；诊断台读同一份结果
+  // 三维注册表与平台档案求交，产出各能力状态与原因码；诊断台读同一份结果
   const deviceRegistry = createDeviceRegistry(createChannelRegistry())
   registerStandardCatalog(deviceRegistry)
   const resolutions = deviceRegistry.resolveAll(options.platformId, false)
@@ -314,6 +338,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     resolutions,
     options.availableDomains,
     options.platformId,
+    channelIdFor,
   )
 
   const configPersistence = overridesStore(join(ctx.storageRoot, 'device-config.json'))
@@ -324,27 +349,30 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
   })
   const internalCtx: DomainCallContext = { appId: 'shell', instanceId: 'shell', log: () => {} }
 
-  /** 配置中心的打印档案同步为运行时缺省参数；启动时取回已持久化值。 */
-  function syncPrintDefaults(): void {
-    const current = configCenter.snapshot('print')[0]?.profiles[0]?.current
-    if (!current) { return }
-    printDefaults.options = Object.fromEntries(Object.entries(current).filter(([key]) => key !== 'id'))
+  /** 配置变更后把各能力声明的缺省参数同步进对应域运行时；启动时取回已持久化值。 */
+  function syncRuntimeDefaults(): void {
+    for (const id of DEVICE_CAPABILITY_IDS) {
+      const sync = DOMAIN_SPECS[id].syncDefaults
+      if (!sync) { continue }
+      const current = configCenter.snapshot(id)[0]?.profiles[0]?.current
+      if (current) { sync(ctx, current) }
+    }
   }
-  syncPrintDefaults()
+  syncRuntimeDefaults()
 
   async function callSetConfig(capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>): Promise<void> {
-    const definition = domains.find(d => d.name === capabilityId)
-    const setConfig = definition?.methods.setConfig
-    if (!setConfig) { return }
+    const spec = DOMAIN_SPECS[capabilityId as DeviceCapabilityId]
+    const setConfig = spec?.toSetConfigInput && domains.find(d => d.name === capabilityId)?.methods.setConfig
+    if (!spec?.toSetConfigInput || !setConfig) { return }
     let activeId: string | undefined
-    if (capabilityId === 'scanner') {
-      const current = await definition?.methods.getConfig?.handler(undefined, internalCtx)
+    if (spec.needsActiveId) {
+      const current = await domains.find(d => d.name === capabilityId)?.methods.getConfig?.handler(undefined, internalCtx)
       if (current && typeof current === 'object' && 'activeId' in current) {
         activeId = String((current as { activeId: unknown }).activeId)
       }
     }
-    const input = buildSetConfigInput(capabilityId, deviceProfileId, patch, activeId)
-    if (input) { await setConfig.handler(setConfig.input.parse(input), internalCtx) }
+    const input = spec.toSetConfigInput({ deviceProfileId, patch, activeId })
+    await setConfig.handler(setConfig.input.parse(input), internalCtx)
   }
 
   return {
@@ -356,7 +384,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     async applyConfig(capabilityId, deviceProfileId, patch) {
       configCenter.setOverrides(capabilityId, deviceProfileId, patch)
       await callSetConfig(capabilityId, deviceProfileId, patch)
-      syncPrintDefaults()
+      syncRuntimeDefaults()
     },
 
     async resetConfig(capabilityId) {
@@ -364,7 +392,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
       for (const entry of configCenter.factoryPatches(capabilityId)) {
         await callSetConfig(entry.capabilityId, entry.deviceProfileId, entry.patch)
       }
-      syncPrintDefaults()
+      syncRuntimeDefaults()
     },
 
     isDemoMode() { return demoMode.enabled },

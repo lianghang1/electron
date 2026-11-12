@@ -65,7 +65,7 @@ function profileOf(value: unknown): DeviceConfigProfile | undefined {
 }
 
 /**
- * 六域参数的统一读写底座：出厂档案不落盘，现场覆盖由 config-store 合并、白名单过滤并持久化。
+ * 各能力参数的统一读写底座：出厂档案不落盘，现场覆盖由 config-store 合并、白名单过滤并持久化。
  * 组合根把写操作同步到各域运行时，中心自身不认识域实现。
  */
 export function createDeviceConfigCenter(options: DeviceConfigCenterOptions): DeviceConfigCenter {

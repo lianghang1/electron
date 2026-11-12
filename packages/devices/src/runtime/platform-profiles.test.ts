@@ -4,7 +4,7 @@ import { createChannelRegistry } from './channel'
 import { buildPlatformProfiles, CAPABILITY_DESCRIPTORS, registerStandardCatalog } from './platform-profiles'
 import { createDeviceRegistry } from './registry'
 
-describe('平台档案 —— 能力表接线、六平台求交、原因码', () => {
+describe('平台档案 —— 能力表接线、各平台求交、原因码', () => {
   it('档案与唯一事实源 PLATFORM_CAPABILITIES 逐平台一致', () => {
     const profiles = buildPlatformProfiles()
     expect(profiles).toHaveLength(Object.keys(PLATFORM_CAPABILITIES).length)
@@ -22,7 +22,7 @@ describe('平台档案 —— 能力表接线、六平台求交、原因码', ()
     expect(ids).toEqual(expect.arrayContaining(['linux-cn', 'linux-arm64', 'loongarch64']))
   })
 
-  it('标准目录装配后，六平台对六能力都有明确结论（支持或带原因码）', () => {
+  it('标准目录装配后，各平台对全部能力都有明确结论（支持或带原因码）', () => {
     const registry = createDeviceRegistry(createChannelRegistry())
     registerStandardCatalog(registry)
     expect(registry.capabilities()).toHaveLength(CAPABILITY_DESCRIPTORS.length)

@@ -1,6 +1,6 @@
 /**
  * 调用管线：权限 → 校验 → 仲裁 → 超时 → 调用 → 错误归一 → 打点 → 释放。
- * 六个能力域的每一次外部调用都经过唯一入口，横切逻辑只实现一次。
+ * 各能力域的每一次外部调用都经过唯一入口，横切逻辑只实现一次。
  */
 import type { LeaseOwner, LeaseRegistry } from './session'
 import type { DeviceTelemetry } from './telemetry'

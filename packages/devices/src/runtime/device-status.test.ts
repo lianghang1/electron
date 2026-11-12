@@ -14,7 +14,7 @@ const resolutions: SupportResolution[] = [
   { capabilityId: 'signature', platformId: 'linux', supported: true, channelId: 'sig-ws' },
 ]
 
-describe('六域设备状态构建', () => {
+describe('设备状态构建', () => {
   it('开放能力为 ready 且带平台 id 与实现通道', () => {
     const statuses = buildDeviceStatuses(capabilities, resolutions, ['print', 'signature'], 'linux')
     expect(statuses).toHaveLength(3)

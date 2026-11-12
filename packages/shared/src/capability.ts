@@ -5,6 +5,25 @@
 export const platforms = ['win32', 'darwin', 'linux', 'linux-cn', 'linux-arm64', 'loongarch64'] as const
 export type Platform = (typeof platforms)[number]
 
+/**
+ * 已登记设备能力的唯一身份源。新增能力域 = 在此加一项；
+ * 配置档案、装配表、诊断描述符、通道声明等登记点用
+ * `Record<DeviceCapabilityId, ...>` 约束，漏登记一处即编译不通过。
+ */
+export const DEVICE_CAPABILITIES = [
+  { id: 'print', label: '打印' },
+  { id: 'capture', label: '高拍仪拍摄' },
+  { id: 'idcard', label: '身份证阅读' },
+  { id: 'iccard', label: 'IC 卡读写' },
+  { id: 'scanner', label: '扫码枪' },
+  { id: 'signature', label: '签名板' },
+] as const satisfies readonly { readonly id: string, readonly label: string }[]
+
+export type DeviceCapabilityId = (typeof DEVICE_CAPABILITIES)[number]['id']
+
+/** 全部能力 id，供平台档案与各登记表按同一顺序派生。 */
+export const DEVICE_CAPABILITY_IDS: readonly DeviceCapabilityId[] = DEVICE_CAPABILITIES.map(c => c.id)
+
 /** 驱动部署方式：bundled = 随包分发；system = 系统自带；manual = 需现场部署 */
 export const driverDeployments = ['bundled', 'system', 'manual'] as const
 
@@ -26,7 +45,7 @@ export interface PlatformCapability {
  * 底座三维求交、UI 灰置、诊断台原因码都从这一份数据推导，不另立事实源。
  */
 export const PLATFORM_CAPABILITIES: Record<Platform, PlatformCapability> = {
-  'win32': { platform: 'win32', availableDomains: ['print', 'capture', 'idcard', 'iccard', 'scanner', 'signature'], driverDeployment: 'bundled', nativeSupported: true, winspoolSupported: true },
+  'win32': { platform: 'win32', availableDomains: DEVICE_CAPABILITY_IDS, driverDeployment: 'bundled', nativeSupported: true, winspoolSupported: true },
   'darwin': { platform: 'darwin', availableDomains: ['print'], driverDeployment: 'system', nativeSupported: false, winspoolSupported: false, notes: '厂商未提供 macOS 原生 SDK，非打印能力不可用' },
   'linux': { platform: 'linux', availableDomains: ['print'], driverDeployment: 'system', nativeSupported: false, winspoolSupported: false, notes: '厂商未提供 Linux 原生 SDK，非打印能力不可用' },
   'linux-cn': { platform: 'linux-cn', availableDomains: ['print'], driverDeployment: 'manual', nativeSupported: false, winspoolSupported: false, notes: '统信 UOS / 银河麒麟：厂商驱动需现场部署' },

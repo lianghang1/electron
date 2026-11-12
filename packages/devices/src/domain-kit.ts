@@ -8,7 +8,7 @@ import { DeviceError } from './runtime/errors'
 
 /**
  * 域装配公共基座：路由、错误、共享 helper。
- * 六个域各自 defineDomain，只依赖本文件；gateway 退化为「建系统 + 查表收域」。
+ * 各能力域各自 defineDomain，只依赖本文件；gateway 退化为「建系统 + 查表收域」。
  */
 
 export type DomainErrorCode = 'METHOD_NOT_FOUND' | 'INVALID_INPUT' | 'DEVICE_NOT_FOUND' | 'DOMAIN_UNAVAILABLE' | 'PERMISSION_DENIED'
@@ -49,7 +49,7 @@ export interface DomainRouterOptions {
   availableDomains?: readonly string[]
   /** 授权闸门：按方法声明的 grant（缺省按域推导）判定，返回 false 即拒绝 */
   authorize?: (grant: string, ctx: DomainCallContext) => Promise<boolean>
-  /** 观测底座：每次域调用统一打点，六域共用一份汇总 */
+  /** 观测底座：每次域调用统一打点，各能力域共用一份汇总 */
   telemetry?: DeviceTelemetry
   /** 观测输出：打点后把单条记录与汇总快照推给事件总线 */
   observation?: DeviceObservationSink

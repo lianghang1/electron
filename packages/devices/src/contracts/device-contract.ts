@@ -121,7 +121,7 @@ export const FIELD_RENAME_MAP: Readonly<Record<string, string>> = {
   id: 'deviceProfileId',
 }
 
-/** 用无害桩构造六个域定义：只需要方法表与 schema，不触发任何设备调用。 */
+/** 用无害桩构造各能力域定义：只需要方法表与 schema，不触发任何设备调用。 */
 export function buildDomainDefinitions(): DomainDefinition[] {
   const stub = new Proxy({}, { get: () => async () => ({}) })
   const print = stub as Parameters<typeof createPrintDomain>[0]

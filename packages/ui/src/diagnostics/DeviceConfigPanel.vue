@@ -111,7 +111,7 @@ async function save(section: ConfigSection, profile: SectionProfile): Promise<vo
 async function reset(capabilityId?: string): Promise<void> {
   await run(async () => {
     await desktop().deviceConfig.reset(capabilityId)
-    notice.value = capabilityId ? '该能力已恢复出厂' : '六域参数已全部恢复出厂'
+    notice.value = capabilityId ? '该能力已恢复出厂' : '全部能力参数已恢复出厂'
     await reload()
   })
 }
