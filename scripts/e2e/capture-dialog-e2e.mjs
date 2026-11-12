@@ -106,8 +106,9 @@ await step('预览帧只推给拍摄浮层窗', async () => {
   await service.startPreview(captureWc, 'dev-1')
   assert.equal(events.frames.length, 1)
   events.frames[0].onFrame('BASE64')
+  // 通道名与 @shell/shared ipc 契约派生名同形（captureDialog:frame）
   assert.deepEqual(captureWc.sent[0], {
-    channel: 'capture:frameReceived',
+    channel: 'captureDialog:frame',
     payload: { deviceId: 'dev-1', base64: 'BASE64' },
   })
   service.cancelByOverlay()

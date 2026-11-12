@@ -9,7 +9,8 @@
     "./capability": "./src/capability.ts",
     "./settings": "./src/settings.ts",
     "./events": "./src/events.ts",
-    "./domain": "./src/domain.ts"
+    "./domain": "./src/domain.ts",
+    "./ipc": "./src/ipc/index.ts"
   },
   "main": "./src/index.ts",
   "types": "./src/index.ts",

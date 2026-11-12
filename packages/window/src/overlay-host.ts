@@ -1,13 +1,14 @@
+import type { OverlayKind } from '@shell/shared/ipc'
 import type { BrowserWindow } from 'electron'
+
+export type { OverlayKind } from '@shell/shared/ipc'
 
 /**
  * 浮层种类：新增浮层 = 注册一条策略，窗口系统零分发。
  * WebContentsView 是原生合成层，永远盖在 Shell DOM 之上——所有要盖过应用区的
  * 弹窗、菜单、提示、通知必须走同一套原生窗宿主（master overlay-window.ts 注释）。
+ * 联合成员定义在 @shell/shared ipc 契约（IPC 边界形状唯一真源），此处只转发。
  */
-export type OverlayKind
-  = | 'panel' | 'dialog' | 'menu' | 'capture' | 'permission' | 'config'
-    | 'app-center' | 'settings' | 'command-palette' | 'update-prompt'
 
 export interface OverlayPolicy<K extends string = OverlayKind> {
   readonly kind: K

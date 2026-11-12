@@ -16,6 +16,7 @@ import {
   registerAppScheme,
   RemoteOpener,
 } from '@shell/app-runtime'
+import { attachShellHandleLogger, shellHandle, shellOn } from '@shell/bridge/handle'
 import { createDeviceGateway, createDeviceTelemetry, createDomainRouter, createDriverResolver, detectDevicePlatform, DomainRouteError, resolvePlatformCapability } from '@shell/devices'
 import { AppKvStore, createKernel, NotificationCenter, RetentionRegistry } from '@shell/kernel'
 import { AuditLog } from '@shell/kernel/audit'
@@ -408,6 +409,11 @@ async function main(context: BootContext): Promise<void> {
       },
     },
   })
+  // 壳设施通道统一经 shellHandle/shellOn 注册：通道键与签名由 @shell/shared ipc
+  // 契约推导（拼错通道名/签名不匹配编译报错），异常经统一出口编码过桥（渲染层还原 code/details）。
+  // 设备域与 JSAPI 单通道（domain-call / jsapi:call）不走此包装，保留各自错误语义。
+  attachShellHandleLogger(logger)
+
   ipcMain.handle('domain-call', (event, method: string, input: unknown) => {
     const caller = callers.tryResolve(event.sender.id)
     if (!caller) { throw new DomainRouteError('PERMISSION_DENIED', '调用方未登记') }
@@ -426,8 +432,8 @@ async function main(context: BootContext): Promise<void> {
 
   // 应用运行时通道（open 返回值是 IPC 边界投影：实例内部持有视图/窗口引用，
   // 不可结构化克隆——只出渲染层需要的纯数据）
-  ipcMain.handle('app:list', () => apps.list())
-  ipcMain.handle('app:open', async (_e, appId: string) => {
+  shellHandle('apps:list', () => apps.list())
+  shellHandle('apps:open', async (_e, appId: string) => {
     const instance = await apps.open(appId)
     return {
       instanceId: instance.instanceId,
@@ -436,28 +442,28 @@ async function main(context: BootContext): Promise<void> {
       handle: { route: instance.handle.route },
     }
   })
-  ipcMain.handle('app:close', (_e, instanceId: string) => apps.close(instanceId))
-  ipcMain.handle('app:activate', (_e, instanceId: string) => windows.activate(instanceId))
+  shellHandle('apps:close', (_e, instanceId: string) => apps.close(instanceId))
+  shellHandle('apps:activate', (_e, instanceId: string) => windows.activate(instanceId))
 
   // 下载任务与会话数据：只有壳渲染层持有完整桥面，应用视图拿不到这些通道
-  ipcMain.handle('download:list', () => downloads.list())
-  ipcMain.handle('download:cancel', (_e, taskId: string) => downloads.cancel(taskId))
-  ipcMain.handle('download:open', (_e, taskId: string) => downloads.open(taskId))
-  ipcMain.handle('download:reveal', (_e, taskId: string) => downloads.reveal(taskId))
-  ipcMain.handle('download:dismiss', (_e, taskId: string) => downloads.dismiss(taskId))
-  ipcMain.handle('session:clear-cache', async (_e, appId: string) => {
+  shellHandle('downloads:list', () => downloads.list())
+  shellHandle('downloads:cancel', (_e, taskId: string) => downloads.cancel(taskId))
+  shellHandle('downloads:open', (_e, taskId: string) => downloads.open(taskId))
+  shellHandle('downloads:reveal', (_e, taskId: string) => downloads.reveal(taskId))
+  shellHandle('downloads:dismiss', (_e, taskId: string) => downloads.dismiss(taskId))
+  shellHandle('sessions:clearCache', async (_e, appId: string) => {
     assertRegisteredApp(appId)
     await appSessions.clearCache(appId)
     kernel.ctx.events.emit('session.cleared', { appId, scope: 'cache' })
   })
-  ipcMain.handle('session:clear-site', async (_e, appId: string) => {
+  shellHandle('sessions:clearSiteData', async (_e, appId: string) => {
     assertRegisteredApp(appId)
     await appSessions.clearSiteData(appId)
     kernel.ctx.events.emit('session.cleared', { appId, scope: 'site-data' })
   })
 
   // 壳信息（渲染层按 chrome 档位决定挂不挂壳界面）
-  ipcMain.handle('shell:info', () => ({
+  shellHandle('shell:info', () => ({
     name: flavor.name,
     version: version(),
     defaultAppId: flavor.defaultAppId,
@@ -468,22 +474,25 @@ async function main(context: BootContext): Promise<void> {
     // 能力矩阵下发：业务页按 availableDomains 决定功能可用性，无需自行判断平台
     capabilities: {
       platform: capability.platform,
-      availableDomains: capability.availableDomains,
+      availableDomains: [...capability.availableDomains],
       driverDeployment: capability.driverDeployment,
       notes: capability.notes,
     },
-    deviceStatus: devices.deviceStatuses,
+    deviceStatus: [...devices.deviceStatuses],
     deviceTelemetry: telemetry.snapshot(),
   }))
   // 重启壳：quit 会触发 before-quit，把暂存的整包安装执行掉，再以新版本拉起
-  ipcMain.handle('shell:relaunch', () => {
+  shellHandle('shell:relaunch', () => {
     markGracefulExit()
     app.relaunch()
     app.quit()
   })
   // 门禁页主动更新入口：巡检并应用；需重启时经 update.restart-required 事件回传
-  ipcMain.handle('shell:update-now', () => updateCenter?.checkAndApply())
-  ipcMain.on('view:content-rect', (_e, rect: { x: number, y: number, width: number, height: number }) =>
+  shellHandle('shell:updateNow', () => updateCenter?.checkAndApply())
+  // 内容区矩形上报：渲染层两种语义入口（根 reportContentRect 与 tabs.setWorkArea）共用一份布局事实
+  shellOn('system:reportContentRect', (_e, rect: { x: number, y: number, width: number, height: number }) =>
+    windows.setContentRect(rect))
+  shellOn('tabs:setWorkArea', (_e, rect: { x: number, y: number, width: number, height: number }) =>
     windows.setContentRect(rect))
 
   // JSAPI 受控桥（remote 页面）：账本身份 + origin 白名单双重校验，
@@ -537,33 +546,33 @@ async function main(context: BootContext): Promise<void> {
     return caller.appId
   }
 
-  // App 隔离 KV：master ipc/storage.ts 的解析身份 + 校验 storage 权限，按 appId 分文件
-  ipcMain.handle('storage:get', async (e, key: string) => appKv.get(await authorized(e.sender.id, 'storage'), key))
-  ipcMain.handle('storage:set', async (e, key: string, value: unknown) => { appKv.set(await authorized(e.sender.id, 'storage'), key, value) })
-  ipcMain.handle('storage:remove', async (e, key: string) => { appKv.remove(await authorized(e.sender.id, 'storage'), key) })
-  ipcMain.handle('storage:clear', async (e) => { appKv.clear(await authorized(e.sender.id, 'storage')) })
-  ipcMain.handle('storage:keys', async e => appKv.keys(await authorized(e.sender.id, 'storage')))
-  ipcMain.handle('storage:snapshot', async e => appKv.snapshot(await authorized(e.sender.id, 'storage')))
+  // App 隔离 KV：解析身份 + 校验 storage 权限，按 appId 分文件
+  shellHandle('storage:get', async (e, key: string) => appKv.get(await authorized(e.sender.id, 'storage'), key))
+  shellHandle('storage:set', async (e, key: string, value: unknown) => { appKv.set(await authorized(e.sender.id, 'storage'), key, value) })
+  shellHandle('storage:remove', async (e, key: string) => { appKv.remove(await authorized(e.sender.id, 'storage'), key) })
+  shellHandle('storage:clear', async (e) => { appKv.clear(await authorized(e.sender.id, 'storage')) })
+  shellHandle('storage:keys', async e => appKv.keys(await authorized(e.sender.id, 'storage')))
+  shellHandle('storage:snapshot', async e => appKv.snapshot(await authorized(e.sender.id, 'storage')))
 
   // 统一消息通道：toast / 通知中心 / 下载卡共用一份 TTL
-  ipcMain.handle('notification:show', async (e, input: { title: string, body?: string, level?: string, ttlMs?: number }) => {
+  shellHandle('notifications:show', async (e, input: { title: string, body?: string, level?: string, ttlMs?: number }) => {
     await authorized(e.sender.id, 'notification')
     const level = input.level === 'success' || input.level === 'warning' || input.level === 'error' ? input.level : 'info'
     return notifications.push({ title: String(input.title), body: input.body, level, ttlMs: input.ttlMs })
   })
-  ipcMain.handle('notification:dismiss', async (e, id: string) => {
+  shellHandle('notifications:dismiss', async (e, id: string) => {
     await authorized(e.sender.id, 'notification')
     notifications.dismiss(id)
   })
-  ipcMain.handle('notification:list', async (e) => {
+  shellHandle('notifications:list', async (e) => {
     await authorized(e.sender.id, 'notification')
-    return notifications.list()
+    return [...notifications.list()]
   })
 
-  // 更新状态机：install 对齐 master ipc/update.ts——仅工作台可调用，pending 优先重启
-  ipcMain.handle('update:state', () => updateCenter?.getState() ?? { status: 'idle' })
-  ipcMain.handle('update:cancel', () => updateCenter?.cancel())
-  ipcMain.handle('update:install', async (e) => {
+  // 更新状态机：install 仅工作台可调用，pending 优先重启
+  shellHandle('update:state', () => updateCenter?.getState() ?? { status: 'idle' })
+  shellHandle('update:cancel', () => updateCenter?.cancel())
+  shellHandle('update:install', async (e) => {
     if (callerOf(e.sender.id).appId !== SHELL_APP_ID) { throw new Error('仅工作台可安装更新') }
     if (updateCenter?.hasPendingRestart()) {
       markGracefulExit()
@@ -575,24 +584,24 @@ async function main(context: BootContext): Promise<void> {
   })
 
   // 权限查询只做展示不弹窗；重置授权是工作台的管理动作
-  ipcMain.handle('permission:query', (e, permission: string) => {
+  shellHandle('permissions:query', (e, permission: string) => {
     const caller = callerOf(e.sender.id)
     return permissions.check({ appId: caller.appId, origin: `app://${caller.appId}`, permission })
   })
-  ipcMain.handle('permission:list', (e, appId?: string) => permissions.listStates(appId ?? callerOf(e.sender.id).appId))
-  ipcMain.handle('permission:reset', async (e, permission: string) => {
+  shellHandle('permissions:list', (e, appId?: string) => permissions.listStates(appId ?? callerOf(e.sender.id).appId))
+  shellHandle('permissions:reset', async (e, permission: string) => {
     if (callerOf(e.sender.id).appId !== SHELL_APP_ID) { throw new Error('仅工作台可重置授权') }
     await permissions.resetRuntime(permission)
   })
 
   // Tab 细粒度：重载指定实例；全屏进出由 WebContentsView 的 HTML5 fullscreen 事件接管
-  ipcMain.handle('tabs:reload', (e, instanceId: string) => {
+  shellHandle('tabs:reload', (e, instanceId: string) => {
     callerOf(e.sender.id)
     windows.reload(instanceId)
   })
 
   // 运行时授权：应用主动请求 → 原生浮层询问 → 结论持久化
-  ipcMain.handle('permission:request', (e, permission: string) => {
+  shellHandle('permissions:request', (e, permission: string) => {
     const caller = callerOf(e.sender.id)
     return permissions.requestRuntime({ appId: caller.appId, origin: `app://${caller.appId}`, permission })
   })
@@ -622,7 +631,7 @@ async function main(context: BootContext): Promise<void> {
     })
   }
   if (captureDialog) {
-    ipcMain.handle('capture:open-dialog', (event, input: unknown) => {
+    shellHandle('captureDialog:open', (event, input: unknown) => {
       const caller = callerOf(event.sender.id)
       const appName = apps.list().find(r => r.manifest.id === caller.appId)?.manifest.name ?? caller.appId
       return captureDialog.open(dialogRequest(input), {
@@ -632,16 +641,16 @@ async function main(context: BootContext): Promise<void> {
         appName,
       })
     })
-    ipcMain.handle('capture:close-dialog', (event) => {
+    shellHandle('captureDialog:close', (event) => {
       const caller = callerOf(event.sender.id)
       captureDialog.cancelByCaller({ appId: caller.appId, tabId: caller.instanceId })
     })
-    ipcMain.handle('capture:dialog-preview-start', (event, input: { deviceId?: string, resolutionNum?: number }) =>
-      captureDialog.startPreview(event.sender, String(input?.deviceId ?? ''), typeof input?.resolutionNum === 'number' ? { resolutionNum: input.resolutionNum } : undefined))
-    ipcMain.handle('capture:dialog-preview-stop', event => captureDialog.stopPreview(event.sender))
-    ipcMain.handle('capture:dialog-snap', (event, opts?: { dataUrl?: string, meta?: Record<string, unknown> }) =>
+    shellHandle('captureDialog:startPreview', (event, deviceId: string, resolutionNum?: number) =>
+      captureDialog.startPreview(event.sender, String(deviceId ?? ''), typeof resolutionNum === 'number' ? { resolutionNum } : undefined))
+    shellHandle('captureDialog:stopPreview', event => captureDialog.stopPreview(event.sender))
+    shellHandle('captureDialog:snap', (event, opts?: { dataUrl?: string, meta?: Record<string, unknown> }) =>
       captureDialog.capture(event.sender, opts))
-    ipcMain.handle('capture:dialog-confirm', (event, results: unknown) =>
+    shellHandle('captureDialog:confirm', (event, results: unknown) =>
       captureDialog.confirm(event.sender, confirmResults(results)))
   }
 
@@ -653,38 +662,38 @@ async function main(context: BootContext): Promise<void> {
       throw new Error('仅平台工作台可修改设备配置')
     }
   }
-  ipcMain.handle('device:config:snapshot', (e, capabilityId?: string) => {
+  shellHandle('deviceConfig:snapshot', (e, capabilityId?: string) => {
     assertDeviceConfigCaller(e.sender.id)
     return devices.configCenter.snapshot(capabilityId)
   })
-  ipcMain.handle('device:config:apply', async (e, capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) => {
+  shellHandle('deviceConfig:apply', async (e, capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) => {
     assertDeviceConfigCaller(e.sender.id)
     await devices.applyConfig(capabilityId, deviceProfileId, patch ?? {})
     return devices.configCenter.snapshot(capabilityId)
   })
-  ipcMain.handle('device:config:reset', async (e, capabilityId?: string) => {
+  shellHandle('deviceConfig:reset', async (e, capabilityId?: string) => {
     assertDeviceConfigCaller(e.sender.id)
     await devices.resetConfig(capabilityId)
     return devices.configCenter.snapshot()
   })
-  ipcMain.handle('device:demo-mode', (e) => {
+  shellHandle('deviceConfig:demoMode', (e) => {
     assertDeviceConfigCaller(e.sender.id)
     return devices.isDemoMode()
   })
-  ipcMain.handle('device:demo-mode:set', (e, enabled: boolean) => {
+  shellHandle('deviceConfig:setDemoMode', (e, enabled: boolean) => {
     assertDeviceConfigCaller(e.sender.id)
     devices.setDemoMode(Boolean(enabled))
     return devices.isDemoMode()
   })
 
   // 验机文件选择：渲染层只拿到用户显式选中的绝对路径，不开放任意路径读写。
-  // 扩展名白名单由主进程固定，渲染层传入的 filters 仅作为界面提示，不参与放行判定。
-  ipcMain.handle('diagnostics:pick-file', async (e, input: { kind?: string } | undefined) => {
+  // 扩展名白名单由主进程固定，渲染层传入的 kind 仅作为过滤器，不参与放行判定。
+  shellHandle('diagnostics:pickFile', async (e, kind?: string) => {
     assertDeviceConfigCaller(e.sender.id)
-    const kind = input?.kind === 'image' ? 'image' : input?.kind === 'pdf' ? 'pdf' : 'any'
-    const filters: Electron.FileFilter[] = kind === 'image'
+    const resolved = kind === 'image' ? 'image' : kind === 'pdf' ? 'pdf' : 'any'
+    const filters: Electron.FileFilter[] = resolved === 'image'
       ? [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }]
-      : kind === 'pdf'
+      : resolved === 'pdf'
         ? [{ name: 'PDF 文档', extensions: ['pdf'] }]
         : [{ name: '图片与 PDF', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }]
     const result = await dialog.showOpenDialog({
@@ -698,7 +707,8 @@ async function main(context: BootContext): Promise<void> {
   // 设置通道（schema 驱动）
   registerSettingsIpc(ipcMain)
 
-  ipcMain.on('launch-mark:t4', () => {
+  // 启动打点（T4 首帧）：send 通道经 shellOn 契约注册
+  shellOn('system:markFirstPaint', () => {
     kernel.ctx.marks.t4FirstPaint = Date.now()
     const m = kernel.ctx.marks
     // 启动全链路打点汇总（一次启动一行，观测启动回归）

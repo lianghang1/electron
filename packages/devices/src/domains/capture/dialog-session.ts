@@ -103,7 +103,7 @@ export class CaptureDialogSessionService {
     await this.deps.capture.startPreview(deviceId, (base64) => {
       const wc = this.deps.overlay.getCaptureWindow()?.webContents
       if (wc && !wc.isDestroyed()) {
-        wc.send('capture:frameReceived', { deviceId, base64 })
+        wc.send('captureDialog:frame', { deviceId, base64 })
       }
     }, opts)
     this.previewDevice = deviceId

@@ -1,8 +1,8 @@
 import type { EventBus, NotificationCenter, PlatformNotification, Startable } from '@shell/kernel'
 import type { CaptureDialogSession, DownloadTask } from '@shell/shared'
-import type { OverlayKind } from './overlay-host'
+import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
 import type { WindowSystem } from './window-system'
-import { ipcMain } from 'electron'
+import { shellHandle } from '@shell/bridge/handle'
 
 export interface PermissionRequestView {
   requestId: string
@@ -35,16 +35,8 @@ export interface OverlayState {
   updatePrompt: string | null
 }
 
-export interface OverlayAction {
-  kind: OverlayKind
-  type: 'resolve-permission' | 'select-menu' | 'close-capture' | 'dismiss' | 'open-app' | 'reload' | 'close-tab'
-  requestId?: string
-  granted?: boolean
-  action?: string
-  appId?: string
-  tabId?: string
-  sessionId?: string
-}
+// IPC 边界形状唯一真源在 @shell/shared ipc 契约；此处转发保持既有导出面稳定
+export type { OverlayAction } from '@shell/shared/ipc'
 
 export interface OverlayServiceOptions {
   windows: WindowSystem
@@ -221,20 +213,20 @@ export class OverlayService implements Startable {
   }
 
   private registerIpc(): void {
-    ipcMain.handle('overlay:sync', event => this.syncFor(event.sender.id))
-    ipcMain.handle('overlay:open', (_e, kind: OverlayKind, params: Record<string, string>) => this.open(kind, params))
-    ipcMain.handle('overlay:dismiss', (_e, kind: OverlayKind) => this.dismiss(kind))
-    ipcMain.handle('overlay:action', (event, action: OverlayAction) => {
+    shellHandle('overlay:sync', event => this.syncFor(event.sender.id))
+    shellHandle('overlay:open', (_e, kind: OverlayKind, params?: Record<string, string>) => this.open(kind, params))
+    shellHandle('overlay:dismiss', (_e, kind: OverlayKind) => this.dismiss(kind))
+    shellHandle('overlay:action', (event, action: OverlayAction) => {
       // 来源校验：仅目标浮层窗自身可回传动作，其它 renderer 伪造无效
       if (!this.options.windows.isOverlaySender(action.kind, event.sender.id)) {
         throw new Error('overlay action rejected: sender is not the owning window')
       }
       this.handleAction(action)
     })
-    ipcMain.handle('overlay:resize', (event, height: number) => {
+    shellHandle('overlay:resize', (event, height: number) => {
       this.options.windows.resizePanel(event.sender.id, height)
     })
-    ipcMain.handle('overlay:mouse-ignore', (event, ignore: boolean) => {
+    shellHandle('overlay:mouseIgnore', (event, ignore: boolean) => {
       this.options.windows.setPanelMouseIgnore(event.sender.id, ignore)
     })
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DownloadTask } from '@shell/shared'
+import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
 import { desktop } from '@shell/bridge/client'
 import { Badge, Button } from '@ui/components/ui'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -42,7 +43,7 @@ interface CaptureView {
 }
 
 interface OverlayState {
-  kind: string
+  kind: OverlayKind
   params: Record<string, string>
   notifications: NotificationItem[]
   downloads: DownloadTask[]
@@ -133,7 +134,7 @@ function cancelCapture(): void {
   close()
 }
 
-function action(type: string, extra: Record<string, unknown> = {}): void {
+function action(type: OverlayAction['type'], extra: Omit<OverlayAction, 'kind' | 'type'> = {}): void {
   void desktop().overlay.action({ kind: kind.value, type, ...extra })
 }
 

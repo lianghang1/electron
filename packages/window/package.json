@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@shell/app-runtime": "workspace:*",
+    "@shell/bridge": "workspace:*",
     "@shell/kernel": "workspace:*",
     "@shell/shared": "workspace:*",
     "electron": "catalog:"

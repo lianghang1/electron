@@ -1,16 +1,16 @@
-import type { DesktopBridge } from './preload'
+import type { ShellBridge } from '@shell/shared/ipc'
 
 /**
  * 渲染层类型化调用端：window.desktop 的 TS 视图。
- * 域方法类型由 @shell/shared 域签名推导。
+ * 桥面类型由 @shell/shared ipc 契约推导（ShellBridge），域方法签名单一真源。
  */
 declare global {
   interface Window {
-    desktop: DesktopBridge
+    desktop: ShellBridge
   }
 }
 
-export function desktop(): DesktopBridge {
+export function desktop(): ShellBridge {
   if (!window.desktop) { throw new Error('[bridge] desktop bridge not installed — preload missing?') }
   return window.desktop
 }
