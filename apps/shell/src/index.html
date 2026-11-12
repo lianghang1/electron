@@ -24,6 +24,9 @@
         box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.2);
         transform: scale(0.72); opacity: 0;
         animation: splash-pop 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        /* 动画以窗口可见为起点：hidden 期间暂停，show() 触发 visibilitychange 后播放，
+           保证弹出段完整呈现在屏幕上而不是被隐藏期消耗 */
+        animation-play-state: paused;
         transform-origin: center;
       }
       .startup-logo-shell::before {
@@ -88,7 +91,18 @@
       }
       else {
         shell.addEventListener('animationend', markAnimationDone, { once: true })
-        window.setTimeout(markAnimationDone, 1000)
+        // 弹出动画与 1s 兜底都以窗口可见为起点：hidden 期间计时的兜底会在窗口
+        // 显示前就把启动层撤掉，弹出段会被整段吞掉
+        const beginIntro = () => {
+          shell.style.animationPlayState = 'running'
+          window.setTimeout(markAnimationDone, 1000)
+        }
+        if (document.visibilityState === 'visible') { beginIntro() }
+        else {
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') { beginIntro() }
+          }, { once: true })
+        }
       }
     </script>
     <script type="module" src="/main.ts"></script>
