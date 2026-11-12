@@ -28,6 +28,8 @@ export interface ShellInfo {
   deviceStatus: any[]
   /** 设备运行观测快照（结构随观测面板演化，渲染层按字段消费） */
   deviceTelemetry: any
+  /** 守护进程预热是否完成：未完成时设备相关入口显示「设备初始化中」过渡态（可经 devices.ready 事件解除） */
+  deviceHostReady: boolean
 }
 
 /** 更新状态（UpdateCenter.getState 投影，status 承载状态机全量取值） */

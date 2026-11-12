@@ -221,7 +221,7 @@ function scanDeviceRules() {
 
 /** 契约外字面量注册白名单：文件 → 允许的通道名集合（每处都有结构性理由，新增须先在此登记） */
 const IPC_REGISTRATION_ALLOW = new Map([
-  ['apps/shell/electron/main/index.ts', new Set(['domain-call', 'jsapi:call'])],
+  ['apps/shell/electron/main/shell-ipc.ts', new Set(['domain-call', 'jsapi:call'])],
   ['packages/kernel/src/settings/service.ts', new Set(['settings:all', 'settings:set'])],
 ])
 

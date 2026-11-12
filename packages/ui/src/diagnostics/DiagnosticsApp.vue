@@ -9,6 +9,7 @@ import {
   CreditCard,
   FlaskConical,
   IdCard,
+  Loader2,
   MonitorCog,
   PenLine,
   Printer,
@@ -16,7 +17,7 @@ import {
   ScanLine,
   Settings2,
 } from 'lucide-vue-next'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import DeviceConfigPanel from './DeviceConfigPanel.vue'
 import DeviceInsights from './DeviceInsights.vue'
 import EventStream from './EventStream.vue'
@@ -35,6 +36,7 @@ interface ShellInfo {
     driverDeployment: string
     notes?: string
   }
+  deviceHostReady?: boolean
 }
 
 const ICONS = { Camera, IdCard, CreditCard, PenLine, ScanLine, Printer }
@@ -45,14 +47,20 @@ const active = ref('capture')
 const scenarioCapability = ref<DeviceCapabilityId>('print')
 const domains = DIAGNOSTIC_CATALOG
 const clock = ref('')
+// 启动门禁：守护进程预热完成前，设备相关入口进入「初始化中」过渡态而非可点状态
+// （快照取 shell.info 的 deviceHostReady，就绪事件 devices.ready 即时解除）
+const deviceReady = ref(false)
 
 const available = computed(() => new Set(info.value?.capabilities.availableDomains ?? []))
 const enabledCount = computed(() => domains.filter(d => available.value.has(d.name)).length)
+
+let offDeviceReady: (() => void) | undefined
 
 async function loadInfo() {
   loadError.value = ''
   try {
     info.value = await desktop().shell.info() as ShellInfo
+    deviceReady.value = info.value.deviceHostReady === true
     clock.value = new Date().toLocaleTimeString('zh-CN', { hour12: false })
   }
   catch (err) {
@@ -60,7 +68,16 @@ async function loadInfo() {
   }
 }
 
-onMounted(loadInfo)
+onMounted(() => {
+  void loadInfo()
+  offDeviceReady = desktop().onEvent('devices.ready', () => {
+    deviceReady.value = true
+  })
+})
+
+onUnmounted(() => {
+  offDeviceReady?.()
+})
 </script>
 
 <template>
@@ -107,7 +124,8 @@ onMounted(loadInfo)
         <TabsTrigger v-for="domain in domains" :key="domain.name" :value="domain.name" class="shrink-0">
           <component :is="ICONS[domain.icon as keyof typeof ICONS]" :size="14" class="mr-1.5 inline" />
           {{ domain.label }}
-          <span v-if="!available.has(domain.name)" class="ml-1 text-ui-xs text-foreground-subtle">· 未启用</span>
+          <span v-if="available.has(domain.name) && !deviceReady" class="ml-1 text-ui-xs text-foreground-subtle">· 初始化中</span>
+          <span v-else-if="!available.has(domain.name)" class="ml-1 text-ui-xs text-foreground-subtle">· 未启用</span>
         </TabsTrigger>
         <TabsTrigger value="scenarios">
           <FlaskConical :size="14" class="mr-1.5 inline" />场景验机
@@ -138,13 +156,23 @@ onMounted(loadInfo)
               <p class="text-ui-caption text-muted-foreground">
                 {{ domain.description }}
               </p>
-              <div class="flex flex-col gap-3">
+              <!-- 启动门禁：已启用域在守护进程就绪前进入「初始化中」过渡态，方法入口不可点 -->
+              <div v-if="available.has(domain.name) && !deviceReady" class="rounded-md border border-border bg-card p-4">
+                <div class="flex items-center gap-2 text-ui-caption text-muted-foreground">
+                  <Loader2 :size="14" class="animate-spin" />
+                  设备守护进程初始化中，{{ domain.label }} 方法暂不可调用…
+                </div>
+                <div class="mt-3 grid gap-2">
+                  <div v-for="i in domain.methods.length" :key="i" class="h-12 animate-pulse rounded-md bg-accent" />
+                </div>
+              </div>
+              <div v-else class="flex flex-col gap-3">
                 <MethodRunner
                   v-for="method in domain.methods"
                   :key="method.name"
                   :domain="domain.name"
                   :method="method"
-                  :enabled="available.has(domain.name)"
+                  :enabled="available.has(domain.name) && deviceReady"
                 />
               </div>
             </div>
@@ -164,7 +192,7 @@ onMounted(loadInfo)
                   {{ DIAGNOSTIC_SCENARIOS[id].label }}
                 </Button>
               </div>
-              <ScenarioRunner :capability-id="scenarioCapability" :enabled="available.has(scenarioCapability)" />
+              <ScenarioRunner :capability-id="scenarioCapability" :enabled="available.has(scenarioCapability) && deviceReady" />
             </div>
           </TabsContent>
 

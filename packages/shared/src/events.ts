@@ -31,6 +31,8 @@ export interface PlatformEvents {
   'window.created': { profile: string, id: number }
   'window.closed': { id: number }
   // 设备数据流（gateway 接入层把回调转为广播）
+  // 守护进程预热完成：设备相关入口据此从「初始化中」过渡态切换为可交互
+  'devices.ready': Record<string, never>
   'scanner.scanned': { code: string }
   'signature.stroke': { point: unknown }
   'capture.frame': { deviceId: string, frame: unknown }
