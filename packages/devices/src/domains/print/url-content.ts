@@ -25,8 +25,8 @@ export interface DownloadedUrl {
 /**
  * 下载 URL 负载到归档目录（print/<jobId>.<ext>），复用任务归档生命周期。
  * 类型判定链：fileType 显式提示 > Content-Type > URL 扩展名 > PDF 兜底（记 warn）。
- * 源站白名单由组合根注入（与更新链路同源）；缺省拒绝一切远程下载，杜绝渲染层借打印通道
- * 让主进程访问内网/元数据服务（SSRF）。
+ * 源站白名单由组合根注入（flavor.print.urlOrigins，独立于更新链路）；缺省拒绝一切远程下载，
+ * 杜绝渲染层借打印通道让主进程访问内网/元数据服务（SSRF）。
  */
 export async function downloadUrlContent(
   payload: UrlPayload,

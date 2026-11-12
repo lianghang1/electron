@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { desktop } from '@shell/bridge/client'
-import { Button, Separator, Tooltip } from '@ui/components/ui'
-import { AppWindow, Minus, Plus, Settings, Square, X } from 'lucide-vue-next'
+import { Button, Separator } from '@ui/components/ui'
+import { AppWindow, Minus, Settings, Square, X } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import EmptyState from '../apps/pages/EmptyState.vue'
 import { resolveEmbeddedRoute } from '../apps/registry'
@@ -18,7 +18,7 @@ interface ShellTab {
 }
 
 interface AppSummary {
-  manifest: { id: string, name: string, icon?: string, entry: { kind: string } }
+  manifest: { id: string, name: string, icon?: string, entry: { kind: string, route?: string } }
 }
 
 const TAB_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b6d4']
@@ -36,7 +36,8 @@ const tabStripEl = ref<HTMLElement | null>(null)
 const forceRequiredVersion = ref<string | null>(null)
 
 let offForceRequired: (() => void) | undefined
-let offOverlayClosed: (() => void) | undefined
+let offAppOpened: (() => void) | undefined
+let offAppClosed: (() => void) | undefined
 
 /** 跨进程载荷不可信：形状不符就忽略，不渲染脏数据 */
 function isForceRequired(value: unknown): value is { requiredVersion: string } {
@@ -46,13 +47,9 @@ function isForceRequired(value: unknown): value is { requiredVersion: string } {
 
 const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
 
-// 命令面板与设置走原生浮层窗：WebContentsView 会盖住壳内 DOM 浮层
-const paletteOpen = ref(false)
-
-function togglePalette() {
-  paletteOpen.value = !paletteOpen.value
-  if (paletteOpen.value) { void desktop().overlay.open('command-palette') }
-  else { void desktop().overlay.dismiss('command-palette') }
+/** 应用在侧边栏的打开态：存在对应 tab 即已打开 */
+function tabOfApp(appId: string): ShellTab | undefined {
+  return tabs.value.find(t => t.appId === appId)
 }
 
 function openSettings() {
@@ -101,8 +98,6 @@ async function openApp(appId: string) {
     ?? tabs.value.find(t => t.appId === appId && t.kind === 'embedded')
   rememberRecent(appId)
   if (target) {
-    paletteOpen.value = false
-    void desktop().overlay.dismiss('command-palette')
     activate(target)
     return
   }
@@ -116,9 +111,30 @@ async function openApp(appId: string) {
     appId,
   }
   tabs.value.push(tab)
-  paletteOpen.value = false
-  void desktop().overlay.dismiss('command-palette')
   activate(tab)
+}
+
+/** 其他入口（浮层/应用中心）打开应用时同步 tab：以 app.opened 事件为准，本地 open 的重复事件靠 instanceId 去重 */
+function ensureTabFromEvent(appId: string, instanceId: string): void {
+  const existing = tabs.value.find(t => t.instanceId === instanceId || (t.appId === appId && t.kind === 'embedded'))
+  if (existing) {
+    if (existing.instanceId !== instanceId) { existing.instanceId = instanceId }
+    return
+  }
+  const manifest = appList.value.find(a => a.manifest.id === appId)?.manifest
+  const kind = manifest?.entry.kind === 'embedded' ? 'embedded' : 'view'
+  const route = manifest?.entry.route
+  const tab: ShellTab = {
+    key: instanceId,
+    kind,
+    title: manifest?.name ?? appId,
+    iconColor: colorFor(appId),
+    route,
+    instanceId: kind === 'view' ? instanceId : undefined,
+    appId,
+  }
+  tabs.value.push(tab)
+  void activate(tab)
 }
 
 function closeTab(tab: ShellTab) {
@@ -205,13 +221,6 @@ function onGlobalKeydown(e: KeyboardEvent) {
   const mod = e.ctrlKey || e.metaKey
   if (!mod) { return }
 
-  if (e.key.toLowerCase() === 'k') {
-    e.preventDefault()
-    togglePalette()
-    return
-  }
-  if (paletteOpen.value) { return }
-
   if (e.key === 'Tab' && tabs.value.length > 1) {
     e.preventDefault()
     const idx = tabs.value.findIndex(t => t.key === activeKey.value)
@@ -239,8 +248,15 @@ onMounted(async () => {
   offForceRequired = desktop().onEvent('update.force-required', (payload) => {
     if (isForceRequired(payload)) { forceRequiredVersion.value = payload.requiredVersion }
   })
-  offOverlayClosed = desktop().onEvent('overlay.closed', (payload) => {
-    if ((payload as { kind?: string }).kind === 'command-palette') { paletteOpen.value = false }
+  // 应用打开/关闭全量以事件同步：本地 openApp 与浮层入口共用同一套 tab 状态
+  offAppOpened = desktop().onEvent('app.opened', (payload) => {
+    const p = payload as { appId?: string, instanceId?: string }
+    if (p.appId && p.instanceId) { ensureTabFromEvent(p.appId, p.instanceId) }
+  })
+  offAppClosed = desktop().onEvent('app.closed', (payload) => {
+    const p = payload as { appId?: string, instanceId?: string }
+    const tab = tabs.value.find(t => t.instanceId === p.instanceId || t.appId === p.appId)
+    if (tab) { closeTab(tab) }
   })
 
   try {
@@ -263,7 +279,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onGlobalKeydown)
   offForceRequired?.()
-  offOverlayClosed?.()
+  offAppOpened?.()
+  offAppClosed?.()
 })
 </script>
 
@@ -283,7 +300,7 @@ onBeforeUnmount(() => {
             @scroll="updateTabFade"
           >
             <div
-              v-for="(tab, i) in tabs"
+              v-for="tab in tabs"
               :key="tab.key"
               class="tab flex h-9 shrink-0 cursor-default items-center gap-2 rounded-md px-2.5 text-ui-base"
               :class="{
@@ -292,12 +309,6 @@ onBeforeUnmount(() => {
                 'shadow-[inset_2px_0_0_var(--ring)]': dropTargetKey === tab.key && draggingKey !== tab.key,
               }"
               draggable="true"
-              role="tab"
-              tabindex="0"
-              :aria-selected="tab.key === activeKey"
-              @click="activate(tab)"
-              @keydown.enter="activate(tab)"
-              @keydown.space.prevent="activate(tab)"
               @dragstart="onDragStart($event, tab)"
               @dragover="onDragOver($event, tab)"
               @drop="onDrop($event, tab)"
@@ -310,17 +321,12 @@ onBeforeUnmount(() => {
                 <AppWindow :size="12" :stroke-width="2.4" />
               </span>
               <span class="font-medium text-foreground">{{ tab.title }}</span>
-              <span v-if="i < 9" class="tab-index text-ui-xs text-foreground-subtle">{{ i + 1 }}</span>
-              <button class="tab-close ml-0.5 opacity-0 hover:opacity-100" aria-label="关闭标签" @click.stop="closeTab(tab)">
+              <button class="tab-close" aria-label="关闭标签" @click.stop="closeTab(tab)">
                 <X :size="12" />
               </button>
             </div>
           </div>
-          <Button variant="ghost" size="icon-sm" aria-label="打开应用" @click="togglePalette()">
-            <Plus :size="15" />
-          </Button>
         </div>
-        <span class="shrink-0 text-ui-sm text-foreground-subtle">⌘K</span>
         <Button variant="ghost" size="icon-sm" aria-label="设置" @click="openSettings()">
           <Settings :size="16" />
         </Button>
@@ -359,18 +365,35 @@ onBeforeUnmount(() => {
       <div class="flex min-h-0 flex-1">
         <nav
           v-if="chrome === 'platform'"
-          class="flex w-16 flex-col items-center gap-1.5 border-r border-border py-3"
+          class="flex w-44 shrink-0 flex-col border-r border-border py-3"
         >
-          <Tooltip v-for="tab in tabs" :key="tab.key" :text="tab.title">
-            <button
-              class="rail-icon flex size-10 items-center justify-center rounded-icon text-white"
-              :class="{ 'rail-icon-active': tab.key === activeKey }"
-              :style="{ background: tab.iconColor }"
-              @click="activate(tab)"
+          <div class="px-4 pb-2 text-ui-xs text-foreground-subtle">
+            应用
+          </div>
+          <div v-if="!appList.length" class="px-4 py-3 text-ui-xs text-foreground-subtle">
+            暂无已安装应用
+          </div>
+          <button
+            v-for="app in appList"
+            :key="app.manifest.id"
+            class="mx-2 flex h-10 items-center gap-2.5 rounded-md px-2 text-left transition-colors"
+            :class="tabOfApp(app.manifest.id)?.key === activeKey ? 'bg-hover shadow-card' : 'hover:bg-hover'"
+            :aria-label="`打开 ${app.manifest.name}`"
+            @click="openApp(app.manifest.id)"
+          >
+            <span
+              class="flex size-7 shrink-0 items-center justify-center rounded-md text-white"
+              :style="{ background: colorFor(app.manifest.id) }"
             >
-              <AppWindow :size="19" :stroke-width="2.2" />
-            </button>
-          </Tooltip>
+              <AppWindow :size="14" :stroke-width="2.2" />
+            </span>
+            <span class="min-w-0 flex-1 truncate text-ui-sm font-medium text-foreground">{{ app.manifest.name }}</span>
+            <span
+              class="size-1.5 shrink-0 rounded-full"
+              :class="tabOfApp(app.manifest.id) ? 'bg-primary' : 'bg-transparent'"
+              aria-hidden="true"
+            />
+          </button>
         </nav>
 
         <main
@@ -433,27 +456,18 @@ onBeforeUnmount(() => {
 .tab:hover {
   background: var(--hover);
 }
-.tab-index {
-  font-variant-numeric: tabular-nums;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-.tab:hover .tab-index {
-  opacity: 0.5;
-}
 .tab-close {
   color: var(--foreground-subtle);
   border-radius: 6px;
   padding: 2px;
   transition: opacity 0.12s ease, background 0.12s ease;
 }
-.tab:hover .tab-close,
-.tab-active .tab-close {
-  opacity: 0.7;
-}
 .tab-close:hover {
   background: var(--hover);
   opacity: 1 !important;
+}
+.tab-active .tab-close {
+  opacity: 0.7;
 }
 .ctrl {
   transition: background 0.12s ease;
@@ -464,19 +478,5 @@ onBeforeUnmount(() => {
 .ctrl-close:hover {
   background: var(--destructive) !important;
   color: var(--destructive-foreground) !important;
-}
-
-.rail-icon {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-.rail-icon:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--elevation-card);
-}
-.rail-icon-active {
-  box-shadow:
-    0 0 0 2.5px var(--card),
-    0 0 0 4px var(--accent),
-    0 6px 14px color-mix(in srgb, var(--primary) 28%, transparent);
 }
 </style>

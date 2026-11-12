@@ -88,6 +88,12 @@ export const flavorManifestSchema = z.object({
       allowedOrigins: z.array(z.string()).default([]),
     })
     .default({ allowedOrigins: [] }),
+  print: z
+    .object({
+      /** 打印 URL 负载允许下载的 origin 白名单；'*' 放行全部公网（内网仍被 SSRF 防线拦截），空 = 拒绝一切远程下载 */
+      urlOrigins: z.array(z.string()).default([]),
+    })
+    .default({ urlOrigins: [] }),
   /**
    * 运行韧性（无人值守形态如 kiosk 才配；未声明即全关）：
    * crashReload 仅 desktop 形态生效，kiosk 自带 relaunch 看门狗，两者互斥

@@ -4,7 +4,7 @@ import type { ScenarioStreamEntry } from './scenario-stream'
 import { desktop } from '@shell/bridge/client'
 import { DIAGNOSTIC_SCENARIOS, fieldVisible, scenarioDefaults, scenarioInput } from '@shell/shared'
 import { Badge, Button, Input, Label, Select, Switch, Textarea } from '@ui/components/ui'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ScenarioPanels from './ScenarioPanels.vue'
 import ScenarioResult from './ScenarioResult.vue'
 
@@ -27,6 +27,65 @@ const elapsed = ref(0)
 const currentView = ref<ScenarioResultView>('json')
 const confirmId = ref('')
 const refreshKey = ref(0)
+
+/* 本机摄像头（UVC）：渲染层 getUserMedia 路线，不走 SDK 通道；
+   抓拍帧填入 imageDataUrl 字段，由「保存图片」动作经 capture.saveCapturedImage 落盘 */
+const uvcStream = ref<MediaStream | null>(null)
+const uvcVideoEl = ref<HTMLVideoElement | null>(null)
+const uvcError = ref('')
+
+async function uvcEnumerate(): Promise<void> {
+  try {
+    if (!navigator.mediaDevices?.enumerateDevices()) { throw new Error('当前环境不支持媒体设备枚举') }
+    const list = await navigator.mediaDevices.enumerateDevices()
+    const cameras = list.filter(d => d.kind === 'videoinput')
+    setOptions('deviceId', cameras.map((d, i) => ({ value: d.deviceId, label: d.label || `摄像头 ${i + 1}` })))
+    uvcError.value = cameras.length ? '' : '未枚举到本机摄像头（或尚未授权，开启一次后名称可见）'
+  }
+  catch (err) {
+    uvcError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+async function uvcStart(): Promise<void> {
+  try {
+    await uvcStop()
+    const deviceId = String(values.value.deviceId ?? '')
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: deviceId ? { deviceId: { exact: deviceId } } : true,
+      audio: false,
+    })
+    uvcStream.value = stream
+    await nextTick()
+    if (uvcVideoEl.value) { uvcVideoEl.value.srcObject = stream }
+    uvcError.value = ''
+    await uvcEnumerate()
+  }
+  catch (err) {
+    uvcError.value = err instanceof Error ? err.message : String(err)
+  }
+}
+
+async function uvcStop(): Promise<void> {
+  uvcStream.value?.getTracks().forEach(track => track.stop())
+  uvcStream.value = null
+  if (uvcVideoEl.value) { uvcVideoEl.value.srcObject = null }
+}
+
+function uvcSnap(): void {
+  const video = uvcVideoEl.value
+  if (!video?.videoWidth) {
+    uvcError.value = '摄像头未开启，无法抓拍'
+    return
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = video.videoWidth
+  canvas.height = video.videoHeight
+  canvas.getContext('2d')?.drawImage(video, 0, 0)
+  const ext = String(values.value.imageExtension ?? 'png').toLowerCase() === 'jpg' ? 'jpeg' : 'png'
+  values.value.imageDataUrl = canvas.toDataURL(`image/${ext}`)
+  uvcError.value = ''
+}
 
 const offs: Array<() => void> = []
 let seq = 0
@@ -125,6 +184,7 @@ function subscribe(): void {
 function reset(): void {
   for (const off of offs) { off() }
   offs.length = 0
+  void uvcStop()
   activeKind.value = spec.value.kinds[0]?.id ?? ''
   values.value = scenarioDefaults(spec.value.fields)
   dynamicOptions.value = {}
@@ -183,14 +243,20 @@ async function run(action: ScenarioAction): Promise<void> {
 
 watch(() => props.capabilityId, reset)
 watch(() => values.value.printerId, refreshPapers)
+watch(activeKind, (kind) => {
+  // 形态切换即切换摄像头路线：UVC 用渲染层枚举，SDK 路线回落设备目录；离开 UVC 释放摄像头
+  if (kind === 'uvc') { void uvcEnumerate() }
+  else { void uvcStop() }
+})
 onMounted(reset)
 onBeforeUnmount(() => {
   for (const off of offs) { off() }
+  void uvcStop()
 })
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col gap-3">
+  <div class="flex flex-col gap-3">
     <div class="flex flex-wrap items-center gap-2">
       <span class="text-ui-base font-semibold text-foreground">{{ spec.label }}</span>
       <Badge :variant="enabled ? 'default' : 'outline'">
@@ -216,8 +282,8 @@ onBeforeUnmount(() => {
       当前平台未启用该设备域，调用会在路由层被拒绝；可切换到仿真或预览通道验证界面链路。
     </div>
 
-    <div class="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto xl:grid-cols-2">
-      <div class="flex min-h-0 flex-col gap-3">
+    <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+      <div class="flex flex-col gap-3">
         <div v-for="[group, fields] in groups" :key="group" class="rounded-md border border-border bg-card p-3 shadow-card">
           <div class="mb-2 text-ui-sm font-semibold text-foreground">
             {{ group }}
@@ -291,7 +357,39 @@ onBeforeUnmount(() => {
         <ScenarioResult :view="currentView" :result="result" :error="error" :events="events" />
       </div>
 
-      <div class="min-h-0 overflow-auto">
+      <div class="flex flex-col gap-3">
+        <div v-if="activeKind === 'uvc'" class="rounded-md border border-border bg-card p-3 shadow-card">
+          <div class="mb-2 flex items-center gap-2">
+            <span class="text-ui-sm font-semibold text-foreground">本机摄像头</span>
+            <Badge variant="outline">
+              UVC · 渲染层 getUserMedia
+            </Badge>
+          </div>
+          <div class="flex min-h-40 items-center justify-center rounded-md border border-border bg-background p-2">
+            <video
+              v-show="uvcStream"
+              ref="uvcVideoEl"
+              autoplay
+              playsinline
+              muted
+              class="max-h-64 w-full rounded-md object-contain"
+            />
+            <span v-if="!uvcStream" class="text-ui-caption text-foreground-subtle">点击「开启摄像头」后，本机摄像头画面会显示在这里</span>
+          </div>
+          <div class="mt-2 flex flex-wrap items-center gap-2">
+            <Button size="sm" :variant="uvcStream ? 'outline' : 'default'" @click="uvcStream ? uvcStop() : uvcStart()">
+              {{ uvcStream ? '关闭摄像头' : '开启摄像头' }}
+            </Button>
+            <Button size="sm" variant="outline" :disabled="!uvcStream" @click="uvcSnap">
+              抓拍到 DataURL
+            </Button>
+            <span v-if="uvcError" class="text-ui-xs text-destructive">{{ uvcError }}</span>
+          </div>
+          <p class="mt-1.5 text-ui-xs text-foreground-subtle">
+            抓拍帧填入「图片 DataURL」字段；高拍仪 SDK 不在时，可用本机摄像头验证拍摄落盘与打印链路。
+          </p>
+        </div>
+
         <ScenarioPanels
           :panels="spec.panels"
           :printers="printers"

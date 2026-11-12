@@ -10,7 +10,10 @@
       "name": "业务登记",
       "version": "1.0.0",
       "type": "internal",
-      "entry": { "kind": "embedded", "route": "/demo/registration" },
+      "entry": {
+        "kind": "embedded",
+        "route": "/demo/registration"
+      },
       "devices": [],
       "permissions": []
     },
@@ -19,7 +22,10 @@
       "name": "档案查询",
       "version": "1.0.0",
       "type": "internal",
-      "entry": { "kind": "embedded", "route": "/demo/archive" },
+      "entry": {
+        "kind": "embedded",
+        "route": "/demo/archive"
+      },
       "devices": [],
       "permissions": []
     },
@@ -28,11 +34,30 @@
       "name": "设备台账",
       "version": "1.0.0",
       "type": "internal",
-      "entry": { "kind": "embedded", "route": "/demo/devices" },
+      "entry": {
+        "kind": "embedded",
+        "route": "/demo/devices"
+      },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "testbed",
+      "name": "测试应用",
+      "version": "1.0.0",
+      "type": "internal",
+      "entry": {
+        "kind": "embedded",
+        "route": "/demo/testbed"
+      },
       "devices": [],
       "permissions": []
     }
   ],
-  "branding": { "accent": "#0d9488" },
-  "update": { "allowedOrigins": [] }
+  "branding": {
+    "accent": "#0d9488"
+  },
+  "update": {
+    "allowedOrigins": []
+  }
 }

@@ -73,11 +73,19 @@
       const splash = document.getElementById('splash')
       const shell = document.querySelector('.startup-logo-shell')
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      // logo 最短驻留：即使动画与挂载都已就绪，也要保证弹出段+驻留在屏幕上完整呈现
+      const MIN_SPLASH_MS = 600
       let finished = false
       let animationDone = false
       let appReady = false
+      let introStartedAt = 0
       const tryFinish = () => {
         if (finished || !animationDone || !appReady || !splash) { return }
+        // 撤层可见门闩：动画/兜底/挂载可能在窗口隐藏期全部就绪（reduced-motion 或
+        // 机器极快时），撤层必须等窗口真正上屏，否则启动段被隐藏期整段吞掉，
+        // 上屏即应用界面——这就是「启动动画有时显示不出来」的根因
+        if (document.visibilityState !== 'visible') { return }
+        if (introStartedAt && Date.now() - introStartedAt < MIN_SPLASH_MS) { return }
         finished = true
         document.body.classList.add('ready')
         window.setTimeout(() => splash.remove(), 500)
@@ -86,23 +94,27 @@
       const markAppReady = () => { appReady = true; tryFinish() }
       // 应用侧（apps/shell/src/main.ts）在 Vue 挂载 + 首帧 rAF 后派发
       window.addEventListener('shell-app-ready', markAppReady, { once: true })
-      if (reduceMotion || !shell) {
-        markAnimationDone()
-      }
-      else {
-        shell.addEventListener('animationend', markAnimationDone, { once: true })
-        // 弹出动画与 1s 兜底都以窗口可见为起点：hidden 期间计时的兜底会在窗口
-        // 显示前就把启动层撤掉，弹出段会被整段吞掉
-        const beginIntro = () => {
+      // 一切计时与动画统一以窗口可见为起点；窗口隐藏期（show:false + ready-to-show 前）
+      // 不播动画、不跑兜底、不撤层
+      const beginIntro = () => {
+        if (introStartedAt) { tryFinish(); return }
+        introStartedAt = Date.now()
+        if (reduceMotion || !shell) {
+          markAnimationDone()
+        }
+        else {
+          shell.addEventListener('animationend', markAnimationDone, { once: true })
           shell.style.animationPlayState = 'running'
           window.setTimeout(markAnimationDone, 1000)
         }
-        if (document.visibilityState === 'visible') { beginIntro() }
-        else {
-          document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') { beginIntro() }
-          }, { once: true })
-        }
+        // 最短驻留到期后复核撤层：门闩条件可能早已全部满足，只差驻留时长
+        window.setTimeout(tryFinish, MIN_SPLASH_MS)
+      }
+      if (document.visibilityState === 'visible') { beginIntro() }
+      else {
+        document.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') { beginIntro() }
+        }, { once: true })
       }
     </script>
     <script type="module" src="/main.ts"></script>

@@ -103,8 +103,8 @@ onMounted(loadInfo)
     </div>
 
     <Tabs v-model="active" class="min-h-0 flex-1 flex-col">
-      <TabsList>
-        <TabsTrigger v-for="domain in domains" :key="domain.name" :value="domain.name">
+      <TabsList class="overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <TabsTrigger v-for="domain in domains" :key="domain.name" :value="domain.name" class="shrink-0">
           <component :is="ICONS[domain.icon as keyof typeof ICONS]" :size="14" class="mr-1.5 inline" />
           {{ domain.label }}
           <span v-if="!available.has(domain.name)" class="ml-1 text-ui-xs text-foreground-subtle">· 未启用</span>
@@ -126,7 +126,7 @@ onMounted(loadInfo)
       <div class="flex min-h-0 flex-1">
         <div class="flex min-h-0 flex-1 flex-col">
           <TabsContent v-for="domain in domains" :key="domain.name" :value="domain.name" class="p-4">
-            <div class="mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col gap-3">
+            <div class="mx-auto flex w-full max-w-5xl flex-col gap-3">
               <div class="flex items-center gap-2">
                 <component :is="ICONS[domain.icon as keyof typeof ICONS]" :size="16" class="text-primary" />
                 <span class="text-ui-base font-semibold text-foreground">{{ domain.label }}</span>
@@ -138,7 +138,7 @@ onMounted(loadInfo)
               <p class="text-ui-caption text-muted-foreground">
                 {{ domain.description }}
               </p>
-              <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto pr-1">
+              <div class="flex flex-col gap-3">
                 <MethodRunner
                   v-for="method in domain.methods"
                   :key="method.name"
@@ -151,7 +151,7 @@ onMounted(loadInfo)
           </TabsContent>
 
           <TabsContent value="scenarios" class="p-4">
-            <div class="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-3">
+            <div class="mx-auto flex w-full max-w-6xl flex-col gap-3">
               <div class="flex flex-wrap items-center gap-1.5">
                 <span class="mr-1 text-ui-caption text-foreground-subtle">能力域</span>
                 <Button

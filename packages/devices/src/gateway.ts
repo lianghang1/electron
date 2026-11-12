@@ -71,9 +71,9 @@ export interface DeviceGatewayOptions {
   hostEntryPath: string
   /** 驱动资产寻址策略：组合根查 PLATFORM_CAPABILITIES 装配并注入 */
   driver: DriverResolver
-  paths: DeviceGatewayPaths
-  /** 打印 URL 负载允许的源站（组合根注入）；空 = 拒绝远程下载，防 SSRF */
+  /** 打印 URL 负载允许的源站（组合根注入 flavor.print.urlOrigins）；空 = 拒绝远程下载，防 SSRF */
   allowedOrigins: readonly string[]
+  paths: DeviceGatewayPaths
   /** 验机形态：演示模式初始开关（可运行时切换），生产形态默认关闭 */
   diagnostics: boolean
   /** 当前平台 id（能力表键），用于三维求交与状态原因码 */

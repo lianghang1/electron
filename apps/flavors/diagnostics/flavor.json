@@ -11,11 +11,42 @@
       "name": "系统功能检测",
       "version": "2.0.0-alpha.0",
       "type": "internal",
-      "entry": { "kind": "embedded", "route": "/diagnostics" },
-      "devices": ["capture", "idcard", "iccard", "signature", "scanner", "print"],
+      "entry": {
+        "kind": "embedded",
+        "route": "/diagnostics"
+      },
+      "devices": [
+        "capture",
+        "idcard",
+        "iccard",
+        "signature",
+        "scanner",
+        "print"
+      ],
+      "permissions": []
+    },
+    {
+      "id": "testbed",
+      "name": "测试应用",
+      "version": "2.0.0-alpha.0",
+      "type": "internal",
+      "entry": {
+        "kind": "embedded",
+        "route": "/demo/testbed"
+      },
+      "devices": [],
       "permissions": []
     }
   ],
-  "branding": { "accent": "#0d9488" },
-  "update": { "allowedOrigins": [] }
+  "branding": {
+    "accent": "#0d9488"
+  },
+  "update": {
+    "allowedOrigins": []
+  },
+  "print": {
+    "urlOrigins": [
+      "*"
+    ]
+  }
 }

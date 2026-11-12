@@ -77,12 +77,14 @@ if (!InstallerCtor) { logger.error('未支持的构建平台，整包更新通�
 const packageInstaller = InstallerCtor ? new InstallerCtor() : undefined
 
 // 平台自身桥面权限：工作台代表平台，不与第三方应用共用声明式隔离
+// media：验机拍摄走壳渲染层 getUserMedia（本机摄像头 UVC 路线），平台自身放行
 const PLATFORM_SELF_PERMISSIONS: readonly PermissionRule[] = [
   'storage',
   'notification',
   'update',
   'tabs',
   'permissions',
+  'media',
 ].map(permission => ({ app: SHELL_APP_ID, permission, verdict: 'allow' as const }))
 
 // app:// 协议的特权声明必须在 app ready 前（Electron 时序硬约束）
@@ -235,7 +237,8 @@ async function main(context: BootContext): Promise<void> {
     hostEntryPath: join(mainDir, 'device-host.js'),
     driver,
     paths: { storageRoot: configDir(), filesRoot: filesDir() },
-    allowedOrigins: flavor.update.allowedOrigins,
+    // 打印 URL 白名单独立于更新链路：flavor.print.urlOrigins（'*' 放行公网，内网仍被 SSRF 防线拦截）
+    allowedOrigins: flavor.print.urlOrigins,
     diagnostics: flavor.diagnostics,
     platformId: capability.platform,
     availableDomains: capability.availableDomains,
@@ -708,11 +711,11 @@ async function main(context: BootContext): Promise<void> {
     })
   })
 
-  await kernel.start()
-
   // 应用 dist 分区协议：主 Session 注册（packaged 形态）
   registerAppProtocol(session.defaultSession, resolveAppRoot)
 
+  // 窗口先行：主窗在后台加载启动层，设备预热（守护进程 spawn + koffi 加载）
+  // 与内核其余系统并行——暖机耗时不再表现为一段屏幕空窗
   windows.createShellWindow()
   focusShell = () => {
     const win = windows.shellWindow
@@ -724,6 +727,8 @@ async function main(context: BootContext): Promise<void> {
   // 扫码枪键盘观察挂到工作台窗口
   devices.attachShellWindow(windows.shellWindow!)
   kernel.ctx.marks.t3WindowShown = Date.now()
+
+  await kernel.start()
 
   // 韧性接线：更新择优依赖闭包注入——整包看通道实例状态，asar 看暂存标记
   resilience.attach(flavor.resilience ?? {}, () => windows.shellWindow, {
