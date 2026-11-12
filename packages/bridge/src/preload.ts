@@ -122,6 +122,12 @@ export const desktop = {
     setDemoMode: (enabled: boolean) => ipcRenderer.invoke('device:demo-mode:set', enabled) as Promise<boolean>,
   },
 
+  /** 验机文件选择：用户在原生对话框显式选中后只回传绝对路径，取消返回 null */
+  diagnostics: {
+    pickFile: (kind?: 'image' | 'pdf' | 'any') =>
+      ipcRenderer.invoke('diagnostics:pick-file', { kind }) as Promise<string | null>,
+  },
+
   /** 下载任务：按 taskId 间接寻址，页面无法用任意路径触达文件系统 */
   downloads: {
     list: () => ipcRenderer.invoke('download:list'),

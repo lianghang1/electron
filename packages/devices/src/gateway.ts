@@ -9,7 +9,9 @@ import type { CaptureOverlayHost } from './domains/capture/overlay-host'
 import type { DriverResolver } from './drivers'
 import type { ChannelDescriptor } from './runtime/channel'
 import type { DeviceStatus } from './runtime/device-state'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import process from 'node:process'
 import { DEVICE_CAPABILITIES, DEVICE_CAPABILITY_IDS } from '@shell/shared'
 import { createDeviceConfigCenter } from './config-center'
 import { overridesStore } from './domain-kit'
@@ -29,7 +31,7 @@ import { createIdcardDomain } from './domains/idcard/domain'
 import { createPrintSystem } from './domains/print'
 import { PRINT_CHANNELS } from './domains/print/channels/registry'
 import { createPrintDomain } from './domains/print/domain'
-import { SUMATRA_PDF_FILE } from './domains/print/sumatra'
+import { selectSumatraPdfFile } from './domains/print/sumatra'
 import { createScannerSystem } from './domains/scanner'
 import { SCANNER_CHANNELS } from './domains/scanner/channels/registry'
 import { createScannerDomain } from './domains/scanner/domain'
@@ -306,12 +308,13 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
   const host = new DeviceHost(options.logger, options.hostEntryPath)
   const demoMode: DemoModeState = { enabled: options.diagnostics }
   const printDefaults = { options: {} as Record<string, unknown> }
+  const sumatraFile = selectSumatraPdfFile(process.arch, rel => existsSync(options.driver.resolve(rel)))
   const ctx: AssemblyContext = {
     logger: options.logger,
     events: options.events,
     host,
     resourcesRoot: options.driver.assetRoot,
-    sumatraPath: options.driver.resolve(SUMATRA_PDF_FILE),
+    sumatraPath: options.driver.resolve(sumatraFile),
     storageRoot: options.paths.storageRoot,
     filesRoot: options.paths.filesRoot,
     allowedOrigins: options.allowedOrigins,

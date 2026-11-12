@@ -10,6 +10,7 @@
  */
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 import { ensureDriverAssets } from '../../scripts/prepare-driver-assets.mjs'
 
 const flavorId = process.env.FLAVOR ?? 'cemetery'
@@ -34,7 +35,9 @@ const arch = [targetArch]
 
 // 构建期把源码树 assets 按同一套规则聚合成 resources/devices/<域>/<厂商>/<平台>/<文件>，
 // 使 bundled 策略的 <resources>/devices/... 与域内声明一一对应（不在 asar 内散落携带 DLL）。
-await ensureDriverAssets()
+// 按目标平台裁剪：Windows 产物不携带非 win 资产，mac/linux 产物不携带 win 系列 DLL/exe。
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
+await ensureDriverAssets(repoRoot, targetOs)
 
 // rpm 需 rpmbuild，逐端构建时由 TARGET_RPM=1 显式启用；默认 deb + AppImage 保证任意
 // 干净的 Linux 环境都能完成打包，国产化 rpm 产物在装有 rpmbuild 的机器上产出

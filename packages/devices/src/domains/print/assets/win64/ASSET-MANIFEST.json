@@ -1,0 +1,15 @@
+{
+  "asset": "SumatraPDF.exe",
+  "platform": "win64",
+  "version": "3.6.1",
+  "sha256": "719f689b34f47be8ca105ce8484948474dafde0e106bab599e4a89326070c3d0",
+  "sizeBytes": 20292984,
+  "license": "GPL-3.0-or-later（部分组件为 BSD，见 LICENSE-SumatraPDF.txt）",
+  "source": "https://www.sumatrapdfreader.org/",
+  "repository": "https://github.com/sumatrapdfreader/sumatrapdf",
+  "arm64Alternative": {
+    "path": "devices/print/win-arm64/SumatraPDF.exe",
+    "note": "放入官方 ARM64 构建后，arm64 宿主自动优先选用；缺失时回退 win64"
+  },
+  "verify": "sha256sum packages/devices/src/domains/print/assets/win64/SumatraPDF.exe"
+}

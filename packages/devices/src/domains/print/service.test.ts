@@ -1,4 +1,4 @@
-import type { PrintOptions, PrintRequest } from '@shell/shared'
+import type { PrintOptions, PrintRequest, UnifiedPrinter } from '@shell/shared'
 import { Buffer } from 'node:buffer'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -139,5 +139,39 @@ describe('统一打印服务全链路', () => {
   it('不存在的任务状态返回 null', async () => {
     const service = makeService()
     expect(await service.getJobStatus('missing')).toBeNull()
+  })
+})
+
+describe('打印前设备状态预检', () => {
+  const basePrinter: UnifiedPrinter = {
+    id: 'P1',
+    displayName: 'P1',
+    source: 'system',
+    isDefault: true,
+    status: 'unknown',
+    capabilities: {},
+    meta: {},
+  }
+
+  it('明确离线的打印机在送打前拦截，并落一条带错误码的失败任务', async () => {
+    const spy = vi.spyOn(PrinterRegistry.prototype, 'resolve').mockResolvedValue({ ...basePrinter, status: 'offline' })
+    const service = makeService()
+    await expect(service.submitPrintJob(htmlRequest({ channel: 'system' })))
+      .rejects
+      .toMatchObject({ code: 'PRINTER_OFFLINE' })
+    const jobs = service.listPrintJobs()
+    expect(jobs).toHaveLength(1)
+    expect(jobs[0].state).toBe('failed')
+    expect(jobs[0].error?.code).toBe('PRINTER_OFFLINE')
+    spy.mockRestore()
+  })
+
+  it('状态 unknown 只是平台无法判定，不误拦', async () => {
+    const spy = vi.spyOn(PrinterRegistry.prototype, 'resolve').mockResolvedValue({ ...basePrinter, status: 'unknown' })
+    const service = makeService()
+    const result = await service.submitPrintJob(htmlRequest({ preview: true }))
+    expect(result.channel).toBe('preview')
+    expect(result.mode).toBe('preview')
+    spy.mockRestore()
   })
 })

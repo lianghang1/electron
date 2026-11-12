@@ -42,7 +42,7 @@ import {
   Win32Installer,
 } from '@shell/update'
 import { OverlayService, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
-import { app, ipcMain, session } from 'electron'
+import { app, dialog, ipcMain, session } from 'electron'
 
 /**
  * 组合根：全仓库唯一的组装现场。
@@ -672,6 +672,24 @@ async function main(context: BootContext): Promise<void> {
     assertDeviceConfigCaller(e.sender.id)
     devices.setDemoMode(Boolean(enabled))
     return devices.isDemoMode()
+  })
+
+  // 验机文件选择：渲染层只拿到用户显式选中的绝对路径，不开放任意路径读写。
+  // 扩展名白名单由主进程固定，渲染层传入的 filters 仅作为界面提示，不参与放行判定。
+  ipcMain.handle('diagnostics:pick-file', async (e, input: { kind?: string } | undefined) => {
+    assertDeviceConfigCaller(e.sender.id)
+    const kind = input?.kind === 'image' ? 'image' : input?.kind === 'pdf' ? 'pdf' : 'any'
+    const filters: Electron.FileFilter[] = kind === 'image'
+      ? [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }]
+      : kind === 'pdf'
+        ? [{ name: 'PDF 文档', extensions: ['pdf'] }]
+        : [{ name: '图片与 PDF', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'] }]
+    const result = await dialog.showOpenDialog({
+      title: '选择验机文件',
+      properties: ['openFile'],
+      filters,
+    })
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0]
   })
 
   // 设置通道（schema 驱动）

@@ -33,12 +33,22 @@ export function collectAssetSources(devicesRoot) {
   return sources
 }
 
+/** 目标操作系统是否应携带该平台目录的资产；缺省目标不过滤，避免开发态漏资产。 */
+export function isRelevantAssetPlatform(platformDir, targetOs) {
+  if (!targetOs) { return true }
+  if (targetOs === 'win32') { return platformDir.startsWith('win') }
+  if (targetOs === 'darwin') { return /^(?:mac|darwin)/.test(platformDir) }
+  if (targetOs === 'linux') { return platformDir.startsWith('linux') }
+  return true
+}
+
 /** 构建期资产聚合计划：源 assets/<平台>/<文件> → devices/<targetRel>/<平台>/<文件> */
-export function planDriverAssets(devicesRoot) {
+export function planDriverAssets(devicesRoot, targetOs) {
   const plans = []
   for (const source of collectAssetSources(devicesRoot)) {
     for (const platform of readdirSync(source.dir, { withFileTypes: true })) {
       if (!platform.isDirectory()) { continue }
+      if (!isRelevantAssetPlatform(platform.name, targetOs)) { continue }
       for (const file of readdirSync(path.join(source.dir, platform.name))) {
         plans.push({
           from: path.join(source.dir, platform.name, file),

@@ -3,7 +3,7 @@
  * 方法名必须与各域 defineDomain 的键一致；入参字段的默认值可构造出合法调用，
  * 由 e2e 对每个方法的默认入参跑真实 input schema 的 safeParse 验证。
  */
-export type DiagnosticFieldKind = 'text' | 'number' | 'select' | 'boolean' | 'textarea' | 'json'
+export type DiagnosticFieldKind = 'text' | 'number' | 'select' | 'boolean' | 'textarea' | 'json' | 'file'
 
 export interface DiagnosticField {
   key: string

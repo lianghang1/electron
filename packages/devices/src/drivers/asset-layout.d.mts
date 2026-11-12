@@ -16,4 +16,6 @@ export interface DriverAssetPlan {
 
 export declare function collectAssetSources(devicesRoot: string): AssetSource[]
 
-export declare function planDriverAssets(devicesRoot: string): DriverAssetPlan[]
+export declare function isRelevantAssetPlatform(platformDir: string, targetOs?: string): boolean
+
+export declare function planDriverAssets(devicesRoot: string, targetOs?: string): DriverAssetPlan[]

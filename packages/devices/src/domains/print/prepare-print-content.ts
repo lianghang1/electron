@@ -3,6 +3,7 @@ import type { PreparedContent } from './channels/prepared-job'
 import type { UrlLogFn } from './url-content'
 import { existsSync, readFileSync } from 'node:fs'
 import { extname } from 'node:path'
+import { copySourceIntoArchive } from './archive-source'
 import { printError } from './errors'
 import { IMAGE_MIME, renderImageViewerHtml } from './templates'
 import { downloadUrlContent } from './url-content'
@@ -28,7 +29,9 @@ export function preparePrintContent(payload: PrintPayload, ctx: PrintContentCont
       if (!existsSync(payload.path)) {
         throw printError('VALIDATION_FAILED', `文件不存在: ${payload.path}`)
       }
-      return prepareLocalFile(payload.path, ctx.paper)
+      // 送打、存档、重打、删除一律面向归档副本：业务源文件不允许被任务簿生命周期改写
+      const archived = copySourceIntoArchive(payload.path, ctx.archiveDir, ctx.jobId)
+      return prepareLocalFile(archived, ctx.paper)
     }
     case 'url':
       return downloadUrlContent(payload, ctx.archiveDir, ctx.jobId, ctx.log, ctx.allowedOrigins)

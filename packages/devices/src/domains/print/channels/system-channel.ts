@@ -1,4 +1,4 @@
-import type { PaperSpec, PrintOptions, UnifiedPrinter } from '@shell/shared'
+import type { UnifiedPrinter } from '@shell/shared'
 import type { HiddenWindowPool } from '../hidden-window'
 import type { PreparedJob } from './prepared-job'
 import type { ChannelOutcome, PrintChannel } from './print-channel'
@@ -17,6 +17,7 @@ import {
   resolveEffectiveMargin,
   writePdfArchive,
 } from './pdf-export'
+import { buildLpArgs, buildSumatraArgs, classifyProcessFailure, duplexMode, parsePageRanges, sumatraPrintSettings, wcMarginType } from './print-args'
 
 /**
  * 系统打印队列通道：
@@ -111,21 +112,12 @@ export class SystemChannel implements PrintChannel {
     if (isWindowsHost()) {
       const sumatra = this.resolveSumatraPath()
       if (sumatra) {
-        // SumatraPDF -print-settings：份数、页码范围、奇偶页、黑白、双面、纸张、纸盒、缩放
-        const settings: string[] = []
-        if (copies > 1) { settings.push(`${copies}x`) }
-        if (job.options.pages) { settings.push(job.options.pages) }
-        if (job.options.subset) { settings.push(job.options.subset) }
-        if (job.options.grayscale) { settings.push('monochrome') }
-        if (job.options.duplex && job.options.duplex !== 'simplex') { settings.push(job.options.duplex) }
-        if (job.options.landscape) { settings.push('landscape') }
-        const paperName = standardPaperName(job.paper)
-        if (paperName) { settings.push(`paper=${paperName}`) }
-        if (job.options.bin) { settings.push(`bin=${job.options.bin}`) }
-        settings.push(job.options.scale ?? 'fit')
-        const args = ['-print-to', printer.id, '-silent', '-print-settings', settings.join(','), pdfPath]
+        const args = buildSumatraArgs({ printerId: printer.id, pdfPath, options: job.options, paper: job.paper, copies })
         await withPrintDeadline(runProcess(sumatra, args), 90000, 'SPOOL_FAILED', `SumatraPDF 送打超时（90s）`)
-        return { archivedPdfPath: pdfPath, detail: { via: 'SumatraPDF', settings: settings.join(',') } }
+        return {
+          archivedPdfPath: pdfPath,
+          detail: { via: 'SumatraPDF', settings: sumatraPrintSettings(job.options, job.paper, copies), args },
+        }
       }
       // 未打包 SumatraPDF：退回 Chromium PDF 插件窗口打印（无需外部依赖）
       await this.windows.runExclusive('pdf', async (win) => {
@@ -148,120 +140,10 @@ export class SystemChannel implements PrintChannel {
     }
 
     // macOS / Linux（含国产化 OS）：CUPS lp（纸盒 InputSlot 为 CUPS 通用约定，具体名依驱动）
-    const args = ['-d', printer.id, '-n', String(copies), '-t', sanitizeJobName(job.jobName), pdfPath]
-    if (job.options.pages) { args.unshift('-P', job.options.pages) }
-    if (job.options.subset) { args.unshift('-o', `page-set=${job.options.subset}`) }
-    if (job.options.grayscale) { args.unshift('-o', 'ColorModel=Gray') }
-    if (job.options.landscape) { args.unshift('-o', 'landscape') }
-    const sides = lpSides(job.options.duplex)
-    if (sides) { args.unshift('-o', `sides=${sides}`) }
-    if (job.options.bin) { args.unshift('-o', `InputSlot=${job.options.bin}`) }
-    const media = lpMediaName(job.paper)
-    if (media) { args.unshift('-o', `media=${media}`) }
-    if (job.options.scale === 'fit') { args.unshift('-o', 'fit-to-page') }
-    for (const [k, v] of lpMarginOptions(job.options.margin)) { args.unshift('-o', `${k}=${v}`) }
+    const args = buildLpArgs({ printerId: printer.id, pdfPath, jobName: job.jobName, options: job.options, paper: job.paper, copies })
     await withPrintDeadline(runProcess('lp', args), 90000, 'SPOOL_FAILED', 'lp 送打超时（90s）')
-    return { archivedPdfPath: pdfPath, detail: { via: 'cups-lp' } }
+    return { archivedPdfPath: pdfPath, detail: { via: 'cups-lp', args } }
   }
-}
-
-/** 统一 duplex 语义 → Electron print duplexMode */
-function duplexMode(duplex: PrintOptions['duplex']): NonNullable<Electron.WebContentsPrintOptions['duplexMode']> {
-  switch (duplex) {
-    case 'duplexshort':
-      return 'shortEdge'
-    case 'duplexlong':
-      return 'longEdge'
-    default:
-      return 'longEdge'
-  }
-}
-
-const mmToInch = (mm: number): number => Math.max(0, mm) / 25.4
-const mmToPt = (mm: number): number => Math.max(0, mm) * 2.83465
-
-/** webContents.print 的 margins（静默路径）：默认跟随/零边距/自定义英寸 */
-function wcMarginType(margin: PrintOptions['margin']): Record<string, unknown> {
-  if (margin === 'default') { return { marginType: 'default' } }
-  if (margin == null || margin === 'none') { return { marginType: 'none' } }
-  return {
-    marginType: 'custom',
-    top: mmToInch(margin.topMm),
-    bottom: mmToInch(margin.bottomMm),
-    left: mmToInch(margin.leftMm),
-    right: mmToInch(margin.rightMm),
-  }
-}
-
-/** CUPS lp 页边距（点）：仅 none/自定义生效，default 不传由系统决定 */
-function lpMarginOptions(margin: PrintOptions['margin']): Array<[string, string]> {
-  if (margin === 'default' || margin == null) { return [] }
-  if (margin === 'none') {
-    return [['page-top', '0'], ['page-bottom', '0'], ['page-left', '0'], ['page-right', '0']]
-  }
-  return [
-    ['page-top', String(Math.round(mmToPt(margin.topMm)))],
-    ['page-bottom', String(Math.round(mmToPt(margin.bottomMm)))],
-    ['page-left', String(Math.round(mmToPt(margin.leftMm)))],
-    ['page-right', String(Math.round(mmToPt(margin.rightMm)))],
-  ]
-}
-
-/** "1-3,5" → Electron pageRanges；非法输入返回 null（由调用方决定跳过） */
-function parsePageRanges(pages: string | undefined): Array<{ from: number, to: number }> | null {
-  if (!pages?.trim()) { return null }
-  const ranges: Array<{ from: number, to: number }> = []
-  for (const part of pages.split(',')) {
-    const m = part.trim().match(/^(\d+)(?:\s*-\s*(\d+))?$/)
-    if (!m) { return null }
-    const from = Number(m[1])
-    ranges.push(m[2] ? { from, to: Number(m[2]) } : { from, to: from })
-  }
-  return ranges.length > 0 ? ranges : null
-}
-
-/** 物理尺寸 → 标准纸型名（SumatraPDF paper= 与 CUPS media= 共用；其他尺寸返回 null 由调用方处理） */
-function standardPaperName(paper?: PaperSpec): string | null {
-  if (!paper || paper.heightMm <= 0) { return null }
-  switch (`${paper.widthMm}x${paper.heightMm}`) {
-    case '210x297':
-      return 'A4'
-    case '148x210':
-      return 'A5'
-    case '216x279':
-      return 'Letter'
-    case '216x356':
-      return 'Legal'
-    case '279x432':
-      return 'Tabloid'
-    default:
-      return null
-  }
-}
-
-/** PaperSpec → CUPS media=：标准尺寸用标准名，其余用 Custom.宽x高mm（连续纸不传，交驱动默认） */
-function lpMediaName(paper?: PaperSpec): string | null {
-  if (!paper || paper.heightMm <= 0) { return null }
-  return standardPaperName(paper) ?? `Custom.${paper.widthMm}x${paper.heightMm}mm`
-}
-
-/** 统一 duplex 语义 → CUPS sides 值 */
-function lpSides(duplex: PrintOptions['duplex']): string | null {
-  switch (duplex) {
-    case 'duplex':
-    case 'duplexlong':
-      return 'two-sided-long-edge'
-    case 'duplexshort':
-      return 'two-sided-short-edge'
-    case 'simplex':
-      return 'one-sided'
-    default:
-      return null
-  }
-}
-
-function sanitizeJobName(name: string): string {
-  return name.replace(/[^\w\u4E00-\u9FA5.-]+/g, '_').slice(0, 80)
 }
 
 function runProcess(cmd: string, args: string[], timeoutMs = 90000): Promise<void> {
@@ -301,7 +183,10 @@ function runProcess(cmd: string, args: string[], timeoutMs = 90000): Promise<voi
     child.on('close', (code) => {
       finish(() => {
         if (code === 0) { resolve() }
-        else { reject(printError('SPOOL_FAILED', `打印命令退出码 ${code}`, { cmd, stderr: stderr.trim() })) }
+        else {
+          const failure = classifyProcessFailure(cmd, code, stderr)
+          reject(printError(failure.code, failure.message, { cmd, exitCode: code, stderr: stderr.trim() }))
+        }
       })
     })
   })

@@ -1,6 +1,7 @@
 import type { JobStatus, PrintError, PrintRemoteState, PrintRequest, PrintResult } from '@shell/shared'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
+import { isWithinArchive } from './archive-source'
 
 interface JobRecord {
   jobId: string
@@ -28,7 +29,7 @@ export class JobStore {
   private saveTimer: ReturnType<typeof setTimeout> | null = null
   private readonly filePath: string
 
-  constructor(filePath: string) {
+  constructor(filePath: string, private readonly archiveDir?: string) {
     this.filePath = path.resolve(filePath)
     // 任务簿是 storage/ 目录下与 electron-store 并列的独立写方，不依赖其建目录
     mkdirSync(path.dirname(this.filePath), { recursive: true })
@@ -178,6 +179,11 @@ export class JobStore {
 
   private deleteArchivedPdf(pdfPath?: string): void {
     if (!pdfPath || !existsSync(pdfPath)) { return }
+    // 只允许删除任务归档目录内的副本：历史记录若被写入业务源路径，删除动作必须拒绝而不是连带删源文件
+    if (!this.archiveDir || !isWithinArchive(pdfPath, this.archiveDir)) {
+      console.warn('[print] 拒绝删除归档目录之外的文件:', pdfPath)
+      return
+    }
     try {
       rmSync(pdfPath, { force: true })
     }

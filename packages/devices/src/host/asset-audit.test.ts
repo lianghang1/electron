@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, describe, expect, it } from 'vitest'
+import { isRelevantAssetPlatform, planDriverAssets } from '../drivers/asset-layout.mjs'
 import { auditDeviceAssets, collectAssetDeclarations, collectAssetSources } from './asset-audit'
 
 /** devices 树真实源根（host/ 的上级即 devices/） */
@@ -97,5 +98,29 @@ describe('auditDeviceAssets（缺失与孤儿检出）', () => {
     const huashiMissing = result.missing.find(m => m.origin === 'idcard 驱动 huashi')
     expect(huashiMissing).toBeDefined()
     expect(huashiMissing?.expected).toBe('源资产缺失: idcard/huashi/assets/win64/Termb.dll')
+  })
+})
+
+describe('按目标平台裁剪驱动资产', () => {
+  it('windows 保留 win 系列，mac/linux 排除 win 系列，缺省目标不过滤', () => {
+    expect(isRelevantAssetPlatform('win64', 'win32')).toBe(true)
+    expect(isRelevantAssetPlatform('win-arm64', 'win32')).toBe(true)
+    expect(isRelevantAssetPlatform('mac-arm64', 'win32')).toBe(false)
+    expect(isRelevantAssetPlatform('win64', 'darwin')).toBe(false)
+    expect(isRelevantAssetPlatform('mac-arm64', 'darwin')).toBe(true)
+    expect(isRelevantAssetPlatform('linux-arm64', 'linux')).toBe(true)
+    expect(isRelevantAssetPlatform('win64', 'linux')).toBe(false)
+    expect(isRelevantAssetPlatform('anything', undefined)).toBe(true)
+    expect(isRelevantAssetPlatform('anything', 'unknown-os')).toBe(true)
+  })
+
+  it('聚合计划按目标平台过滤文件，开发态保留全部', () => {
+    const all = planDriverAssets(DEVICES_ROOT)
+    const exe = 'devices/print/win64/SumatraPDF.exe'
+    expect(all.some(p => p.to === exe)).toBe(true)
+    expect(planDriverAssets(DEVICES_ROOT, 'win32').some(p => p.to === exe)).toBe(true)
+    const linux = planDriverAssets(DEVICES_ROOT, 'linux')
+    expect(linux.some(p => p.to.includes('/win64/'))).toBe(false)
+    expect(linux.length).toBeLessThan(all.length)
   })
 })

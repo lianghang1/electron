@@ -56,7 +56,7 @@ export class PrintService {
     this.logger = deps.logger ?? (() => {})
     this.archiveDir = deps.archiveDir
     this.allowedOrigins = deps.allowedOrigins ?? []
-    this.jobs = new JobStore(deps.jobsFile)
+    this.jobs = new JobStore(deps.jobsFile, deps.archiveDir)
     this.channels = createPrintChannelRegistry()
     for (const channel of buildPrintChannels({
       windows,
@@ -77,6 +77,7 @@ export class PrintService {
     try {
       const channel = this.pickChannel(req)
       const printer = await this.resolvePrinter(channel, req?.options?.printerId)
+      this.assertPrinterReady(printer)
       this.validate(req)
       // 纸张归一：字符串便捷写法（'a4'/'80x60'…）→ 物理尺寸，识别不了 → undefined 交驱动默认；PDF 直通豁免纸型
       const paper = req.options.paper ? resolvePaper(req.options.paper) : undefined
@@ -205,6 +206,13 @@ export class PrintService {
   private async resolvePrinter(channel: PrintChannel, printerId?: string): Promise<UnifiedPrinter> {
     if (channel.spools) { return this.registry.resolve(printerId) }
     return (await this.registry.resolveOptional(printerId)) ?? virtualPrinter(printerId)
+  }
+
+  /** 明确离线的打印机在送打前拦截；状态为 unknown 的平台不误拦。 */
+  private assertPrinterReady(printer: UnifiedPrinter): void {
+    if (printer.status === 'offline') {
+      throw printError('PRINTER_OFFLINE', `打印机离线: ${printer.displayName}`, { printerId: printer.id })
+    }
   }
 
   /** 内容归一委托给策略表：本类零 switch，负载形态差异收敛在 prepare-print-content */

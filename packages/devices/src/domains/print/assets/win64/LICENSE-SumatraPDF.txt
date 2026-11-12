@@ -1,0 +1,20 @@
+SumatraPDF 3.6.1（随包资产：devices/print/win64/SumatraPDF.exe）
+Copyright (c) Krzysztof Kowalczyk 及 SumatraPDF 贡献者
+
+许可
+  GNU General Public License v3.0 或更高版本（GPL-3.0-or-later）。
+  许可全文见官方仓库根目录 COPYING；部分第三方组件使用 BSD 许可，
+  见 COPYING.BSD 与 AUTHORS。许可与版权信息以官方仓库为准。
+
+源码与二进制获取
+  仓库   https://github.com/sumatrapdfreader/sumatrapdf
+  官网   https://www.sumatrapdfreader.org/
+  构建方式见仓库 readme.md；本目录提供的是官方发布的预编译 win64 可执行文件。
+
+资产核对
+  版本、SHA-256 与文件大小见同目录 ASSET-MANIFEST.json。
+  更换二进制时须同步更新该清单，并重新跑打印域单测与干净 clone 全链路验证。
+
+ARM64
+  官方 ARM64 构建可放置于 devices/print/win-arm64/SumatraPDF.exe。
+  该文件就位时，arm64 宿主自动优先选用；缺失时回退到 win64 构建。

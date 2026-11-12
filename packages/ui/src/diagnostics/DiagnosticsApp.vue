@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import type { DeviceCapabilityId } from '@shell/shared'
 import { desktop } from '@shell/bridge/client'
-import { DIAGNOSTIC_CATALOG } from '@shell/shared'
+import { DIAGNOSTIC_CATALOG, DIAGNOSTIC_SCENARIOS, SCENARIO_CAPABILITY_IDS } from '@shell/shared'
 import { Badge, Button, Tabs, TabsContent, TabsList, TabsTrigger } from '@ui/components/ui'
 import {
   Activity,
   Camera,
   CreditCard,
+  FlaskConical,
   IdCard,
   MonitorCog,
   PenLine,
@@ -20,6 +22,7 @@ import DeviceInsights from './DeviceInsights.vue'
 import EventStream from './EventStream.vue'
 import MethodRunner from './MethodRunner.vue'
 import PlatformPanel from './PlatformPanel.vue'
+import ScenarioRunner from './ScenarioRunner.vue'
 
 interface ShellInfo {
   name: string
@@ -39,6 +42,7 @@ const ICONS = { Camera, IdCard, CreditCard, PenLine, ScanLine, Printer }
 const info = ref<ShellInfo | null>(null)
 const loadError = ref('')
 const active = ref('capture')
+const scenarioCapability = ref<DeviceCapabilityId>('print')
 const domains = DIAGNOSTIC_CATALOG
 const clock = ref('')
 
@@ -105,6 +109,9 @@ onMounted(loadInfo)
           {{ domain.label }}
           <span v-if="!available.has(domain.name)" class="ml-1 text-ui-xs text-foreground-subtle">· 未启用</span>
         </TabsTrigger>
+        <TabsTrigger value="scenarios">
+          <FlaskConical :size="14" class="mr-1.5 inline" />场景验机
+        </TabsTrigger>
         <TabsTrigger value="platform">
           <MonitorCog :size="14" class="mr-1.5 inline" />平台自检
         </TabsTrigger>
@@ -140,6 +147,24 @@ onMounted(loadInfo)
                   :enabled="available.has(domain.name)"
                 />
               </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="scenarios" class="p-4">
+            <div class="mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col gap-3">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="mr-1 text-ui-caption text-foreground-subtle">能力域</span>
+                <Button
+                  v-for="id in SCENARIO_CAPABILITY_IDS"
+                  :key="id"
+                  size="sm"
+                  :variant="scenarioCapability === id ? 'default' : 'outline'"
+                  @click="scenarioCapability = id"
+                >
+                  {{ DIAGNOSTIC_SCENARIOS[id].label }}
+                </Button>
+              </div>
+              <ScenarioRunner :capability-id="scenarioCapability" :enabled="available.has(scenarioCapability)" />
             </div>
           </TabsContent>
 

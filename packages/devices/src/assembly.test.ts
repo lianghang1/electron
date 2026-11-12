@@ -1,5 +1,5 @@
 import type { DeviceCapabilityId } from '@shell/shared'
-import { DEVICE_CAPABILITIES, DEVICE_CAPABILITY_IDS, PLATFORM_CAPABILITIES } from '@shell/shared'
+import { DEVICE_CAPABILITIES, DEVICE_CAPABILITY_IDS, DIAGNOSTIC_CATALOG, DIAGNOSTIC_SCENARIOS, diagnosticMethodKeys, PLATFORM_CAPABILITIES, SCENARIO_CAPABILITY_IDS } from '@shell/shared'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { CAPABILITIES } from './contracts/device-contract'
 import { buildDeviceStatuses } from './runtime/device-status'
@@ -76,5 +76,33 @@ describe('生产装配一致性：能力身份表是唯一事实源', () => {
     // 该断言锁定类型契约：DOMAIN_SPECS 的键集合必须等于 DeviceCapabilityId。
     const keys: readonly DeviceCapabilityId[] = Object.keys(catalog.DOMAIN_SPECS) as DeviceCapabilityId[]
     expect(sorted(keys)).toEqual(sorted(DEVICE_CAPABILITY_IDS))
+  })
+
+  it('验机场景目录覆盖同一组能力，且每个域都有形态、动作与结果视图', () => {
+    expect(sorted(SCENARIO_CAPABILITY_IDS)).toEqual(sorted(DEVICE_CAPABILITY_IDS))
+    expect(sorted(Object.keys(DIAGNOSTIC_SCENARIOS))).toEqual(sorted(DEVICE_CAPABILITY_IDS))
+    for (const id of DEVICE_CAPABILITY_IDS) {
+      const spec = DIAGNOSTIC_SCENARIOS[id]
+      expect(spec.capabilityId).toBe(id)
+      expect(spec.kinds.length).toBeGreaterThan(0)
+      expect(spec.actions.length).toBeGreaterThan(0)
+      expect(spec.resultView).toBeTruthy()
+    }
+  })
+
+  it('场景动作引用的方法、字段与设备枚举方法都在真实目录内', () => {
+    const methods = new Set(diagnosticMethodKeys())
+    for (const spec of Object.values(DIAGNOSTIC_SCENARIOS)) {
+      const fieldKeys = new Set(spec.fields.map(f => f.key))
+      if (spec.deviceMethod) { expect(methods.has(spec.deviceMethod)).toBe(true) }
+      for (const action of spec.actions) {
+        expect(methods.has(action.method), `${action.method} 不在方法目录内`).toBe(true)
+        for (const key of action.fields) {
+          expect(fieldKeys.has(key), `${spec.capabilityId}.${action.id} 引用了未登记字段 ${key}`).toBe(true)
+        }
+      }
+    }
+    // 场景表与方法目录的域集合一致，避免只补了一边
+    expect(sorted([...new Set(DIAGNOSTIC_CATALOG.map(d => d.name))])).toEqual(sorted(DEVICE_CAPABILITY_IDS))
   })
 })

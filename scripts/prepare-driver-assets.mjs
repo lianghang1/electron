@@ -15,12 +15,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-export async function stageDriverAssets(root = REPO_ROOT) {
+export async function stageDriverAssets(root = REPO_ROOT, targetOs) {
   const src = join(root, 'packages/devices/src')
   const out = join(root, 'resources/devices')
   // 规则模块是源码树里的纯 ESM（.mjs），Node 直接加载，无 dist 前置构建
   const { planDriverAssets } = await import('../packages/devices/src/drivers/asset-layout.mjs')
-  const plans = planDriverAssets(src)
+  const plans = planDriverAssets(src, targetOs)
 
   rmSync(out, { recursive: true, force: true })
   for (const plan of plans) {
@@ -31,10 +31,10 @@ export async function stageDriverAssets(root = REPO_ROOT) {
   return { files: plans.length, out }
 }
 
-/** 打包配置显式调用，保证产物先于 extraResources 就位 */
-export async function ensureDriverAssets(root = REPO_ROOT) {
-  const { files } = await stageDriverAssets(root)
-  process.stdout.write(`[driver-assets] staged ${files} files → resources/devices/\n`)
+/** 打包配置显式调用，保证产物先于 extraResources 就位；开发态不传目标，资产保持全量 */
+export async function ensureDriverAssets(root = REPO_ROOT, targetOs) {
+  const { files } = await stageDriverAssets(root, targetOs)
+  process.stdout.write(`[driver-assets] staged ${files} files → resources/devices/${targetOs ? ` (${targetOs})` : ''}\n`)
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

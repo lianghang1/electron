@@ -14,8 +14,10 @@ import { createIdcardDomain } from '../../packages/devices/src/domains/idcard/do
 import { createPrintDomain } from '../../packages/devices/src/domains/print/domain.ts'
 import { createScannerDomain } from '../../packages/devices/src/domains/scanner/domain.ts'
 import { createSignatureDomain } from '../../packages/devices/src/domains/signature/domain.ts'
+import { DEVICE_CAPABILITY_IDS } from '../../packages/shared/src/capability.ts'
 import { buildDiagnosticInput, DIAGNOSTIC_CATALOG, diagnosticDefaults, diagnosticMethodKeys } from '../../packages/shared/src/diagnostics.ts'
 import { flavorManifestSchema } from '../../packages/shared/src/manifest.ts'
+import { DIAGNOSTIC_SCENARIOS, fieldVisible, SCENARIO_CAPABILITY_IDS, scenarioDefaults, scenarioInput } from '../../packages/shared/src/scenarios.ts'
 
 let passed = 0
 let failed = 0
@@ -124,6 +126,70 @@ await step('$input 的 json 字段作为整个入参对象，非字符串键正�
 
 await step('无字段方法返回 undefined（与 noInput schema 一致）', () => {
   assert.equal(buildDiagnosticInput([], {}), undefined)
+})
+
+// 验机场景目录：能力覆盖、方法引用、字段引用、各内容形态默认入参过真实 schema
+const SAMPLE = {
+  filePath: 'C:/sample/report.pdf',
+  fileUrl: 'https://example.com/report.pdf',
+  imageDataUrl: 'data:image/png;base64,AAAA',
+  deviceId: 'dev-1',
+}
+
+await step('验机场景目录覆盖全部能力，且域与产品声明一致', () => {
+  assert.deepEqual([...SCENARIO_CAPABILITY_IDS].sort(), [...DEVICE_CAPABILITY_IDS].sort())
+  assert.equal(Object.keys(DIAGNOSTIC_SCENARIOS).length, DEVICE_CAPABILITY_IDS.length)
+  for (const id of DEVICE_CAPABILITY_IDS) {
+    assert.equal(DIAGNOSTIC_SCENARIOS[id].capabilityId, id)
+  }
+})
+
+await step('场景动作引用的方法与字段都在真实定义 / 字段表内', () => {
+  const realKeys = new Set(real.keys())
+  for (const spec of Object.values(DIAGNOSTIC_SCENARIOS)) {
+    const keys = new Set(spec.fields.map(f => f.key))
+    if (spec.deviceMethod) { assert.ok(realKeys.has(spec.deviceMethod), `设备枚举方法不存在：${spec.deviceMethod}`) }
+    for (const action of spec.actions) {
+      assert.ok(realKeys.has(action.method), `场景动作方法不存在：${action.method}`)
+      for (const key of action.fields) { assert.ok(keys.has(key), `${action.id} 引用未登记字段 ${key}`) }
+    }
+  }
+})
+
+await step('每个场景动作在每种内容形态下的入参都通过真实 zod schema', () => {
+  for (const spec of Object.values(DIAGNOSTIC_SCENARIOS)) {
+    for (const kind of spec.kinds) {
+      const values = { ...scenarioDefaults(spec.fields), ...SAMPLE }
+      for (const action of spec.actions) {
+        const input = scenarioInput(spec, action, values, kind.id)
+        const def = real.get(action.method)
+        const parsed = def.input.safeParse(input)
+        assert.equal(parsed.success, true, `${spec.capabilityId}/${kind.id}/${action.id} 入参不合法：${JSON.stringify(parsed.error?.flatten?.() ?? input)}`)
+      }
+    }
+  }
+})
+
+await step('打印四种内容形态组装出正确的负载判别联合', () => {
+  const spec = DIAGNOSTIC_SCENARIOS.print
+  const submit = spec.actions.find(a => a.id === 'submit')
+  const values = { ...scenarioDefaults(spec.fields), ...SAMPLE }
+  const expectKind = { image: 'file', pdf: 'file', pdfurl: 'url', html: 'html' }
+  for (const kind of spec.kinds) {
+    const input = scenarioInput(spec, submit, values, kind.id)
+    assert.equal(input.printContent.kind, expectKind[kind.id], `${kind.id} 负载类型不符`)
+    assert.equal(typeof input.printOptions.paper, 'string')
+  }
+})
+
+await step('字段可见性按内容形态收窄，PDF 专有参数不出现在 HTML 形态', () => {
+  const spec = DIAGNOSTIC_SCENARIOS.print
+  const visible = id => spec.fields.filter(f => fieldVisible(f, id)).map(f => f.key)
+  assert.ok(visible('html').includes('htmlData'))
+  assert.ok(!visible('html').includes('filePath'))
+  assert.ok(visible('pdf').includes('scale'))
+  assert.ok(!visible('html').includes('scale'))
+  assert.ok(!visible('image').includes('fileUrl'))
 })
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url))
