@@ -128,6 +128,8 @@ export class WindowSystem implements Startable, ViewHost {
           `--shell-theme=${this.initialTheme}`,
           // 布局档位同步定型：solo 档无接缝底板，异步获取会让视图容器矩形首报落空
           `--shell-chrome=${effectiveChrome(this.flavor)}`,
+          // 启动握手只对「有默认应用」场景生效：无直出时撤层不必等应用，避免门闩悬空
+          ...(this.flavor.defaultAppId ? ['--shell-intro-gate=app'] : []),
         ],
       },
     })

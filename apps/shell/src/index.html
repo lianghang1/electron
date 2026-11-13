@@ -84,8 +84,17 @@
       let animationDone = false
       let appReady = false
       let introStartedAt = 0
+      // 握手门闩：主进程声明 defaultAppId 直出（--shell-intro-gate=app）时，撤层还要等
+      // 首应用开好（shell-app-opened），否则撤层瞬间先闪工作台底色再切应用，破坏启动单色；
+      // 无直出场景（纯桌面多 tab）不引入第三个门闩
+      const introGateApp = (() => {
+        try { return window.shell?.shell?.appearance?.()?.introGate === 'app' }
+        catch { return false }
+      })()
+      let contentReady = !introGateApp
+      window.addEventListener('shell-app-opened', () => { contentReady = true; tryFinish() }, { once: true })
       const tryFinish = () => {
-        if (finished || !animationDone || !appReady || !splash) { return }
+        if (finished || !animationDone || !appReady || !contentReady || !splash) { return }
         if (!introStartedAt || Date.now() - introStartedAt < MIN_SPLASH_MS) { return }
         finished = true
         document.body.classList.add('ready')

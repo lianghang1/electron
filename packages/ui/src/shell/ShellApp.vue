@@ -95,7 +95,19 @@ onMounted(async () => {
   const info = await shell().shell.info()
   mode.value = info.mode
   if (info.forceUpdate?.blocked) { forceRequiredVersion.value = info.forceUpdate.requiredVersion ?? '' }
-  if (info.defaultAppId && appList.value.some(a => a.manifest.id === info.defaultAppId)) { void openApp(info.defaultAppId) }
+  if (info.defaultAppId && appList.value.some(a => a.manifest.id === info.defaultAppId)) {
+    try {
+      await openApp(info.defaultAppId)
+    }
+    finally {
+      // 启动握手：首应用 open 结果（成功/失败）都放行启动层撤层，intro 出口恒存在
+      window.dispatchEvent(new Event('shell-app-opened'))
+    }
+  }
+  else {
+    // 无直出目标（未配置/配置未注册）：撤层条件当场满足，启动层不等应用
+    window.dispatchEvent(new Event('shell-app-opened'))
+  }
 })
 
 onBeforeUnmount(() => {

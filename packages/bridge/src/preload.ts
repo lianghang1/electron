@@ -18,17 +18,19 @@ import { contextBridge, ipcRenderer } from 'electron'
  */
 
 /** 启动外观与布局档位：由组合根经 additionalArguments 同步送达，避免异步 IPC 造成的首帧闪烁 */
-function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'system', chrome: 'platform' | 'solo' } {
+function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'system', chrome: 'platform' | 'solo', introGate?: 'app' } {
   const pick = (prefix: string, fallback: string) =>
     process.argv.find(a => a.startsWith(prefix))?.slice(prefix.length) ?? fallback
   // fallback 与 tokens.css 的 --dt-accent 默认一致：argv 异常缺失时不引入第二色源
   const accent = pick('--shell-accent=', '#3b82f6')
   const theme = pick('--shell-theme=', 'system')
   const chrome = pick('--shell-chrome=', 'platform')
+  const introGate = pick('--shell-intro-gate=', '')
   return {
     accent,
     theme: theme === 'light' || theme === 'dark' ? theme : 'system',
     chrome: chrome === 'solo' ? 'solo' : 'platform',
+    ...(introGate === 'app' ? { introGate: 'app' as const } : {}),
   }
 }
 
