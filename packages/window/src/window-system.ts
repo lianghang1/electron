@@ -4,8 +4,9 @@ import type { CallerRegistry, FlavorManifest } from '@shell/shared'
 import type { OverlayKind, OverlayPolicy } from './overlay-host'
 import { join } from 'node:path'
 import process from 'node:process'
-import { shellHandle } from '@shell/bridge/handle'
+import { registerIpcDomain } from '@shell/bridge/handle'
 import { matchesOrigin, sessionToPlatformPermission, SHELL_APP_ID } from '@shell/shared'
+import { windowDomain } from '@shell/shared/ipc'
 import { app, BrowserWindow, WebContentsView } from 'electron'
 import { createDesktopMode, createKioskMode } from './modes'
 import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
@@ -252,33 +253,35 @@ export class WindowSystem implements Startable, ViewHost {
   /** 自绘标题栏的窗口控制通道：动作只作用于发起方自己的窗口（按 sender 定位，天然多窗安全） */
   registerWindowControls(): void {
     const own = (sender: Electron.WebContents) => BrowserWindow.fromWebContents(sender)
-    shellHandle('window:minimize', (event) => {
-      own(event.sender)?.minimize()
+    registerIpcDomain(windowDomain, {
+      minimize: (event) => {
+        own(event.sender)?.minimize()
+      },
+      toggleMaximize: (event) => {
+        const win = own(event.sender)
+        if (!win) { return }
+        if (win.isMaximized()) { win.unmaximize() }
+        else { win.maximize() }
+      },
+      isMaximized: event => own(event.sender)?.isMaximized() ?? false,
+      restore: (event) => {
+        const win = own(event.sender)
+        if (!win) { return }
+        if (win.isMinimized()) { win.restore() }
+        win.show()
+        win.focus()
+      },
+      setAlwaysOnTop: (event, flag) => {
+        own(event.sender)?.setAlwaysOnTop(Boolean(flag))
+      },
+      flash: (event, flag) => {
+        own(event.sender)?.flashFrame(Boolean(flag))
+      },
+      close: (event) => {
+        own(event.sender)?.close()
+      },
+      quit: () => app.quit(),
     })
-    shellHandle('window:toggleMaximize', (event) => {
-      const win = own(event.sender)
-      if (!win) { return }
-      if (win.isMaximized()) { win.unmaximize() }
-      else { win.maximize() }
-    })
-    shellHandle('window:isMaximized', event => own(event.sender)?.isMaximized() ?? false)
-    shellHandle('window:restore', (event) => {
-      const win = own(event.sender)
-      if (!win) { return }
-      if (win.isMinimized()) { win.restore() }
-      win.show()
-      win.focus()
-    })
-    shellHandle('window:setAlwaysOnTop', (event, flag: boolean) => {
-      own(event.sender)?.setAlwaysOnTop(Boolean(flag))
-    })
-    shellHandle('window:flash', (event, flag: boolean) => {
-      own(event.sender)?.flashFrame(Boolean(flag))
-    })
-    shellHandle('window:close', (event) => {
-      own(event.sender)?.close()
-    })
-    shellHandle('window:quit', () => app.quit())
   }
 
   /** 平台事件广播：EventBus 全量事件转发给所有存活窗口的渲染层（渲染层经 bridge.onEvent 订阅） */

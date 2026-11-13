@@ -2,7 +2,8 @@ import type { EventBus, NotificationCenter, PlatformNotification, Startable } fr
 import type { CaptureDialogSession, DownloadTask } from '@shell/shared'
 import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
 import type { WindowSystem } from './window-system'
-import { shellHandle } from '@shell/bridge/handle'
+import { registerIpcDomain } from '@shell/bridge/handle'
+import { overlayDomain } from '@shell/shared/ipc'
 
 export interface PermissionRequestView {
   requestId: string
@@ -213,21 +214,23 @@ export class OverlayService implements Startable {
   }
 
   private registerIpc(): void {
-    shellHandle('overlay:sync', event => this.syncFor(event.sender.id))
-    shellHandle('overlay:open', (_e, kind: OverlayKind, params?: Record<string, string>) => this.open(kind, params))
-    shellHandle('overlay:dismiss', (_e, kind: OverlayKind) => this.dismiss(kind))
-    shellHandle('overlay:action', (event, action: OverlayAction) => {
-      // 来源校验：仅目标浮层窗自身可回传动作，其它 renderer 伪造无效
-      if (!this.options.windows.isOverlaySender(action.kind, event.sender.id)) {
-        throw new Error('overlay action rejected: sender is not the owning window')
-      }
-      this.handleAction(action)
-    })
-    shellHandle('overlay:resize', (event, height: number) => {
-      this.options.windows.resizePanel(event.sender.id, height)
-    })
-    shellHandle('overlay:mouseIgnore', (event, ignore: boolean) => {
-      this.options.windows.setPanelMouseIgnore(event.sender.id, ignore)
+    registerIpcDomain(overlayDomain, {
+      sync: event => this.syncFor(event.sender.id),
+      open: (_e, input) => this.open(input.kind, input.params),
+      dismiss: (_e, kind) => this.dismiss(kind),
+      action: (event, action) => {
+        // 来源校验：仅目标浮层窗自身可回传动作，其它 renderer 伪造无效
+        if (!this.options.windows.isOverlaySender(action.kind, event.sender.id)) {
+          throw new Error('overlay action rejected: sender is not the owning window')
+        }
+        this.handleAction(action)
+      },
+      resize: (event, height) => {
+        this.options.windows.resizePanel(event.sender.id, height)
+      },
+      mouseIgnore: (event, ignore) => {
+        this.options.windows.setPanelMouseIgnore(event.sender.id, ignore)
+      },
     })
   }
 

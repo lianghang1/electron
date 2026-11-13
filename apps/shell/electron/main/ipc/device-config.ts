@@ -28,10 +28,10 @@ export function registerDeviceConfigIpc(deps: DeviceConfigIpcDeps): void {
       assertDeviceConfigCaller(e.sender.id)
       return deps.devices.configCenter.snapshot(capabilityId)
     },
-    apply: async (e, capabilityId, deviceProfileId, patch) => {
+    apply: async (e, input) => {
       assertDeviceConfigCaller(e.sender.id)
-      await deps.devices.applyConfig(capabilityId, deviceProfileId, patch ?? {})
-      return deps.devices.configCenter.snapshot(capabilityId)
+      await deps.devices.applyConfig(input.capabilityId, input.deviceProfileId, input.patch ?? {})
+      return deps.devices.configCenter.snapshot(input.capabilityId)
     },
     reset: async (e, capabilityId) => {
       assertDeviceConfigCaller(e.sender.id)

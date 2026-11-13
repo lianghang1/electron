@@ -12,9 +12,9 @@
       "type": "internal",
       "entry": {
         "kind": "remote",
-        "url": "https://example.com",
+        "url": "https://vite.dev",
         "origins": [
-          "https://example.com"
+          "https://vite.dev"
         ]
       },
       "devices": [],

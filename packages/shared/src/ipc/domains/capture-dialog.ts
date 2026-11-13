@@ -17,6 +17,12 @@ export interface CaptureFramePayload {
   base64: string
 }
 
+/** 预览启动请求（多参数收对象） */
+export interface CapturePreviewInput {
+  deviceId: string
+  resolutionNum?: number
+}
+
 /**
  * 拍摄浮层会话域契约：发起方开/关会话，浮层窗内预览与结果回传。
  * push `frame`（channel `captureDialog:frame`）由 devices 拍摄域直推浮层窗 webContents。
@@ -24,7 +30,7 @@ export interface CaptureFramePayload {
 export const captureDialogDomain = defineIpcDomain('captureDialog', {
   open: invoke<(input: CaptureDialogOpenInput) => unknown>(),
   close: invoke<() => void>(),
-  startPreview: invoke<(deviceId: string, resolutionNum?: number) => unknown>(),
+  startPreview: invoke<(input: CapturePreviewInput) => unknown>(),
   stopPreview: invoke<() => void>(),
   snap: invoke<(opts?: { dataUrl?: string, meta?: Record<string, unknown> }) => unknown>(),
   confirm: invoke<(results: unknown[]) => unknown>(),

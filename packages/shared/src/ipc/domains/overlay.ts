@@ -23,6 +23,12 @@ export interface OverlayAction {
   sessionId?: string
 }
 
+/** 浮层开窗请求（多参数收对象） */
+export interface OverlayOpenInput {
+  kind: OverlayKind
+  params?: Record<string, string>
+}
+
 /**
  * 原生浮层宿主域契约：所有要盖过应用 view 的 UI 统一从这里开窗。
  * push `updated` 推全量浮层状态快照（channel `overlay:updated`，注册实现在
@@ -30,7 +36,7 @@ export interface OverlayAction {
  */
 export const overlayDomain = defineIpcDomain('overlay', {
   sync: invoke<() => any>(),
-  open: invoke<(kind: OverlayKind, params?: Record<string, string>) => void>(),
+  open: invoke<(input: OverlayOpenInput) => void>(),
   dismiss: invoke<(kind: OverlayKind) => void>(),
   action: invoke<(action: OverlayAction) => void>(),
   /** 浮层页上报内容高度，宿主据此调整窗口尺寸 */

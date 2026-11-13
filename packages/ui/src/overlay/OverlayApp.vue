@@ -99,7 +99,7 @@ async function startPreview(): Promise<void> {
   const session = state.value?.capture
   if (!session?.deviceId) { return }
   try {
-    await desktop().captureDialog.startPreview(session.deviceId, session.resolutionNum)
+    await desktop().captureDialog.startPreview({ deviceId: session.deviceId, resolutionNum: session.resolutionNum })
     previewing = true
   }
   catch { frame.value = '' }

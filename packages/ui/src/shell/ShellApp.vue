@@ -66,7 +66,7 @@ function tabOfApp(appId: string): ShellTab | undefined {
 }
 
 function openSettings() {
-  void desktop().overlay.open('settings')
+  void desktop().overlay.open({ kind: 'settings' })
 }
 
 let resizeObserver: ResizeObserver | undefined
