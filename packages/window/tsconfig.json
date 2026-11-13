@@ -1,12 +1,7 @@
 {
+  "extends": "@shell/config/tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2023",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "types": ["node"],
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true
+    "types": ["node"]
   },
   "include": ["src"]
 }
