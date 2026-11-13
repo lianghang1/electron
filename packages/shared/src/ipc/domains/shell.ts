@@ -1,5 +1,5 @@
 import type { IpcDefs, IpcDomainValue } from '../contract'
-import { defineIpcDomain, invoke } from '../contract'
+import { defineIpcDomain, invoke, push } from '../contract'
 
 /** 设备状态行（DeviceStatus 投影：契约不反向依赖 devices 包，按结构化克隆面声明） */
 export interface DeviceStatusRow {
@@ -48,4 +48,11 @@ export const shellDomain = defineIpcDomain('shell', {
   relaunch: invoke<() => void>(),
   /** 立即巡检并应用更新（门禁页主动更新入口），结果经 update 事件回传 */
   updateNow: invoke<() => unknown>(),
+  /**
+   * 启动过场起点：主进程在首帧已绘制（ready-to-show）时推送一次。
+   * 渲染层收到才开始播启动 logo 动画——窗口是否真正上屏只有主进程知道，
+   * 渲染层的 visibilityState 不可作为依据（禁用 Win 遮罩计算后隐藏窗恒为 visible，
+   * 过场会被隐藏期整段吞掉，上屏即应用界面）。
+   */
+  introBegin: push<[]>(),
 }) satisfies IpcDomainValue<'shell', IpcDefs>

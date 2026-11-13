@@ -81,11 +81,7 @@
       let introStartedAt = 0
       const tryFinish = () => {
         if (finished || !animationDone || !appReady || !splash) { return }
-        // 撤层可见门闩：动画/兜底/挂载可能在窗口隐藏期全部就绪（reduced-motion 或
-        // 机器极快时），撤层必须等窗口真正上屏，否则启动段被隐藏期整段吞掉，
-        // 上屏即应用界面——这就是「启动动画有时显示不出来」的根因
-        if (document.visibilityState !== 'visible') { return }
-        if (introStartedAt && Date.now() - introStartedAt < MIN_SPLASH_MS) { return }
+        if (!introStartedAt || Date.now() - introStartedAt < MIN_SPLASH_MS) { return }
         finished = true
         document.body.classList.add('ready')
         window.setTimeout(() => splash.remove(), 500)
@@ -94,8 +90,10 @@
       const markAppReady = () => { appReady = true; tryFinish() }
       // 应用侧（apps/shell/src/main.ts）在 Vue 挂载 + 首帧 rAF 后派发
       window.addEventListener('shell-app-ready', markAppReady, { once: true })
-      // 一切计时与动画统一以窗口可见为起点；窗口隐藏期（show:false + ready-to-show 前）
-      // 不播动画、不跑兜底、不撤层
+      // 一切计时与动画统一以「主进程确认首帧已绘」为起点（shell:introBegin 推送）。
+      // 窗口上屏时机只有主进程知道：渲染层 visibilityState 在壳窗口（禁用 Win 遮罩
+      // 计算）下从加载起恒为 visible，若据它起播，动画会在窗口上屏前被整段消耗——
+      // 上屏即应用界面，这正是「启动动画有时显示不出来」的根因。
       const beginIntro = () => {
         if (introStartedAt) { tryFinish(); return }
         introStartedAt = Date.now()
@@ -110,11 +108,18 @@
         // 最短驻留到期后复核撤层：门闩条件可能早已全部满足，只差驻留时长
         window.setTimeout(tryFinish, MIN_SPLASH_MS)
       }
-      if (document.visibilityState === 'visible') { beginIntro() }
+      const bridge = window.desktop?.shell
+      if (typeof bridge?.onIntroBegin === 'function') {
+        bridge.onIntroBegin(beginIntro)
+      }
       else {
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') { beginIntro() }
-        }, { once: true })
+        // 桥缺失（纯浏览器预览等）：退回 visibility 信号
+        if (document.visibilityState === 'visible') { beginIntro() }
+        else {
+          document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') { beginIntro() }
+          }, { once: true })
+        }
       }
     </script>
     <script type="module" src="/main.ts"></script>

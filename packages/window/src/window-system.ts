@@ -128,7 +128,27 @@ export class WindowSystem implements Startable, ViewHost {
     if (devUrl) { void win.loadURL(devUrl) }
     else { void win.loadFile(join(this.rendererDir, 'index.html')) }
 
-    win.once('ready-to-show', () => win.show())
+    // 立即上屏：加载与 bundle 求值间隙里窗口不再缺席（win32 有 acrylic 材质打底，
+    // 呈现为磨砂玻璃而非无窗「卡死」观感）；启动层 logo 随首帧绘制覆盖其上。
+    // 过场动画不在此启动——等 shell:introBegin（首帧已绘）。
+    win.show()
+
+    // 过场起点 = 首帧已绘制（ready-to-show）：此刻 splash 帧已在合成器里，
+    // 推送后渲染层才播 logo 动画 + 600ms 最短驻留。窗口上屏时机只有主进程知道，
+    // 渲染层 visibilityState 在禁用 Win 遮罩计算时恒为 visible，不可作依据。
+    let paintedOnce = false
+    win.once('ready-to-show', () => {
+      paintedOnce = true
+      win.show()
+      win.webContents.send('shell:introBegin')
+    })
+    // 已上屏后的重载（HMR/恢复模式）不会再触发 ready-to-show：load 完成即补发
+    // 起点信号；渲染层按 introStartedAt 幂等去重
+    win.webContents.on('did-finish-load', () => {
+      if (paintedOnce && !win.isDestroyed() && win.isVisible()) {
+        win.webContents.send('shell:introBegin')
+      }
+    })
     this.track(win, { appId: SHELL_APP_ID, instanceId: 'shell', kind: 'shell' })
     this.installPermissionGate(win.webContents)
     this.shellWindowId = win.id

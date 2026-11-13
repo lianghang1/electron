@@ -114,11 +114,16 @@ else if (isOverlayMode()) {
   createApp(OverlayApp).mount('#app')
 }
 else {
-  // Vue 挂载完成后只派发 shell-app-ready（撤层双门闩见 index.html 内联脚本：
-  // 等 logo 动画播完且应用就绪才淡出），并回传 T4 首帧打点
-  createApp(ShellApp).mount('#app')
+  // 先让首帧（启动层 logo）真正绘制，再挂 Vue：重 bundle 的同步求值与挂载会把
+  // 首帧推迟到自身结束之后——不先让路，窗口上屏直接就是应用界面（启动段被吞）。
+  // 双 rAF 保证中间隔一次真实绘制；撤层双门闩见 index.html 内联脚本
   requestAnimationFrame(() => {
-    window.desktop?.markFirstPaint()
-    window.dispatchEvent(new Event('shell-app-ready'))
+    requestAnimationFrame(() => {
+      createApp(ShellApp).mount('#app')
+      requestAnimationFrame(() => {
+        window.desktop?.markFirstPaint()
+        window.dispatchEvent(new Event('shell-app-ready'))
+      })
+    })
   })
 }

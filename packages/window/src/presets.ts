@@ -36,8 +36,9 @@ function shellVisualOptions(): BrowserWindowConstructorOptions {
 
 /**
  * 工作台基础：隐藏系统标题栏（自绘 chrome）+ 平台透明视觉（启动期透出桌面/材质）。
- * show: false——首帧前不上屏，与浮层同一「数据先行」模式；等 ready-to-show 再 show，
- * 否则窗口创建即上屏，加载启动层的间隙是一段纯透明空窗。
+ * show: false 创建后由 createShellWindow 立即 show 上屏（加载/求值间隙 win32 有
+ * acrylic 材质打底，不再是「无窗如卡死」）；过场动画由 shell:introBegin（首帧已绘）
+ * 驱动，不再依赖 ready-to-show 的 show 时机。
  */
 export const shellBase: BrowserWindowConstructorOptions = {
   show: false,
