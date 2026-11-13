@@ -27,7 +27,6 @@ export function registerShellInfoIpc(deps: ShellInfoIpcDeps): void {
     info: () => ({
       name: deps.flavor.name,
       version: deps.version(),
-      defaultAppId: deps.flavor.defaultAppId,
       mode: deps.flavor.mode,
       // 门禁快照：渲染层启动即知是否阻断，后续变化经 update.force-required 事件推送
       forceUpdate: deps.forceGate?.snapshot,

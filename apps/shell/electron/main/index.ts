@@ -517,7 +517,7 @@ async function main(context: BootContext): Promise<void> {
   const flavor = loadFlavor()
 
   // 档位约束：solo/kiosk 容器隐形档必须有直达目标，否则窗口无内容可铺
-  if (flavor.chrome === 'solo' && !flavor.defaultAppId && flavor.apps.length > 0) { logger.warn('flavor chrome=solo 但未配置 defaultAppId，启动将无应用直出', { flavor: flavor.id }) }
+  if (flavor.chrome === 'solo' && flavor.apps.length !== 1) { logger.warn('flavor chrome=solo 直出要求应用清单恰为一个，启动将无应用可铺', { flavor: flavor.id, apps: flavor.apps.length }) }
 
   const a = buildAssembly(context, flavor)
   setupUpdate(a)

@@ -132,9 +132,11 @@ onMounted(async () => {
   const info = await shell().shell.info()
   mode.value = info.mode
   if (info.forceUpdate?.blocked) { forceRequiredVersion.value = info.forceUpdate.requiredVersion ?? '' }
-  if (info.defaultAppId && appList.value.some(a => a.manifest.id === info.defaultAppId)) {
+  // solo 直出的应用就是清单本身：恰为一个时直开它，platform 永不自动开（时钟页是唯一起点）
+  const directApp = chrome.value === 'solo' && appList.value.length === 1 ? appList.value[0].manifest.id : ''
+  if (directApp) {
     try {
-      await openApp(info.defaultAppId)
+      await openApp(directApp)
     }
     finally {
       // 启动握手：首应用 open 结果（成功/失败）都放行启动层撤层，intro 出口恒存在
@@ -142,7 +144,7 @@ onMounted(async () => {
     }
   }
   else {
-    // 无直出目标（未配置/配置未注册）：撤层条件当场满足，启动层不等应用
+    // 无直出目标（platform / 清单为空或多个）：撤层条件当场满足，启动层不等应用
     window.dispatchEvent(new Event('shell-app-opened'))
   }
 })

@@ -9,12 +9,12 @@
 | `id` / `name` | 形态标识与显示名（`id` 同时决定 `appId` 与可执行文件名） |
 | `mode` | `windowed`（托盘工作台）或 `kiosk`（全屏锁定 + 看门狗） |
 | `chrome` | `platform`（工作台壳）/ `solo`（容器隐形，应用直出） |
-| `apps` / `defaultAppId` | 内置应用清单与启动直达目标 |
+| `apps` | 内置应用清单（solo 直出要求清单恰为一个，platform 可多个） |
 | `branding.accent` | 主色，经启动参数同步注入 preload，首帧零闪烁 |
 | `update.manifestUrl` / `update.allowedOrigins` | 更新清单地址与源站白名单 |
 | `resilience` | 崩溃重载 / 开机自启 / 退出守卫 / 定时重启，逐项默认关闭 |
 
-`solo` 档必须配 `defaultAppId` 或直出应用，否则窗口无内容可铺。`kiosk` 形态不创建托盘，避免现场出现逃逸入口。
+`solo` 档直出的应用就是清单本身：清单恰为一个应用时启动直开它，为空或多于一个则启动无内容可铺（启动日志告警）。`kiosk` 形态不创建托盘，避免现场出现逃逸入口。
 
 ## 应用注册
 

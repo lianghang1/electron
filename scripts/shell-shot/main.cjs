@@ -21,7 +21,7 @@ const name = arg('name', 'shot')
 const chrome = arg('chrome', 'platform')
 const mode = arg('mode', 'windowed')
 const tabs = arg('tabs', '0')
-const withDefault = arg('default-app', '')
+const appsCount = arg('apps', '')
 const withFail = arg('fail', '') !== ''
 
 const WIDTH = Number(arg('width', '1280'))
@@ -77,7 +77,7 @@ app.whenReady().then(async () => {
         `--shot-chrome=${chrome}`,
         `--shot-mode=${mode}`,
         `--shot-tabs=${tabs}`,
-        `--shot-default-app=${withDefault}`,
+        `--shot-apps=${appsCount}`,
         `--shot-fail=${withFail}`,
       ],
     },

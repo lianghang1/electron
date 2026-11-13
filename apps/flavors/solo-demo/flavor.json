@@ -3,7 +3,6 @@
   "name": "单应用客户端演示",
   "mode": "windowed",
   "chrome": "solo",
-  "defaultAppId": "demo-web",
   "apps": [
     {
       "id": "demo-web",

@@ -16,14 +16,16 @@ function arg(name, fallback) {
 const chrome = arg('chrome', 'platform')
 const mode = arg('mode', 'windowed')
 const openedCount = Number(arg('tabs', '0'))
-const withDefault = arg('default-app', '') !== ''
-const withFail = arg('fail', '') !== ''
+// main.cjs 把布尔参数序列化成 'true'/'false' 字符串：必须按字面量判，!== '' 会把 'false' 误判为真
+const withFail = arg('fail', '') === 'true'
 
 const APPS = [
   { manifest: { id: 'demo-web', name: '演示远程', icon: '', entry: { kind: 'remote' } } },
   { manifest: { id: 'demo-local', name: '本地工具', icon: '', entry: { kind: 'local' } } },
   { manifest: { id: 'demo-third', name: '第三个应用', icon: '', entry: { kind: 'remote' } } },
 ]
+// 应用清单按形态裁剪：solo 直出要求清单恰为一个（--shot-apps=0 可验证无直出撤层）
+const catalog = chrome === 'solo' ? APPS.slice(0, Number(arg('apps', '1'))) : APPS
 
 const listeners = new Map()
 function onEvent(event, handler) {
@@ -54,7 +56,7 @@ function emitLifecycle(instanceId, delayMs) {
 // 一致伴随视图加载开始：垫场 spinner 先行，loading-finished 随后）
 let seq = 0
 setTimeout(() => {
-  const targets = APPS.slice(0, openedCount)
+  const targets = catalog.slice(0, openedCount)
   for (const app of targets) {
     seq += 1
     const instanceId = `mock-${app.manifest.id}-${seq}`
@@ -69,13 +71,12 @@ const shell = {
   reportContentRect: () => {},
   invoke: () => Promise.resolve({}),
   shell: {
-    // introGate 与主进程同规则：有 defaultAppId 直出时启动层等首应用开好再撤
-    appearance: () => ({ accent: '#4f46e5', theme: 'light', chrome, ...(withDefault ? { introGate: 'app' } : {}) }),
+    // introGate 与主进程同规则：solo 直出（清单恰一个应用）时启动层等首应用开好再撤
+    appearance: () => ({ accent: '#4f46e5', theme: 'light', chrome, ...(chrome === 'solo' && catalog.length === 1 ? { introGate: 'app' } : {}) }),
     info: () => Promise.resolve({
       name: '壳平台',
       flavor: { id: 'shot', name: '截图形态' },
       mode,
-      defaultAppId: withDefault ? 'demo-web' : '',
       version: '2.0.0-shot',
       forceUpdate: { blocked: false },
     }),
@@ -86,7 +87,7 @@ const shell = {
     },
   },
   apps: {
-    list: () => Promise.resolve(APPS),
+    list: () => Promise.resolve(catalog),
     open: (appId) => {
       const instanceId = `mock-open-${appId}-${++seq}`
       // 模拟视图加载生命周期：垫场 spinner 可见一段时间后完成（或转入失败兜底）

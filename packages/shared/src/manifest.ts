@@ -59,8 +59,6 @@ export const flavorManifestSchema = z.object({
   name: z.string().min(1),
   /** 运行模式：windowed = 窗口可调；kiosk = 全屏锁定 + 看门狗 */
   mode: z.enum(['windowed', 'kiosk']).default('windowed'),
-  /** 启动直达的默认应用（须在 apps 清单内）；未配置 = 启动落空状态页 */
-  defaultAppId: z.string().optional(),
   /**
    * 壳 chrome 档位：platform = tab 体系完整壳（多应用可切换）；
    * solo = 容器隐形（单应用直出、全屏 chrome 归零）。kiosk 运行模式强制 solo。

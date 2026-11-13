@@ -68,7 +68,7 @@ export type ShellBridge = UnionToIntersection<DomainApiPart<ShellDomainValue>> &
   /** 平台事件订阅：kernel 事件名 → event:<name> 通道；scanner.scanned 兼容映射旧通道 */
   onEvent: (event: string, handler: (payload: unknown) => void) => () => void
 } & {
-  /** 同步快照：启动外观与布局档位（组合根经 additionalArguments 送达，preload 读启动参数，不经 IPC）；introGate 是启动层撤层的握手声明（仅 defaultAppId 直出场景） */
+  /** 同步快照：启动外观与布局档位（组合根经 additionalArguments 送达，preload 读启动参数，不经 IPC）；introGate 是启动层撤层的握手声明（仅 solo 直出场景） */
   shell: { appearance: () => { accent: string, theme: 'light' | 'dark' | 'system', chrome: 'platform' | 'solo', introGate?: 'app' } }
 }
 

@@ -125,14 +125,17 @@ export class WindowSystem implements Startable, ViewHost {
         ...shellBase.webPreferences,
         preload: join(this.rendererDir, '../preload/index.cjs'),
         // 启动外观：同步随 preload 抵达，渲染层挂载前即可应用（零闪烁；不走异步 IPC）
-        additionalArguments: [
-          `--shell-accent=${this.initialAccent}`,
-          `--shell-theme=${this.initialTheme}`,
-          // 布局档位同步定型：solo 档无接缝底板，异步获取会让视图容器矩形首报落空
-          `--shell-chrome=${effectiveChrome(this.flavor)}`,
-          // 启动握手只对「有默认应用」场景生效：无直出时撤层不必等应用，避免门闩悬空
-          ...(this.flavor.defaultAppId ? ['--shell-intro-gate=app'] : []),
-        ],
+        additionalArguments: (() => {
+          const chrome = effectiveChrome(this.flavor)
+          return [
+            `--shell-accent=${this.initialAccent}`,
+            `--shell-theme=${this.initialTheme}`,
+            // 布局档位同步定型：solo 档无接缝底板，异步获取会让视图容器矩形首报落空
+            `--shell-chrome=${chrome}`,
+            // 启动握手只对 solo 直出（清单恰一个应用）生效：platform 撤层不必等应用，避免门闩悬空
+            ...(chrome === 'solo' && this.flavor.apps.length === 1 ? ['--shell-intro-gate=app'] : []),
+          ]
+        })(),
       },
     })
     mode.enter(win)

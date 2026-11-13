@@ -84,9 +84,9 @@
       let animationDone = false
       let appReady = false
       let introStartedAt = 0
-      // 握手门闩：主进程声明 defaultAppId 直出（--shell-intro-gate=app）时，撤层还要等
+      // 握手门闩：主进程声明 solo 直出（--shell-intro-gate=app）时，撤层还要等
       // 首应用开好（shell-app-opened），否则撤层瞬间先闪工作台底色再切应用，破坏启动单色；
-      // 无直出场景（纯桌面多 tab）不引入第三个门闩
+      // 无直出场景（platform / 清单不恰一个）不引入第三个门闩
       const introGateApp = (() => {
         try { return window.shell?.shell?.appearance?.()?.introGate === 'app' }
         catch { return false }
