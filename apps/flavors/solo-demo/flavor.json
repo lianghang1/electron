@@ -1,7 +1,7 @@
 {
   "id": "solo-demo",
   "name": "单应用客户端演示",
-  "mode": "desktop",
+  "mode": "windowed",
   "chrome": "solo",
   "defaultAppId": "demo-web",
   "apps": [

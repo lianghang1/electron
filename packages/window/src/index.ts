@@ -1,5 +1,5 @@
-export { createDesktopMode, createKioskMode } from './modes'
-export type { DesktopMode, KioskMode } from './modes'
+export { createKioskMode, createWindowedMode } from './modes'
+export type { KioskMode, WindowedMode } from './modes'
 export { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 export type { OverlayFactory, OverlayKind, OverlayPolicy } from './overlay-host'
 export { OverlayService } from './overlay-service'

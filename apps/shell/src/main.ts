@@ -3,7 +3,7 @@ import { createApp, h } from 'vue'
 import '@shell/ui/styles.css'
 
 // 挂载前同步应用启动外观：preload 已写 :root，此处补 system 模式的动态跟随
-const boot = window.desktop?.shell.appearance()
+const boot = window.shell?.shell.appearance()
 if (boot) {
   bootstrapAppearance(boot.accent, boot.theme)
 }
@@ -50,7 +50,7 @@ else {
     requestAnimationFrame(() => {
       createApp(ShellApp).mount('#app')
       requestAnimationFrame(() => {
-        window.desktop?.markFirstPaint()
+        window.shell?.markFirstPaint()
         window.dispatchEvent(new Event('shell-app-ready'))
       })
     })

@@ -1,4 +1,4 @@
-import { desktop } from '@shell/bridge/client'
+import { shell } from '@shell/bridge/client'
 import { computed, ref } from 'vue'
 
 export interface ShellTab {
@@ -45,11 +45,11 @@ export function useShellTabs() {
 
   function activate(tab: ShellTab) {
     activeKey.value = tab.key
-    void desktop().apps.activate(tab.instanceId ?? '')
+    void shell().apps.activate(tab.instanceId ?? '')
   }
 
   async function openApp(appId: string) {
-    const result = await desktop().apps.open(appId) as { instanceId: string, handle: Record<string, unknown> }
+    const result = await shell().apps.open(appId) as { instanceId: string, handle: Record<string, unknown> }
     const manifest = appList.value.find(a => a.manifest.id === appId)?.manifest
     const target = tabs.value.find(t => t.instanceId === result.instanceId)
       ?? tabs.value.find(t => t.appId === appId)
@@ -90,7 +90,7 @@ export function useShellTabs() {
 
   function closeTab(tab: ShellTab) {
     tabs.value = tabs.value.filter(t => t.key !== tab.key)
-    if (tab.instanceId) { void desktop().apps.close(tab.instanceId) }
+    if (tab.instanceId) { void shell().apps.close(tab.instanceId) }
     if (activeKey.value === tab.key) {
       const next = tabs.value[tabs.value.length - 1]
       if (next) {
@@ -98,7 +98,7 @@ export function useShellTabs() {
       }
       else {
         activeKey.value = ''
-        void desktop().apps.activate('')
+        void shell().apps.activate('')
       }
     }
   }
@@ -115,11 +115,11 @@ export function useShellTabs() {
 
   /** 订阅应用生命周期事件（返回清理函数） */
   function watchAppEvents(): () => void {
-    const offOpened = desktop().onEvent('app.opened', (payload) => {
+    const offOpened = shell().onEvent('app.opened', (payload) => {
       const p = payload as { appId?: string, instanceId?: string }
       if (p.appId && p.instanceId) { ensureTabFromEvent(p.appId, p.instanceId) }
     })
-    const offClosed = desktop().onEvent('app.closed', (payload) => {
+    const offClosed = shell().onEvent('app.closed', (payload) => {
       const p = payload as { appId?: string, instanceId?: string }
       const tab = tabs.value.find(t => t.instanceId === p.instanceId || t.appId === p.appId)
       if (tab) { closeTab(tab) }
@@ -138,7 +138,7 @@ export function useShellTabs() {
   }
 
   async function loadApps() {
-    appList.value = await desktop().apps.list() as AppSummary[]
+    appList.value = await shell().apps.list() as AppSummary[]
   }
 
   return {

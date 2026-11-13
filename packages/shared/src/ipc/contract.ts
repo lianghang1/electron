@@ -78,7 +78,7 @@ export interface IpcDomainValue<D extends string, Defs extends IpcDefs> {
   readonly sendChannels: Readonly<Record<string, string>>
   /** 方法名 → 通道全名（push 形态） */
   readonly pushChannels: Readonly<Record<string, string>>
-  /** 根域：方法直接挂在 window.desktop 根上（跨分组的基础面，如 reportContentRect） */
+  /** 根域：方法直接挂在 window.桥面根上（跨分组的基础面，如 reportContentRect） */
   readonly root?: true
 }
 

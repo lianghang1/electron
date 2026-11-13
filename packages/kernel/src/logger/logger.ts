@@ -12,27 +12,27 @@ export type LogFields = Record<string, string | number | boolean | undefined>
 export interface LoggerOptions {
   /** debug 日志开关（默认关闭，避免影响用户），dev 模式由 Application 打开 */
   debug?: boolean
-  /** 根作用域名，缺省 'desktop'；Application 按启动的 App 传入（appId 末段） */
+  /** 根作用域名，缺省 'main'；Application 按启动的 App 传入（appId 末段） */
   scope?: string
 }
 
 /**
  * 平台日志：基于 electron-log（console + 文件轮转 + 崩溃捕获），自身不能成为故障点。
- * - scope(name)：模块作用域，路径式叠加（desktop → desktop:tab）
+ * - scope(name)：模块作用域，路径式叠加（main → main:tab）
  * - child(fields)：固定身份字段（appId / instanceId / tabId ...）随每条日志输出
  */
 export class Logger {
   private readonly elog: LogFunctions
 
   constructor(
-    private readonly scopePath: string = 'desktop',
+    private readonly scopePath: string = 'main',
     private readonly options: LoggerOptions = {},
     private readonly fields: LogFields = {},
   ) {
     this.elog = log.scope(scopePath)
   }
 
-  /** 子作用域：desktop:tab → desktop:tab:xxx */
+  /** 子作用域：main:tab → main:tab:xxx */
   scope(name: string): Logger {
     return new Logger(`${this.scopePath}:${name}`, this.options, this.fields)
   }
@@ -80,7 +80,7 @@ export function createRootLogger(options: LoggerOptions = {}): Logger {
   log.transports.file.level = options.debug ? 'debug' : 'info'
   log.transports.console.level = options.debug ? 'debug' : 'error'
   configureFileRotation()
-  return new Logger(options.scope ?? 'desktop', options)
+  return new Logger(options.scope ?? 'main', options)
 }
 
 /** 当天日期文本（本地时区），用于日志文件命名 */

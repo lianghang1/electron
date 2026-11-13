@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DownloadTask } from '@shell/shared'
 import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
-import { desktop } from '@shell/bridge/client'
+import { shell } from '@shell/bridge/client'
 import { Badge, Button } from '@ui/components/ui'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import CommandPalette from '../shell/CommandPalette.vue'
@@ -71,22 +71,22 @@ const fullscreen = computed(() => kind.value !== 'panel')
 const paletteItems = computed(() => apps.value.map(a => ({ id: a.manifest.id, name: a.manifest.name, kind: 'app' })))
 
 onMounted(async () => {
-  state.value = await desktop().overlay.sync() as OverlayState
-  unsubscribe = desktop().overlay.onUpdated((next) => {
+  state.value = await shell().overlay.sync() as OverlayState
+  unsubscribe = shell().overlay.onUpdated((next) => {
     state.value = next as OverlayState
   })
   if (kind.value === 'command-palette' || kind.value === 'app-center') {
-    try { apps.value = await desktop().apps.list() as AppSummary[] }
+    try { apps.value = await shell().apps.list() as AppSummary[] }
     catch { apps.value = [] }
   }
   if (kind.value === 'capture') {
-    offFrame = desktop().captureDialog.onFrame(({ base64 }) => {
+    offFrame = shell().captureDialog.onFrame(({ base64 }) => {
       frame.value = `data:image/jpeg;base64,${base64}`
     })
     await startPreview()
   }
   // panel 的透明区穿透由窗口策略设定，卡片自身经 mouseenter/mouseleave 临时解除
-  if (kind.value === 'panel') { desktop().overlay.mouseIgnore(true) }
+  if (kind.value === 'panel') { shell().overlay.mouseIgnore(true) }
 })
 
 onBeforeUnmount(() => {
@@ -99,7 +99,7 @@ async function startPreview(): Promise<void> {
   const session = state.value?.capture
   if (!session?.deviceId) { return }
   try {
-    await desktop().captureDialog.startPreview({ deviceId: session.deviceId, resolutionNum: session.resolutionNum })
+    await shell().captureDialog.startPreview({ deviceId: session.deviceId, resolutionNum: session.resolutionNum })
     previewing = true
   }
   catch { frame.value = '' }
@@ -108,7 +108,7 @@ async function startPreview(): Promise<void> {
 async function stopPreview(): Promise<void> {
   if (!previewing) { return }
   previewing = false
-  await desktop().captureDialog.stopPreview()
+  await shell().captureDialog.stopPreview()
 }
 
 async function snap(): Promise<void> {
@@ -116,7 +116,7 @@ async function snap(): Promise<void> {
   busy.value = true
   try {
     const input = frame.value ? { dataUrl: frame.value } : {}
-    const result = await desktop().captureDialog.snap(input) as { imagePath: string, thumbDataUrl?: string }
+    const result = await shell().captureDialog.snap(input) as { imagePath: string, thumbDataUrl?: string }
     const max = state.value?.capture?.maxCount ?? 1
     shots.value = max <= 1 ? [result] : [...shots.value, result].slice(-max)
   }
@@ -126,7 +126,7 @@ async function snap(): Promise<void> {
 async function confirmCapture(): Promise<void> {
   if (!shots.value.length) { return }
   // 主进程在结果交付后延迟收场：发起页先拿到结果，浮层不会秒关
-  await desktop().captureDialog.confirm(shots.value)
+  await shell().captureDialog.confirm(shots.value)
 }
 
 function cancelCapture(): void {
@@ -135,24 +135,24 @@ function cancelCapture(): void {
 }
 
 function action(type: OverlayAction['type'], extra: Omit<OverlayAction, 'kind' | 'type'> = {}): void {
-  void desktop().overlay.action({ kind: kind.value, type, ...extra })
+  void shell().overlay.action({ kind: kind.value, type, ...extra })
 }
 
 function close(): void {
-  void desktop().overlay.dismiss(kind.value)
+  void shell().overlay.dismiss(kind.value)
 }
 
 async function openApp(appId: string): Promise<void> {
-  await desktop().apps.open(appId)
+  await shell().apps.open(appId)
   close()
 }
 
 function dismissNotification(id: string): void {
-  void desktop().notifications.dismiss(id)
+  void shell().notifications.dismiss(id)
 }
 
 function dismissDownload(taskId: string): void {
-  void desktop().downloads.dismiss(taskId)
+  void shell().downloads.dismiss(taskId)
 }
 
 const levelTone: Record<string, string> = {
@@ -170,8 +170,8 @@ const levelTone: Record<string, string> = {
         v-for="item in state?.notifications ?? []"
         :key="item.id"
         class="relative rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur"
-        @mouseenter="desktop().overlay.mouseIgnore(false)"
-        @mouseleave="desktop().overlay.mouseIgnore(true)"
+        @mouseenter="shell().overlay.mouseIgnore(false)"
+        @mouseleave="shell().overlay.mouseIgnore(true)"
       >
         <div class="absolute left-0 top-3 h-6 w-1 rounded-r" :class="levelTone[item.level] ?? levelTone.info" />
         <div class="flex items-start justify-between gap-2">
@@ -190,8 +190,8 @@ const levelTone: Record<string, string> = {
         v-for="task in state?.downloads ?? []"
         :key="task.id"
         class="rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur"
-        @mouseenter="desktop().overlay.mouseIgnore(false)"
-        @mouseleave="desktop().overlay.mouseIgnore(true)"
+        @mouseenter="shell().overlay.mouseIgnore(false)"
+        @mouseleave="shell().overlay.mouseIgnore(true)"
       >
         <div class="flex items-start justify-between gap-2">
           <div class="truncate text-ui-sm font-medium text-foreground">
@@ -334,7 +334,7 @@ const levelTone: Record<string, string> = {
           <Button variant="outline" @click="close">
             稍后
           </Button>
-          <Button @click="desktop().shell.relaunch()">
+          <Button @click="shell().shell.relaunch()">
             立即重启
           </Button>
         </div>

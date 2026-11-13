@@ -68,8 +68,8 @@ function subscribe(channel: string, listener: (...args: unknown[]) => void): () 
   return () => ipcRenderer.removeListener(channel, wrapped)
 }
 
-// 壳设施分组由域运行时表生成；根域（system）方法直接挂 desktop 根
-const desktop: Record<string, unknown> = {
+// 壳设施分组由域运行时表生成；根域（system）方法直接挂桥面根
+const shellBridge: Record<string, unknown> = {
   /** 设备域通用调用端：invoke('print.submitJob', input)（zod 校验 + 权限闸门在主进程路由层） */
   invoke: (method: string, input: unknown) => ipcRenderer.invoke('domain-call', method, input),
 
@@ -94,15 +94,15 @@ for (const domain of shellDomains) {
     group[onName] = (handler: (...args: unknown[]) => void) => subscribe(channel, handler)
   }
   if (domain.root) {
-    Object.assign(desktop, group)
+    Object.assign(shellBridge, group)
   }
   else {
-    desktop[domain.domain] = group
+    shellBridge[domain.domain] = group
   }
 }
 
 // 同步快照方法：appearance 读启动参数不经 IPC，挂进 shell 分组（契约外唯一手工成员）
-;(desktop.shell as Record<string, unknown>).appearance = () => bootAppearance
+;(shellBridge.shell as Record<string, unknown>).appearance = () => bootAppearance
 
 // exposeInMainWorld 的 api 参数为 any：桥面结构由 ShellBridge 契约类型约束
-contextBridge.exposeInMainWorld('desktop', desktop)
+contextBridge.exposeInMainWorld('shell', shellBridge)

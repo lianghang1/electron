@@ -1,4 +1,4 @@
-import { desktop } from '@shell/bridge/client'
+import { shell } from '@shell/bridge/client'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 /**
@@ -13,7 +13,7 @@ export function useViewDock() {
     const el = dockEl.value
     if (!el) { return }
     const r = el.getBoundingClientRect()
-    desktop().reportContentRect({ x: r.left, y: r.top, width: r.width, height: r.height })
+    shell().reportContentRect({ x: r.left, y: r.top, width: r.width, height: r.height })
   }
 
   function onResize() {

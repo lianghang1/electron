@@ -1,5 +1,5 @@
 /** 平台统一错误码：跨 IPC 只传 code + message + details，可序列化 */
-export type DesktopErrorCode
+export type PlatformErrorCode
   = | 'APP_NOT_FOUND'
     | 'APP_NOT_ALLOWED'
     | 'PERMISSION_DENIED'
@@ -14,24 +14,24 @@ export type DesktopErrorCode
  * 平台统一错误。跨 IPC 传递时序列化为 { code, message, details }，
  * 不要把 Electron 原生 Error 对象直接扔过 IPC。
  */
-export class DesktopError extends Error {
-  readonly code: DesktopErrorCode
+export class PlatformError extends Error {
+  readonly code: PlatformErrorCode
   readonly details?: unknown
 
-  constructor(code: DesktopErrorCode, message: string, details?: unknown) {
+  constructor(code: PlatformErrorCode, message: string, details?: unknown) {
     super(message)
-    this.name = 'DesktopError'
+    this.name = 'PlatformError'
     this.code = code
     this.details = details
   }
 }
 
 /** ipcMain.handle 抛出的错误只保留 message 字符串（code/details 丢失）：序列化进 message 跨进程还原 */
-const IPC_ERROR_PREFIX = '__desktop_error__:'
+const IPC_ERROR_PREFIX = '__platform_error__:'
 
 /** 跨 IPC 错误载荷：code 用字符串承载各域错误码体系（平台码/设备码），details 须可结构化克隆 */
 export interface IpcErrorPayload {
-  /** 主进程错误类名（DesktopError / IdCardError…），渲染层用于识别错误种类 */
+  /** 主进程错误类名（PlatformError / IdCardError…），渲染层用于识别错误种类 */
   name: string
   code: string
   message: string

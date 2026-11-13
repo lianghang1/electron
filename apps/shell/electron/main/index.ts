@@ -1,4 +1,8 @@
 import type { AppRootResolver, PermissionRule } from '@shell/app-runtime'
+import type { DeviceGateway, DeviceTelemetry, DomainRouter, DriverResolver } from '@shell/devices'
+import type { EventBus, PlatformKernel } from '@shell/kernel'
+import type { Logger } from '@shell/kernel/logger'
+import type { AppManifest, FlavorManifest } from '@shell/shared'
 import type { PackageInstaller } from '@shell/update'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
@@ -112,21 +116,51 @@ else {
   app.on('second-instance', () => focusShell?.())
 }
 
-async function main(context: BootContext): Promise<void> {
-  // 持久化设置的启动副作用（开机自启可能被安装器重置，启动即纠正）
-  applySettingsSideEffects()
-  const flavor = loadFlavor()
+/**
+ * 按域分段的装配现场：buildAssembly 建基础件，setup* 按依赖顺序填充产出
+ * （可空字段 = 对应 setup 的产出，装配顺序保证消费点非空）。
+ */
+interface Assembly {
+  context: BootContext
+  flavor: FlavorManifest
+  logger: Logger
+  /** 薄壳的 app.getVersion() 恒为出厂版本：生效版本一律读 current.json 指针 */
+  version: () => string
+  outDir: string
+  rendererDir: string
+  preloadDir: string
+  mainDir: string
+  builtinAppsRoot: string
+  resolveAppRoot: AppRootResolver
+  kernel: PlatformKernel
+  windows: WindowSystem
+  callers: CallerRegistry
+  events: EventBus
+  capability?: ReturnType<typeof resolvePlatformCapability>
+  driver?: DriverResolver
+  fullPackage?: FullPackageChannel
+  updateCenter?: UpdateCenter
+  forceGate?: ForceUpdateGate
+  notifications?: NotificationCenter
+  appKv?: AppKvStore
+  overlays?: OverlayService
+  resilience?: ResilienceSystem
+  devices?: DeviceGateway
+  telemetry?: DeviceTelemetry
+  catalog?: AppManifest[]
+  permissions?: PermissionService
+  downloads?: DownloadManager
+  appSessions?: AppSessionRegistry
+  apps?: AppService
+  router?: DomainRouter
+  cancelCaptureDialog?: () => void
+}
 
-  // 档位约束：solo/kiosk 容器隐形档必须有直达目标，否则窗口无内容可铺
-  if (flavor.chrome === 'solo' && !flavor.defaultAppId && flavor.apps.length > 0) { logger.warn('flavor chrome=solo 但未配置 defaultAppId，启动将无应用直出', { flavor: flavor.id }) }
-
+/** 基础件：路径 / 版本 / 主题主色 / 窗口系统 / 内核与身份账本 */
+function buildAssembly(context: BootContext, flavor: FlavorManifest): Assembly {
   // 产物根由引导层注入：热更包位于 userData 时 __dirname 指向薄壳，那里没有 renderer/preload/device-host
   const outDir = join(context.artifactRoot, 'out')
-  const rendererDir = join(outDir, 'renderer')
-  const preloadDir = join(outDir, 'preload')
-  const mainDir = join(outDir, 'main')
-  const builtinVersion = context.builtinVersion
-  const version = () => effectiveVersion(builtinVersion)
+  const version = () => effectiveVersion(context.builtinVersion)
 
   const theme = (settingsSnapshot().values.appearance?.theme as 'light' | 'dark' | 'system' | undefined) ?? 'system'
   // 主色：用户设置覆盖（appearance.accent，合法 Hex）优先，缺省跟随 flavor 品牌色
@@ -134,9 +168,9 @@ async function main(context: BootContext): Promise<void> {
     ? settingsSnapshot().values.appearance.accent as string
     : ''
   const accent = /^#[0-9a-f]{6}$/i.test(accentSetting) ? accentSetting : flavor.branding.accent
-  const windows = new WindowSystem(flavor, rendererDir, theme, accent)
-  const callers = new CallerRegistry()
+  const windows = new WindowSystem(flavor, join(outDir, 'renderer'), theme, accent)
   const kernel = createKernel(flavor, [windows])
+  windows.bindEvents(kernel.ctx.events)
 
   // 内置应用 dist 根：asar 外的 extraResources 落点（<resources>/apps），只读基线。
   // dist-hot 产物落 userData，app:// 协议按 apps-current.json 指针取目录，读写同源。
@@ -151,125 +185,98 @@ async function main(context: BootContext): Promise<void> {
     return { root: builtinAppsRoot, dir: appId }
   }
 
-  // 更新中心：通道按 flavor.update 配置装配，整包落地策略由组合根注入
-  const updateManifestUrl = flavor.update.manifestUrl ?? ''
-  let fullPackage: FullPackageChannel | undefined
-  let updateCenter: UpdateCenter | undefined
-  let forceGate: ForceUpdateGate | undefined
-  if (updateManifestUrl) {
-    if (packageInstaller) {
-      fullPackage = new FullPackageChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins, installer: packageInstaller })
-    }
-    updateCenter = new UpdateCenter({
-      channels: [
-        new DistHotChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins }),
-        new AsarHotChannel({ manifestUrl: updateManifestUrl, allowedOrigins: flavor.update.allowedOrigins, resourcesVersion: context.resourcesVersion }),
-        ...(fullPackage ? [fullPackage] : []),
-      ],
-      events: kernel.ctx.events,
-      // 薄壳的 app.getVersion() 恒为出厂版本：生效版本一律读 current.json 指针
-      versionMatrix: async () => ({
-        shell: version(),
-        asar: version(),
-        apps: collectEffectiveAppVersions(builtinAppsRoot, readAppsPointer()),
-      }),
-    })
-    void kernel.register(updateCenter)
-
-    // 强制更新门禁：清单 minVersion 低于生效版本即阻断，决策快照经 shell:info 下发
-    const gate = new ForceUpdateGate({
-      manifestUrl: updateManifestUrl,
-      allowedOrigins: flavor.update.allowedOrigins,
-      currentVersion: version,
-      events: kernel.ctx.events,
-    })
-    void kernel.register({
-      name: 'force-gate',
-      start: () => gate.start(),
-      stop: () => gate.stop(),
-    })
-    forceGate = gate
+  return {
+    context,
+    flavor,
+    logger,
+    version,
+    outDir,
+    rendererDir: join(outDir, 'renderer'),
+    preloadDir: join(outDir, 'preload'),
+    mainDir: join(outDir, 'main'),
+    builtinAppsRoot,
+    resolveAppRoot,
+    kernel,
+    windows,
+    callers: new CallerRegistry(),
+    events: kernel.ctx.events,
   }
-  windows.bindEvents(kernel.ctx.events)
+}
 
-  // 平台能力一次探测，处处消费：能力表 → 驱动寻址策略 / 路由闸门 / 渲染层下发
-  // 统一消息通道、应用隔离 KV、过期产物清理、原生浮层宿主由内核统一持有生命周期
-  const notifications = new NotificationCenter({ events: kernel.ctx.events })
-  void kernel.register(notifications)
-  const appKv = new AppKvStore(join(configDir(), 'app-storage'))
+/** 更新链路：通道按 flavor.update 配置装配，整包落地策略由模块级 INSTALLERS 注入 */
+function setupUpdate(a: Assembly): void {
+  const updateManifestUrl = a.flavor.update.manifestUrl ?? ''
+  if (!updateManifestUrl) { return }
+
+  if (packageInstaller) {
+    a.fullPackage = new FullPackageChannel({ manifestUrl: updateManifestUrl, allowedOrigins: a.flavor.update.allowedOrigins, installer: packageInstaller })
+  }
+  a.updateCenter = new UpdateCenter({
+    channels: [
+      new DistHotChannel({ manifestUrl: updateManifestUrl, allowedOrigins: a.flavor.update.allowedOrigins }),
+      new AsarHotChannel({ manifestUrl: updateManifestUrl, allowedOrigins: a.flavor.update.allowedOrigins, resourcesVersion: a.context.resourcesVersion }),
+      ...(a.fullPackage ? [a.fullPackage] : []),
+    ],
+    events: a.events,
+    versionMatrix: async () => ({
+      shell: a.version(),
+      asar: a.version(),
+      apps: collectEffectiveAppVersions(a.builtinAppsRoot, readAppsPointer()),
+    }),
+  })
+  void a.kernel.register(a.updateCenter)
+
+  // 强制更新门禁：清单 minVersion 低于生效版本即阻断，决策快照经 shell:info 下发
+  a.forceGate = new ForceUpdateGate({
+    manifestUrl: updateManifestUrl,
+    allowedOrigins: a.flavor.update.allowedOrigins,
+    currentVersion: a.version,
+    events: a.events,
+  })
+  void a.kernel.register({
+    name: 'force-gate',
+    start: () => a.forceGate!.start(),
+    stop: () => a.forceGate!.stop(),
+  })
+}
+
+/** 平台自管服务：通知 / 应用 KV / 保留期 / 原生浮层 / 托盘 / 运行韧性，及跨系统事件接线 */
+function setupPlatformSystems(a: Assembly): void {
+  const notifications = new NotificationCenter({ events: a.events })
+  a.notifications = notifications
+  void a.kernel.register(notifications)
+  a.appKv = new AppKvStore(join(configDir(), 'app-storage'))
   const DAY_MS = 24 * 60 * 60 * 1000
-  const retention = new RetentionRegistry({ events: kernel.ctx.events })
+  const retention = new RetentionRegistry({ events: a.events })
   for (const domain of ['capture', 'print', 'signature']) {
     retention.register({ id: `product:${domain}`, dir: () => join(filesDir(), domain), maxAgeMs: 7 * DAY_MS })
   }
   retention.register({ id: 'audit-log', dir: () => join(logsDir(), 'audit'), maxAgeMs: 30 * DAY_MS })
-  void kernel.register(retention)
+  void a.kernel.register(retention)
 
   // WebContentsView 是原生合成层：弹窗、通知、菜单、更新提示统一走原生窗，避免被应用视图遮挡
-  let cancelCaptureDialog: (() => void) | undefined
-  const overlays = new OverlayService({
-    windows,
-    events: kernel.ctx.events,
+  a.overlays = new OverlayService({
+    windows: a.windows,
+    events: a.events,
     notifications,
-    onCaptureClose: () => cancelCaptureDialog?.(),
+    onCaptureClose: () => a.cancelCaptureDialog?.(),
   })
-  void kernel.register(overlays)
+  void a.kernel.register(a.overlays)
 
-  kernel.ctx.events.on('update.restart-required', ({ version }) => overlays.showUpdatePrompt(version))
-  kernel.ctx.events.on('update.failed', ({ channel, reason }) => {
+  a.events.on('update.restart-required', ({ version }) => a.overlays!.showUpdatePrompt(version))
+  a.events.on('update.failed', ({ channel, reason }) => {
     notifications.push({ title: `更新失败（${channel}）`, body: reason, level: 'error' })
   })
-  kernel.ctx.events.on('download.completed', ({ filename }) => {
+  a.events.on('download.completed', ({ filename }) => {
     notifications.push({ title: '下载完成', body: filename, level: 'success' })
   })
 
-  const capability = resolvePlatformCapability(detectDevicePlatform().id, process.arch)
-  // 声明格式是 devices/<域>/...，故资源根 = 包含 devices/ 的那个父目录。
-  // dev/打包差异只在此处解析一次（唯一组装现场），域内部零感知。
-  const bundledRoot = app.isPackaged
-    ? (process.resourcesPath ?? app.getAppPath())
-    : join(app.getAppPath(), '../../resources')
-  const driver = createDriverResolver(capability, {
-    bundled: bundledRoot,
-    manual: join(platformDataRoot(), 'resources'),
-  })
-  const devices = createDeviceGateway({
-    logger,
-    events: kernel.ctx.events,
-    hostEntryPath: join(mainDir, 'device-host.js'),
-    driver,
-    paths: { storageRoot: configDir(), filesRoot: filesDir() },
-    // 打印 URL 白名单独立于更新链路：flavor.print.urlOrigins（'*' 放行公网，内网仍被 SSRF 防线拦截）
-    allowedOrigins: flavor.print.urlOrigins,
-    platformId: capability.platform,
-    availableDomains: capability.availableDomains,
-    getParent: () => windows.shellWindow,
-    captureOverlay: {
-      pushCaptureSession: session => overlays.pushCaptureDialog(session),
-      getCaptureWindow: () => windows.getOverlay('capture') ?? null,
-      dismissCaptureSession: () => overlays.closeCapture(),
-    },
-  })
-
-  cancelCaptureDialog = () => devices.captureDialog?.cancelByOverlay()
-
-  // 设备系统并入内核生命周期：start = 守护进程预热（打 t2 并广播 ready），
-  // stop = 全域 dispose
-  void kernel.register({
-    name: 'devices',
-    start: () => devices.warmup(() => {
-      kernel.ctx.marks.t2DeviceHostReady = Date.now()
-      kernel.ctx.events.emit('devices.ready', {})
-    }),
-    stop: async () => devices.dispose(),
-  })
-
   // 托盘（kiosk 全屏形态不创建——现场不该有逃逸入口）
-  if (flavor.mode === 'desktop') {
-    void kernel.register(new TraySystem(
-      kernel.ctx.events,
+  if (a.flavor.mode === 'windowed') {
+    void a.kernel.register(new TraySystem(
+      a.events,
       () => {
-        const win = windows.shellWindow
+        const win = a.windows.shellWindow
         if (win) {
           if (win.isMinimized()) { win.restore() }
           win.show()
@@ -280,32 +287,79 @@ async function main(context: BootContext): Promise<void> {
   }
 
   // 运行韧性：flavor 声明才启用，全部默认关闭；attach 在主窗创建后调用
-  const resilience = new ResilienceSystem(kernel.ctx.events, logger)
-  void kernel.register(resilience)
+  a.resilience = new ResilienceSystem(a.events, a.logger)
+  void a.kernel.register(a.resilience)
+}
 
-  // apps.json 与 flavor 同为受信任部署输入：能写配置目录即可注册应用并声明权限，
-  // 目录写权限须由部署侧管控；未声明的权限一律拒绝
-  const externalApps = loadAppsJson(configDir(), logger, { excludeIds: flavor.apps.map(a => a.id) })
-  const catalog = [...flavor.apps, ...externalApps]
+/** 设备域：能力探测 / 驱动寻址 / 网关与守护进程，观测统一发布进内核事件 */
+function setupDevices(a: Assembly): void {
+  // 平台能力一次探测，处处消费：能力表 → 驱动寻址策略 / 路由闸门 / 渲染层下发
+  a.capability = resolvePlatformCapability(detectDevicePlatform().id, process.arch)
+  // 声明格式是 devices/<域>/...，故资源根 = 包含 devices/ 的那个父目录。
+  // dev/打包差异只在此处解析一次（唯一组装现场），域内部零感知。
+  const bundledRoot = app.isPackaged
+    ? (process.resourcesPath ?? app.getAppPath())
+    : join(app.getAppPath(), '../../resources')
+  a.driver = createDriverResolver(a.capability, {
+    bundled: bundledRoot,
+    manual: join(platformDataRoot(), 'resources'),
+  })
+  a.devices = createDeviceGateway({
+    logger,
+    events: a.events,
+    hostEntryPath: join(a.mainDir, 'device-host.js'),
+    driver: a.driver,
+    paths: { storageRoot: configDir(), filesRoot: filesDir() },
+    // 打印 URL 白名单独立于更新链路：flavor.print.urlOrigins（'*' 放行公网，内网仍被 SSRF 防线拦截）
+    allowedOrigins: a.flavor.print.urlOrigins,
+    platformId: a.capability.platform,
+    availableDomains: a.capability.availableDomains,
+    getParent: () => a.windows.shellWindow,
+    captureOverlay: {
+      pushCaptureSession: session => a.overlays!.pushCaptureDialog(session),
+      getCaptureWindow: () => a.windows.getOverlay('capture') ?? null,
+      dismissCaptureSession: () => a.overlays!.closeCapture(),
+    },
+  })
+  a.telemetry = createDeviceTelemetry()
 
-  const permissions = new PermissionService({
+  a.cancelCaptureDialog = () => a.devices?.captureDialog?.cancelByOverlay()
+
+  // 设备系统并入内核生命周期：start = 守护进程预热（打 t2 并广播 ready），stop = 全域 dispose
+  void a.kernel.register({
+    name: 'devices',
+    start: () => a.devices!.warmup(() => {
+      a.kernel.ctx.marks.t2DeviceHostReady = Date.now()
+      a.events.emit('devices.ready', {})
+    }),
+    stop: async () => a.devices!.dispose(),
+  })
+}
+
+/** 信任轴：apps.json 与 flavor 同为受信任部署输入，策略表与身份账本同源接线 */
+function setupPermissions(a: Assembly): void {
+  // 能写配置目录即可注册应用并声明权限，目录写权限须由部署侧管控；未声明的权限一律拒绝
+  const externalApps = loadAppsJson(configDir(), a.logger, { excludeIds: a.flavor.apps.map(app => app.id) })
+  a.catalog = [...a.flavor.apps, ...externalApps]
+
+  a.permissions = new PermissionService({
     rules: [
-      ...buildAppPermissionRules(catalog),
-      ...buildPlatformPermissionRules(capability.availableDomains),
+      ...buildAppPermissionRules(a.catalog),
+      ...buildPlatformPermissionRules(a.capability!.availableDomains),
       ...PLATFORM_SELF_PERMISSIONS,
     ],
     // 运行时授权结论落在平台 KV：同一 appId|permission 不再反复弹窗
     store: {
       get: async (key) => {
-        const stored = appKv.get(SHELL_APP_ID, `permission:${key}`)
+        const stored = a.appKv!.get(SHELL_APP_ID, `permission:${key}`)
         return stored === 'allow' || stored === 'deny' || stored === 'prompt' ? stored : undefined
       },
-      set: async (key, verdict) => { appKv.set(SHELL_APP_ID, `permission:${key}`, verdict) },
-      delete: async (key) => { appKv.remove(SHELL_APP_ID, `permission:${key}`) },
+      set: async (key, verdict) => { a.appKv!.set(SHELL_APP_ID, `permission:${key}`, verdict) },
+      delete: async (key) => { a.appKv!.remove(SHELL_APP_ID, `permission:${key}`) },
     },
-    prompt: { ask: request => overlays.requestPermission(request) },
+    prompt: { ask: request => a.overlays!.requestPermission(request) },
     audit: (decision) => {
-      kernel.ctx.events.emit('permission.decided', {
+      a.events.emit('permission.decided', {
         appId: decision.request.appId,
         permission: decision.request.permission,
         verdict: decision.verdict,
@@ -316,15 +370,18 @@ async function main(context: BootContext): Promise<void> {
 
   // 身份账本与系统权限闸门同源：窗口/视图创建时登记 webContents → appId，
   // 系统权限请求（摄像头/剪贴板等）按真实调用方查同一张策略表，页面无法伪造身份
-  windows.bindCallerRegistry(
-    callers,
-    (appId, permission) => permissions.decide({ appId, origin: `app://${appId}`, permission }),
+  a.windows.bindCallerRegistry(
+    a.callers,
+    (appId, permission) => a.permissions!.decide({ appId, origin: `app://${appId}`, permission }),
   )
+}
 
+/** 应用运行时：下载门控 / 会话分区 / 审计 / AppService 与 openers 装配 */
+function setupAppRuntime(a: Assembly): void {
   // 下载门控走同一张权限策略表：未声明 download 权限即拒绝。
   // 决策允许异步返回，期间下载照常进行；拒绝时取消并清理部分文件。
-  const downloads = new DownloadManager({
-    events: kernel.ctx.events,
+  a.downloads = new DownloadManager({
+    events: a.events,
     logger,
     gate: ({ appId, url }) => {
       let origin = url
@@ -334,7 +391,7 @@ async function main(context: BootContext): Promise<void> {
       catch {
         // blob:/data: 等非标准 URL，原值仅作审计线索
       }
-      return permissions.decide({ appId, origin, permission: 'download' })
+      return a.permissions!.decide({ appId, origin, permission: 'download' })
         .then(allowed => (allowed ? 'allow' : 'deny'))
     },
     downloadsDir: app.getPath('downloads'),
@@ -342,55 +399,56 @@ async function main(context: BootContext): Promise<void> {
 
   // 每个应用一个会话分区：协议与下载门控在创建时由组合根接线，
   // 视图只声明 partition，窗口系统不认识应用会话策略。
-  const appSessions = new AppSessionRegistry({
+  a.appSessions = new AppSessionRegistry({
     logger,
-    events: kernel.ctx.events,
+    events: a.events,
     cookiesDir: cookiesDir(),
     onSessionCreated: (ses, appId) => {
-      registerAppProtocol(ses, resolveAppRoot)
-      downloads.attach(ses, appId)
+      registerAppProtocol(ses, a.resolveAppRoot)
+      a.downloads!.attach(ses, appId)
     },
   })
-  const auditLog = new AuditLog({ events: kernel.ctx.events, logger, dir: join(logsDir(), 'audit') })
-  void kernel.register(auditLog)
-  void kernel.register(appSessions)
-  void kernel.register(downloads)
+  const auditLog = new AuditLog({ events: a.events, logger, dir: join(logsDir(), 'audit') })
+  void a.kernel.register(auditLog)
+  void a.kernel.register(a.appSessions)
+  void a.kernel.register(a.downloads)
 
   // 应用运行时：openers 在此装配，AppService 只认 SPI
-  const apps = new AppService(
-    manifest => permissions.allowsApp(manifest),
+  a.apps = new AppService(
+    manifest => a.permissions!.allowsApp(manifest),
     [
-      new LocalOpener(windows, builtinAppsRoot, join(preloadDir, 'jsapi.cjs')),
-      new RemoteOpener(windows, join(preloadDir, 'jsapi.cjs')),
+      new LocalOpener(a.windows, a.builtinAppsRoot, join(a.preloadDir, 'jsapi.cjs')),
+      new RemoteOpener(a.windows, join(a.preloadDir, 'jsapi.cjs')),
     ],
-    kernel.ctx.events,
+    a.events,
   )
-  for (const appManifest of flavor.apps) { apps.register(appManifest, 'flavor') }
-  for (const appManifest of externalApps) { apps.register(appManifest, 'apps.json') }
+  for (const appManifest of a.flavor.apps) { a.apps.register(appManifest, 'flavor') }
+  for (const appManifest of a.catalog!) { a.apps.register(appManifest, 'apps.json') }
 
-  // 非 embedded 应用先建分区：窗口系统按 partition 取到的就是已注册协议与门控的 Session
-  for (const manifest of catalog) {
-    appSessions.forApp(manifest.id)
+  // 应用先建分区：窗口系统按 partition 取到的就是已注册协议与门控的 Session
+  for (const manifest of a.catalog!) {
+    a.appSessions.forApp(manifest.id)
   }
+}
 
-  // ── IPC 接线 ─────────────────────────────────────────────
-  windows.registerWindowControls()
-  windows.attachEventBroadcast(kernel.ctx.events)
+/** IPC 接线：窗口控制 / 事件广播 / 域路由 + 壳设施通道编排（通道实现在 shell-ipc.ts） */
+function setupIpc(a: Assembly): void {
+  a.windows.registerWindowControls()
+  a.windows.attachEventBroadcast(a.events)
 
   // 域方法调用：身份从账本反查（页面无法伪造），授权与能力闸门在路由层统一判定
-  const telemetry = createDeviceTelemetry()
-  const router = createDomainRouter(devices.domains, logger, {
-    availableDomains: capability.availableDomains,
-    authorize: (grant, ctx) => permissions.decide({
+  a.router = createDomainRouter(a.devices!.domains, logger, {
+    availableDomains: a.capability!.availableDomains,
+    authorize: (grant, ctx) => a.permissions!.decide({
       appId: ctx.appId,
       origin: `app://${ctx.appId}`,
       permission: grant,
     }),
-    telemetry,
+    telemetry: a.telemetry!,
     observation: {
       publish(observation) {
         if (observation.kind === 'call') {
-          kernel.ctx.events.emit('devices.call-recorded', {
+          a.events.emit('devices.call-recorded', {
             capabilityId: observation.record.capabilityId,
             methodName: observation.record.methodName,
             appId: observation.record.appId,
@@ -401,58 +459,45 @@ async function main(context: BootContext): Promise<void> {
           })
         }
         else {
-          kernel.ctx.events.emit('devices.telemetry-changed', observation.snapshot)
+          a.events.emit('devices.telemetry-changed', observation.snapshot)
         }
       },
     },
   })
+
   // 壳设施通道注册集中在 shell-ipc 模块（组合根只装配，不做通道接线）：
   // 契约通道经 shellHandle/shellOn 注册（见 packages/shared/src/ipc/AGENTS.md），
   // 设备域与 JSAPI 单通道（domain-call / jsapi:call）在模块内保留各自错误语义。
   registerShellIpc({
     logger,
-    kernel,
-    callers,
-    router,
-    apps,
-    windows,
-    downloads,
-    appSessions,
-    permissions,
-    appKv,
-    notifications,
-    updateCenter,
-    forceGate,
-    capability,
-    devices,
-    telemetry,
-    flavor,
-    version,
+    kernel: a.kernel,
+    callers: a.callers,
+    router: a.router,
+    apps: a.apps!,
+    windows: a.windows,
+    downloads: a.downloads!,
+    appSessions: a.appSessions!,
+    permissions: a.permissions!,
+    appKv: a.appKv!,
+    notifications: a.notifications!,
+    updateCenter: a.updateCenter,
+    forceGate: a.forceGate,
+    capability: a.capability!,
+    devices: a.devices!,
+    telemetry: a.telemetry!,
+    flavor: a.flavor,
+    version: a.version,
     markGracefulExit,
   })
+  // 应用 dist 分区协议：主 Session 注册（壳自身页面不经应用分区）
+  registerAppProtocol(session.defaultSession, a.resolveAppRoot)
+}
 
-  // 应用 dist 分区协议：主 Session 注册（packaged 形态）
-  registerAppProtocol(session.defaultSession, resolveAppRoot)
-
-  // 窗口先行：主窗在后台加载启动层，设备预热（守护进程 spawn + koffi 加载）
-  // 与内核其余系统并行——暖机耗时不再表现为一段屏幕空窗
-  windows.createShellWindow()
-  focusShell = () => {
-    const win = windows.shellWindow
-    if (!win) { return }
-    if (win.isMinimized()) { win.restore() }
-    win.show()
-    win.focus()
-  }
-  // 扫码枪键盘观察挂到工作台窗口
-  devices.attachShellWindow(windows.shellWindow!)
-  kernel.ctx.marks.t3WindowShown = Date.now()
-
-  await kernel.start()
-
+/** 主窗创建后的韧性接线与退出屏障 */
+function setupResilienceAndExit(a: Assembly): void {
   // 韧性接线：更新择优依赖闭包注入——整包看通道实例状态，asar 看暂存标记
-  resilience.attach(flavor.resilience ?? {}, () => windows.shellWindow, {
-    hasStagedPackage: () => fullPackage?.hasPendingInstall ?? false,
+  a.resilience!.attach(a.flavor.resilience ?? {}, () => a.windows.shellWindow, {
+    hasStagedPackage: () => a.fullPackage?.hasPendingInstall ?? false,
     hasPendingAsar: () => hasPendingAsarUpdate(),
   })
 
@@ -460,8 +505,42 @@ async function main(context: BootContext): Promise<void> {
   // 整包安装器在应用退出后拉起，与设备守护进程的 kernel.stop() 同属一次退出流程
   app.on('before-quit', () => {
     markGracefulExit()
-    fullPackage?.installOnQuit(err => logger.warn('整包安装器拉起失败', { error: String(err) }))
+    a.fullPackage?.installOnQuit(err => logger.warn('整包安装器拉起失败', { error: String(err) }))
   })
+}
+
+async function main(context: BootContext): Promise<void> {
+  // 持久化设置的启动副作用（开机自启可能被安装器重置，启动即纠正）
+  applySettingsSideEffects()
+  const flavor = loadFlavor()
+
+  // 档位约束：solo/kiosk 容器隐形档必须有直达目标，否则窗口无内容可铺
+  if (flavor.chrome === 'solo' && !flavor.defaultAppId && flavor.apps.length > 0) { logger.warn('flavor chrome=solo 但未配置 defaultAppId，启动将无应用直出', { flavor: flavor.id }) }
+
+  const a = buildAssembly(context, flavor)
+  setupUpdate(a)
+  setupPlatformSystems(a)
+  setupDevices(a)
+  setupPermissions(a)
+  setupAppRuntime(a)
+  setupIpc(a)
+
+  // 窗口先行：主窗在后台加载启动层，设备预热（守护进程 spawn + koffi 加载）
+  // 与内核其余系统并行——暖机耗时不再表现为一段屏幕空窗
+  a.windows.createShellWindow()
+  focusShell = () => {
+    const win = a.windows.shellWindow
+    if (!win) { return }
+    if (win.isMinimized()) { win.restore() }
+    win.show()
+    win.focus()
+  }
+  // 扫码枪键盘观察挂到工作台窗口
+  a.devices!.attachShellWindow(a.windows.shellWindow!)
+  a.kernel.ctx.marks.t3WindowShown = Date.now()
+
+  await a.kernel.start()
+  setupResilienceAndExit(a)
 }
 
 /** 引导层在 app ready 前 import 本模块后调用；dev 态无引导层时由下方自行构造上下文 */
@@ -478,6 +557,6 @@ if (!app.isPackaged) {
     builtinVersion: app.getVersion(),
     effectiveVersion: app.getVersion(),
     resourcesVersion: null,
-    updaterDir: join(app.getPath('userData'), 'desktop-updater'),
+    updaterDir: join(app.getPath('userData'), 'updater'),
   })
 }

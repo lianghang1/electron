@@ -29,7 +29,7 @@ export class RemoteOpener implements AppOpener {
       instanceId: instance.instanceId,
       appId: manifest.id,
       url: entry.url,
-      // remote 页面拿到的不是完整 desktop 桥，只有受控 jsapi
+      // remote 页面拿到的不是完整 壳桥，只有受控 jsapi
       preload: this.jsapiPreloadPath,
       partition: `persist:app-${manifest.id}`,
       allowedOrigins: entry.origins,

@@ -8,7 +8,7 @@ import { registerIpcDomain } from '@shell/bridge/handle'
 import { effectiveChrome, SHELL_APP_ID } from '@shell/shared'
 import { windowDomain } from '@shell/shared/ipc'
 import { app, BrowserWindow, WebContentsView } from 'electron'
-import { createDesktopMode, createKioskMode } from './modes'
+import { createKioskMode, createWindowedMode } from './modes'
 import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
 import { applyNavigationGuards, installSessionGuards, parsePopupFeatures, SECURE_WEB_PREFERENCES } from './security'
@@ -109,7 +109,7 @@ export class WindowSystem implements Startable, ViewHost {
 
   /** 工作台主窗：tab 条 + 左导航的产品主体 */
   createShellWindow(): BrowserWindow {
-    const mode = this.flavor.mode === 'kiosk' ? createKioskMode() : createDesktopMode()
+    const mode = this.flavor.mode === 'kiosk' ? createKioskMode() : createWindowedMode()
     // 浮层/视图体系需要 Windows 停止合成补偿
     const win = new BrowserWindow({
       ...shellBase,
@@ -464,7 +464,7 @@ export class WindowSystem implements Startable, ViewHost {
     applyNavigationGuards(webContents, spec.allowedOrigins, (url, features) =>
       this.openManagedPopup(spec, url, features))
     // HTML5 全屏跟随：WebContentsView 不响应页面全屏请求，必须显式放大。
-    // desktop 模式同步系统全屏——setFullScreen 是异步布局，等 enter-full-screen 后
+    // 窗口模式同步系统全屏——setFullScreen 是异步布局，等 enter-full-screen 后
     // 再铺 view（此时 getContentBounds 才是屏幕尺寸）；kiosk 恒为全屏，无 OS 状态
     // 切换，直接在整窗与工作区矩形间切换，绝不能调 setFullScreen(false) 破坏 kiosk
     webContents.on('enter-html-full-screen', () => {

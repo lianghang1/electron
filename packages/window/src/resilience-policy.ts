@@ -15,7 +15,7 @@ export const RESTART_POLL_MS = 60_000
 
 /**
  * 运行韧性策略（flavor 声明，未声明的项全部关闭）：
- * - crashReload：渲染进程崩溃自动重载，指数退避 + 滑动窗口熔断（desktop 形态；
+ * - crashReload：渲染进程崩溃自动重载，指数退避 + 滑动窗口熔断（窗口模式；
  *   kiosk 自带 relaunch 看门狗，两者互斥）
  * - autoLaunch：开机自启，仅打包态生效（dev 的登录项指向 electron.exe 无意义）
  * - exitGuard：拦截用户发起的窗口关闭（Alt+F4 等），app.quit() 退出流程放行

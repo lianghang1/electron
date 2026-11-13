@@ -1,6 +1,6 @@
 # 壳设施 IPC 域契约规范
 
-本目录定义 `window.desktop` 壳设施桥面契约（`defineIpcDomain` 单一真源：通道名、分组、三端类型全部自动推导）。
+本目录定义 `window.shell` 壳设施桥面契约（`defineIpcDomain` 单一真源：通道名、分组、三端类型全部自动推导）。
 主进程注册实现在 `apps/shell/electron/main/index.ts` 与 `packages/window`（经 `shellHandle` 统一注册）；
 `packages/kernel` settings 服务经注入的 ipc 接口注册（字面量与契约派生名同形）。
 新增或修改通道必须遵守以下约定。
@@ -56,7 +56,7 @@
 1. `domains/` 新建契约文件（`defineIpcDomain` 声明签名 + 业务注释）
 2. `index.ts` 的 `shellDomains` 并集加一行
 3. 主进程在组合根用 `shellHandle('domain:method', handler)` / `shellOn` 注册
-4. 渲染层即刻获得 `desktop().domain.method()` 类型化调用，零桥面改动
+4. 渲染层即刻获得 `shell().domain.method()` 类型化调用，零桥面改动
 
 以上约束由 guard 的 `ipc/*` 规则族强制执行：契约声明了但漏注册（`ipc/unregistered-channel`）、
 注册了契约外通道（`ipc/foreign-channel`）、契约外字面量 `ipcMain.handle/on`（`ipc/literal-registration`）。

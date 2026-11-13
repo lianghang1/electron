@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { desktop } from '@shell/bridge/client'
+import { shell } from '@shell/bridge/client'
 import { Button } from '@ui/components/ui'
 import { RefreshCw } from 'lucide-vue-next'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
@@ -24,7 +24,7 @@ async function updateNow() {
   phase.value = 'updating'
   updateError.value = ''
   try {
-    await desktop().shell.updateNow()
+    await shell().shell.updateNow()
   }
   catch (err) {
     phase.value = 'blocked'
@@ -33,13 +33,13 @@ async function updateNow() {
 }
 
 onMounted(() => {
-  offForce = desktop().onEvent('update.force-required', (payload) => {
+  offForce = shell().onEvent('update.force-required', (payload) => {
     if (isStringPayload(payload)) {
       requiredVersion.value = payload.requiredVersion
       phase.value = 'blocked'
     }
   })
-  offRestart = desktop().onEvent('update.restart-required', () => {
+  offRestart = shell().onEvent('update.restart-required', () => {
     phase.value = 'restart-ready'
   })
 })
@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
     <p v-if="updateError" class="text-ui-sm text-destructive">
       {{ updateError }}
     </p>
-    <Button v-if="phase === 'restart-ready'" @click="desktop().shell.relaunch()">
+    <Button v-if="phase === 'restart-ready'" @click="shell().shell.relaunch()">
       重启完成更新
     </Button>
     <Button v-else :disabled="phase === 'updating'" @click="updateNow()">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SettingField, SettingGroup, SettingsValues, ThemePreference } from '@shell/shared'
-import { desktop } from '@shell/bridge/client'
+import { shell } from '@shell/bridge/client'
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Switch } from '@ui/components/ui'
 import { onMounted, ref } from 'vue'
 import { applyAccent, applyTheme } from '../styles/appearance'
@@ -21,11 +21,11 @@ const busy = ref(false)
 const actionError = ref('')
 
 onMounted(async () => {
-  const snap = await desktop().settings.all() as { schema: SettingGroup[], values: SettingsValues }
+  const snap = await shell().settings.all() as { schema: SettingGroup[], values: SettingsValues }
   schema.value = snap.schema
   values.value = snap.values
   try {
-    apps.value = await desktop().apps.list() as AppSummary[]
+    apps.value = await shell().apps.list() as AppSummary[]
   }
   catch {
     apps.value = []
@@ -36,8 +36,8 @@ async function clearAppData(appId: string, scope: 'cache' | 'site-data'): Promis
   busy.value = true
   actionError.value = ''
   try {
-    if (scope === 'cache') { await desktop().sessions.clearCache(appId) }
-    else { await desktop().sessions.clearSiteData(appId) }
+    if (scope === 'cache') { await shell().sessions.clearCache(appId) }
+    else { await shell().sessions.clearSiteData(appId) }
   }
   catch (err) {
     actionError.value = err instanceof Error ? err.message : String(err)
@@ -61,7 +61,7 @@ async function setField(group: string, field: SettingField, value: unknown) {
   const theme = key === 'appearance.theme' ? asThemePreference(value) : undefined
   if (theme) { applyTheme(theme) }
   if (key === 'appearance.accent') { applyAccent(String(value)) }
-  await desktop().settings.set(key, value)
+  await shell().settings.set(key, value)
 }
 
 function visibleFields(group: SettingGroup) {

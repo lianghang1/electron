@@ -7,7 +7,7 @@
 | 字段 | 说明 |
 |---|---|
 | `id` / `name` | 形态标识与显示名（`id` 同时决定 `appId` 与可执行文件名） |
-| `mode` | `desktop`（托盘工作台）或 `kiosk`（全屏锁定 + 看门狗） |
+| `mode` | `windowed`（托盘工作台）或 `kiosk`（全屏锁定 + 看门狗） |
 | `chrome` | `platform`（工作台壳）/ `solo`（容器隐形，应用直出） |
 | `apps` / `defaultAppId` | 内置应用清单与启动直达目标 |
 | `branding.accent` | 主色，经启动参数同步注入 preload，首帧零闪烁 |
@@ -24,7 +24,7 @@
 
 | 形态 | 说明 |
 |---|---|
-| `local` | `resources/apps/<appId>/` 的构建产物，经 `app://` 协议加载；开发态可配 `devUrl` 直连 dev server。热更产物落 `userData/desktop-updater/apps/`，指针优先于安装预置 |
+| `local` | `resources/apps/<appId>/` 的构建产物，经 `app://` 协议加载；开发态可配 `devUrl` 直连 dev server。热更产物落 `userData/updater/apps/`，指针优先于安装预置 |
 | `remote` | 远端页面，按 `origins` 白名单与账本身份双重校验 |
 
 两种形态注入同一个 JSAPI 受控桥（零能力转发器），`app://`/`app://<id>` 响应带 ETag（`no-cache` + 304 校验），热更后旧缓存自动失效。
@@ -52,8 +52,8 @@
 | `platform/logs/` | 运行日志与 `logs/audit/` 审计日志 |
 | `platform/cookies/` | 各应用 cookie 快照 |
 | `platform/files/capture\|print\|signature/` | 业务产物（7 天保留期，由注册制清理器统一处理） |
-| `userData/desktop-updater/` | **唯一例外**：asar 热更指针与核心包，是引导器跨版本契约目录，不可改名 |
-| `userData/desktop-updater/apps/` | dist 热更产物与 `apps-current.json` 指针 |
+| `userData/updater/` | **唯一例外**：asar 热更指针与核心包，是引导器跨版本契约目录，不可改名 |
+| `userData/updater/apps/` | dist 热更产物与 `apps-current.json` 指针 |
 
 审计日志保留 30 天，业务产物 7 天；生产者只注册目录与保留期，清理器不认识业务名。
 

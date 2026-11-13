@@ -31,15 +31,15 @@ export function createKioskMode(): KioskMode {
   }
 }
 
-export interface DesktopMode {
-  readonly name: 'desktop'
+export interface WindowedMode {
+  readonly name: 'windowed'
   enter: (win: BrowserWindow) => void
   exit: (win: BrowserWindow) => void
 }
 
-export function createDesktopMode(): DesktopMode {
+export function createWindowedMode(): WindowedMode {
   return {
-    name: 'desktop',
+    name: 'windowed',
     enter() {},
     exit() {},
   }

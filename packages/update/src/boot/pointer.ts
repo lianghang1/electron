@@ -6,7 +6,7 @@ import { app } from 'electron'
  * 热更指针：文件名与引导层 apps/shell/electron/launcher/marks.mjs 是跨版本契约，
  * 改动必须两侧同步，并由 scripts/e2e/launcher-e2e.mjs 双向校验。
  */
-export const UPDATER_DIR_NAME = 'desktop-updater'
+export const UPDATER_DIR_NAME = 'updater'
 export const MARK_FILES = {
   pending: 'pending.json',
   current: 'current.json',

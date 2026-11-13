@@ -6,7 +6,7 @@ import { app } from 'electron'
 import { logLine } from './marks.mjs'
 import { bootSequence } from './sequence.mjs'
 
-const dir = path.join(app.getPath('userData'), 'desktop-updater')
+const dir = path.join(app.getPath('userData'), 'updater')
 // 引导器在 app.asar/out/main，真实代码包是 resources/app.core.asar（after-pack 改名而来）
 const builtinRoot = path.join(process.resourcesPath, 'app.core.asar')
 const builtinVersion = app.getVersion()

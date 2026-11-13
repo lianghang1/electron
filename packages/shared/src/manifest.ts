@@ -57,8 +57,8 @@ export type AppManifest = z.infer<typeof appManifestSchema>
 export const flavorManifestSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/),
   name: z.string().min(1),
-  /** 运行模式：desktop = 窗口可调；kiosk = 全屏锁定 + 看门狗 */
-  mode: z.enum(['desktop', 'kiosk']).default('desktop'),
+  /** 运行模式：windowed = 窗口可调；kiosk = 全屏锁定 + 看门狗 */
+  mode: z.enum(['windowed', 'kiosk']).default('windowed'),
   /** 启动直达的默认应用（须在 apps 清单内）；未配置 = 启动落空状态页 */
   defaultAppId: z.string().optional(),
   /**
@@ -94,7 +94,7 @@ export const flavorManifestSchema = z.object({
     .default({ urlOrigins: [] }),
   /**
    * 运行韧性（无人值守形态如 kiosk 才配；未声明即全关）：
-   * crashReload 仅 desktop 形态生效，kiosk 自带 relaunch 看门狗，两者互斥
+   * crashReload 仅窗口模式生效，kiosk 自带 relaunch 看门狗，两者互斥
    */
   resilience: z
     .object({

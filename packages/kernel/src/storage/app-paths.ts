@@ -6,7 +6,7 @@ import { app } from 'electron'
  * 收敛到 userData/platform/ 之下按职责分目录，与 userData 层的 Chromium 引擎自管内容
  * （Partitions / Cache / Crashpad 等，无重定向接口）隔离。
  *
- * 唯一例外：userData/desktop-updater/（asar 热更工作目录）保持原位——它是主进程与引导器
+ * 唯一例外：userData/updater/（asar 热更工作目录）保持原位——它是主进程与引导器
  * （launcher，只随整包更新落地、自身永不热更）的跨版本契约目录，改名会使已部署环境的旧
  * 引导器失去 pending/current 指针，热更链路断裂。
  */

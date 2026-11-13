@@ -100,7 +100,7 @@ resources/devices/                     驱动资产
 | 路径 | 证据 |
 |---|---|
 | pending 应用 + current 指针 | `hot core applied: 2.0.1 (core-2.0.1.asar)`，pending 清理，`current.json` 落盘 |
-| 热更版本真实生效 | `loaded hot core from ...desktop-updater/core-2.0.1.asar` + stdout `[hot-core] v2.0.1 marker` |
+| 热更版本真实生效 | `loaded hot core from ...updater/core-2.0.1.asar` + stdout `[hot-core] v2.0.1 marker` |
 | 优雅重启不清版本 | timeout SIGTERM → `graceful-exit.json` → 下次启动 `graceful relaunch, settle skipped`，继续跑热更版本 |
 | 崩溃式早死自动回滚 | first-run 留存 → 下次启动 `hot core rollback applied` → `loaded builtin core`，stdout 零次热更标记，热更包/指针全部清除 |
 

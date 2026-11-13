@@ -14,7 +14,7 @@ export interface ShellInfo {
   name: string
   version: string
   defaultAppId?: string
-  mode: 'desktop' | 'kiosk'
+  mode: 'windowed' | 'kiosk'
   /** 强制更新门禁快照（清单 minVersion 与当前版本比对的结果） */
   forceUpdate?: { blocked: boolean, requiredVersion?: string }
   capabilities: {

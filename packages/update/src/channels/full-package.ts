@@ -51,7 +51,7 @@ export class FullPackageChannel implements UpdateChannel {
       url: plan.downloadUrl,
       sha256: plan.payload?.sha256 ?? '',
     }
-    const staging = join(app.getPath('userData'), 'desktop-updater', this.options.installer.stagingName(artifact))
+    const staging = join(app.getPath('userData'), 'updater', this.options.installer.stagingName(artifact))
     this.pending = null
     try {
       assertAllowedUrl(plan.downloadUrl, this.options.allowedOrigins)

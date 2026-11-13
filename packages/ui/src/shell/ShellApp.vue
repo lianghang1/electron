@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { desktop } from '@shell/bridge/client'
+import { shell } from '@shell/bridge/client'
 import { Kbd, Separator } from '@ui/components/ui'
 import { Minus, Search, Settings, Square, X } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -10,8 +10,8 @@ import ShellTabBar from './ShellTabBar.vue'
 import { useShellTabs } from './use-shell-tabs'
 import { useViewDock } from './use-view-dock'
 
-const chrome = ref<'platform' | 'solo'>(desktop().shell.appearance().chrome)
-const mode = ref<'desktop' | 'kiosk'>('desktop')
+const chrome = ref<'platform' | 'solo'>(shell().shell.appearance().chrome)
+const mode = ref<'windowed' | 'kiosk'>('windowed')
 const forceRequiredVersion = ref<string | null>(null)
 
 const {
@@ -43,7 +43,7 @@ function isForceRequired(value: unknown): value is { requiredVersion: string } {
 const multiApp = computed(() => tabs.value.length >= 2)
 
 /** solo 档的窗口控制条：仅桌面形态需要，kiosk 全屏锁定无控制条 */
-const soloWindowControls = computed(() => chrome.value === 'solo' && mode.value === 'desktop')
+const soloWindowControls = computed(() => chrome.value === 'solo' && mode.value === 'windowed')
 
 /** 命令面板：⌘K / ＋ / 点击 omnibox 唤起 */
 const paletteOpen = ref(false)
@@ -54,7 +54,7 @@ const paletteItems = computed(() => appList.value.map(a => ({
 })))
 
 function openSettings() {
-  void desktop().overlay.open({ kind: 'settings' })
+  void shell().overlay.open({ kind: 'settings' })
 }
 
 function onGlobalKeydown(e: KeyboardEvent) {
@@ -87,12 +87,12 @@ function onGlobalKeydown(e: KeyboardEvent) {
 onMounted(async () => {
   window.addEventListener('keydown', onGlobalKeydown)
   offAppEvents = watchAppEvents()
-  offForceRequired = desktop().onEvent('update.force-required', (payload) => {
+  offForceRequired = shell().onEvent('update.force-required', (payload) => {
     if (isForceRequired(payload)) { forceRequiredVersion.value = payload.requiredVersion }
   })
   loadRecent()
   await loadApps()
-  const info = await desktop().shell.info()
+  const info = await shell().shell.info()
   mode.value = info.mode
   if (info.forceUpdate?.blocked) { forceRequiredVersion.value = info.forceUpdate.requiredVersion ?? '' }
   if (info.defaultAppId && appList.value.some(a => a.manifest.id === info.defaultAppId)) { void openApp(info.defaultAppId) }
@@ -152,13 +152,13 @@ onBeforeUnmount(() => {
             <Settings :size="15" />
           </button>
           <Separator orientation="vertical" class="mx-1 h-4" />
-          <button class="ctrl flex h-8 w-10 items-center justify-center rounded-md text-foreground" aria-label="最小化" @click="desktop().window.minimize()">
+          <button class="ctrl flex h-8 w-10 items-center justify-center rounded-md text-foreground" aria-label="最小化" @click="shell().window.minimize()">
             <Minus :size="14" />
           </button>
-          <button class="ctrl flex h-8 w-10 items-center justify-center rounded-md text-foreground" aria-label="最大化" @click="desktop().window.toggleMaximize()">
+          <button class="ctrl flex h-8 w-10 items-center justify-center rounded-md text-foreground" aria-label="最大化" @click="shell().window.toggleMaximize()">
             <Square :size="12" />
           </button>
-          <button class="ctrl ctrl-close flex h-8 w-10 items-center justify-center rounded-md text-foreground" aria-label="关闭" @click="desktop().window.close()">
+          <button class="ctrl ctrl-close flex h-8 w-10 items-center justify-center rounded-md text-foreground" aria-label="关闭" @click="shell().window.close()">
             <X :size="14" />
           </button>
         </div>
@@ -170,13 +170,13 @@ onBeforeUnmount(() => {
       >
         <span class="titlebar-drag h-full flex-1" />
         <div class="flex h-full items-center">
-          <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="最小化" @click="desktop().window.minimize()">
+          <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="最小化" @click="shell().window.minimize()">
             <Minus :size="13" />
           </button>
-          <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="最大化" @click="desktop().window.toggleMaximize()">
+          <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="最大化" @click="shell().window.toggleMaximize()">
             <Square :size="11" />
           </button>
-          <button class="ctrl ctrl-close flex h-full w-11 items-center justify-center text-foreground" aria-label="关闭" @click="desktop().window.close()">
+          <button class="ctrl ctrl-close flex h-full w-11 items-center justify-center text-foreground" aria-label="关闭" @click="shell().window.close()">
             <X :size="13" />
           </button>
         </div>

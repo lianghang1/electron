@@ -72,7 +72,7 @@ core-<版本>.zip
 
 ## 指针与判活
 
-工作目录 `userData/desktop-updater/`（引导器与主进程的跨版本契约目录，不可改名）：
+工作目录 `userData/updater/`（引导器与主进程的跨版本契约目录，不可改名）：
 
 | 标记 | 作用 |
 |---|---|
@@ -89,8 +89,8 @@ core-<版本>.zip
 
 | 通道 | 生效方式 | 落地位置 | 平台差异 |
 |---|---|---|---|
-| `dist-hot` | 免重启 | `userData/desktop-updater/apps/<appId>-<v>/` | 无，原子换名 + 指针 |
-| `asar-hot` | 重启生效 | `userData/desktop-updater/core-<v>.asar` | 无，指针切换 |
+| `dist-hot` | 免重启 | `userData/updater/apps/<appId>-<v>/` | 无，原子换名 + 指针 |
+| `asar-hot` | 重启生效 | `userData/updater/core-<v>.asar` | 无，指针切换 |
 | `full-package` | 退出交接 | 暂存后拉起安装器 | `Win32Installer` / `DarwinInstaller` / `LinuxInstaller` 查表注入 |
 
 `UpdateCenter` 一轮巡检最多连续应用 8 个免重启更新；命中需重启的通道后立即停下，等下一次启动生效。状态快照经 `update.state-changed` 推送。

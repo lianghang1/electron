@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DownloadTask } from '@shell/shared'
-import { desktop } from '@shell/bridge/client'
+import { shell } from '@shell/bridge/client'
 import { Badge, Button } from '@ui/components/ui'
 import { Check, Download, FolderOpen, X } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -11,8 +11,8 @@ let unsubscribe: (() => void) | undefined
 const visible = computed(() => tasks.value.length > 0)
 
 onMounted(async () => {
-  tasks.value = await desktop().downloads.list() as DownloadTask[]
-  unsubscribe = desktop().onEvent('download.tasks-changed', (payload) => {
+  tasks.value = await shell().downloads.list() as DownloadTask[]
+  unsubscribe = shell().onEvent('download.tasks-changed', (payload) => {
     const data = payload as { tasks?: DownloadTask[] } | null
     if (data && Array.isArray(data.tasks)) { tasks.value = data.tasks }
   })
@@ -84,15 +84,15 @@ async function act(fn: () => Promise<unknown>): Promise<void> {
             v-if="!isTerminal(task)"
             size="xs"
             variant="ghost"
-            @click="act(() => desktop().downloads.cancel(task.id))"
+            @click="act(() => shell().downloads.cancel(task.id))"
           >
             取消
           </Button>
           <template v-if="task.status === 'completed'">
-            <Button size="xs" variant="ghost" @click="act(() => desktop().downloads.open(task.id))">
+            <Button size="xs" variant="ghost" @click="act(() => shell().downloads.open(task.id))">
               <Check :size="13" /> 打开
             </Button>
-            <Button size="xs" variant="ghost" @click="act(() => desktop().downloads.reveal(task.id))">
+            <Button size="xs" variant="ghost" @click="act(() => shell().downloads.reveal(task.id))">
               <FolderOpen :size="13" /> 定位
             </Button>
           </template>
@@ -101,7 +101,7 @@ async function act(fn: () => Promise<unknown>): Promise<void> {
             size="xs"
             variant="ghost"
             aria-label="移除下载记录"
-            @click="act(() => desktop().downloads.dismiss(task.id))"
+            @click="act(() => shell().downloads.dismiss(task.id))"
           >
             <X :size="13" />
           </Button>

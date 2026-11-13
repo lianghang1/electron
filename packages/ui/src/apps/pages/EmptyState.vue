@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { desktop } from '@shell/bridge/client'
+import { shell } from '@shell/bridge/client'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 const version = ref('')
@@ -16,7 +16,7 @@ const date = computed(() => {
 })
 
 onMounted(async () => {
-  version.value = (await desktop().shell.info()).version
+  version.value = (await shell().shell.info()).version
   timer = setInterval(() => (now.value = new Date()), 1000)
 })
 onBeforeUnmount(() => clearInterval(timer))

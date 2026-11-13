@@ -1,6 +1,6 @@
 import type { ScannerConfig, ScannerDeviceConfig, ScannerDeviceOverrides, ScannerLogFn, ScannerOverrides, ScannerSetInput, ScannerStatus, ScanResult } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
-import { DesktopError } from '@shell/shared'
+import { PlatformError } from '@shell/shared'
 import { webContents } from 'electron'
 import { HID_SERVICE_URL, HidScanner } from './hid-scanner'
 import { KeyboardScanner } from './keyboard-scanner'
@@ -162,7 +162,7 @@ export class ScanService {
   setConfig(input: ScannerSetInput): ScannerConfig {
     const profile = this.config.devices.find(d => d.id === input.deviceId)
     if (!profile) {
-      throw new DesktopError('VALIDATION_FAILED', `扫码枪档案不存在: ${input.deviceId}`)
+      throw new PlatformError('VALIDATION_FAILED', `扫码枪档案不存在: ${input.deviceId}`)
     }
     applyOverrides(profile, input.overrides ?? {})
     this.config.enabled = input.enabled !== false

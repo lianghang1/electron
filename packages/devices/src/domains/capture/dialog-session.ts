@@ -2,7 +2,7 @@ import type { CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSess
 import type { WebContents } from 'electron'
 import type { CaptureSystem } from './index'
 import type { CaptureOverlayHost } from './overlay-host'
-import { DesktopError } from '@shell/shared'
+import { PlatformError } from '@shell/shared'
 import { captureError } from './errors'
 
 /** 确认回传后的浮层宽限收场时长（ms）：发起页拿到结果并渲染后再关浮层 */
@@ -209,7 +209,7 @@ export class CaptureDialogSessionService {
   /** 浮层内操作通道的安全关卡：仅拍摄窗自身可调 */
   private assertCaptureWindow(sender: WebContents): void {
     if (this.deps.overlay.getCaptureWindow()?.webContents !== sender) {
-      throw new DesktopError('PERMISSION_DENIED', 'This channel is capture-dialog-only')
+      throw new PlatformError('PERMISSION_DENIED', 'This channel is capture-dialog-only')
     }
   }
 }

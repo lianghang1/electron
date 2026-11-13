@@ -56,12 +56,12 @@ export type ShellSendIpc = UnionToIntersection<ShellSendPart<ShellDomainValue>>
 /** preload 订阅通道与回调参数表（push） */
 export type ShellPushIpc = UnionToIntersection<ShellPushPart<ShellDomainValue>>
 
-/** 非根域 → 分组 API；根域（system）方法提升到 window.desktop 根（外层条件保证逐成员分发） */
+/** 非根域 → 分组 API；根域（system）方法提升到 window.桥面根（外层条件保证逐成员分发） */
 type DomainApiPart<V> = V extends ShellDomainValue
   ? V['root'] extends true ? ShellDomainApi<V>[V['domain']] : ShellDomainApi<V>
   : never
 
-/** window.desktop 的壳设施桥面类型（preload 生成面 + 设备域两个特殊方法 + 同步外观快照） */
+/** window.shell 的壳设施桥面类型（preload 生成面 + 设备域两个特殊方法 + 同步外观快照） */
 export type ShellBridge = UnionToIntersection<DomainApiPart<ShellDomainValue>> & {
   /** 设备域通用调用端：invoke('print.submitJob', input)（zod 校验 + 权限闸门在主进程路由层） */
   invoke: (method: string, input: unknown) => Promise<unknown>

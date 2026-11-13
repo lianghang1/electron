@@ -1,7 +1,7 @@
 {
   "id": "update-e2e",
   "name": "更新链路端到端",
-  "mode": "desktop",
+  "mode": "windowed",
   "chrome": "platform",
   "apps": [
     {
