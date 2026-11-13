@@ -48,6 +48,13 @@ export const SETTINGS_SCHEMA: SettingGroup[] = [
         options: [{ value: 'system', label: '跟随系统' }, { value: 'light', label: '浅色' }, { value: 'dark', label: '深色' }],
         description: '切换后立即生效，无需重启',
       },
+      {
+        key: 'accent',
+        label: '强调色',
+        type: 'string',
+        default: '',
+        description: '留空跟随部署品牌色；支持任意 Hex（如 #4f46e5 靛蓝、#7c3aed 紫罗兰），立即生效',
+      },
     ],
   },
 ]

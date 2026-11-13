@@ -122,6 +122,8 @@ interface AssemblyContext {
   demoMode: DemoModeState
   /** 现场默认打印参数：配置中心写入时同步，打印系统提交时读取 */
   printDefaults: { options: Record<string, unknown> }
+  /** 现场追加的打印 URL 白名单：配置中心 urlOrigins 覆盖项，打印系统每次提交时读取 */
+  printOrigins: { site: readonly string[] }
   getParent?: () => BrowserWindow | undefined
   captureOverlay?: CaptureOverlayHost
 }
@@ -178,12 +180,14 @@ const DEFAULT_SET_CONFIG: DomainSpec['toSetConfigInput'] = ({ deviceProfileId, p
 export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
   print: {
     config: {
-      overridableKeys: ['paper', 'channel', 'preview', 'dryRun', 'silent', 'copies'],
-      profiles: [{ id: 'print-default', paper: 'A4', channel: 'auto', preview: false, dryRun: false, silent: true, copies: 1 }],
+      overridableKeys: ['paper', 'channel', 'preview', 'dryRun', 'silent', 'copies', 'urlOrigins'],
+      profiles: [{ id: 'print-default', paper: 'A4', channel: 'auto', preview: false, dryRun: false, silent: true, copies: 1, urlOrigins: [] }],
     },
     channels: PRINT_CHANNELS,
     syncDefaults: (ctx, current) => {
-      ctx.printDefaults.options = Object.fromEntries(Object.entries(current).filter(([key]) => key !== 'id'))
+      ctx.printDefaults.options = Object.fromEntries(Object.entries(current).filter(([key]) => key !== 'id' && key !== 'urlOrigins'))
+      const site = current.urlOrigins
+      ctx.printOrigins.site = Array.isArray(site) ? site.map(String) : []
     },
     assemble: (ctx) => {
       const system = createPrintSystem({
@@ -193,6 +197,7 @@ export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
         host: ctx.host,
         getParent: ctx.getParent,
         allowedOrigins: ctx.allowedOrigins,
+        siteOrigins: () => ctx.printOrigins.site,
         logger: ctx.logger.scope('devices:print'),
         defaultOptions: () => ctx.printDefaults.options,
       })
@@ -308,6 +313,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
   const host = new DeviceHost(options.logger, options.hostEntryPath)
   const demoMode: DemoModeState = { enabled: options.diagnostics }
   const printDefaults = { options: {} as Record<string, unknown> }
+  const printOrigins = { site: [] as readonly string[] }
   const sumatraFile = selectSumatraPdfFile(process.arch, rel => existsSync(options.driver.resolve(rel)))
   const ctx: AssemblyContext = {
     logger: options.logger,
@@ -320,6 +326,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     allowedOrigins: options.allowedOrigins,
     demoMode,
     printDefaults,
+    printOrigins,
     getParent: options.getParent,
     captureOverlay: options.captureOverlay,
   }

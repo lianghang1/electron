@@ -35,6 +35,7 @@ export class WindowSystem implements Startable, ViewHost {
   private readonly flavor: FlavorManifest
   private readonly rendererDir: string
   private readonly initialTheme: 'light' | 'dark' | 'system'
+  private readonly initialAccent: string
   /** 通用浮层宿主：新增浮层 = 注册一条策略，本类零分发 */
   readonly overlays: OverlayHost<OverlayKind>
 
@@ -46,10 +47,13 @@ export class WindowSystem implements Startable, ViewHost {
     rendererDir: string,
     /** 启动外观：组合根从 flavor + 持久化设置读出，经启动参数同步注入渲染层 */
     initialTheme: 'light' | 'dark' | 'system' = 'system',
+    /** 启动主色：用户设置覆盖（appearance.accent）优先，缺省跟随 flavor 品牌色 */
+    initialAccent?: string,
   ) {
     this.flavor = flavor
     this.rendererDir = rendererDir
     this.initialTheme = initialTheme
+    this.initialAccent = initialAccent || flavor.branding.accent
     this.overlays = new OverlayHost<OverlayKind>((policy, params) => this.createOverlay(policy, params))
     for (const policy of DEFAULT_OVERLAY_POLICIES) {
       this.overlays.register({ ...policy, parent: () => this.shellWindow })
@@ -112,7 +116,7 @@ export class WindowSystem implements Startable, ViewHost {
         preload: join(this.rendererDir, '../preload/index.cjs'),
         // 启动外观：同步随 preload 抵达，渲染层挂载前即可应用（零闪烁；不走异步 IPC）
         additionalArguments: [
-          `--shell-accent=${this.flavor.branding.accent}`,
+          `--shell-accent=${this.initialAccent}`,
           `--shell-theme=${this.initialTheme}`,
         ],
       },
@@ -279,7 +283,7 @@ export class WindowSystem implements Startable, ViewHost {
         partition: 'persist:overlay-window',
         backgroundThrottling: false,
         additionalArguments: [
-          `--shell-accent=${this.flavor.branding.accent}`,
+          `--shell-accent=${this.initialAccent}`,
           `--shell-theme=${this.initialTheme}`,
           `--overlay-kind=${policy.kind}`,
         ],

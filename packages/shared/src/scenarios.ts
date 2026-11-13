@@ -171,7 +171,7 @@ export const DIAGNOSTIC_SCENARIOS: Readonly<Record<DeviceCapabilityId, ScenarioS
     ],
     fields: [
       { key: 'filePath', label: '文件绝对路径', kind: 'file', required: true, kinds: ['image', 'pdf'], placeholder: '选择本地图片或 PDF', hint: '打印前会复制到任务归档目录，源文件不会被改动' },
-      { key: 'fileUrl', label: 'PDF 链接', kind: 'text', required: true, kinds: ['pdfurl'], placeholder: 'https://…/report.pdf', hint: '主进程下载后按 PDF 直通打印；origin 需在 flavor.print.urlOrigins 白名单，验机形态默认放行公网（内网始终拦截）' },
+      { key: 'fileUrl', label: 'PDF 链接', kind: 'text', required: true, kinds: ['pdfurl'], placeholder: 'https://…/report.pdf', hint: '主进程下载后按 PDF 直通打印；origin 需在白名单（flavor.print.urlOrigins 或「设备配置」现场追加）。* 放行公网，内网主机需显式列出' },
       { key: 'fileType', label: '内容类型提示', kind: 'select', kinds: ['pdfurl'], options: [{ value: '', label: '自动识别' }, { value: 'pdf', label: 'PDF' }, { value: 'image', label: '图片' }] },
       { key: 'htmlData', label: 'HTML 内容', kind: 'textarea', required: true, kinds: ['html'], default: TEST_PAGE_HTML },
       { key: 'printerId', label: '打印机', kind: 'select', source: 'printers', group: '输出选项', options: [{ value: '', label: '系统默认打印机' }] },

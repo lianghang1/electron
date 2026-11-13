@@ -10,11 +10,26 @@
       "name": "演示应用",
       "version": "1.0.0",
       "type": "internal",
-      "entry": { "kind": "remote", "url": "https://example.com", "origins": ["https://example.com"] },
+      "entry": {
+        "kind": "remote",
+        "url": "https://example.com",
+        "origins": [
+          "https://example.com"
+        ]
+      },
       "devices": [],
       "permissions": []
     }
   ],
-  "branding": { "accent": "#3b82f6" },
-  "update": { "allowedOrigins": [] }
+  "branding": {
+    "accent": "#4f46e5"
+  },
+  "update": {
+    "allowedOrigins": []
+  },
+  "print": {
+    "urlOrigins": [
+      "*"
+    ]
+  }
 }

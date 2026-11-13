@@ -53,34 +53,43 @@ export function isNewer(candidate: string, current: string): boolean {
 /**
  * 源站匹配：只认协议+主机+端口的精确相等，或显式的 `*.example.com` 子域模式。
  * 不做裸字符串 startsWith——`https://a.com` 不得放行 `https://a.com.evil.com`，
- * 空前缀不得变成全放行。
+ * 空前缀不得变成全放行。返回命中的模式（无命中返回 undefined），供调用方区分
+ * 「通配放行」与「显式指定主机」：显式条目视为运维意图，可放行内网主机；通配不行。
  */
-export function matchesOrigin(url: string, allowed: readonly string[]): boolean {
-  if (allowed.length === 0) { return false }
+export function matchOriginPattern(url: string, allowed: readonly string[]): string | undefined {
+  if (allowed.length === 0) { return undefined }
   let target: URL
   try {
     target = new URL(url)
   }
   catch {
-    return false
+    return undefined
   }
-  return allowed.some((pattern) => {
-    if (pattern === '*') { return true }
+  for (const pattern of allowed) {
+    if (pattern === '*') { return pattern }
     if (pattern.startsWith('*.')) {
       const suffix = pattern.slice(2).toLowerCase()
       const host = target.hostname.toLowerCase()
-      return host === suffix || host.endsWith(`.${suffix}`)
+      if (host === suffix || host.endsWith(`.${suffix}`)) { return pattern }
+      continue
     }
     try {
       const p = new URL(pattern)
-      return p.protocol === target.protocol
+      if (p.protocol === target.protocol
         && p.hostname.toLowerCase() === target.hostname.toLowerCase()
-        && p.port === target.port
+        && p.port === target.port) {
+        return pattern
+      }
     }
     catch {
-      return false
+      continue
     }
-  })
+  }
+  return undefined
+}
+
+export function matchesOrigin(url: string, allowed: readonly string[]): boolean {
+  return matchOriginPattern(url, allowed) !== undefined
 }
 
 /** 校验 URL 落在源站白名单内，否则抛（清单/下载地址统一经此闸门）。 */

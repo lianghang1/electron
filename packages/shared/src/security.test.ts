@@ -8,6 +8,7 @@ import {
   isPrivateHost,
   isSafeSegment,
   matchesOrigin,
+  matchOriginPattern,
 } from './security'
 
 describe('compareVersions（语义版本，非字典序）', () => {
@@ -72,6 +73,17 @@ describe('matchesOrigin（源站边界）', () => {
   it('非法 URL 与非法模式不抛异常，判定为拒绝', () => {
     expect(matchesOrigin('::::', allowed)).toBe(false)
     expect(matchesOrigin('https://a.com', ['not a url'])).toBe(false)
+  })
+})
+
+describe('matchOriginPattern（命中模式区分通配与显式条目）', () => {
+  it('返回命中的模式本身；无命中返回 undefined', () => {
+    expect(matchOriginPattern('https://a.com/x', ['https://a.com'])).toBe('https://a.com')
+    expect(matchOriginPattern('https://b.com/x', ['https://a.com'])).toBeUndefined()
+    expect(matchOriginPattern('https://b.com/x', ['*'])).toBe('*')
+    expect(matchOriginPattern('https://sub.a.com/x', ['*.a.com'])).toBe('*.a.com')
+    expect(matchOriginPattern('::::', ['*'])).toBeUndefined()
+    expect(matchOriginPattern('https://a.com', [])).toBeUndefined()
   })
 })
 

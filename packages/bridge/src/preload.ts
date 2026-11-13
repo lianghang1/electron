@@ -21,7 +21,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'system' } {
   const pick = (prefix: string, fallback: string) =>
     process.argv.find(a => a.startsWith(prefix))?.slice(prefix.length) ?? fallback
-  const accent = pick('--shell-accent=', '#3b82f6')
+  const accent = pick('--shell-accent=', '#4f46e5')
   const theme = pick('--shell-theme=', 'system')
   return {
     accent,

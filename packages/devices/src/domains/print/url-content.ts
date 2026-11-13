@@ -3,7 +3,7 @@ import type { UrlFileType } from './url-type'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { assertFetchableUrl, isPrivateHost } from '@shell/shared'
+import { assertFetchableUrl, isPrivateHost, matchOriginPattern } from '@shell/shared'
 import { net } from 'electron'
 import { printError } from './errors'
 import { withPrintDeadline } from './operation-deadline'
@@ -25,8 +25,9 @@ export interface DownloadedUrl {
 /**
  * 下载 URL 负载到归档目录（print/<jobId>.<ext>），复用任务归档生命周期。
  * 类型判定链：fileType 显式提示 > Content-Type > URL 扩展名 > PDF 兜底（记 warn）。
- * 源站白名单由组合根注入（flavor.print.urlOrigins，独立于更新链路）；缺省拒绝一切远程下载，
- * 杜绝渲染层借打印通道让主进程访问内网/元数据服务（SSRF）。
+ * 源站白名单 = flavor 基线 ∪ 设备配置现场追加（运行期可在诊断台「设备配置」增删）；
+ * 缺省拒绝一切远程下载，杜绝渲染层借打印通道让主进程访问元数据服务（SSRF）。
+ * 内网策略：`*` 只放行公网；内网主机必须在白名单中显式列出（显式条目即运维意图）。
  */
 export async function downloadUrlContent(
   payload: UrlPayload,
@@ -42,8 +43,14 @@ export async function downloadUrlContent(
   catch (err) {
     throw printError('VALIDATION_FAILED', `URL 未通过下载校验: ${String(err)}`)
   }
-  if (isPrivateHost(target.hostname)) {
-    throw printError('VALIDATION_FAILED', `URL 指向内网地址，拒绝下载: ${target.hostname}`)
+  const matched = matchOriginPattern(target.href, allowedOrigins)
+  if (isPrivateHost(target.hostname) && matched !== undefined) {
+    // `*` 通配只代表放行公网；内网主机必须显式列出才放行（防渲染进程借道探测内网）
+    if (matched === '*') {
+      throw printError('VALIDATION_FAILED', `URL 指向内网地址，公网通配不放行；如需访问请把 ${target.origin} 显式加入白名单`)
+    }
+    // 显式条目命中内网主机：视为运维意图，放行（防回环探测仍挡 localhost 元数据之外的误配由使用者自担）
+    log('warn', 'URL 指向内网主机，因白名单显式列出而放行', { origin: target.origin })
   }
 
   const res = await withPrintDeadline(

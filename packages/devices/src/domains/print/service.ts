@@ -35,7 +35,10 @@ export class PrintService {
   /** 可选日志注入（PII 域外的打印数据可记录） */
   private readonly logger: PrintLogFn
   private readonly archiveDir: string
+  /** flavor 白名单基线（打包期定）；与现场追加在每次提交时合并生效 */
   private readonly allowedOrigins: readonly string[]
+  /** 设备配置现场追加的源站（配置中心写入后即时生效） */
+  private readonly siteOrigins: () => readonly string[]
 
   /** 装配注入的依赖与现场数据（文件路径/打印机），设备层不自行寻址 */
   constructor(
@@ -50,12 +53,15 @@ export class PrintService {
       sumatraPath?: string
       /** 打印 URL 负载允许的源站；空 = 拒绝远程下载 */
       allowedOrigins?: readonly string[]
+      /** 现场追加源站的读取器（配置中心 urlOrigins 覆盖项） */
+      siteOrigins?: () => readonly string[]
       logger?: PrintLogFn
     },
   ) {
     this.logger = deps.logger ?? (() => {})
     this.archiveDir = deps.archiveDir
     this.allowedOrigins = deps.allowedOrigins ?? []
+    this.siteOrigins = deps.siteOrigins ?? (() => [])
     this.jobs = new JobStore(deps.jobsFile, deps.archiveDir)
     this.channels = createPrintChannelRegistry()
     for (const channel of buildPrintChannels({
@@ -215,6 +221,12 @@ export class PrintService {
     }
   }
 
+  /** 生效白名单：flavor 基线 ∪ 现场追加（含 '*' 任一处即视为通配公网） */
+  private get effectiveOrigins(): readonly string[] {
+    const merged = [...new Set([...this.allowedOrigins, ...this.siteOrigins()])]
+    return merged
+  }
+
   /** 内容归一委托给策略表：本类零 switch，负载形态差异收敛在 prepare-print-content */
   private preparePrintContent(req: PrintRequest, paper: PaperSpec | undefined, jobId: string): Promise<PreparedContent> | PreparedContent {
     return preparePrintContent(req.payload, {
@@ -222,7 +234,7 @@ export class PrintService {
       jobId,
       paper,
       log: this.log.bind(this),
-      allowedOrigins: this.allowedOrigins,
+      allowedOrigins: this.effectiveOrigins,
     })
   }
 

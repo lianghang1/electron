@@ -3,10 +3,12 @@ import type { SettingField, SettingGroup, SettingsValues, ThemePreference } from
 import { desktop } from '@shell/bridge/client'
 import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Input, Switch } from '@ui/components/ui'
 import { onMounted, ref } from 'vue'
-import { applyTheme } from '../styles/appearance'
+import { applyAccent, applyTheme } from '../styles/appearance'
 
 const props = defineProps<{ open: boolean, isKiosk?: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
+
+const ACCENT_RE = /^#[0-9a-f]{6}$/i
 
 interface AppSummary {
   manifest: { id: string, name: string }
@@ -58,6 +60,7 @@ async function setField(group: string, field: SettingField, value: unknown) {
   const key = `${group}.${field.key}`
   const theme = key === 'appearance.theme' ? asThemePreference(value) : undefined
   if (theme) { applyTheme(theme) }
+  if (key === 'appearance.accent') { applyAccent(String(value)) }
   await desktop().settings.set(key, value)
 }
 

@@ -77,9 +77,9 @@ export const flavorManifestSchema = z.object({
     .object({
       icon: z.string().optional(),
       /** 启动页主色（与 dt token 同源的语义别名） */
-      accent: z.string().default('#2f81f7'),
+      accent: z.string().default('#4f46e5'),
     })
-    .default({ accent: '#2f81f7' }),
+    .default({ accent: '#4f46e5' }),
   update: z
     .object({
       /** 更新清单地址；空 = 禁用远程更新 */

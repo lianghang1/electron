@@ -132,7 +132,12 @@ async function main(context: BootContext): Promise<void> {
   const version = () => effectiveVersion(builtinVersion)
 
   const theme = (settingsSnapshot().values.appearance?.theme as 'light' | 'dark' | 'system' | undefined) ?? 'system'
-  const windows = new WindowSystem(flavor, rendererDir, theme)
+  // 主色：用户设置覆盖（appearance.accent，合法 Hex）优先，缺省跟随 flavor 品牌色
+  const accentSetting = typeof settingsSnapshot().values.appearance?.accent === 'string'
+    ? settingsSnapshot().values.appearance.accent as string
+    : ''
+  const accent = /^#[0-9a-f]{6}$/i.test(accentSetting) ? accentSetting : flavor.branding.accent
+  const windows = new WindowSystem(flavor, rendererDir, theme, accent)
   const callers = new CallerRegistry()
   const kernel = createKernel(flavor, [windows])
 

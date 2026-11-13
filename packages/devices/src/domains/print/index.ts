@@ -40,6 +40,8 @@ export interface PrintSystemOptions {
   host?: DeviceHost
   /** 打印 URL 负载允许的源站；空 = 拒绝远程下载 */
   allowedOrigins?: readonly string[]
+  /** 现场追加源站读取器（设备配置 urlOrigins 覆盖项，每次提交时读取） */
+  siteOrigins?: () => readonly string[]
   /** 结构化日志（模块内不直接 console） */
   logger?: Logger
   /** 现场默认打印参数：请求未显式给出的字段由配置中心补齐 */
@@ -58,6 +60,7 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
     jobsFile: options.jobsFile,
     sumatraPath: options.sumatraPath,
     allowedOrigins: options.allowedOrigins ?? [],
+    siteOrigins: options.siteOrigins,
     logger: log,
   })
 

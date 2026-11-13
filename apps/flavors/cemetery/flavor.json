@@ -3,6 +3,15 @@
   "name": "陵园服务工作台",
   "mode": "desktop",
   "apps": [],
-  "branding": { "accent": "#3b82f6" },
-  "update": { "allowedOrigins": [] }
+  "branding": {
+    "accent": "#4f46e5"
+  },
+  "update": {
+    "allowedOrigins": []
+  },
+  "print": {
+    "urlOrigins": [
+      "*"
+    ]
+  }
 }

@@ -55,9 +55,14 @@
     }
   ],
   "branding": {
-    "accent": "#0d9488"
+    "accent": "#4f46e5"
   },
   "update": {
     "allowedOrigins": []
+  },
+  "print": {
+    "urlOrigins": [
+      "*"
+    ]
   }
 }

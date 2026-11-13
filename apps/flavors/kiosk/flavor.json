@@ -3,6 +3,15 @@
   "name": "殡葬自助终端",
   "mode": "kiosk",
   "apps": [],
-  "branding": { "accent": "#3b82f6" },
-  "update": { "allowedOrigins": [] }
+  "branding": {
+    "accent": "#4f46e5"
+  },
+  "update": {
+    "allowedOrigins": []
+  },
+  "print": {
+    "urlOrigins": [
+      "*"
+    ]
+  }
 }

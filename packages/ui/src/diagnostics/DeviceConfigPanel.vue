@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { desktop } from '@shell/bridge/client'
-import { Badge, Button, Card, CardContent, CardHeader, Input, Label, Separator, Switch } from '@ui/components/ui'
+import { Badge, Button, Card, CardContent, CardHeader, Input, Label, Separator, Switch, Textarea } from '@ui/components/ui'
 import { Play, RotateCcw, Save, Settings2, TriangleAlert } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
@@ -44,6 +44,16 @@ function display(value: unknown): string {
   return String(value)
 }
 
+/** 打印 URL 白名单出厂数组 → 单行展示；空数组显示说明文字 */
+function displayOrigins(value: unknown): string {
+  return Array.isArray(value) && value.length ? value.join('  ') : '（未放行远程下载）'
+}
+
+/** 出厂值提示行：打印 URL 白名单走列表展示，其余按类型原样显示 */
+function factoryHint(profile: SectionProfile, key: string): string {
+  return key === 'urlOrigins' ? displayOrigins(profile.factory[key]) : (display(profile.factory[key]) || '（空）')
+}
+
 /** 编辑框文本按出厂值类型还原：数字 / 布尔 / JSON 结构 / 字符串。 */
 function parseValue(text: string, factory: unknown): unknown {
   if (typeof factory === 'number') { return Number(text) }
@@ -60,7 +70,10 @@ function seed(list: ConfigSection[]): void {
   for (const section of list) {
     for (const profile of section.profiles) {
       for (const key of section.overridableKeys) {
-        next[draftKey(section, profile, key)] = display(profile.current[key])
+        const current = profile.current[key]
+        next[draftKey(section, profile, key)] = key === 'urlOrigins' && Array.isArray(current)
+          ? current.map(String).join('\n')
+          : display(current)
       }
     }
   }
@@ -98,6 +111,13 @@ async function save(section: ConfigSection, profile: SectionProfile): Promise<vo
     const patch: Record<string, unknown> = {}
     for (const key of section.overridableKeys) {
       const text = drafts.value[draftKey(section, profile, key)] ?? ''
+      if (key === 'urlOrigins') {
+        // 打印 URL 白名单按行编辑：去空行/去重后与出厂值比较，无差异不写覆盖
+        const lines = [...new Set(text.split('\n').map(s => s.trim()).filter(Boolean))]
+        const factoryLines = Array.isArray(profile.factory[key]) ? (profile.factory[key] as unknown[]).map(String) : []
+        if (JSON.stringify(lines) !== JSON.stringify(factoryLines)) { patch[key] = lines }
+        continue
+      }
       if (text !== display(profile.factory[key])) {
         patch[key] = parseValue(text, profile.factory[key])
       }
@@ -236,18 +256,30 @@ onBeforeUnmount(() => {
               </Button>
             </div>
             <Separator v-if="section.overridableKeys.length" />
-            <div v-for="key in section.overridableKeys" :key="key" class="flex flex-col gap-1">
+            <div v-for="fieldKey in section.overridableKeys" :key="fieldKey" class="flex flex-col gap-1">
               <div class="flex items-center gap-2">
                 <div class="flex w-40 shrink-0 items-center gap-1">
-                  <Label class="truncate font-mono text-ui-xs">{{ key }}</Label>
-                  <Badge v-if="profile.overridden.includes(key)" variant="outline" class="shrink-0">
+                  <Label class="truncate font-mono text-ui-xs">{{ fieldKey }}</Label>
+                  <Badge v-if="profile.overridden.includes(fieldKey)" variant="outline" class="shrink-0">
                     改
                   </Badge>
                 </div>
-                <Input v-model="drafts[draftKey(section, profile, key)]" class="min-w-0 flex-1 font-mono text-ui-xs" />
+                <Textarea
+                  v-if="fieldKey === 'urlOrigins'"
+                  :model-value="drafts[draftKey(section, profile, fieldKey)]"
+                  :rows="3"
+                  class="min-w-0 flex-1 font-mono text-ui-xs"
+                  placeholder="https://print.example.com（一行一条）&#10;* 放行公网；内网主机需显式列出"
+                  @update:model-value="drafts[draftKey(section, profile, fieldKey)] = $event"
+                />
+                <Input
+                  v-else
+                  v-model="drafts[draftKey(section, profile, fieldKey)]"
+                  class="min-w-0 flex-1 font-mono text-ui-xs"
+                />
               </div>
               <p class="truncate pl-1 font-mono text-ui-xs text-foreground-subtle">
-                出厂 {{ display(profile.factory[key]) || '（空）' }}
+                出厂 {{ factoryHint(profile, fieldKey) }}
               </p>
             </div>
           </div>
