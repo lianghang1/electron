@@ -72,7 +72,9 @@
       // 有意不做「挂载超时兜底撤层」：应用挂载失败时宁可停在 logo（运维能看出异常），
       // 也不露出无提示的破碎白屏。
       const splash = document.getElementById('splash')
-      const shell = document.querySelector('.startup-logo-shell')
+      // 局部名不能叫 shell：桥面经 contextBridge 暴露的 window.shell 是不可配置全局属性，
+      // 全局词法声明与之同名会在整段脚本解析期抛 SyntaxError，启动层两门闩全部失效
+      const logoShell = document.querySelector('.startup-logo-shell')
       const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
       // logo 最短驻留：即使动画与挂载都已就绪，也要保证弹出段+驻留在屏幕上完整呈现
       const MIN_SPLASH_MS = 600
@@ -98,18 +100,18 @@
       const beginIntro = () => {
         if (introStartedAt) { tryFinish(); return }
         introStartedAt = Date.now()
-        if (reduceMotion || !shell) {
+        if (reduceMotion || !logoShell) {
           markAnimationDone()
         }
         else {
-          shell.addEventListener('animationend', markAnimationDone, { once: true })
-          shell.style.animationPlayState = 'running'
+          logoShell.addEventListener('animationend', markAnimationDone, { once: true })
+          logoShell.style.animationPlayState = 'running'
           window.setTimeout(markAnimationDone, 1000)
         }
         // 最短驻留到期后复核撤层：门闩条件可能早已全部满足，只差驻留时长
         window.setTimeout(tryFinish, MIN_SPLASH_MS)
       }
-      const bridge = window.desktop?.shell
+      const bridge = window.shell?.shell
       if (typeof bridge?.onIntroBegin === 'function') {
         bridge.onIntroBegin(beginIntro)
       }

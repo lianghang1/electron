@@ -168,7 +168,12 @@ onBeforeUnmount(() => {
         v-else-if="soloWindowControls"
         class="flex h-chrome-solo items-center border-b border-border bg-glass"
       >
-        <span class="titlebar-drag h-full flex-1" />
+        <span class="titlebar-drag h-full min-w-3 flex-1" />
+        <!-- solo 直出态：名称跟平台单应用态同语义（窗口框里显示当前应用名） -->
+        <span v-if="activeTab" class="truncate text-ui-sm font-medium text-foreground">
+          {{ activeTab.title }}
+        </span>
+        <span class="titlebar-drag h-full min-w-3 flex-1" />
         <div class="flex h-full items-center">
           <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="最小化" @click="shell().window.minimize()">
             <Minus :size="13" />
@@ -191,7 +196,11 @@ onBeforeUnmount(() => {
             :class="chrome === 'platform' ? 'rounded-xl border border-border bg-card' : ''"
           />
         </div>
-        <EmptyState v-if="chrome === 'platform' && !activeTab" class="absolute inset-0" />
+        <!-- 定位包装层承载 absolute：EmptyState 根自带 relative，两个类同元素层叠时
+             产物 CSS 里 .relative 排在 .absolute 后必胜出，组件会被顶出视口 -->
+        <div v-if="chrome === 'platform' && !activeTab" class="absolute inset-0">
+          <EmptyState />
+        </div>
       </main>
 
       <CommandPalette
