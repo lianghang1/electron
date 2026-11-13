@@ -110,8 +110,14 @@ app.whenReady().then(async () => {
     clock: !!document.querySelector('.clock'),
     tabs: document.querySelectorAll('.tab').length,
     omni: !!document.querySelector('.omnibox'),
+    marks: [...document.querySelectorAll('.tab-mark')].map(m => m.textContent.trim()),
+    idleTitle: document.querySelector('.tab-idle')?.getAttribute('title') ?? null,
+    activeBg: getComputedStyle(document.querySelector('.tab-active') ?? document.body).backgroundColor,
+    activeColor: getComputedStyle(document.querySelector('.tab-active') ?? document.body).color,
+    headerKids: [...(document.querySelector('header')?.children ?? [])].slice(0, 4).map(el => el.tagName + '|' + [...el.classList].slice(0, 3).join('.') + '|' + getComputedStyle(el).borderRightWidth + '|' + getComputedStyle(el).backgroundColor),
+    purpleScan: [...document.querySelectorAll('body *')].filter(el => { const b = getComputedStyle(el).backgroundColor; return b.includes('139, 92, 246') || b.includes('rgb(139') }).slice(0, 6).map(el => el.tagName + '|' + [...el.classList].slice(0, 3).join('.') + '|' + JSON.stringify(el.getBoundingClientRect().toJSON())),
   })`, true)
-  console.log(`[audit] ${JSON.stringify(audit)}`)
+  console.log(`[audit] ${JSON.stringify(audit, null, 1)}`)
 
   const probe = await win.webContents.executeJavaScript(`(() => {
     const el = document.querySelector('.clock')
