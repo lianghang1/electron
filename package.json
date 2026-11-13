@@ -12,7 +12,7 @@
     "dev:platform": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev -- --flavor=platform-demo",
     "dev:solo": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev -- --flavor=solo-demo",
     "dev:kiosk": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev -- --flavor=kiosk",
-    "dev:diagnostics": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev:diagnostics",
+    "dev:kit": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev:kit",
     "build": "pnpm --filter @app/shell build",
     "build:win": "pnpm --filter @app/shell build:win",
     "build:mac": "pnpm --filter @app/shell build:mac",

@@ -13,7 +13,6 @@ import { createIccardDomain } from '../domains/iccard/domain'
 import { createIdcardDomain } from '../domains/idcard/domain'
 import { createPrintDomain } from '../domains/print/domain'
 import { createScannerDomain } from '../domains/scanner/domain'
-import { createSignatureDomain } from '../domains/signature/domain'
 
 /** legacy = 现状对外名；target = 定稿名。切换只改这一处常量。 */
 export const CONTRACT_PHASE = 'target' as const
@@ -77,15 +76,6 @@ export const CAPABILITIES: readonly CapabilityContract[] = [
   { id: 'scanner:getConfig', legacyName: 'scanner.getConfig', targetName: 'scanner.getConfig', accepted: [NO_INPUT] },
   { id: 'scanner:setConfig', legacyName: 'scanner.setConfig', targetName: 'scanner.setConfig', accepted: [{ enabled: true, activeProfileId: 'a1', deviceId: 'd1', overrides: { minLength: 4 } }], rejected: [{ enabled: 'yes', activeProfileId: 'a1', deviceId: 'd1', overrides: {} }] },
   { id: 'scanner:simulateScan', legacyName: 'scanner.simulate', targetName: 'scanner.simulateScan', accepted: [{ scannedCode: 'EAN-1' }], rejected: [{ scannedCode: '' }] },
-
-  // signature
-  { id: 'signature:listDevices', legacyName: 'signature.listDevices', targetName: 'signature.listDevices', accepted: [NO_INPUT] },
-  { id: 'signature:startSigning', legacyName: 'signature.start', targetName: 'signature.startSigning', accepted: [NO_INPUT, { deviceId: 's1' }] },
-  { id: 'signature:stopSigning', legacyName: 'signature.stop', targetName: 'signature.stopSigning', accepted: [NO_INPUT] },
-  { id: 'signature:clearSignature', legacyName: 'signature.clear', targetName: 'signature.clearSignature', accepted: [NO_INPUT] },
-  { id: 'signature:cancelSigning', legacyName: 'signature.cancel', targetName: 'signature.cancelSigning', accepted: [NO_INPUT] },
-  { id: 'signature:getConfig', legacyName: 'signature.getConfig', targetName: 'signature.getConfig', accepted: [NO_INPUT] },
-  { id: 'signature:setConfig', legacyName: 'signature.setConfig', targetName: 'signature.setConfig', accepted: [{ deviceProfileId: 's1', overrides: {} }], rejected: [{ deviceProfileId: '', overrides: {} }] },
 ]
 
 export function activeName(c: CapabilityContract, phase: ContractPhase = CONTRACT_PHASE): string {
@@ -129,7 +119,6 @@ export function buildDomainDefinitions(): DomainDefinition[] {
   const idcard = stub as Parameters<typeof createIdcardDomain>[0]
   const iccard = stub as Parameters<typeof createIccardDomain>[0]
   const scanner = stub as Parameters<typeof createScannerDomain>[0]
-  const signature = stub as Parameters<typeof createSignatureDomain>[0]
   const eventBus = new Proxy({}, { get: () => () => {} }) as DomainDeps['events']
   const deps: DomainDeps = { events: eventBus, demoMode: { enabled: true } }
   return [
@@ -138,7 +127,6 @@ export function buildDomainDefinitions(): DomainDefinition[] {
     createIdcardDomain(idcard),
     createIccardDomain(iccard),
     createScannerDomain(scanner, deps),
-    createSignatureDomain(signature, deps),
   ]
 }
 

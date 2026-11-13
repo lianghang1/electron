@@ -6,21 +6,6 @@ import type { CaptureDeviceConfig, CaptureDllBinary } from '@shell/shared'
  */
 export const BUILT_IN_CAPTURE_CONFIGS: CaptureDeviceConfig[] = [
   {
-    id: 'dianyipai-x1800',
-    brand: '点易拍',
-    displayName: '点易拍 X1800（本地服务 9002）',
-    transport: 'ws',
-    ws: { url: 'ws://localhost:9002', camId: 0, width: 1600, height: 1200 },
-    capabilities: { crop: true, desewarp: true, dualPage: true },
-  },
-  {
-    id: 'huashi-cvr100',
-    brand: '华视',
-    displayName: '华视 CVR-100（DLL SDK）',
-    transport: 'dll',
-    capabilities: { ocr: true },
-  },
-  {
     id: 'camsdk',
     brand: 'CamSDK',
     displayName: 'CamSDK 高拍仪（本地服务 9000）',

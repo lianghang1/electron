@@ -1,11 +1,11 @@
-import type { WsLike } from '../../../kernel/channel/ws-channel'
-import type { CapturePreviewSession, WsEndpoint } from './vendor-contracts'
-import { connectWs } from '../../../kernel/channel/ws-channel'
-import { captureError } from '../errors'
-import { checkCamSdkFrame, frameImage, parseCamSdkFrame, sendCamSdk } from './camsdk-protocol'
+import type { WsLike } from '#kernel/channel/ws-channel'
+import type { CapturePreviewSession, WsEndpoint } from '../vendor-contracts'
+import { connectWs } from '#kernel/channel/ws-channel'
+import { captureError } from '../../errors'
+import { checkCamSdkFrame, frameImage, parseCamSdkFrame, sendCamSdk } from './protocol'
 
 /**
- * CamSDKServer 常驻预览会话（协议同 camsdk-protocol.ts，时序参考官方 Demo
+ * CamSDKServer 常驻预览会话（协议同 protocol.ts，时序参考官方 Demo
  * samples/www/JS/camera/idFace.js）：
  *   预览：OpenCamera(devNum, mediaNum:0, resolutionNum, fps) → SetCameraImageInfo(cropType:1)
  *         → GetCameraVideoBuff(enable:true) → 持续推送带 imgBase64Str 的预览帧
@@ -72,9 +72,6 @@ export class CamSdkPreviewSession implements CapturePreviewSession {
         sendCamSdk(ws, devNum, { func: 'GetCameraVideoBuff', enable: true })
       }
       ws.onmessage = (ev) => {
-        if (typeof ev.data !== 'string') {
-          return
-        }
         const msg = parseCamSdkFrame(ev.data)
         if (!msg) {
           return
@@ -171,7 +168,7 @@ export class CamSdkPreviewSession implements CapturePreviewSession {
   }
 
   /** 拍照响应处理（仅在途拍照生效） */
-  private onCaptureResponse(msg: import('./camsdk-protocol').CamSdkFrame): void {
+  private onCaptureResponse(msg: import('./protocol').CamSdkFrame): void {
     if (!this.capturing) {
       return
     }

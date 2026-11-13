@@ -16,7 +16,6 @@ export const DEVICE_CAPABILITIES = [
   { id: 'idcard', label: '身份证阅读' },
   { id: 'iccard', label: 'IC 卡读写' },
   { id: 'scanner', label: '扫码枪' },
-  { id: 'signature', label: '签名板' },
 ] as const satisfies readonly { readonly id: string, readonly label: string }[]
 
 export type DeviceCapabilityId = (typeof DEVICE_CAPABILITIES)[number]['id']

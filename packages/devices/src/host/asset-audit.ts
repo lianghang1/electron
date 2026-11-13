@@ -2,7 +2,6 @@ import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { CAPTURE_DLL_BINARIES } from '../domains/capture/configs'
 import { SUMATRA_PDF_FILE } from '../domains/print/sumatra'
-import { HANVON_DLL_FILE } from '../domains/signature/vendors/hanvon'
 import { collectAssetSources } from '../drivers/asset-layout.mjs'
 import { IC_DRIVERS, ID_DRIVERS } from './run'
 
@@ -36,7 +35,7 @@ export interface AssetAuditResult {
   orphans: string[]
 }
 
-/** 枚举全部代码内资源声明：idcard/iccard 驱动注册表 + capture DLL 注册表 + signature/print 常量 */
+/** 枚举全部代码内资源声明：idcard/iccard 驱动注册表 + capture DLL 注册表 + print 常量 */
 export function collectAssetDeclarations(): AssetDeclaration[] {
   const declarations: AssetDeclaration[] = []
   for (const [name, Ctor] of Object.entries(ID_DRIVERS)) {
@@ -48,7 +47,6 @@ export function collectAssetDeclarations(): AssetDeclaration[] {
   for (const [id, binary] of Object.entries(CAPTURE_DLL_BINARIES)) {
     declarations.push({ origin: `capture 档案 ${id}`, file: binary.file })
   }
-  declarations.push({ origin: 'signature 汉王', file: HANVON_DLL_FILE })
   declarations.push({ origin: 'print SumatraPDF', file: SUMATRA_PDF_FILE })
   return declarations
 }

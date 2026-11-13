@@ -50,7 +50,6 @@ const scannerOverride = z.object({
 export const idcardConfigInput = z.object({ deviceProfileId: z.string().min(1), overrides: simpleOverride })
 export const iccardConfigInput = z.object({ deviceProfileId: z.string().min(1), overrides: simpleOverride })
 export const captureConfigInput = z.object({ deviceProfileId: z.string().min(1), overrides: captureOverride })
-export const signatureConfigInput = z.object({ deviceProfileId: z.string().min(1), overrides: simpleOverride })
 export const scannerConfigInput = z.object({
   enabled: z.boolean(),
   activeProfileId: z.string().min(1),

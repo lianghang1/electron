@@ -1,4 +1,4 @@
-import type { ShellIpc, ShellSendIpc } from '@shell/shared/ipc'
+import type { InvokeSig, IpcDefs, IpcDomainValue, SendSig, ShellDomainValue, ShellIpc, ShellSendIpc, SigOf } from '@shell/shared/ipc'
 import type { IpcMainEvent, IpcMainInvokeEvent } from 'electron'
 import { encodeIpcError } from '@shell/shared/ipc'
 import { ipcMain } from 'electron'
@@ -67,11 +67,22 @@ export function shellHandle<K extends keyof ShellIpc & string>(
   channel: K,
   handler: (event: IpcMainInvokeEvent, ...args: Parameters<ShellIpc[K]>) => ReturnType<ShellIpc[K]> | Promise<ReturnType<ShellIpc[K]>>,
 ): void {
+  registerInvokeChannel(channel, (event, args) => handler(event, ...(args as Parameters<ShellIpc[K]>)))
+}
+
+/** send 通道注册：channel 键 ∈ ShellSendIpc（参数元组展开，单向无回执） */
+export function shellOn<K extends keyof ShellSendIpc & string>(
+  channel: K,
+  handler: (event: IpcMainEvent, ...args: ShellSendIpc[K]) => void,
+): void {
+  registerSendChannel(channel, (event, args) => handler(event, ...(args as ShellSendIpc[K])))
+}
+
+/** invoke 通道运行时接线（ipcMain.handle）：异常统一出口，shellHandle 与域级注册共用 */
+function registerInvokeChannel(channel: string, handler: (event: IpcMainInvokeEvent, args: unknown[]) => unknown): void {
   ipcMain.handle(channel, async (event, ...args: unknown[]) => {
-    // 断言为 any 参形态：契约 handler 的具体参数表在签名处已校验，运行期只做统一转发
-    const call = handler as (event: IpcMainInvokeEvent, ...args: any[]) => unknown
     try {
-      return await call(event, ...args)
+      return await handler(event, args)
     }
     catch (error) {
       const described = describeHandleError(error)
@@ -86,14 +97,49 @@ export function shellHandle<K extends keyof ShellIpc & string>(
   })
 }
 
-/** send 通道注册：channel 键 ∈ ShellSendIpc（参数元组展开，单向无回执） */
-export function shellOn<K extends keyof ShellSendIpc & string>(
-  channel: K,
-  handler: (event: IpcMainEvent, ...args: ShellSendIpc[K]) => void,
-): void {
+/** send 通道运行时接线（ipcMain.on）：单向无回执，shellOn 与域级注册共用 */
+function registerSendChannel(channel: string, handler: (event: IpcMainEvent, args: unknown[]) => void): void {
   ipcMain.on(channel, (event, ...args: unknown[]) => {
-    // 断言为 any 参形态：契约参数元组在签名处已校验，运行期只做统一转发
-    const call = handler as (event: IpcMainEvent, ...args: any[]) => void
-    call(event, ...args)
+    handler(event, args)
   })
+}
+
+/** invoke 契约签名 → handler 签名（event 前插，返回值可同步可异步） */
+export type IpcInvokeHandler<S> = S extends (...args: infer A) => infer R
+  ? (event: IpcMainInvokeEvent, ...args: A) => R | Promise<R>
+  : never
+
+/** send 契约签名 → handler 签名（event 前插，单向无回执） */
+export type IpcSendHandler<S> = S extends (...args: infer A) => unknown
+  ? (event: IpcMainEvent, ...args: A) => void
+  : never
+
+/**
+ * 域 handler 表：方法名 → handler，键集与签名由域契约推导——
+ * 契约声明的方法缺 handler、契约外多写 handler 都是调用点编译错误；
+ * push 通道主进程只发不收（webContents.send 方向），不在表内。
+ */
+export type IpcDomainHandlers<V extends IpcDomainValue<string, IpcDefs>> = {
+  [K in keyof V['defs'] & string as V['defs'][K] extends InvokeSig<any> ? K : never]: IpcInvokeHandler<SigOf<V['defs'][K]>>
+} & {
+  [K in keyof V['defs'] & string as V['defs'][K] extends SendSig<any> ? K : never]: IpcSendHandler<SigOf<V['defs'][K]>>
+}
+
+/** 契约外的弱化转发形态：键与签名已由 IpcDomainHandlers 在调用点按契约校验，此处仅做运行时绑定 */
+type AnyInvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
+type AnySendHandler = (event: IpcMainEvent, ...args: unknown[]) => void
+
+/**
+ * 域级表驱动注册：遍历 defineIpcDomain 运行时通道表接线——通道名与 handler 签名
+ * 全部由契约推导，主进程侧零通道字面量（渲染层 preload 表驱动生成的对偶面）。
+ * 域级注册让「契约声明了但漏注册」从静态正则检查变成调用点编译错误。
+ */
+export function registerIpcDomain<V extends ShellDomainValue>(domain: V, handlers: IpcDomainHandlers<V>): void {
+  const table = handlers as Record<string, AnyInvokeHandler | AnySendHandler>
+  for (const [method, channel] of Object.entries(domain.invokeChannels)) {
+    registerInvokeChannel(channel, (event, args) => (table[method] as AnyInvokeHandler)(event, ...args))
+  }
+  for (const [method, channel] of Object.entries(domain.sendChannels)) {
+    registerSendChannel(channel, (event, args) => (table[method] as AnySendHandler)(event, ...args))
+  }
 }

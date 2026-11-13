@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { parseWsUrl, tcpProbe } from '../../../kernel/channel/ws-channel'
-import { isWindowsHost, supportsServiceAutoStart } from '../../platform'
+import { parseWsUrl, tcpProbe } from '#kernel/channel/ws-channel'
+import { isWindowsHost, supportsServiceAutoStart } from '#platform'
 
 const execFileAsync = promisify(execFile)
 

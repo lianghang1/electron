@@ -1,4 +1,4 @@
-import type { CaptureDevice, CaptureDeviceConfig, SignDevice } from '@shell/shared'
+import type { CaptureDevice, CaptureDeviceConfig } from '@shell/shared'
 import type { IcCardData, IcCardDriver, IcCardReadRequest, IcCardWriteRequest } from '../domains/iccard/device-contracts'
 import type { IdCardData, IdCardDriver, IdReaderDevice } from '../domains/idcard/device-contracts'
 import type { HostError, HostRequest, HostResponse } from './protocol'
@@ -12,7 +12,6 @@ import { HuashiDriver } from '../domains/idcard/vendors/huashi-driver'
 import { KemiDriver } from '../domains/idcard/vendors/kemi-driver'
 import { detectDevicePlatform } from '../domains/platform'
 import { queryWinspoolForms, queryWinspoolHardware } from '../domains/print/winspool-forms'
-import { probeHanvonDevice } from '../domains/signature/vendors/hanvon'
 import { koffiAvailable } from '../kernel/koffi'
 
 /**
@@ -282,15 +281,6 @@ registerDomainMethods('capture', {
   'capture.listDevices': (payload) => {
     const { resourcesRoot, profiles } = payload as { resourcesRoot: string, profiles: DaemonCaptureProfile[] }
     return listCaptureDevices(resourcesRoot, profiles)
-  },
-})
-
-// ── signature 域：DLL 路线探测（汉王 SPTabletSign，原生会话待 SDK 手册后落地） ──
-
-registerDomainMethods('signature', {
-  'signature.listDevices': (payload) => {
-    const { resourcesRoot } = payload as { resourcesRoot: string }
-    return [probeHanvonDevice(resourcesRoot)] satisfies SignDevice[]
   },
 })
 

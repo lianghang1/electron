@@ -1,5 +1,5 @@
+import type { DeviceHost } from '#host/device-host'
 import type { CaptureChannel, CaptureDevice, CaptureDeviceConfig, CaptureResult, ChannelCaptureRequest } from '@shell/shared'
-import type { DeviceHost } from '../../../host/device-host'
 import { CAPTURE_DLL_BINARIES } from '../configs'
 import { captureError } from '../errors'
 

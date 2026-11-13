@@ -153,7 +153,7 @@ function scanPackages() {
 
 // 设备骨架护栏：规则只作用于 packages/devices/src/domains，全部机器可精确判定。
 // 存量违规由 baseline 冻结；新代码一律按当前规则判定。
-const DEVICE_DOMAINS = ['print', 'capture', 'idcard', 'iccard', 'scanner', 'signature']
+const DEVICE_DOMAINS = ['print', 'capture', 'idcard', 'iccard', 'scanner']
 const REQUIRED_DOMAIN_FILES = ['domain.ts', 'methods.ts', 'index.ts', 'channels/registry.ts']
 const DUAL_TRACK_RE = /@deprecated|别名导出|待迁移|TODO 迁移/
 
@@ -221,12 +221,13 @@ function scanDeviceRules() {
 
 /** 契约外字面量注册白名单：文件 → 允许的通道名集合（每处都有结构性理由，新增须先在此登记） */
 const IPC_REGISTRATION_ALLOW = new Map([
-  ['apps/shell/electron/main/shell-ipc.ts', new Set(['domain-call', 'jsapi:call'])],
+  ['apps/shell/electron/main/ipc/router.ts', new Set(['domain-call', 'jsapi:call'])],
   ['packages/kernel/src/settings/service.ts', new Set(['settings:all', 'settings:set'])],
 ])
 
 const DOMAIN_BLOCK_RE = /defineIpcDomain\(\s*'(\w+)'\s*,\s*\{([\s\S]*?)\n\}(?:\s*,\s*\{[^}]*\})?\s*\)\s*satisfies/g
 const SHELL_REGISTER_RE = /shell(?:Handle|On)\(\s*'([\w:]+)'/g
+const DOMAIN_REGISTER_RE = /registerIpcDomain\(\s*(\w+?)Domain\b/g
 const LITERAL_REGISTER_RE = /\bipcMain\.(?:handle|on)\(\s*['"`]([\w:-]+)['"`]|\bipc\.handle\(\s*['"`]([\w:-]+)['"`]/g
 
 function scanIpcChannels() {
@@ -242,8 +243,9 @@ function scanIpcChannels() {
       }
     }
   }
-  // 2. 全仓收集 shellHandle/shellOn 注册点（含行号供报错定位）
+  // 2. 全仓收集注册点（shellHandle/shellOn 逐通道 + registerIpcDomain 域级，含行号供报错定位）
   const registered = new Map()
+  const domainRegistered = new Map()
   // 3. 契约外字面量注册：仅白名单文件、且通道名逐个匹配才放行
   for (const f of sourceFiles()) {
     const r = rel(f)
@@ -253,6 +255,10 @@ function scanIpcChannels() {
       const line = lines[i]
       for (const m of line.matchAll(SHELL_REGISTER_RE)) {
         registered.set(m[1], { file: r, line: i + 1 })
+      }
+      for (const m of line.matchAll(DOMAIN_REGISTER_RE)) {
+        // 域级注册：变量约定 `${domain}Domain`，该域全部 invoke/send 通道视为已注册
+        domainRegistered.set(m[1], { file: r, line: i + 1 })
       }
       for (const m of line.matchAll(LITERAL_REGISTER_RE)) {
         const channel = m[1] ?? m[2]
@@ -268,8 +274,8 @@ function scanIpcChannels() {
   }
   // 4. 契约声明了但主进程漏注册 → 渲染层调用即运行时黑洞（typecheck 盲区）
   for (const [channel, file] of contract) {
-    if (!registered.has(channel)) {
-      push(v, 'ipc/unregistered-channel', join(ROOT, file), 0, `契约通道 ${channel} 无 shellHandle/shellOn 注册`)
+    if (!registered.has(channel) && !domainRegistered.has(channel.slice(0, channel.indexOf(':')))) {
+      push(v, 'ipc/unregistered-channel', join(ROOT, file), 0, `契约通道 ${channel} 无 shellHandle/shellOn/registerIpcDomain 注册`)
     }
   }
   // 5. 注册了契约外通道 → 双轨桥面，契约失去唯一真源地位（基础设施白名单通道除外）

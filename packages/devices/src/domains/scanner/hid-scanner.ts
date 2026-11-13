@@ -1,7 +1,7 @@
 import type { ScannerStatus, ScanResult } from '@shell/shared'
 import type { WsLike } from '../../kernel/channel/ws-channel'
 import type { KeyboardScanner } from './keyboard-scanner'
-import { connectWs, parseWsUrl, tcpProbe } from '../../kernel/channel/ws-channel'
+import { connectWs, parseWsUrl, tcpProbe, wsFrameText } from '../../kernel/channel/ws-channel'
 
 /**
  * 厂商本地服务 HID 扫码通道（CamSDKServer（华夏电通）BarcodeScanner，由服务端监听 HID 条码枪）。
@@ -162,13 +162,14 @@ interface HidFrame {
   [key: string]: unknown
 }
 
-/** 解析 CamSDK JSON 文本帧（二进制帧/非法 JSON 返回 null，调用方忽略） */
+/** 解析 CamSDK JSON 帧（CamSDKServer 可能以二进制帧包 JSON 推送，文本/二进制均收；非法 JSON 返回 null） */
 function parseFrame(data: unknown): HidFrame | null {
-  if (typeof data !== 'string') {
+  const text = wsFrameText(data)
+  if (!text) {
     return null
   }
   try {
-    return JSON.parse(data) as HidFrame
+    return JSON.parse(text) as HidFrame
   }
   catch {
     return null

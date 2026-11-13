@@ -4,6 +4,12 @@
   "version": "2.0.0-alpha.0",
   "private": true,
   "description": "设备网关：kernel→adapters→vendors→host 四层（自 core 平移，逻辑未动）",
+  "imports": {
+    "#kernel/*": "./src/kernel/*.ts",
+    "#runtime/*": "./src/runtime/*.ts",
+    "#host/*": "./src/host/*.ts",
+    "#platform": "./src/domains/platform/index.ts"
+  },
   "exports": {
     ".": "./src/index.ts"
   },
@@ -15,14 +21,14 @@
   "dependencies": {
     "@shell/kernel": "workspace:*",
     "@shell/shared": "workspace:*",
-    "electron-store": "^10.0.0",
+    "electron-store": "catalog:",
     "koffi": "catalog:",
-    "ws": "^8.22.0",
+    "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "@types/ws": "^8.18.1",
+    "@types/ws": "catalog:",
     "typescript": "catalog:"
   }
 }

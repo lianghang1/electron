@@ -2,7 +2,6 @@ import type { IpcContract, IpcDefs, IpcDomainValue, IpcPushContract, IpcSendCont
 import { appsDomain } from './domains/apps'
 import { captureDialogDomain } from './domains/capture-dialog'
 import { deviceConfigDomain } from './domains/device-config'
-import { diagnosticsDomain } from './domains/diagnostics'
 import { downloadsDomain } from './domains/downloads'
 import { notificationsDomain } from './domains/notifications'
 import { overlayDomain } from './domains/overlay'
@@ -26,7 +25,6 @@ export const shellDomains = [
   shellDomain,
   settingsDomain,
   deviceConfigDomain,
-  diagnosticsDomain,
   downloadsDomain,
   sessionsDomain,
   storageDomain,
@@ -39,7 +37,8 @@ export const shellDomains = [
   systemDomain,
 ] as const
 
-type ShellDomainValue = (typeof shellDomains)[number]
+/** 壳设施域值的并集：主进程域级表驱动注册（registerIpcDomain）的域参数约束 */
+export type ShellDomainValue = (typeof shellDomains)[number]
 
 type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (k: infer I) => void ? I : never
 
@@ -73,6 +72,24 @@ export type ShellBridge = UnionToIntersection<DomainApiPart<ShellDomainValue>> &
   shell: { appearance: () => { accent: string, theme: 'light' | 'dark' | 'system' } }
 }
 
+// 域值再导出：主进程域级表驱动注册（registerIpcDomain）与广播发送按域引用
+export {
+  appsDomain,
+  captureDialogDomain,
+  deviceConfigDomain,
+  downloadsDomain,
+  notificationsDomain,
+  overlayDomain,
+  permissionsDomain,
+  sessionsDomain,
+  settingsDomain,
+  shellDomain,
+  storageDomain,
+  systemDomain,
+  tabsDomain,
+  updateDomain,
+  windowDomain,
+}
 // 契约原语与异常规范化一并出桥：preload 生成面 / 主进程 shellHandle 同源引用
 export type { InvokeSig, IpcContract, IpcDefs, IpcDomainValue, IpcPushContract, IpcSendContract, PushSig, SendArgsOf, SendSig, ShellDomainApi, SigOf } from './contract'
 export { defineIpcDomain, invoke, push, send } from './contract'

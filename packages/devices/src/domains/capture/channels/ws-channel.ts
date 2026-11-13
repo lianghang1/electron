@@ -1,11 +1,10 @@
 import type { CaptureCameraInfo, CaptureChannel, CaptureDevice, CaptureDeviceConfig, CaptureResult, ChannelCaptureRequest } from '@shell/shared'
-import type { CapturePreviewSession } from '../vendors/vendor-contracts'
+import type { CapturePreviewSession, CaptureVendor } from '../vendors/vendor-contracts'
 import { Buffer } from 'node:buffer'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { parseWsUrl, tcpProbe } from '../../../kernel/channel/ws-channel'
+import { parseWsUrl, tcpProbe } from '#kernel/channel/ws-channel'
 import { captureError } from '../errors'
-import { diagnoseCamSdkService, ensureCamSdkService } from '../vendors/camsdk-service'
 import { getCaptureVendor } from '../vendors/registry'
 
 /**
@@ -27,14 +26,15 @@ export class WsChannel implements CaptureChannel {
         .filter(p => p.transport === 'ws' && p.ws)
         .map(async (p) => {
           const { host, port } = parseWsUrl(p.ws!.url)
+          const vendor = getCaptureVendor(p.ws!.protocol)
           let alive = await tcpProbe(host, port)
-          // 探活失败先尝试自动拉起厂商服务（camsdk 发现式自愈），仍不通再走离线提示
-          if (!alive && p.ws!.protocol === 'camsdk') {
-            alive = await ensureCamSdkService({ url: p.ws!.url, brand: p.brand, command: p.ws!.wake?.command })
+          // 探活失败先走厂商服务自愈（契约可选能力：发现式拉起本地服务端），仍不通再走离线提示
+          if (!alive) {
+            alive = await vendor?.ensureService?.({ url: p.ws!.url, brand: p.brand, command: p.ws!.wake?.command }) ?? false
           }
           // 协议未经验证的配置（verified: false）只探活不采集：声明 ready 会误导上层直接拍照
           const verified = p.ws!.verified !== false
-          const status = await this.assessStatus(p.ws!, { alive, verified, brand: p.brand })
+          const status = await this.assessStatus(p.ws!, { alive, verified, brand: p.brand, vendor })
           return {
             id: `ws:${p.id}`,
             displayName: p.displayName,
@@ -53,7 +53,7 @@ export class WsChannel implements CaptureChannel {
 
   /**
    * 设备状态判定（ready 收紧：探活通过 ≠ 设备在位）：
-   * - 服务不通 → offline（含 camsdk 自愈失败的四态诊断）；
+   * - 服务不通 → offline（含厂商离线诊断文案）；
    * - 协议未验证/未知协议 → unavailable（不伪装可用）；
    * - 服务在线且厂商支持摄像头枚举 → 枚举 ≥1 台真机才 ready，0 台 = 设备未接（unavailable）；
    *   枚举异常（会话占用等暂态）退回探活级 ready，不惩罚；
@@ -61,23 +61,22 @@ export class WsChannel implements CaptureChannel {
    */
   private async assessStatus(
     ws: NonNullable<CaptureDeviceConfig['ws']>,
-    ctx: { alive: boolean, verified: boolean, brand: string },
+    ctx: { alive: boolean, verified: boolean, brand: string, vendor: CaptureVendor | null },
   ): Promise<{ value: 'ready' | 'offline' | 'unavailable', note: string }> {
     if (!ctx.alive) {
-      return { value: 'offline', note: await this.offlineNote(ctx.brand, ws) }
+      return { value: 'offline', note: await this.offlineNote(ctx.brand, ws, ctx.vendor) }
     }
     if (!ctx.verified) {
       return { value: 'unavailable', note: '服务在线，但该设备 ws 协议帧待真机实测，暂未接入采集' }
     }
-    const vendor = getCaptureVendor(ws.protocol)
-    if (!vendor) {
+    if (!ctx.vendor) {
       return { value: 'unavailable', note: `配置了未知的 ws 协议: ${String(ws.protocol)}` }
     }
-    if (!vendor.listCameras) {
+    if (!ctx.vendor.listCameras) {
       return { value: 'ready', note: '本地服务运行中' }
     }
     try {
-      const cameras = await vendor.listCameras(ws)
+      const cameras = await ctx.vendor.listCameras(ws)
       if (cameras.length > 0) {
         return { value: 'ready', note: `本地服务运行中（${cameras.length} 台摄像头在位）` }
       }
@@ -144,11 +143,11 @@ export class WsChannel implements CaptureChannel {
     }
     const { host, port } = parseWsUrl(ws.url)
     let reachable = await tcpProbe(host, port)
-    if (!reachable && ws.protocol === 'camsdk') {
-      reachable = await ensureCamSdkService({ url: ws.url, brand: config.brand, command: ws.wake?.command })
+    if (!reachable) {
+      reachable = await vendor.ensureService?.({ url: ws.url, brand: config.brand, command: ws.wake?.command }) ?? false
     }
     if (!reachable) {
-      throw captureError('DEVICE_OFFLINE', await this.offlineNote(config.brand, ws), { url: ws.url })
+      throw captureError('DEVICE_OFFLINE', await this.offlineNote(config.brand, ws, vendor), { url: ws.url })
     }
     return fn(vendor, ws)
   }
@@ -162,15 +161,10 @@ export class WsChannel implements CaptureChannel {
     return vendor
   }
 
-  /** 自动拉起失败后的离线提示：camsdk 协议附带发现式四态诊断，诊断不可用回落默认文案 */
-  private async offlineNote(brand: string, ws: NonNullable<CaptureDeviceConfig['ws']>): Promise<string> {
-    if (ws.protocol === 'camsdk') {
-      const diagnosed = await diagnoseCamSdkService({ url: ws.url, brand, command: ws.wake?.command })
-      if (diagnosed) {
-        return diagnosed
-      }
-    }
-    return '本地服务未运行（需安装厂商 SDK 服务端）'
+  /** 自动拉起失败后的离线提示：厂商实现离线诊断则用其文案，未实现/诊断不可用回落默认文案 */
+  private async offlineNote(brand: string, ws: NonNullable<CaptureDeviceConfig['ws']>, vendor: CaptureVendor | null): Promise<string> {
+    const diagnosed = await vendor?.offlineDiagnose?.({ url: ws.url, brand, command: ws.wake?.command })
+    return diagnosed ?? '本地服务未运行（需安装厂商 SDK 服务端）'
   }
 
   private async saveCaptureBase64(req: ChannelCaptureRequest, profileId: string, base64: string): Promise<string> {

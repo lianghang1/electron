@@ -99,6 +99,16 @@ export class WindowSystem implements Startable, ViewHost {
     this.windows.clear()
   }
 
+  /** dev 模式 F12 切换 devtools（Electron 窗口默认不绑定 F12，仅未打包时注册） */
+  private installDevToolsShortcut(win: BrowserWindow): void {
+    if (app.isPackaged) { return }
+    win.webContents.on('before-input-event', (_event, input) => {
+      if (input.type === 'keyDown' && input.key === 'F12') {
+        win.webContents.toggleDevTools()
+      }
+    })
+  }
+
   /** 工作台主窗：tab 条 + 左导航的产品主体 */
   createShellWindow(): BrowserWindow {
     const mode = this.flavor.mode === 'kiosk' ? createKioskMode() : createDesktopMode()
@@ -151,6 +161,7 @@ export class WindowSystem implements Startable, ViewHost {
     })
     this.track(win, { appId: SHELL_APP_ID, instanceId: 'shell', kind: 'shell' })
     this.installPermissionGate(win.webContents)
+    this.installDevToolsShortcut(win)
     this.shellWindowId = win.id
     if (this.flavor.mode === 'kiosk') { this.installKioskWatchdog(win) }
     return win
@@ -317,6 +328,7 @@ export class WindowSystem implements Startable, ViewHost {
     else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash: hash.replace(/^#/, '') }) }
     this.track(win, { appId: SHELL_APP_ID, instanceId: `overlay-${policy.kind}`, kind: 'overlay' })
     this.installPermissionGate(win.webContents)
+    this.installDevToolsShortcut(win)
     return win
   }
 

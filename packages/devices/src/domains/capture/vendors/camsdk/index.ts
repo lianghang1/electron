@@ -1,18 +1,19 @@
 import type { CaptureCameraInfo } from '@shell/shared'
-import type { CaptureVendor, WsEndpoint } from './vendor-contracts'
-import { withWsSession } from '../../../kernel/channel/ws-channel'
-import { captureError } from '../errors'
-import { CamSdkPreviewSession } from './camsdk-preview'
-import { checkCamSdkFrame, frameImage, parseCamSdkFrame, sendCamSdk } from './camsdk-protocol'
+import type { CaptureVendor, WsEndpoint } from '../vendor-contracts'
+import { withWsSession } from '#kernel/channel/ws-channel'
+import { captureError } from '../../errors'
+import { CamSdkPreviewSession } from './preview'
+import { checkCamSdkFrame, frameImage, parseCamSdkFrame, sendCamSdk } from './protocol'
+import { diagnoseCamSdkService, ensureCamSdkService } from './service'
 
 /**
  * CamSDK 厂商模块（CaptureVendor）。CamSDK = 华夏电通「华夏扫描中间件」，多厂商高拍仪经白名单接入。
  * 采集序列：OpenCamera → GetCameraVideoBuff(enable) 首帧 → SetCameraImageInfo → CameraCapture(base64) → CloseCamera；
- * 枚举序列：GetCameraInfo → devInfo（funcType 1=文档 2=人像）。常驻预览见 camsdk-preview.ts。
+ * 枚举序列：GetCameraInfo → devInfo（funcType 1=文档 2=人像）。常驻预览见 preview.ts。
  */
 
 /** devInfo 条目 → 统一枚举视图（分辨率兼容 resolutionList / mediaTypes[0].resolutions 两种固件） */
-function toCameraInfo(dev: NonNullable<import('./camsdk-protocol').CamSdkFrame['devInfo']>[number]): CaptureCameraInfo {
+function toCameraInfo(dev: NonNullable<import('./protocol').CamSdkFrame['devInfo']>[number]): CaptureCameraInfo {
   return {
     id: dev.id,
     name: dev.devName,
@@ -104,4 +105,6 @@ export const camSdkVendor: CaptureVendor = {
   captureOnce,
   listCameras,
   createPreviewSession: (endpoint, opts, onFrame) => new CamSdkPreviewSession(endpoint, opts.resolutionNum ?? 0, onFrame),
+  ensureService: ensureCamSdkService,
+  offlineDiagnose: diagnoseCamSdkService,
 }

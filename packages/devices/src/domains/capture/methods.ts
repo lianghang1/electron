@@ -13,7 +13,7 @@ import {
   requiredDeviceInput,
 } from '../input-schemas'
 
-/** capture 域：高拍仪 / 摄像采集（预览帧经 EventBus 广播）。 */
+/** capture 域：高拍仪 / 摄像采集（预览帧经 ctx.push 点对点送达发起方窗口）。 */
 
 export function createCaptureMethods(capture: CaptureSystem, deps: DomainDeps): DomainDefinition['methods'] {
   return {
@@ -64,12 +64,12 @@ export function createCaptureMethods(capture: CaptureSystem, deps: DomainDeps): 
     startPreview: {
       input: optionalDeviceInput,
       output: z.unknown(),
-      handler: async (input) => {
+      handler: async (input, ctx) => {
         const resolved = input.deviceId
           ?? (await capture.findDefaultDevice() as { id?: string } | undefined)?.id
         if (!resolved) { throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备') }
         return capture.startPreview(resolved, frame =>
-          deps.events.emit('capture.frame', { deviceId: resolved, frame }))
+          ctx.push?.('capture.frame', { deviceId: resolved, frame }))
       },
     },
     stopPreview: {

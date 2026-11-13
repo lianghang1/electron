@@ -13,7 +13,7 @@ export type ScenarioValue = string | number | boolean
 export type ScenarioValues = Readonly<Record<string, ScenarioValue>>
 
 /** 结果呈现方式：通用渲染器按此选择视图组件，不关心是哪个能力域。 */
-export type ScenarioResultView = 'json' | 'image' | 'canvas' | 'stream' | 'table' | 'idcard'
+export type ScenarioResultView = 'json' | 'image' | 'stream' | 'table' | 'idcard'
 
 /** 附加面板：由渲染器按 id 挂载，场景表只声明要不要。 */
 export type ScenarioPanelId = 'printers' | 'jobs' | 'preview'
@@ -45,6 +45,8 @@ export interface ScenarioAction {
   label: string
   /** 完整域方法名，如 print.submitPrintJob */
   method: string
+  /** 执行路由：captureSource = 采集源门面（SDK 设备与本机摄像头统一调用面），省略 = 域方法 invoke */
+  route?: 'captureSource'
   /** 引用的字段 key；空数组表示无参方法 */
   fields: readonly string[]
   /** 入参组装：省略时按 fields 平铺组装 */
@@ -204,9 +206,9 @@ export const DIAGNOSTIC_SCENARIOS: Readonly<Record<DeviceCapabilityId, ScenarioS
   capture: {
     capabilityId: 'capture',
     label: '拍摄采集',
-    summary: '高拍仪 / 本机摄像头的设备枚举、抓拍、实时预览帧、图片转存与打印此图',
+    summary: '高拍仪 / 本机摄像头的统一设备列表、抓拍、实时预览帧、图片转存与打印此图',
     icon: 'Camera',
-    kinds: [{ id: 'camera', label: '拍摄', payload: 'none' }, { id: 'uvc', label: '本机摄像头', payload: 'none' }],
+    kinds: [{ id: 'camera', label: '拍摄', payload: 'none' }],
     fields: [
       { key: 'deviceId', label: '采集设备', kind: 'select', source: 'devices', options: [{ value: '', label: '默认设备' }] },
       { key: 'imageFormat', label: '图片格式', kind: 'select', default: 'jpg', options: [{ value: 'jpg', label: 'JPG' }, { value: 'png', label: 'PNG' }, { value: 'bmp', label: 'BMP' }] },
@@ -216,36 +218,15 @@ export const DIAGNOSTIC_SCENARIOS: Readonly<Record<DeviceCapabilityId, ScenarioS
     ],
     deviceMethod: DEVICES('capture'),
     actions: [
-      { id: 'capture', label: '拍摄一张', method: 'capture.captureImage', fields: ['deviceId', 'imageFormat', 'resolutionIndex'], resultView: 'image', hint: '结果图片会显示在右侧预览区' },
-      { id: 'previewStart', label: '开始预览', method: 'capture.startPreview', fields: ['deviceId'], event: 'capture.frame', tone: 'outline', hint: '帧经 capture.frame 推送，预览面板实时显示' },
-      { id: 'previewStop', label: '停止预览', method: 'capture.stopPreview', fields: ['deviceId'], tone: 'outline' },
+      { id: 'capture', label: '拍摄一张', method: 'capture.captureImage', route: 'captureSource', fields: ['deviceId', 'imageFormat', 'resolutionIndex'], resultView: 'image', hint: '结果图片会显示在右侧预览区' },
+      { id: 'previewStart', label: '开始预览', method: 'capture.startPreview', route: 'captureSource', fields: ['deviceId'], event: 'capture.frame', tone: 'outline', hint: '帧经 capture.frame 推送，预览面板实时显示' },
+      { id: 'previewStop', label: '停止预览', method: 'capture.stopPreview', route: 'captureSource', fields: ['deviceId'], tone: 'outline' },
       { id: 'save', label: '保存图片', method: 'capture.saveCapturedImage', fields: ['imageDataUrl', 'imageExtension'], tone: 'outline' },
       { id: 'setDefault', label: '设为默认设备', method: 'capture.setDefaultDevice', fields: ['deviceId'], tone: 'outline' },
     ],
     resultView: 'image',
     panels: ['preview'],
     events: ['capture.frame'],
-  },
-
-  signature: {
-    capabilityId: 'signature',
-    label: '签名板',
-    summary: '会话管理、笔迹实时绘制、完成回收签名图',
-    icon: 'PenLine',
-    kinds: [{ id: 'session', label: '签名会话', payload: 'none' }],
-    fields: [
-      { key: 'deviceId', label: '签名设备', kind: 'select', source: 'devices', options: [{ value: '', label: '默认设备' }] },
-    ],
-    deviceMethod: DEVICES('signature'),
-    actions: [
-      { id: 'start', label: '开始会话', method: 'signature.startSigning', fields: ['deviceId'], event: 'signature.stroke', hint: '笔迹经 signature.stroke 推送，画布实时绘制' },
-      { id: 'stop', label: '完成并回收', method: 'signature.stopSigning', fields: [], resultView: 'image', tone: 'outline' },
-      { id: 'clear', label: '清板', method: 'signature.clearSignature', fields: [], tone: 'outline' },
-      { id: 'cancel', label: '取消会话', method: 'signature.cancelSigning', fields: [], tone: 'destructive' },
-    ],
-    resultView: 'canvas',
-    panels: [],
-    events: ['signature.stroke'],
   },
 
   idcard: {

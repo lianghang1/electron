@@ -5,6 +5,7 @@
  * 二者同源，无需类型强转。
  */
 import type { z } from 'zod'
+import type { PlatformEventName, PlatformEvents } from './events'
 
 type AnySchema = z.ZodType<any, any, any>
 
@@ -22,6 +23,8 @@ export interface DomainCallContext {
   instanceId: string
   /** 日志作用域已含域前缀（domain:<name>） */
   log: (message: string, fields?: Record<string, unknown>) => void
+  /** 发起方单播推送：高频流式数据（预览帧）点对点送达调用窗，不经事件总线广播；缺省 = 无推送能力（帧静默丢弃） */
+  push?: (event: PlatformEventName, payload: PlatformEvents[PlatformEventName]) => void
 }
 
 export interface DomainDefinition {

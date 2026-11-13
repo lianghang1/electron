@@ -1,5 +1,6 @@
-import type { WsLike } from '../../../kernel/channel/ws-channel'
-import { captureError } from '../errors'
+import type { WsLike } from '#kernel/channel/ws-channel'
+import { wsFrameText } from '#kernel/channel/ws-channel'
+import { captureError } from '../../errors'
 
 /**
  * CamSDKServer JSON 协议层（ws://127.0.0.1:9000，华夏电通「华夏扫描中间件」SDK 安装后常驻 Windows 服务）。
@@ -40,13 +41,18 @@ export function frameImage(msg: CamSdkFrame): string | undefined {
   return msg.imgBase64Str ?? msg.imgBase64?.[0]
 }
 
-/** 解析 CamSDK JSON 文本帧（二进制帧/非法 JSON 返回 null，调用方忽略） */
+/**
+ * 解析 CamSDK JSON 帧：官方 Demo 约定纯文本帧，但实测部分固件的预览流
+ * （GetCameraVideoBuff 大图帧）以二进制帧包 JSON 推送，故文本/二进制均收。
+ * 非法 JSON 返回 null，调用方忽略。
+ */
 export function parseCamSdkFrame(data: unknown): CamSdkFrame | null {
-  if (typeof data !== 'string') {
+  const text = wsFrameText(data)
+  if (!text) {
     return null
   }
   try {
-    return JSON.parse(data) as CamSdkFrame
+    return JSON.parse(text) as CamSdkFrame
   }
   catch {
     return null

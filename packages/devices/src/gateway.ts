@@ -36,10 +36,6 @@ import { createScannerSystem } from './domains/scanner'
 import { SCANNER_CHANNELS } from './domains/scanner/channels/registry'
 import { createScannerDomain } from './domains/scanner/domain'
 import { SCANNER_DEFAULTS } from './domains/scanner/service'
-import { createSignatureSystem } from './domains/signature'
-import { SIGNATURE_CHANNELS } from './domains/signature/channels/registry'
-import { BUILT_IN_SIGNATURE_CONFIGS } from './domains/signature/configs'
-import { createSignatureDomain } from './domains/signature/domain'
 import { DeviceHost } from './host/device-host'
 import { createChannelRegistry } from './runtime/channel'
 import { buildDeviceStatuses } from './runtime/device-status'
@@ -278,19 +274,6 @@ export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
         dispose: () => system.destroy(),
         attachWindow: win => system.attachWindow(win),
       }
-    },
-  },
-  signature: {
-    config: { overridableKeys: ['displayName', 'ws'], profiles: BUILT_IN_SIGNATURE_CONFIGS },
-    toSetConfigInput: DEFAULT_SET_CONFIG,
-    channels: SIGNATURE_CHANNELS,
-    assemble: (ctx) => {
-      const system = createSignatureSystem({
-        resourcesRoot: ctx.resourcesRoot,
-        host: ctx.host,
-        logger: ctx.logger.scope('devices:signature'),
-      })
-      return { id: 'signature', definition: createSignatureDomain(system, domainDeps(ctx)), dispose: () => system.destroy() }
     },
   },
 }

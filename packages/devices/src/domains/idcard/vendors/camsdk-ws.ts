@@ -1,5 +1,5 @@
 import type { IdCardData } from '@shell/shared'
-import { parseWsUrl, tcpProbe, withWsSession } from '../../../kernel/channel/ws-channel'
+import { parseWsUrl, tcpProbe, withWsSession, wsFrameText } from '#kernel/channel/ws-channel'
 import { idCardError } from '../errors'
 import { normalizeCardDate } from './card-date'
 
@@ -42,13 +42,14 @@ interface CamSdkIdCardFrame {
   [key: string]: unknown
 }
 
-/** 解析 CamSDK JSON 文本帧（二进制帧/非法 JSON 返回 null，调用方忽略） */
+/** 解析 CamSDK JSON 帧（CamSDKServer 可能以二进制帧包 JSON 推送，文本/二进制均收；非法 JSON 返回 null） */
 function parseFrame(data: unknown): CamSdkIdCardFrame | null {
-  if (typeof data !== 'string') {
+  const text = wsFrameText(data)
+  if (!text) {
     return null
   }
   try {
-    return JSON.parse(data) as CamSdkIdCardFrame
+    return JSON.parse(text) as CamSdkIdCardFrame
   }
   catch {
     return null

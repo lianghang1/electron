@@ -14,7 +14,7 @@ devices/
 │   ├── run.ts          域方法表注册制：域接入 = registerDomainMethods('<域>', {...}) 一处
 │   └── asset-audit.ts  SDK 资产对账：代码声明 ↔ assets 源资产（单测对账）
 ├── <域>/adapters/      接入方式适配器：按 transport 路由（ws/dll/service/wia...）
-└── <域>/vendors/       厂商模块：一个厂商 = 一个模块文件 + 注册表一行 + assets/ SDK 资产
+└── <域>/vendors/       厂商模块：一个厂商 = 一个目录（单文件厂商可为模块文件）+ 注册表一行 + assets/ SDK 资产
 ```
 
 ## SDK 资产约定（devices/**/assets/）
