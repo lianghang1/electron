@@ -451,6 +451,8 @@ export class WindowSystem implements Startable, ViewHost {
         partition: spec.partition,
       },
     })
+    // 页面未绘区域垫品牌主色：与渲染层垫场/intro 底同色源，加载与重载间隙不露白
+    view.setBackgroundColor(this.initialAccent)
     this.views.set(spec.instanceId, view)
     win.contentView.addChildView(view)
     view.setVisible(false)

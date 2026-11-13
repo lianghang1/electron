@@ -5,12 +5,14 @@
     <title>壳平台</title>
     <style>
       html, body, #app { margin: 0; width: 100%; height: 100%; }
-      /* 启动层：遮罩无底色，动画期透出窗口材质；#app 淡入与遮罩淡出交叉。
-         --dt-accent 由 preload 同步注入（零闪烁）。换 logo 只改下面 .startup-logo 内的 SVG。 */
+      /* 启动层：intro 底恒为品牌主色（与视图垫场、加载兜底同一色源），撤层前后不跳色；
+         #app 淡入与遮罩淡出交叉。--dt-accent 由 preload 同步注入（零闪烁）。
+         换 logo 只改下面 .startup-logo 内的 SVG。 */
       #app { opacity: 0; transition: opacity 0.16s ease; }
       body.ready #app { opacity: 1; }
       #splash {
         position: fixed; inset: 0; z-index: 2147483647;
+        background: var(--dt-accent, #3b82f6);
         display: flex; align-items: center; justify-content: center;
         transition: opacity 0.16s ease;
       }

@@ -21,7 +21,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'system', chrome: 'platform' | 'solo' } {
   const pick = (prefix: string, fallback: string) =>
     process.argv.find(a => a.startsWith(prefix))?.slice(prefix.length) ?? fallback
-  const accent = pick('--shell-accent=', '#4f46e5')
+  // fallback 与 tokens.css 的 --dt-accent 默认一致：argv 异常缺失时不引入第二色源
+  const accent = pick('--shell-accent=', '#3b82f6')
   const theme = pick('--shell-theme=', 'system')
   const chrome = pick('--shell-chrome=', 'platform')
   return {
