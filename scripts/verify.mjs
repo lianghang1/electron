@@ -91,7 +91,6 @@ function main() {
   results.push(['build', run('build', 'pnpm', ['build'], { show: true })])
   results.push(['design:css', run('design:css', 'pnpm', ['check:design:css'], { show: true })])
   results.push(['dev-resolve', devResolve()])
-  results.push(['dev:diagnostics', devResolve('dev:diagnostics', 'dev:diagnostics')])
 
   // 构建后不得重新出现中间 dist（源码直引约定的反向证明）
   const distCount = existsSync(join(WORK, 'packages'))

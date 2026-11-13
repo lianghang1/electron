@@ -92,13 +92,13 @@ registerAppScheme()
 
 function loadFlavor() {
   // 打包：构建期把 flavor.json 注入 resources/（见 electron-builder.config.mjs extraResources）；
-  // dev：--flavor=<id> 指向仓库 apps/flavors/<id>/flavor.json，缺省 cemetery。
+  // dev：--flavor=<id> 指向仓库 apps/flavors/<id>/flavor.json，缺省 solo-demo。
   const packaged = join(process.resourcesPath ?? '', 'flavor.json')
   if (existsSync(packaged)) {
     return flavorManifestSchema.parse(JSON.parse(readFileSync(packaged, 'utf-8')) as unknown)
   }
   const flavorArg = process.argv.find(a => a.startsWith('--flavor='))
-  const flavorId = flavorArg?.split('=')[1] ?? 'cemetery'
+  const flavorId = flavorArg?.split('=')[1] ?? 'solo-demo'
   assertSafeSegment(flavorId, 'flavorId')
   const flavorPath = join(app.getAppPath(), '../../apps/flavors', flavorId, 'flavor.json')
   const raw = JSON.parse(readFileSync(flavorPath, 'utf-8')) as unknown

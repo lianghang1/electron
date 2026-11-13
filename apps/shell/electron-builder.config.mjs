@@ -5,7 +5,7 @@
  * 默认只发现 electron-builder.{yml,yaml,json,json5,toml,js,cjs,ts}，不认 .mjs，
  * 故由 build:* 脚本显式 --config 传入。
  *
- * 用法：FLAVOR=update-e2e pnpm build:linux（不设 FLAVOR 默认 cemetery）
+ * 用法：FLAVOR=update-e2e pnpm build:linux（不设 FLAVOR 默认 solo-demo）
  * 打包态组合根读取 <resources>/flavor.json（extraResources 注入，见 main/index.ts loadFlavor）
  */
 import { readFileSync } from 'node:fs'
@@ -13,7 +13,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { ensureDriverAssets } from '../../scripts/prepare-driver-assets.mjs'
 
-const flavorId = process.env.FLAVOR ?? 'cemetery'
+const flavorId = process.env.FLAVOR ?? 'solo-demo'
 const flavor = JSON.parse(readFileSync(new URL(`../../apps/flavors/${flavorId}/flavor.json`, import.meta.url), 'utf-8'))
 
 /**
