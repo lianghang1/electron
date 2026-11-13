@@ -1,45 +1,37 @@
 <script setup lang="ts">
 import { desktop } from '@shell/bridge/client'
 import { Kbd, Separator } from '@ui/components/ui'
-import { Minus, Plus, Search, Settings, Square, X } from 'lucide-vue-next'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { Minus, Search, Settings, Square, X } from 'lucide-vue-next'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import EmptyState from '../apps/pages/EmptyState.vue'
-import { resolveEmbeddedRoute } from '../apps/registry'
 import CommandPalette from './CommandPalette.vue'
 import ForceGate from './ForceGate.vue'
+import ShellTabBar from './ShellTabBar.vue'
+import { useShellTabs } from './use-shell-tabs'
+import { useViewDock } from './use-view-dock'
 
-interface ShellTab {
-  key: string
-  kind: 'embedded' | 'view'
-  title: string
-  iconColor: string
-  route?: string
-  instanceId?: string
-  appId?: string
-}
-
-interface AppSummary {
-  manifest: { id: string, name: string, icon?: string, entry: { kind: string, route?: string } }
-}
-
-const TAB_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b6d4']
-const RECENT_KEY = 'shell.recentAppIds'
-const MAX_RECENT = 8
-
-const tabs = ref<ShellTab[]>([])
-const activeKey = ref('')
-const chrome = ref<'platform' | 'solo'>('platform')
+const chrome = ref<'platform' | 'solo'>(desktop().shell.appearance().chrome)
 const mode = ref<'desktop' | 'kiosk'>('desktop')
-const appList = ref<AppSummary[]>([])
-const recentIds = ref<string[]>([])
-const contentEl = ref<HTMLElement | null>(null)
-const seamEl = ref<HTMLElement | null>(null)
-const tabStripEl = ref<HTMLElement | null>(null)
 const forceRequiredVersion = ref<string | null>(null)
 
+const {
+  tabs,
+  activeKey,
+  activeTab,
+  recentIds,
+  appList,
+  activate,
+  openApp,
+  closeTab,
+  moveTab,
+  watchAppEvents,
+  loadRecent,
+  loadApps,
+} = useShellTabs()
+const { dockEl } = useViewDock()
+
 let offForceRequired: (() => void) | undefined
-let offAppOpened: (() => void) | undefined
-let offAppClosed: (() => void) | undefined
+let offAppEvents: (() => void) | undefined
 
 /** 跨进程载荷不可信：形状不符就忽略，不渲染脏数据 */
 function isForceRequired(value: unknown): value is { requiredVersion: string } {
@@ -47,189 +39,22 @@ function isForceRequired(value: unknown): value is { requiredVersion: string } {
   return typeof (value as Record<string, unknown>).requiredVersion === 'string'
 }
 
-const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
-
 /** 多应用态：≥2 个 tab 时顶栏出现 tab 条；单应用态退化为 36px 窗口框（v2 定稿） */
 const multiApp = computed(() => tabs.value.length >= 2)
+
+/** solo 档的窗口控制条：仅桌面形态需要，kiosk 全屏锁定无控制条 */
+const soloWindowControls = computed(() => chrome.value === 'solo' && mode.value === 'desktop')
 
 /** 命令面板：⌘K / ＋ / 点击 omnibox 唤起 */
 const paletteOpen = ref(false)
 const paletteItems = computed(() => appList.value.map(a => ({
   id: a.manifest.id,
   name: a.manifest.name,
-  kind: a.manifest.entry.kind === 'embedded' ? '内置' : '网页',
+  kind: a.manifest.entry.kind === 'remote' ? '远程' : '本地',
 })))
-
-/** 应用在侧边栏的打开态：存在对应 tab 即已打开 */
-function tabOfApp(appId: string): ShellTab | undefined {
-  return tabs.value.find(t => t.appId === appId)
-}
 
 function openSettings() {
   void desktop().overlay.open({ kind: 'settings' })
-}
-
-let resizeObserver: ResizeObserver | undefined
-
-function reportRect() {
-  // remote 应用时上报接缝视口矩形（原生视图精确落在圆角框内）；其余上报整个内容区
-  const el = activeTab.value?.kind === 'view' ? seamEl.value : contentEl.value
-  if (!el) { return }
-  const r = el.getBoundingClientRect()
-  desktop().reportContentRect({ x: r.left, y: r.top, width: r.width, height: r.height })
-}
-
-function onResize() {
-  reportRect()
-  updateTabFade()
-}
-
-function activate(tab: ShellTab) {
-  activeKey.value = tab.key
-  void desktop().apps.activate(tab.instanceId ?? '')
-  void nextTick(() => scrollActiveIntoView())
-}
-
-function colorFor(appId: string): string {
-  let hash = 0
-  for (const ch of appId) { hash = (hash * 31 + ch.charCodeAt(0)) >>> 0 }
-  return TAB_COLORS[hash % TAB_COLORS.length]!
-}
-
-function rememberRecent(appId: string) {
-  recentIds.value = [appId, ...recentIds.value.filter(id => id !== appId)].slice(0, MAX_RECENT)
-  try {
-    localStorage.setItem(RECENT_KEY, JSON.stringify(recentIds.value))
-  }
-  catch { /* 隐私模式下 localStorage 不可用：本次会话内仍有效 */ }
-}
-
-async function openApp(appId: string) {
-  const result = await desktop().apps.open(appId) as { instanceId: string, handle: Record<string, unknown> }
-  const manifest = appList.value.find(a => a.manifest.id === appId)?.manifest
-  const kind = result.handle.route !== undefined ? 'embedded' : 'view'
-  const target = tabs.value.find(t => t.instanceId === result.instanceId)
-    ?? tabs.value.find(t => t.appId === appId && t.kind === 'embedded')
-  rememberRecent(appId)
-  if (target) {
-    activate(target)
-    return
-  }
-  const tab: ShellTab = {
-    key: result.instanceId,
-    kind,
-    title: manifest?.name ?? appId,
-    iconColor: colorFor(appId),
-    route: result.handle.route as string | undefined,
-    instanceId: kind === 'view' ? result.instanceId : undefined,
-    appId,
-  }
-  tabs.value.push(tab)
-  activate(tab)
-}
-
-/** 其他入口（浮层/应用中心）打开应用时同步 tab：以 app.opened 事件为准，本地 open 的重复事件靠 instanceId 去重 */
-function ensureTabFromEvent(appId: string, instanceId: string): void {
-  const existing = tabs.value.find(t => t.instanceId === instanceId || (t.appId === appId && t.kind === 'embedded'))
-  if (existing) {
-    if (existing.instanceId !== instanceId) { existing.instanceId = instanceId }
-    return
-  }
-  const manifest = appList.value.find(a => a.manifest.id === appId)?.manifest
-  const kind = manifest?.entry.kind === 'embedded' ? 'embedded' : 'view'
-  const route = manifest?.entry.route
-  const tab: ShellTab = {
-    key: instanceId,
-    kind,
-    title: manifest?.name ?? appId,
-    iconColor: colorFor(appId),
-    route,
-    instanceId: kind === 'view' ? instanceId : undefined,
-    appId,
-  }
-  tabs.value.push(tab)
-  void activate(tab)
-}
-
-function closeTab(tab: ShellTab) {
-  tabs.value = tabs.value.filter(t => t.key !== tab.key)
-  if (tab.instanceId) { void desktop().apps.close(tab.instanceId) }
-  if (activeKey.value === tab.key) {
-    const next = tabs.value[tabs.value.length - 1]
-    if (next) {
-      activate(next)
-    }
-    else {
-      activeKey.value = ''
-      void desktop().apps.activate('')
-    }
-  }
-}
-
-const fadeStart = ref(false)
-const fadeEnd = ref(false)
-
-function updateTabFade() {
-  const el = tabStripEl.value
-  if (!el) {
-    fadeStart.value = false
-    fadeEnd.value = false
-    return
-  }
-  fadeStart.value = el.scrollLeft > 1
-  fadeEnd.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
-}
-
-function scrollActiveIntoView() {
-  const strip = tabStripEl.value
-  const active = strip?.querySelector<HTMLElement>('.tab-active')
-  if (strip && active) { active.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }
-  updateTabFade()
-}
-
-watch(() => tabs.value.length, () => nextTick(updateTabFade))
-// 激活 tab 切换 embedded/remote 形态：接缝视口与内容区矩形不同，需重报
-watch(activeKey, () => nextTick(reportRect))
-
-const draggingKey = ref<string | null>(null)
-const dropTargetKey = ref<string | null>(null)
-
-function onDragStart(e: DragEvent, tab: ShellTab) {
-  draggingKey.value = tab.key
-  dropTargetKey.value = tab.key
-  if (e.dataTransfer) {
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', tab.key)
-  }
-}
-
-function onDragOver(e: DragEvent, tab: ShellTab) {
-  if (!draggingKey.value || draggingKey.value === tab.key) { return }
-  e.preventDefault()
-  if (e.dataTransfer) { e.dataTransfer.dropEffect = 'move' }
-  dropTargetKey.value = tab.key
-}
-
-function onDrop(e: DragEvent, tab: ShellTab) {
-  e.preventDefault()
-  const from = draggingKey.value
-  const to = tab.key
-  if (from && from !== to) {
-    const arr = [...tabs.value]
-    const fromIdx = arr.findIndex(t => t.key === from)
-    const toIdx = arr.findIndex(t => t.key === to)
-    if (fromIdx >= 0 && toIdx >= 0) {
-      const [moved] = arr.splice(fromIdx, 1)
-      arr.splice(toIdx, 0, moved!)
-      tabs.value = arr
-    }
-  }
-  onDragEnd()
-}
-
-function onDragEnd() {
-  draggingKey.value = null
-  dropTargetKey.value = null
 }
 
 function onGlobalKeydown(e: KeyboardEvent) {
@@ -260,48 +85,23 @@ function onGlobalKeydown(e: KeyboardEvent) {
 }
 
 onMounted(async () => {
-  reportRect()
-  resizeObserver = new ResizeObserver(reportRect)
-  if (contentEl.value) { resizeObserver.observe(contentEl.value) }
-  window.addEventListener('resize', onResize)
   window.addEventListener('keydown', onGlobalKeydown)
-
+  offAppEvents = watchAppEvents()
   offForceRequired = desktop().onEvent('update.force-required', (payload) => {
     if (isForceRequired(payload)) { forceRequiredVersion.value = payload.requiredVersion }
   })
-  // 应用打开/关闭全量以事件同步：本地 openApp 与浮层入口共用同一套 tab 状态
-  offAppOpened = desktop().onEvent('app.opened', (payload) => {
-    const p = payload as { appId?: string, instanceId?: string }
-    if (p.appId && p.instanceId) { ensureTabFromEvent(p.appId, p.instanceId) }
-  })
-  offAppClosed = desktop().onEvent('app.closed', (payload) => {
-    const p = payload as { appId?: string, instanceId?: string }
-    const tab = tabs.value.find(t => t.instanceId === p.instanceId || t.appId === p.appId)
-    if (tab) { closeTab(tab) }
-  })
-
-  try {
-    recentIds.value = JSON.parse(localStorage.getItem(RECENT_KEY) ?? '[]') as string[]
-  }
-  catch { recentIds.value = [] }
-
-  appList.value = await desktop().apps.list() as AppSummary[]
-
+  loadRecent()
+  await loadApps()
   const info = await desktop().shell.info()
-  chrome.value = info.chrome
   mode.value = info.mode
   if (info.forceUpdate?.blocked) { forceRequiredVersion.value = info.forceUpdate.requiredVersion ?? '' }
   if (info.defaultAppId && appList.value.some(a => a.manifest.id === info.defaultAppId)) { void openApp(info.defaultAppId) }
-  await nextTick(updateTabFade)
 })
 
 onBeforeUnmount(() => {
-  resizeObserver?.disconnect()
-  window.removeEventListener('resize', onResize)
   window.removeEventListener('keydown', onGlobalKeydown)
   offForceRequired?.()
-  offAppOpened?.()
-  offAppClosed?.()
+  offAppEvents?.()
 })
 </script>
 
@@ -319,48 +119,15 @@ onBeforeUnmount(() => {
           <path fill="currentColor" d="M6 6h15l14 14h6L27 6h15v36H6Z" />
         </svg>
 
-        <!-- 多应用态：活动带名 tab + 非活动图标 tab + ＋ -->
-        <div
+        <ShellTabBar
           v-if="multiApp"
-          ref="tabStripEl"
-          class="tab-strip relative flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto"
-          :class="{ 'fade-start': fadeStart, 'fade-end': fadeEnd }"
-          @scroll="updateTabFade"
-        >
-          <div
-            v-for="tab in tabs"
-            :key="tab.key"
-            class="tab group flex h-7 shrink-0 cursor-default items-center gap-1.5 rounded-md px-2 text-ui-sm"
-            :class="{
-              'tab-active bg-accent text-accent-foreground font-medium': tab.key === activeKey,
-              'tab-idle opacity-75': tab.key !== activeKey,
-              'opacity-40': draggingKey === tab.key,
-            }"
-            draggable="true"
-            @dragstart="onDragStart($event, tab)"
-            @dragover="onDragOver($event, tab)"
-            @drop="onDrop($event, tab)"
-            @dragend="onDragEnd"
-          >
-            <span class="size-3.5 shrink-0 rounded-sm" :style="{ background: tab.iconColor }" aria-hidden="true" />
-            <span
-              v-if="tab.key === activeKey"
-              class="max-w-32 truncate"
-            >{{ tab.title }}</span>
-            <span v-else class="sr-only">{{ tab.title }}</span>
-            <button class="tab-close" :title="`关闭 ${tab.title}`" aria-label="关闭标签" @click.stop="closeTab(tab)">
-              <X :size="11" />
-            </button>
-          </div>
-          <button
-            class="tab-plus flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-hover hover:text-foreground"
-            title="打开应用（Ctrl+K）"
-            aria-label="打开应用"
-            @click="paletteOpen = true"
-          >
-            <Plus :size="14" />
-          </button>
-        </div>
+          :tabs="tabs"
+          :active-key="activeKey"
+          @activate="activate"
+          @close="closeTab"
+          @move="moveTab"
+          @open-palette="paletteOpen = true"
+        />
 
         <!-- 单应用态：当前应用名直接跟在 logo 后（窗口框语义，不做导航） -->
         <span v-else-if="activeTab" class="truncate text-ui-sm font-medium text-foreground">
@@ -398,7 +165,7 @@ onBeforeUnmount(() => {
       </header>
 
       <header
-        v-else-if="mode === 'desktop'"
+        v-else-if="soloWindowControls"
         class="flex h-chrome-solo items-center border-b border-border bg-glass"
       >
         <span class="titlebar-drag h-full flex-1" />
@@ -415,27 +182,16 @@ onBeforeUnmount(() => {
         </div>
       </header>
 
-      <!-- 内容区：全宽。第三方（view）应用渲染在带接缝的圆角视口里，内置应用平铺 -->
-      <main ref="contentEl" class="relative min-h-0 flex-1 overflow-hidden" :class="chrome === 'solo' ? 'bg-primary' : ''">
-        <template v-if="chrome === 'platform'">
-          <div v-if="activeTab && activeTab.kind === 'view'" class="h-full w-full p-1.5">
-            <!-- remote 应用：原生 WebContentsView 覆盖到接缝视口矩形（seamEl 上报），此处仅是底板 -->
-            <div ref="seamEl" class="h-full w-full overflow-hidden rounded-xl border border-border bg-card" />
-          </div>
-          <component
-            :is="resolveEmbeddedRoute(activeTab.route!)"
-            v-else-if="activeTab?.kind === 'embedded' && activeTab.route"
-            class="h-full w-full overflow-hidden bg-card"
+      <!-- 内容区：视图底板恒存在，solo 铺满无边框 / platform 接缝圆角；落位上报只认 dockEl -->
+      <main class="relative min-h-0 flex-1 overflow-hidden" :class="chrome === 'solo' ? 'bg-primary' : ''">
+        <div class="h-full w-full overflow-hidden" :class="chrome === 'platform' ? 'p-1.5' : ''">
+          <div
+            ref="dockEl"
+            class="h-full w-full overflow-hidden"
+            :class="chrome === 'platform' ? 'rounded-xl border border-border bg-card' : ''"
           />
-          <EmptyState v-else class="h-full w-full" />
-        </template>
-        <template v-else>
-          <component
-            :is="resolveEmbeddedRoute(activeTab!.route!)"
-            v-if="activeTab?.kind === 'embedded' && activeTab.route"
-            class="h-full w-full overflow-hidden bg-card"
-          />
-        </template>
+        </div>
+        <EmptyState v-if="chrome === 'platform' && !activeTab" class="absolute inset-0" />
       </main>
 
       <CommandPalette
@@ -457,8 +213,7 @@ onBeforeUnmount(() => {
 .titlebar-drag :deep(button),
 .titlebar-drag button,
 .titlebar-drag input,
-.omnibox,
-.tab {
+.omnibox {
   -webkit-app-region: no-drag;
 }
 
@@ -473,51 +228,6 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 
-.tab-strip {
-  scrollbar-width: none;
-  padding-right: 4px;
-}
-.tab-strip::-webkit-scrollbar {
-  display: none;
-}
-.tab-strip.fade-start {
-  mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 100%);
-}
-.tab-strip.fade-end {
-  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 20px), transparent 100%);
-}
-.tab-strip.fade-start.fade-end {
-  mask-image: linear-gradient(to right, transparent 0, #000 20px, #000 calc(100% - 20px), transparent 100%);
-}
-
-.tab {
-  transition: background 0.15s ease, color 0.15s ease, opacity 0.12s ease;
-  user-select: none;
-}
-.tab-idle:hover {
-  background: var(--hover);
-  opacity: 1;
-}
-.tab-close {
-  display: grid;
-  place-items: center;
-  color: currentColor;
-  border-radius: 4px;
-  padding: 1.5px;
-  opacity: 0;
-  transition: opacity 0.12s ease, background 0.12s ease;
-}
-.tab:hover .tab-close,
-.tab-active .tab-close {
-  opacity: 0.65;
-}
-.tab-close:hover {
-  opacity: 1 !important;
-  background: var(--hover);
-}
-.tab-plus {
-  transition: background 0.12s ease, color 0.12s ease;
-}
 .ctrl {
   transition: background 0.12s ease;
 }

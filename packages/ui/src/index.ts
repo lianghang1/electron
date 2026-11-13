@@ -1,4 +1,3 @@
-export { registerEmbeddedApp, resolveEmbeddedRoute } from './apps/registry'
 export * from './components'
 export { default as OverlayApp } from './overlay/OverlayApp.vue'
 export { default as CommandPalette } from './shell/CommandPalette.vue'
