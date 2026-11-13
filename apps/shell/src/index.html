@@ -15,6 +15,9 @@
         transition: opacity 0.16s ease;
       }
       body.ready #splash { pointer-events: none; opacity: 0; }
+      /* logo 与窗口同帧出生：初始就是完整可见形态（不起播也恒在），
+         introBegin 后只播放弹性微缩放——动画是 logo 的点缀，不是 logo 的出现方式，
+         杜绝「窗口先出现、logo 迟到」的脱节观感 */
       .startup-logo-shell {
         position: relative; display: flex;
         width: 96px; height: 96px;
@@ -22,10 +25,8 @@
         border-radius: 24px;
         background: linear-gradient(180deg, #000000 0%, #151718 100%);
         box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.2);
-        transform: scale(0.72); opacity: 0;
+        /* paused 时停在 0% 帧（scale 1 完整可见）——起播前后画面无跳变 */
         animation: splash-pop 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-        /* 动画以窗口可见为起点：hidden 期间暂停，show() 触发 visibilitychange 后播放，
-           保证弹出段完整呈现在屏幕上而不是被隐藏期消耗 */
         animation-play-state: paused;
         transform-origin: center;
       }
@@ -37,14 +38,14 @@
       }
       .startup-logo { width: 56px; height: auto; color: #ffffff; }
       @keyframes splash-pop {
-        0% { opacity: 0; transform: scale(0.72); }
-        38% { opacity: 1; transform: scale(1.045); }
-        58% { transform: scale(0.985); }
-        76% { transform: scale(1.008); }
-        100% { opacity: 1; transform: scale(1); }
+        0% { transform: scale(1); }
+        40% { transform: scale(1.05); }
+        62% { transform: scale(0.985); }
+        82% { transform: scale(1.01); }
+        100% { transform: scale(1); }
       }
       @media (prefers-reduced-motion: reduce) {
-        .startup-logo-shell { opacity: 1; transform: scale(1); animation: none; }
+        .startup-logo-shell { animation: none; }
       }
     </style>
   </head>

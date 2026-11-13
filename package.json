@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev",
+    "doctor": "node scripts/doctor-dev.mjs",
     "dev:platform": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev -- --flavor=platform-demo",
     "dev:solo": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev -- --flavor=solo-demo",
     "dev:kiosk": "node scripts/prepare-driver-assets.mjs && pnpm --filter @app/shell dev -- --flavor=kiosk",
