@@ -1,5 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, renameSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { join } from 'node:path'
 import { app } from 'electron'
 
 /**
@@ -38,65 +37,4 @@ export function cookiesDir(): string {
 /** 业务产物文件根目录：capture / print / signature 按域分目录 */
 export function filesDir(): string {
   return join(platformDataRoot(), 'files')
-}
-
-/**
- * 旧布局一次性迁移（启动最早处、任何首次写盘之前调用，幂等）：
- * 旧版散落在 userData 根目录的自管文件整体 rename 进统一根目录。仅"源存在且目标不存在"
- * 才执行，失败仅告警不阻断启动（各落盘点均以新目录为准，rename 失败仅发生于跨卷/文件
- * 占用等异常场景）。
- */
-export function migrateLegacyLayout(): void {
-  const userData = app.getPath('userData')
-
-  moveDir(join(userData, 'storage'), configDir())
-  moveDir(join(userData, 'logs'), logsDir())
-  moveDir(join(userData, 'audit'), join(logsDir(), 'audit'))
-  moveDir(join(userData, 'capture'), join(filesDir(), 'capture'))
-  moveDir(join(userData, 'print-archive'), join(filesDir(), 'print'))
-  // 历史命名收敛：print-archive → print（旧版已迁入统一根目录的机器补迁，幂等）
-  moveDir(join(filesDir(), 'print-archive'), join(filesDir(), 'print'))
-  moveFile(join(userData, 'apps.json'), join(configDir(), 'apps.json'))
-  moveFile(join(userData, 'print-jobs.json'), join(configDir(), 'print-jobs.json'))
-  moveCookiesSnapshots(userData)
-}
-
-/** 根目录散落的 app-<appId>-cookies.json 快照收敛到 cookies/ 目录 */
-function moveCookiesSnapshots(userData: string): void {
-  let names: string[]
-  try {
-    names = readdirSync(userData)
-  }
-  catch {
-    return
-  }
-  for (const name of names) {
-    if (name.startsWith('app-') && name.endsWith('-cookies.json')) {
-      moveFile(join(userData, name), join(cookiesDir(), name))
-    }
-  }
-}
-
-/** 整目录迁移（源存在且目标不存在才 rename） */
-function moveDir(from: string, to: string): void {
-  if (!existsSync(from) || existsSync(to)) { return }
-  try {
-    mkdirSync(dirname(to), { recursive: true })
-    renameSync(from, to)
-  }
-  catch (error) {
-    console.warn(`[paths] legacy dir migrate failed: ${from} → ${to}`, error)
-  }
-}
-
-/** 单文件迁移（源存在且目标不存在才 rename） */
-function moveFile(from: string, to: string): void {
-  if (!existsSync(from) || existsSync(to)) { return }
-  try {
-    mkdirSync(dirname(to), { recursive: true })
-    renameSync(from, to)
-  }
-  catch (error) {
-    console.warn(`[paths] legacy file migrate failed: ${from} → ${to}`, error)
-  }
 }

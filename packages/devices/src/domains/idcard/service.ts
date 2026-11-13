@@ -11,13 +11,10 @@ import { idCardError, toIdCardError } from './errors'
 
 /**
  * 持久化根对象（electron-store 根必须为对象，数组经 devices 包一层）。
- * devices 现为白名单覆盖（仅现场可调字段）；历史版本存过整条档案，
- * 白名单提取按同名字段读取，多余字段（旧 dll 段等）自然忽略。
+ * devices 为白名单覆盖（仅现场可调字段），按同名字段读取，技术字段随代码出厂。
  */
 interface StoredIdcardConfig {
   devices?: IdcardDeviceOverrides[]
-  /** 旧版单值形态：ws 服务地址（识别到即迁入出厂 ws 档案） */
-  wsUrl?: string
 }
 
 /** 档案深拷贝（出厂合并/读出 clone，避免共享内层对象被运行时误改） */
@@ -33,13 +30,12 @@ function overridesOf(p: IdcardDeviceConfig): IdcardDeviceOverrides {
 }
 
 /**
- * 历史持久化合并 + 白名单提取：以出厂整条为基准，stored 同 id 仅提取白名单字段
- * （displayName / ws.url）覆盖——代码修改任何技术字段（品牌/接入方式/驱动）立即生效，
- * 本地旧数据不再整体压住出厂值。清单完全由代码预设决定（不回注用户追加档案）。
+ * 持久化合并 + 白名单提取：以出厂整条为基准，stored 同 id 仅提取白名单字段
+ * （displayName / ws.url）覆盖——代码修改任何技术字段（品牌/接入方式/驱动）立即生效。
+ * 清单完全由代码预设决定（不回注用户追加档案）。
  */
-function migrateConfig(raw: StoredIdcardConfig): IdcardDeviceConfig[] {
+function mergeStoredConfig(raw: StoredIdcardConfig): IdcardDeviceConfig[] {
   const stored = Array.isArray(raw.devices) ? raw.devices : []
-  const legacyUrl = typeof raw.wsUrl === 'string' && raw.wsUrl ? raw.wsUrl : undefined
   return BUILT_IN_IDCARD_CONFIGS.map((b) => {
     const profile = cloneProfile(b)
     const s = stored.find(x => x.id === b.id)
@@ -50,9 +46,6 @@ function migrateConfig(raw: StoredIdcardConfig): IdcardDeviceConfig[] {
       if (profile.transport === 'ws' && typeof s.ws?.url === 'string' && s.ws.url.trim()) {
         profile.ws.url = s.ws.url
       }
-    }
-    else if (legacyUrl && profile.transport === 'ws') {
-      profile.ws.url = legacyUrl
     }
     return profile
   })
@@ -73,7 +66,7 @@ export class IdCardService {
   private readonly configStore = createDeviceStore<StoredIdcardConfig>('idcard')
 
   constructor(resourcesRoot: string, host: DeviceHost, private readonly logger: Logger) {
-    this.configs = migrateConfig(this.configStore.load())
+    this.configs = mergeStoredConfig(this.configStore.load())
     this.channels = new Map<string, IdCardChannel>([
       // dll 路线经设备守护进程执行（koffi 调用崩溃隔离在 host 进程），档案驱动枚举
       ['dll', new DllIdChannel(host, resourcesRoot, () => this.configs)],

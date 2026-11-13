@@ -9,7 +9,6 @@
       "id": "demo-web",
       "name": "演示应用",
       "version": "1.0.0",
-      "type": "internal",
       "entry": {
         "kind": "remote",
         "url": "https://vite.dev",

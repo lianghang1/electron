@@ -5,10 +5,10 @@ import { webContents } from 'electron'
 import { HID_SERVICE_URL, HidScanner } from './hid-scanner'
 import { KeyboardScanner } from './keyboard-scanner'
 
-/** 推送通道（沿用旧域通道命名 `${域}:${方法}`；bridge preload 已做 scanner.scanned → 旧通道映射） */
+/** 推送通道（`${域}:${方法}` 命名；bridge preload 把 scanner.scanned 事件路由到该通道） */
 export const SCANNER_PUSH_CHANNELS = { scanReceived: 'scanner:scanReceived', statusUpdated: 'scanner:statusUpdated' } as const
 
-/** 节奏参数出厂值（keyboard / hid 档案共用一份缺省，旧单值迁移也以此回填） */
+/** 节奏参数出厂值（keyboard / hid 档案共用一份缺省） */
 const PACE_DEFAULTS = { timeout: 100, minLength: 4, endKey: 'Enter', prefixes: [] as string[], requirePrefix: false }
 
 /**
@@ -32,12 +32,7 @@ export const SCANNER_OVERRIDES_DEFAULTS: ScannerOverrides = {
   devices: [],
 }
 
-/** 旧版单值配置（v1 根对象直存节奏参数 + mode/hidUrl），逐字段读取，缺字段不生效 */
-const asNumber = (v: unknown): number | undefined => typeof v === 'number' ? v : undefined
-const asString = (v: unknown): string | undefined => typeof v === 'string' ? v : undefined
-const asBoolean = (v: unknown): boolean | undefined => typeof v === 'boolean' ? v : undefined
-
-/** 白名单字段就地覆盖（仅提供且合法的字段生效；旧整条持久化按同名字段读取，brand/transport 等自然忽略） */
+/** 白名单字段就地覆盖（仅提供且合法的字段生效；brand/transport 等技术字段不在白名单，永远随代码出厂） */
 function applyOverrides(profile: ScannerDeviceConfig, s: ScannerDeviceOverrides): void {
   if (typeof s.displayName === 'string' && s.displayName.trim()) {
     profile.displayName = s.displayName
@@ -77,52 +72,25 @@ function overridesOf(profile: ScannerDeviceConfig): ScannerDeviceOverrides {
 }
 
 /**
- * 历史持久化合并 + 白名单提取：以出厂档案为基准，stored 同 id 仅提取白名单字段
- * （名称/节奏参数/HID 地址）覆盖——代码修改技术字段（品牌/通道）立即生效，
- * 本地旧数据不再整体压住出厂值；不在出厂清单内的档案忽略（清单完全由代码预设决定）。
- * 旧 v1 单值配置（无 devices 数组）：节奏参数落到全部档案、HID 地址落到 hid 档案、激活按旧 mode 指向。
+ * 持久化合并 + 白名单提取：以出厂档案为基准，stored 同 id 仅提取白名单字段
+ * （名称/节奏参数/HID 地址）覆盖——代码修改技术字段（品牌/通道）立即生效；
+ * 不在出厂清单内的档案忽略（清单完全由代码预设决定）。
  */
-function migrateScannerConfig(stored?: ScannerOverrides): ScannerConfig {
+function mergeStoredConfig(stored?: ScannerOverrides): ScannerConfig {
   const base = structuredClone(SCANNER_DEFAULTS)
   const raw = stored && typeof stored === 'object' ? stored as ScannerOverrides & Record<string, unknown> : undefined
   const storedDevices = Array.isArray(raw?.devices) ? raw.devices : []
-  const legacy = raw && !Array.isArray(raw.devices)
-    ? {
-        timeout: asNumber(raw.timeout),
-        minLength: asNumber(raw.minLength),
-        endKey: asString(raw.endKey),
-        prefixes: Array.isArray(raw.prefixes)
-          ? raw.prefixes.filter((x): x is string => typeof x === 'string')
-          : undefined,
-        requirePrefix: asBoolean(raw.requirePrefix),
-        hidUrl: asString(raw.hidUrl),
-        mode: raw.mode === 'hid' || raw.mode === 'keyboard' ? raw.mode : undefined,
-      }
-    : undefined
-  const legacyPace: ScannerDeviceOverrides | undefined = legacy
-    ? {
-        timeout: legacy.timeout,
-        minLength: legacy.minLength,
-        endKey: legacy.endKey,
-        prefixes: legacy.prefixes,
-        requirePrefix: legacy.requirePrefix,
-      }
-    : undefined
   const devices = base.devices.map((profile) => {
     const s = storedDevices.find(x => x && x.id === profile.id)
     if (s) {
       applyOverrides(profile, s)
     }
-    else if (legacyPace) {
-      applyOverrides(profile, { ...legacyPace, ...(profile.transport === 'hid' && legacy?.hidUrl ? { hidUrl: legacy.hidUrl } : {}) })
-    }
     return profile
   })
   const enabled = raw?.enabled !== false
-  const wantedActive = typeof raw?.activeId === 'string' && raw.activeId
+  const activeId = typeof raw?.activeId === 'string' && raw.activeId && devices.some(d => d.id === raw.activeId)
     ? raw.activeId
-    : legacy?.mode === 'hid' ? 'camsdk-hid' : undefined
-  const activeId = wantedActive && devices.some(d => d.id === wantedActive) ? wantedActive : base.activeId
+    : base.activeId
   return { enabled, activeId, devices }
 }
 
@@ -149,7 +117,7 @@ export class ScanService {
     logger: ScannerLogFn = () => {},
   ) {
     this.logger = logger
-    this.config = migrateScannerConfig(initialOverrides)
+    this.config = mergeStoredConfig(initialOverrides)
     this.scanner = this.buildScanner()
     // 启动即按激活档案接管通道（键盘仿真与 HID 通道互斥，由激活档案 transport 决定）
     this.syncHid()

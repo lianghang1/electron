@@ -7,19 +7,23 @@ import { z } from 'zod'
  * 信任面与形态无关：桥面统一为零能力 JSAPI 受控桥，能调什么由 permissions 声明 + 路由层闸门判定。
  */
 export const appEntrySchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('local'),
-    /** 产物相对 resources/apps 的目录名，缺省 = appId；须为 kebab-case，杜绝路径穿越 */
-    dir: z.string().regex(/^[a-z][a-z0-9-]*$/).optional(),
-    /** 开发态覆盖：dev server 地址（pnpm dev 时本地应用直接加载，与 remote 同一条加载链） */
-    devUrl: z.string().url().optional(),
-  }),
-  z.object({
-    kind: z.literal('remote'),
-    url: z.string().url(),
-    /** 允许的页面 origin 白名单；空数组 = 拒绝所有 JSAPI 调用；'*' 显式表示全放行 */
-    origins: z.array(z.string()),
-  }),
+  z
+    .object({
+      kind: z.literal('local'),
+      /** 产物相对 resources/apps 的目录名，缺省 = appId；须为 kebab-case，杜绝路径穿越 */
+      dir: z.string().regex(/^[a-z][a-z0-9-]*$/).optional(),
+      /** 开发态覆盖：dev server 地址（pnpm dev 时本地应用直接加载，与 remote 同一条加载链） */
+      devUrl: z.string().url().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('remote'),
+      url: z.string().url(),
+      /** 允许的页面 origin 白名单；空数组 = 拒绝所有 JSAPI 调用；'*' 显式表示全放行 */
+      origins: z.array(z.string()),
+    })
+    .strict(),
 ])
 
 export type AppEntry = z.infer<typeof appEntrySchema>
@@ -40,8 +44,9 @@ export const appManifestSchema = z.object({
       /** tab 栏是否显示关闭按钮（resource 形态固定 false） */
       closable: z.boolean().default(true),
     })
+    .strict()
     .default({ closable: true }),
-})
+}).strict()
 
 export type AppManifest = z.infer<typeof appManifestSchema>
 
@@ -69,6 +74,7 @@ export const flavorManifestSchema = z.object({
       /** 启动页主色（与 dt token 同源的语义别名） */
       accent: z.string().default('#4f46e5'),
     })
+    .strict()
     .default({ accent: '#4f46e5' }),
   update: z
     .object({
@@ -77,12 +83,14 @@ export const flavorManifestSchema = z.object({
       /** 允许拉取清单与包的 origin 白名单 */
       allowedOrigins: z.array(z.string()).default([]),
     })
+    .strict()
     .default({ allowedOrigins: [] }),
   print: z
     .object({
       /** 打印 URL 负载允许下载的 origin 白名单；'*' 放行全部公网（内网仍被 SSRF 防线拦截），空 = 拒绝一切远程下载 */
       urlOrigins: z.array(z.string()).default([]),
     })
+    .strict()
     .default({ urlOrigins: [] }),
   /**
    * 运行韧性（无人值守形态如 kiosk 才配；未声明即全关）：
@@ -102,10 +110,12 @@ export const flavorManifestSchema = z.object({
           hour: z.number().int().min(0).max(23).default(3),
           minute: z.number().int().min(0).max(59).default(0),
         })
+        .strict()
         .optional(),
     })
+    .strict()
     .optional(),
-})
+}).strict()
 
 export type FlavorManifest = z.infer<typeof flavorManifestSchema>
 

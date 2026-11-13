@@ -21,7 +21,7 @@ import { DownloadManager } from '@shell/kernel/download'
 import { createRootLogger } from '@shell/kernel/logger'
 import { AppSessionRegistry } from '@shell/kernel/session'
 import { applySettingsSideEffects, settingsSnapshot } from '@shell/kernel/settings'
-import { configDir, cookiesDir, filesDir, logsDir, migrateLegacyLayout, platformDataRoot } from '@shell/kernel/storage'
+import { configDir, cookiesDir, filesDir, logsDir, platformDataRoot } from '@shell/kernel/storage'
 import { assertSafeSegment, CallerRegistry, flavorManifestSchema, SHELL_APP_ID } from '@shell/shared'
 import {
   AsarHotChannel,
@@ -59,9 +59,6 @@ export interface BootContext {
   resourcesVersion: string | null
   updaterDir: string
 }
-
-// 旧布局一次性迁移必须先于任何写盘；失败仅告警不阻断启动
-migrateLegacyLayout()
 
 const logger = createRootLogger()
 
