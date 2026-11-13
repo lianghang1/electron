@@ -5,6 +5,8 @@ export interface ShellTab {
   key: string
   title: string
   iconColor: string
+  /** manifest.icon 原样透传：tab 徽标优先渲染应用图标，缺席退首字 */
+  icon?: string
   instanceId?: string
   appId?: string
 }
@@ -62,6 +64,7 @@ export function useShellTabs() {
       key: result.instanceId,
       title: manifest?.name ?? appId,
       iconColor: colorFor(appId),
+      icon: manifest?.icon,
       instanceId: result.instanceId,
       appId,
     }
@@ -81,6 +84,7 @@ export function useShellTabs() {
       key: instanceId,
       title: manifest?.name ?? appId,
       iconColor: colorFor(appId),
+      icon: manifest?.icon,
       instanceId,
       appId,
     }

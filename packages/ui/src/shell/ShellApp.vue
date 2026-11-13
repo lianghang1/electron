@@ -81,7 +81,7 @@ const multiApp = computed(() => tabs.value.length >= 2)
 /** solo 档的窗口控制条：仅桌面形态需要，kiosk 全屏锁定无控制条 */
 const soloWindowControls = computed(() => chrome.value === 'solo' && mode.value === 'windowed')
 
-/** 命令面板：⌘K / ＋ / 点击 omnibox 唤起 */
+/** 命令面板：⌘K / 点击 omnibox 唤起；应用中心走 ＋ 按钮，浏览与跳转分工 */
 const paletteOpen = ref(false)
 const paletteItems = computed(() => appList.value.map(a => ({
   id: a.manifest.id,
@@ -91,6 +91,10 @@ const paletteItems = computed(() => appList.value.map(a => ({
 
 function openSettings() {
   void shell().overlay.open({ kind: 'settings' })
+}
+
+function openAppCenter() {
+  void shell().overlay.open({ kind: 'app-center' })
 }
 
 function onGlobalKeydown(e: KeyboardEvent) {
@@ -166,10 +170,11 @@ onBeforeUnmount(() => {
         v-if="chrome === 'platform'"
         class="titlebar-drag flex h-9 items-center gap-1.5 border-b border-border px-2.5"
       >
-        <!-- 品牌标（壳不显示名称） -->
+        <!-- 品牌标（壳不显示名称）；hairline 与 tab 区断开，logo 不再与首字徽标并排混淆 -->
         <svg class="brand-mark shrink-0" viewBox="0 0 48 48" aria-hidden="true">
           <path fill="currentColor" d="M6 6h15l14 14h6L27 6h15v36H6Z" />
         </svg>
+        <Separator v-if="multiApp" orientation="vertical" class="mx-0.5 h-4 shrink-0" />
 
         <ShellTabBar
           v-if="multiApp"
@@ -178,7 +183,7 @@ onBeforeUnmount(() => {
           @activate="activate"
           @close="closeTab"
           @move="moveTab"
-          @open-palette="paletteOpen = true"
+          @open-app-center="openAppCenter"
         />
 
         <!-- 单应用态：当前应用名直接跟在 logo 后（窗口框语义，不做导航） -->

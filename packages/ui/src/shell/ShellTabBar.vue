@@ -8,7 +8,7 @@ const emit = defineEmits<{
   activate: [tab: ShellTab]
   close: [tab: ShellTab]
   move: [fromKey: string, toKey: string]
-  openPalette: []
+  openAppCenter: []
 }>()
 
 const stripEl = ref<HTMLElement | null>(null)
@@ -90,6 +90,7 @@ function onDragEnd() {
         'tab-idle opacity-75': tab.key !== activeKey,
         'opacity-40': draggingKey === tab.key,
       }"
+      :title="tab.key === activeKey ? undefined : tab.title"
       draggable="true"
       @click="emit('activate', tab)"
       @dragstart="onDragStart($event, tab)"
@@ -97,7 +98,11 @@ function onDragEnd() {
       @drop="onDrop($event, tab)"
       @dragend="onDragEnd"
     >
-      <span class="size-3.5 shrink-0 rounded-sm" :style="{ background: tab.iconColor }" aria-hidden="true" />
+      <!-- 徽标：应用图标优先，缺席退首字；哈希色只作底，顶栏彩色面积收敛到 14px -->
+      <span class="tab-mark grid size-3.5 shrink-0 place-items-center overflow-hidden rounded-sm" :style="{ background: tab.iconColor }" aria-hidden="true">
+        <img v-if="tab.icon" :src="tab.icon" alt="" class="size-3.5 object-cover">
+        <span v-else class="text-[8px] leading-none font-semibold text-white">{{ tab.title.slice(0, 1) }}</span>
+      </span>
       <span v-if="tab.key === activeKey" class="max-w-32 truncate">{{ tab.title }}</span>
       <span v-else class="sr-only">{{ tab.title }}</span>
       <button class="tab-close" :title="`关闭 ${tab.title}`" aria-label="关闭标签" @click.stop="emit('close', tab)">
@@ -106,9 +111,9 @@ function onDragEnd() {
     </div>
     <button
       class="tab-plus flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-hover hover:text-foreground"
-      title="打开应用（Ctrl+K）"
-      aria-label="打开应用"
-      @click="emit('openPalette')"
+      title="打开应用中心"
+      aria-label="打开应用中心"
+      @click="emit('openAppCenter')"
     >
       <Plus :size="14" />
     </button>
