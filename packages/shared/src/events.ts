@@ -94,8 +94,11 @@ export interface PlatformEvents {
   // 运行时授权：弹窗入列与决策完成
   'permission.pending': { requestId: string, appId: string, permission: string, origin: string }
   'permission.resolved': { requestId: string, granted: boolean }
-  // Tab 细粒度状态
-  'tabs.state-changed': { instanceId: string, action: 'reload' | 'fullscreen' | 'work-area' }
+  // Tab 细粒度状态：loading/failed 由视图加载生命周期维护，渲染层据此切换垫场与失败兜底
+  'tabs.state-changed': {
+    instanceId: string
+    action: 'reload' | 'fullscreen' | 'work-area' | 'loading-started' | 'loading-finished' | 'load-failed'
+  }
 }
 
 export type PlatformEventName = keyof PlatformEvents

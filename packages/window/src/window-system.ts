@@ -31,6 +31,8 @@ export class WindowSystem implements Startable, ViewHost {
   private shellWindowId?: number
   /** 视图容器：instanceId → WebContentsView（隐藏态挂载） */
   private views = new Map<string, Electron.WebContentsView>()
+  /** 主框架加载失败的视图：保持隐藏（渲染层失败兜底可见），重试的 did-start-loading 清账 */
+  private failedViews = new Set<string>()
   private activeViewId?: string
   private contentRect = { x: 0, y: 0, width: 0, height: 0 }
   private events?: EventBus
@@ -464,6 +466,21 @@ export class WindowSystem implements Startable, ViewHost {
     this.applySessionGuards(webContents.session, spec.permissions ?? [])
     void webContents.loadURL(spec.url)
 
+    // 加载状态广播：渲染层据此切换垫场（loading）与失败兜底（failed），垫场底色与
+    // view backgroundColor 同源；失败不再展开 Chromium 白错误页，交互出口由渲染层重试承接
+    webContents.on('did-start-loading', () => {
+      this.failedViews.delete(spec.instanceId)
+      this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'loading-started' })
+    })
+    webContents.on('did-stop-loading', () => {
+      this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'loading-finished' })
+    })
+    webContents.on('did-fail-load', (_event, _code, _desc, _url, isMainFrame) => {
+      if (!isMainFrame) { return }
+      this.failedViews.add(spec.instanceId)
+      this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'load-failed' })
+    })
+
     // 导航/新窗策略：白名单内跳转放行，window.open 升级为平台受管弹窗；白名单外转系统浏览器
     applyNavigationGuards(webContents, spec.allowedOrigins, (url, features) =>
       this.openManagedPopup(spec, url, features))
@@ -521,17 +538,14 @@ export class WindowSystem implements Startable, ViewHost {
     this.activeViewId = instanceId
     // 全屏中的视图切回时铺满整窗（期间窗口处于 OS 全屏），否则按工作区矩形落位
     view.setBounds(this.htmlFullscreen === instanceId ? win.getContentBounds() : this.contentRect)
-    // 垫场纪律：页面未加载完成不露白页（渲染层 accent 底透出），完成后仍是激活实例才显示
-    if (view.webContents.isLoading()) {
+    // 垫场纪律：页面未加载完成不露页（渲染层垫场透出），失败视图也不展开（渲染层失败
+    // 兜底承接交互出口），加载完成且仍是激活实例才显示
+    if (view.webContents.isLoading() || this.failedViews.has(instanceId)) {
       view.setVisible(false)
       const reveal = (): void => {
-        if (this.activeViewId === instanceId) { view.setVisible(true) }
+        if (this.activeViewId === instanceId && !this.failedViews.has(instanceId)) { view.setVisible(true) }
       }
       view.webContents.once('did-finish-load', reveal)
-      // 主框架加载失败也要展开：Electron 错误页需可见可交互，否则垫场底色永挂无出口
-      view.webContents.once('did-fail-load', (_event, _code, _desc, _url, isMainFrame) => {
-        if (isMainFrame) { reveal() }
-      })
     }
     else {
       view.setVisible(true)
@@ -554,6 +568,7 @@ export class WindowSystem implements Startable, ViewHost {
     if (!view) { return }
     this.removeView(view)
     this.views.delete(instanceId)
+    this.failedViews.delete(instanceId)
     if (this.activeViewId === instanceId) { this.activeViewId = undefined }
     // 全屏视图销毁时退出 OS 全屏：状态是本系统引入的，销毁后无人恢复
     if (this.htmlFullscreen === instanceId) {

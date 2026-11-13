@@ -32,11 +32,47 @@ const { dockEl } = useViewDock()
 
 let offForceRequired: (() => void) | undefined
 let offAppEvents: (() => void) | undefined
+let offTabState: (() => void) | undefined
 
 /** 跨进程载荷不可信：形状不符就忽略，不渲染脏数据 */
 function isForceRequired(value: unknown): value is { requiredVersion: string } {
   if (!value || typeof value !== 'object') { return false }
   return typeof (value as Record<string, unknown>).requiredVersion === 'string'
+}
+
+/** 视图加载状态：主进程按视图生命周期广播，垫场（loading）与失败兜底（failed）据此显隐 */
+const viewStates = ref<Record<string, 'loading' | 'failed'>>({})
+const activeViewState = computed(() => {
+  const id = activeTab.value?.instanceId
+  return (id ? viewStates.value[id] : undefined) ?? null
+})
+
+function isTabState(value: unknown): value is { instanceId: string, action: string } {
+  if (!value || typeof value !== 'object') { return false }
+  const p = value as Record<string, unknown>
+  return typeof p.instanceId === 'string' && typeof p.action === 'string'
+}
+
+function onTabStateChanged(payload: unknown) {
+  if (!isTabState(payload)) { return }
+  const { instanceId, action } = payload
+  if (action === 'loading-started') {
+    viewStates.value = { ...viewStates.value, [instanceId]: 'loading' }
+  }
+  else if (action === 'load-failed') {
+    viewStates.value = { ...viewStates.value, [instanceId]: 'failed' }
+  }
+  else if (action === 'loading-finished' && viewStates.value[instanceId] === 'loading') {
+    // 只清 loading 态：失败场景 did-stop-loading 也抵达，failed 标记保留到重试
+    const next = { ...viewStates.value }
+    delete next[instanceId]
+    viewStates.value = next
+  }
+}
+
+function retryActive() {
+  const id = activeTab.value?.instanceId
+  if (id) { void shell().tabs.reload(id) }
 }
 
 /** 多应用态：≥2 个 tab 时顶栏出现 tab 条；单应用态退化为 36px 窗口框（v2 定稿） */
@@ -90,6 +126,7 @@ onMounted(async () => {
   offForceRequired = shell().onEvent('update.force-required', (payload) => {
     if (isForceRequired(payload)) { forceRequiredVersion.value = payload.requiredVersion }
   })
+  offTabState = shell().onEvent('tabs.state-changed', onTabStateChanged)
   loadRecent()
   await loadApps()
   const info = await shell().shell.info()
@@ -114,6 +151,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onGlobalKeydown)
   offForceRequired?.()
   offAppEvents?.()
+  offTabState?.()
 })
 </script>
 
@@ -212,6 +250,38 @@ onBeforeUnmount(() => {
              产物 CSS 里 .relative 排在 .absolute 后必胜出，组件会被顶出视口 -->
         <div v-if="chrome === 'platform' && !activeTab" class="absolute inset-0">
           <EmptyState />
+        </div>
+        <!-- 视图垫场/失败兜底：accent 底与 intro、view backgroundColor 同一色源，
+             加载全程不出现第二色；失败不再展开 Chromium 白错误页，重试是交互出口 -->
+        <div
+          v-if="activeViewState"
+          class="absolute inset-0"
+          :class="chrome === 'platform' ? 'p-1.5' : ''"
+        >
+          <div
+            class="grid h-full w-full place-items-center bg-primary"
+            :class="chrome === 'platform' ? 'rounded-xl' : ''"
+          >
+            <div v-if="activeViewState === 'loading'" class="flex flex-col items-center gap-3 text-primary-foreground">
+              <svg viewBox="0 0 24 24" width="28" height="28" class="animate-spin" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="44" />
+              </svg>
+              <p v-if="activeTab" class="text-ui-sm">
+                正在加载「{{ activeTab.title }}」…
+              </p>
+            </div>
+            <div v-else class="flex flex-col items-center gap-4 text-primary-foreground">
+              <p class="text-ui-lg font-medium">
+                页面加载失败
+              </p>
+              <button
+                class="rounded-md bg-primary-foreground px-4 py-1.5 text-ui-base font-medium text-primary transition-colors hover:bg-surface-hover"
+                @click="retryActive()"
+              >
+                重试
+              </button>
+            </div>
+          </div>
         </div>
       </main>
 
