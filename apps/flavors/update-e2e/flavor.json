@@ -5,11 +5,10 @@
   "chrome": "platform",
   "apps": [
     {
-      "id": "demo-packaged",
-      "name": "演示打包应用",
+      "id": "demo-local",
+      "name": "演示本地应用",
       "version": "1.0.0",
-      "type": "internal",
-      "entry": { "kind": "packaged" },
+      "entry": { "kind": "local" },
       "devices": [],
       "permissions": []
     }

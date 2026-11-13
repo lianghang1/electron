@@ -11,12 +11,14 @@ export interface ViewSpec {
   appId: string
   /** 完整加载地址（app://<appId>/index.html 或 remote url） */
   url: string
-  /** JSAPI 受控桥 preload（remote 形态；packaged 不注入） */
+  /** JSAPI 受控桥 preload（remote/packaged 统一注入同一受控桥） */
   preload?: string
   /** 持久化会话分区名（remote 用 appId 隔离 Cookie） */
   partition?: string
   /** 允许导航与 JSAPI 的 origin 白名单；空数组 = 全部拒绝 */
   allowedOrigins: string[]
+  /** manifest 声明的平台权限：session 权限 check 同步判定的唯一来源 */
+  permissions?: string[]
 }
 
 export interface ViewHost {

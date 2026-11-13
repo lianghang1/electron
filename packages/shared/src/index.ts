@@ -9,13 +9,11 @@ export * from './devices/scanner'
 /* ---------------- 设备域类型（idcard / iccard / print / scanner / capture / signature） ---------------- */
 
 export * from './devices/signature'
-export * from './diagnostics'
 export * from './domain'
 export * from './download'
 export * from './errors'
 export * from './events'
 export * from './force-update'
 export * from './manifest'
-export * from './scenarios'
 export * from './security'
 export * from './settings'

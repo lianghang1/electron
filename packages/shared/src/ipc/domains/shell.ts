@@ -9,12 +9,11 @@ export interface DeviceStatusRow {
   [key: string]: unknown
 }
 
-/** 壳信息快照：渲染层按 chrome 档位决定挂不挂壳界面 */
+/** 壳信息快照：chrome 档位不经此下发（经 additionalArguments 同步送达，首帧即定型） */
 export interface ShellInfo {
   name: string
   version: string
   defaultAppId?: string
-  chrome: 'platform' | 'solo'
   mode: 'desktop' | 'kiosk'
   /** 强制更新门禁快照（清单 minVersion 与当前版本比对的结果） */
   forceUpdate?: { blocked: boolean, requiredVersion?: string }

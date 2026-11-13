@@ -8,9 +8,6 @@ if (boot) {
   bootstrapAppearance(boot.accent, boot.theme)
 }
 
-// DiagnosticsApp
-// registerEmbeddedApp('/diagnostics', DiagnosticsApp)
-
 /**
  * kiosk 看门狗恢复模式：连续崩溃后 WindowSystem 以 #/recovery 进入，
  * 渲染自检页而不是反复拉起——现场可读的故障态，而非黑屏/闪屏循环。

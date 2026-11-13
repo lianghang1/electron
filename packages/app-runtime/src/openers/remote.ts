@@ -33,6 +33,7 @@ export class RemoteOpener implements AppOpener {
       preload: this.jsapiPreloadPath,
       partition: `persist:app-${manifest.id}`,
       allowedOrigins: entry.origins,
+      permissions: manifest.permissions,
     })
   }
 

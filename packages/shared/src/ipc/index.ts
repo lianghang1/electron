@@ -68,8 +68,8 @@ export type ShellBridge = UnionToIntersection<DomainApiPart<ShellDomainValue>> &
   /** 平台事件订阅：kernel 事件名 → event:<name> 通道；scanner.scanned 兼容映射旧通道 */
   onEvent: (event: string, handler: (payload: unknown) => void) => () => void
 } & {
-  /** 同步快照：启动外观（组合根经 additionalArguments 送达，preload 读启动参数，不经 IPC） */
-  shell: { appearance: () => { accent: string, theme: 'light' | 'dark' | 'system' } }
+  /** 同步快照：启动外观与布局档位（组合根经 additionalArguments 送达，preload 读启动参数，不经 IPC） */
+  shell: { appearance: () => { accent: string, theme: 'light' | 'dark' | 'system', chrome: 'platform' | 'solo' } }
 }
 
 // 域值再导出：主进程域级表驱动注册（registerIpcDomain）与广播发送按域引用

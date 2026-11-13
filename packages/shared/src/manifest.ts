@@ -1,21 +1,18 @@
 import { z } from 'zod'
 
 /**
- * 应用接入三形态（判别联合）：
- * - embedded：嵌入工作台的融合页（shell 路由组件，零桥接开销）
- * - packaged：打包好的 dist（resources/apps/<id>/，app:// 协议服务）
- * - remote：在线网页（WebContentsView + JSAPI 受控桥）
+ * 应用接入两形态（判别联合），统一 WebContentsView 宿主：
+ * - local：仓库构建产物（resources/apps/<id>/，app:// 协议服务；开发态 devUrl 直连 dev server）
+ * - remote：在线网页
+ * 信任面与形态无关：桥面统一为零能力 JSAPI 受控桥，能调什么由 permissions 声明 + 路由层闸门判定。
  */
 export const appEntrySchema = z.discriminatedUnion('kind', [
   z.object({
-    kind: z.literal('embedded'),
-    /** shell 内路由路径，如 '/devices' */
-    route: z.string().startsWith('/'),
-  }),
-  z.object({
-    kind: z.literal('packaged'),
-    /** 相对 resources/apps 的目录名，缺省 = appId；须为 kebab-case，杜绝路径穿越 */
+    kind: z.literal('local'),
+    /** 产物相对 resources/apps 的目录名，缺省 = appId；须为 kebab-case，杜绝路径穿越 */
     dir: z.string().regex(/^[a-z][a-z0-9-]*$/).optional(),
+    /** 开发态覆盖：dev server 地址（pnpm dev 时本地应用直接加载，与 remote 同一条加载链） */
+    devUrl: z.string().url().optional(),
   }),
   z.object({
     kind: z.literal('remote'),
@@ -31,8 +28,6 @@ export const appManifestSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]*$/, 'appId 须为小写 kebab-case'),
   name: z.string().min(1),
   version: z.string(),
-  /** internal：平台自己人；third-party：外部接入方，按更严格策略处理 */
-  type: z.enum(['internal', 'third-party']).default('internal'),
   entry: appEntrySchema,
   icon: z.string().optional(),
   /** 声明需要的硬件域（idcard/print/...），运行时经 PermissionService 放行 */
@@ -68,11 +63,6 @@ export const flavorManifestSchema = z.object({
   chrome: z.enum(['platform', 'solo']).default('platform'),
   /** 内置应用清单（apps.json 同构，也可远程下发） */
   apps: z.array(appManifestSchema).default([]),
-  /**
-   * 验机形态：声明后放行诊断专用域方法（扫码模拟等），生产形态一律禁用。
-   * 与打包状态无关——现场验机跑的就是打包产物。
-   */
-  diagnostics: z.boolean().default(false),
   branding: z
     .object({
       icon: z.string().optional(),
@@ -118,6 +108,11 @@ export const flavorManifestSchema = z.object({
 })
 
 export type FlavorManifest = z.infer<typeof flavorManifestSchema>
+
+/** 壳 chrome 档位生效值：kiosk 运行模式强制 solo（全屏锁定形态没有工作台 chrome） */
+export function effectiveChrome(flavor: Pick<FlavorManifest, 'mode' | 'chrome'>): 'platform' | 'solo' {
+  return flavor.mode === 'kiosk' ? 'solo' : flavor.chrome
+}
 
 /** 应用注册来源 */
 export type AppSource = 'flavor' | 'apps.json' | 'remote'

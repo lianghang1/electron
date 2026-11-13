@@ -5,12 +5,13 @@ import type { OverlayKind, OverlayPolicy } from './overlay-host'
 import { join } from 'node:path'
 import process from 'node:process'
 import { registerIpcDomain } from '@shell/bridge/handle'
-import { matchesOrigin, sessionToPlatformPermission, SHELL_APP_ID } from '@shell/shared'
+import { effectiveChrome, SHELL_APP_ID } from '@shell/shared'
 import { windowDomain } from '@shell/shared/ipc'
 import { app, BrowserWindow, WebContentsView } from 'electron'
 import { createDesktopMode, createKioskMode } from './modes'
 import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
+import { applyNavigationGuards, installSessionGuards, parsePopupFeatures, SECURE_WEB_PREFERENCES } from './security'
 
 /** 消息窗内容宽度与透明窗阴影余量：透明窗会硬裁超出位图的内容 */
 const PANEL_WIDTH = 320
@@ -75,19 +76,15 @@ export class WindowSystem implements Startable, ViewHost {
     this.permissionGate = gate
   }
 
-  /** Chromium 系统权限（摄像头/剪贴板/位置等）：映射成平台权限后走同一张策略表 */
-  private installPermissionGate(wc: Electron.WebContents): void {
-    wc.session.setPermissionRequestHandler((requesting, chromiumPermission, callback) => {
-      const caller = this.callers?.tryResolve(requesting.id)
-      const permission = sessionToPlatformPermission(chromiumPermission)
-      const gate = this.permissionGate
-      if (!caller || !permission || !gate) {
-        callback(false)
-        return
-      }
-      void gate(caller.appId, permission)
-        .then(allowed => callback(allowed))
-        .catch(() => callback(false))
+  /** Chromium 系统权限（摄像头/剪贴板/位置等）：session 闸门按调用方身份走权限策略链 */
+  private applySessionGuards(session: Electron.Session, declared: 'all' | readonly string[]): void {
+    installSessionGuards(session, {
+      declared,
+      callerOf: id => this.callers?.tryResolve(id),
+      gate: (appId, permission) =>
+        this.permissionGate
+          ? this.permissionGate(appId, permission)
+          : Promise.resolve(false),
     })
   }
 
@@ -129,6 +126,8 @@ export class WindowSystem implements Startable, ViewHost {
         additionalArguments: [
           `--shell-accent=${this.initialAccent}`,
           `--shell-theme=${this.initialTheme}`,
+          // 布局档位同步定型：solo 档无接缝底板，异步获取会让视图容器矩形首报落空
+          `--shell-chrome=${effectiveChrome(this.flavor)}`,
         ],
       },
     })
@@ -161,8 +160,11 @@ export class WindowSystem implements Startable, ViewHost {
       }
     })
     this.track(win, { appId: SHELL_APP_ID, instanceId: 'shell', kind: 'shell' })
-    this.installPermissionGate(win.webContents)
+    this.applySessionGuards(win.webContents.session, 'all')
     this.installDevToolsShortcut(win)
+    // 从最小化/隐藏恢复时重放工作区：系统可能丢弃恢复前施加的 view bounds
+    win.on('restore', () => this.replayContentRect())
+    win.on('show', () => this.replayContentRect())
     this.shellWindowId = win.id
     if (this.flavor.mode === 'kiosk') { this.installKioskWatchdog(win) }
     return win
@@ -330,7 +332,7 @@ export class WindowSystem implements Startable, ViewHost {
     if (devUrl) { void win.loadURL(`${devUrl}/${hash}`) }
     else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash: hash.replace(/^#/, '') }) }
     this.track(win, { appId: SHELL_APP_ID, instanceId: `overlay-${policy.kind}`, kind: 'overlay' })
-    this.installPermissionGate(win.webContents)
+    this.applySessionGuards(win.webContents.session, 'all')
     this.installDevToolsShortcut(win)
     return win
   }
@@ -434,16 +436,17 @@ export class WindowSystem implements Startable, ViewHost {
 
   // ── ViewHost SPI（packaged/remote 应用视图容器）────────────────
 
+  /** 当前处于 HTML5 全屏的视图实例；null = 无。全屏视图铺满整窗，bounds 操作不回落工作区 */
+  private htmlFullscreen: string | null = null
+
   create(spec: ViewSpec): unknown {
     const win = this.shellWindow
     if (!win) { throw new Error('[window] shell window not created yet') }
 
     const view = new WebContentsView({
       webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        // 恒为 true：jsapi preload 只用 contextBridge/ipcRenderer，白名单内沙箱可用
-        sandbox: true,
+        // 安全基线写死（security.ts）：sandbox/contextIsolation/webSecurity 等，不按调用方放宽
+        ...SECURE_WEB_PREFERENCES,
         preload: spec.preload,
         partition: spec.partition,
       },
@@ -454,23 +457,44 @@ export class WindowSystem implements Startable, ViewHost {
 
     const { webContents } = view
     this.callers?.register(webContents.id, { appId: spec.appId, instanceId: spec.instanceId, kind: 'view' })
-    this.installPermissionGate(webContents)
+    this.applySessionGuards(webContents.session, spec.permissions ?? [])
     void webContents.loadURL(spec.url)
 
-    // origin 白名单强制：导航出白名单即拦截回退
-    webContents.on('will-navigate', (event, url) => {
-      if (!this.isOriginAllowed(url, spec.allowedOrigins)) { event.preventDefault() }
-    })
-    webContents.setWindowOpenHandler(({ url }) => {
-      return { action: this.isOriginAllowed(url, spec.allowedOrigins) ? 'allow' : 'deny' }
-    })
-    // HTML5 全屏：原生 view 铺满主窗内容区，退出后回到 Shell 上报的工作区矩形
+    // 导航/新窗策略：白名单内跳转放行，window.open 升级为平台受管弹窗；白名单外转系统浏览器
+    applyNavigationGuards(webContents, spec.allowedOrigins, (url, features) =>
+      this.openManagedPopup(spec, url, features))
+    // HTML5 全屏跟随：WebContentsView 不响应页面全屏请求，必须显式放大。
+    // desktop 模式同步系统全屏——setFullScreen 是异步布局，等 enter-full-screen 后
+    // 再铺 view（此时 getContentBounds 才是屏幕尺寸）；kiosk 恒为全屏，无 OS 状态
+    // 切换，直接在整窗与工作区矩形间切换，绝不能调 setFullScreen(false) 破坏 kiosk
     webContents.on('enter-html-full-screen', () => {
-      view.setBounds(win.getContentBounds())
+      this.htmlFullscreen = spec.instanceId
+      if (this.flavor.mode === 'kiosk') {
+        view.setBounds(win.getContentBounds())
+      }
+      else {
+        win.setFullScreen(true)
+        win.once('enter-full-screen', () => {
+          if (!view.webContents.isDestroyed() && this.htmlFullscreen === spec.instanceId) {
+            view.setBounds(win.getContentBounds())
+          }
+        })
+      }
       this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'fullscreen' })
     })
     webContents.on('leave-html-full-screen', () => {
-      view.setBounds(this.contentRect)
+      this.htmlFullscreen = null
+      if (this.flavor.mode === 'kiosk') {
+        if (this.activeViewId === spec.instanceId) { view.setBounds(this.contentRect) }
+      }
+      else {
+        win.setFullScreen(false)
+        win.once('leave-full-screen', () => {
+          if (!view.webContents.isDestroyed() && this.activeViewId === spec.instanceId) {
+            view.setBounds(this.contentRect)
+          }
+        })
+      }
       this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'work-area' })
     })
     // 崩溃自愈：Chrome 式 Tab 恢复（渲染层感知后按退避策略重开实例）
@@ -491,12 +515,18 @@ export class WindowSystem implements Startable, ViewHost {
     if (!win || !view) { return }
     if (this.activeViewId && this.activeViewId !== instanceId) { this.views.get(this.activeViewId)?.setVisible(false) }
     this.activeViewId = instanceId
-    view.setBounds(this.contentRect)
+    // 全屏中的视图切回时铺满整窗（期间窗口处于 OS 全屏），否则按工作区矩形落位
+    view.setBounds(this.htmlFullscreen === instanceId ? win.getContentBounds() : this.contentRect)
     // 垫场纪律：页面未加载完成不露白页（渲染层 accent 底透出），完成后仍是激活实例才显示
     if (view.webContents.isLoading()) {
       view.setVisible(false)
-      view.webContents.once('did-finish-load', () => {
+      const reveal = (): void => {
         if (this.activeViewId === instanceId) { view.setVisible(true) }
+      }
+      view.webContents.once('did-finish-load', reveal)
+      // 主框架加载失败也要展开：Electron 错误页需可见可交互，否则垫场底色永挂无出口
+      view.webContents.once('did-fail-load', (_event, _code, _desc, _url, isMainFrame) => {
+        if (isMainFrame) { reveal() }
       })
     }
     else {
@@ -512,11 +542,68 @@ export class WindowSystem implements Startable, ViewHost {
   }
 
   destroy(instanceId: string): void {
+    for (const popup of this.popups.get(instanceId) ?? []) {
+      if (!popup.isDestroyed()) { popup.close() }
+    }
+    this.popups.delete(instanceId)
     const view = this.views.get(instanceId)
     if (!view) { return }
     this.removeView(view)
     this.views.delete(instanceId)
     if (this.activeViewId === instanceId) { this.activeViewId = undefined }
+    // 全屏视图销毁时退出 OS 全屏：状态是本系统引入的，销毁后无人恢复
+    if (this.htmlFullscreen === instanceId) {
+      this.htmlFullscreen = null
+      if (this.flavor.mode !== 'kiosk') { this.shellWindow?.setFullScreen(false) }
+    }
+  }
+
+  /**
+   * 平台受管弹窗：window.open 的落点。继承父应用的 preload/session/权限声明与导航策略
+   * （递归套用），身份入账本（kind=view）——弹窗内 JSAPI 调用与父应用同一信任面。
+   */
+  private popupSeq = 0
+  private popups = new Map<string, BrowserWindow[]>()
+
+  private openManagedPopup(spec: ViewSpec, url: string, features?: string): void {
+    const parent = this.shellWindow
+    if (!parent || parent.isDestroyed()) { return }
+    const parsed = parsePopupFeatures(features)
+    const bounds = parent.getContentBounds()
+    // 先钳制再居中：features 要求的尺寸超出父窗时，尺寸与位置必须用同一份钳制值
+    const width = Math.min(parsed.width, bounds.width)
+    const height = Math.min(parsed.height, bounds.height)
+    const win = new BrowserWindow({
+      parent,
+      width,
+      height,
+      x: Math.round(bounds.x + Math.max(0, (bounds.width - width) / 2)),
+      y: Math.round(bounds.y + Math.max(0, (bounds.height - height) / 2)),
+      show: false,
+      autoHideMenuBar: true,
+      webPreferences: {
+        ...SECURE_WEB_PREFERENCES,
+        preload: spec.preload,
+        partition: spec.partition,
+      },
+    })
+    win.setMenu(null)
+    const instanceId = `${spec.instanceId}:popup-${++this.popupSeq}`
+    this.track(win, { appId: spec.appId, instanceId, kind: 'view' })
+    this.applySessionGuards(win.webContents.session, spec.permissions ?? [])
+    applyNavigationGuards(win.webContents, spec.allowedOrigins, (popupUrl, popupFeatures) =>
+      this.openManagedPopup(spec, popupUrl, popupFeatures))
+    const list = this.popups.get(spec.instanceId) ?? []
+    list.push(win)
+    this.popups.set(spec.instanceId, list)
+    win.on('closed', () => {
+      const remaining = this.popups.get(spec.instanceId)
+      if (remaining) { this.popups.set(spec.instanceId, remaining.filter(p => p !== win)) }
+    })
+    win.once('ready-to-show', () => {
+      if (!win.isDestroyed()) { win.show() }
+    })
+    void win.loadURL(url)
   }
 
   /** Tab 细粒度：重载指定实例；全屏进出由 WebContentsView 的 HTML5 fullscreen 事件接管 */
@@ -525,10 +612,28 @@ export class WindowSystem implements Startable, ViewHost {
     this.events?.emit('tabs.state-changed', { instanceId, action: 'reload' })
   }
 
+  /** 工作区采信下限：低于此尺寸视为塌缩上报（窗口最小化/隐藏期间 getBoundingClientRect 的失真值），拒绝采信 */
+  private static readonly WORK_AREA_FLOOR = 64
+
   setContentRect(rect: { x: number, y: number, width: number, height: number }): void {
+    if (rect.width < WindowSystem.WORK_AREA_FLOOR || rect.height < WindowSystem.WORK_AREA_FLOOR) { return }
     this.contentRect = rect
-    if (this.activeViewId) { this.views.get(this.activeViewId)?.setBounds(rect) }
+    this.applyActiveBounds(rect)
     this.events?.emit('tabs.state-changed', { instanceId: this.activeViewId ?? '', action: 'work-area' })
+  }
+
+  /** 窗口从最小化/隐藏恢复时重放工作区矩形：期间施加的 bounds 可能被系统丢弃 */
+  private replayContentRect(): void {
+    if (!this.activeViewId) { return }
+    this.applyActiveBounds(this.contentRect)
+  }
+
+  /** 激活视图落位的统一出口：全屏视图铺满整窗，其余按给定矩形（工作区上报/恢复重放共用） */
+  private applyActiveBounds(rect: { x: number, y: number, width: number, height: number }): void {
+    const view = this.activeViewId ? this.views.get(this.activeViewId) : undefined
+    if (!view) { return }
+    const win = this.shellWindow
+    view.setBounds(this.htmlFullscreen === this.activeViewId && win ? win.getContentBounds() : rect)
   }
 
   /** 活跃视图实例（供组合根做 JSAPI origin 校验等） */
@@ -540,9 +645,5 @@ export class WindowSystem implements Startable, ViewHost {
     this.callers?.unregister(view.webContents.id)
     this.shellWindow?.contentView.removeChildView(view)
     view.webContents.close()
-  }
-
-  private isOriginAllowed(url: string, allowed: string[]): boolean {
-    return matchesOrigin(url, allowed)
   }
 }

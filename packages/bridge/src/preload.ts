@@ -17,15 +17,17 @@ import { contextBridge, ipcRenderer } from 'electron'
  * remote 页面不经过本桥（它们拿 JSAPI 受控桥，按 manifest.devices 过滤）。
  */
 
-/** 启动外观：由组合根经 additionalArguments 同步送达，避免异步 IPC 造成的首帧闪烁 */
-function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'system' } {
+/** 启动外观与布局档位：由组合根经 additionalArguments 同步送达，避免异步 IPC 造成的首帧闪烁 */
+function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'system', chrome: 'platform' | 'solo' } {
   const pick = (prefix: string, fallback: string) =>
     process.argv.find(a => a.startsWith(prefix))?.slice(prefix.length) ?? fallback
   const accent = pick('--shell-accent=', '#4f46e5')
   const theme = pick('--shell-theme=', 'system')
+  const chrome = pick('--shell-chrome=', 'platform')
   return {
     accent,
     theme: theme === 'light' || theme === 'dark' ? theme : 'system',
+    chrome: chrome === 'solo' ? 'solo' : 'platform',
   }
 }
 

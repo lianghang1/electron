@@ -30,7 +30,7 @@ export function registerRouterIpc(deps: RouterIpcDeps): void {
     })
   })
 
-  // JSAPI 受控桥（remote 页面）：账本身份 + origin 白名单双重校验
+  // JSAPI 受控桥（remote/local 页面统一桥面）：账本身份 + origin 白名单双重校验
   ipcMain.handle('jsapi:call', (event, method: string, input: unknown) => {
     const frameUrl = event.senderFrame?.url ?? ''
     let origin: string
@@ -44,9 +44,10 @@ export function registerRouterIpc(deps: RouterIpcDeps): void {
     if (!caller) { throw new DomainRouteError('PERMISSION_DENIED', '调用方未登记') }
     const found = deps.apps.list().find((r) => {
       const entry = r.manifest.entry
-      return r.manifest.id === caller.appId
-        && entry.kind === 'remote'
-        && matchesOrigin(frameUrl, entry.origins)
+      if (r.manifest.id !== caller.appId) { return false }
+      if (entry.kind === 'remote') { return matchesOrigin(frameUrl, entry.origins) }
+      if (entry.kind === 'local') { return origin === `app://${entry.dir ?? r.manifest.id}` }
+      return false
     })
     if (!found) {
       deps.logger.warn('jsapi rejected: origin not allowed', { origin, appId: caller.appId, method })

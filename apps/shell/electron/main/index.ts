@@ -7,9 +7,8 @@ import {
   AppService,
   buildAppPermissionRules,
   buildPlatformPermissionRules,
-  EmbeddedOpener,
   loadAppsJson,
-  PackagedOpener,
+  LocalOpener,
   PermissionService,
   registerAppProtocol,
   registerAppScheme,
@@ -85,6 +84,7 @@ const PLATFORM_SELF_PERMISSIONS: readonly PermissionRule[] = [
   'tabs',
   'permissions',
   'media',
+  'deviceConfig',
 ].map(permission => ({ app: SHELL_APP_ID, permission, verdict: 'allow' as const }))
 
 // app:// 协议的特权声明必须在 app ready 前（Electron 时序硬约束）
@@ -244,7 +244,6 @@ async function main(context: BootContext): Promise<void> {
     paths: { storageRoot: configDir(), filesRoot: filesDir() },
     // 打印 URL 白名单独立于更新链路：flavor.print.urlOrigins（'*' 放行公网，内网仍被 SSRF 防线拦截）
     allowedOrigins: flavor.print.urlOrigins,
-    diagnostics: flavor.diagnostics,
     platformId: capability.platform,
     availableDomains: capability.availableDomains,
     getParent: () => windows.shellWindow,
@@ -364,8 +363,7 @@ async function main(context: BootContext): Promise<void> {
   const apps = new AppService(
     manifest => permissions.allowsApp(manifest),
     [
-      new EmbeddedOpener(),
-      new PackagedOpener(windows, builtinAppsRoot),
+      new LocalOpener(windows, builtinAppsRoot, join(preloadDir, 'jsapi.cjs')),
       new RemoteOpener(windows, join(preloadDir, 'jsapi.cjs')),
     ],
     kernel.ctx.events,
@@ -375,7 +373,7 @@ async function main(context: BootContext): Promise<void> {
 
   // 非 embedded 应用先建分区：窗口系统按 partition 取到的就是已注册协议与门控的 Session
   for (const manifest of catalog) {
-    if (manifest.entry.kind !== 'embedded') { appSessions.forApp(manifest.id) }
+    appSessions.forApp(manifest.id)
   }
 
   // ── IPC 接线 ─────────────────────────────────────────────

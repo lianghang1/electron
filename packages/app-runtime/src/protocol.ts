@@ -75,8 +75,14 @@ export function registerAppProtocol(session: Session, resolve: AppRootResolver):
     if (!mime || !existsSync(resolved) || !statSync(resolved).isFile()) {
       return new Response('not found', { status: 404 })
     }
-    return new Response(readFileSync(resolved), {
-      headers: { 'content-type': mime },
-    })
+    // 版本指纹缓存：no-cache 强制每次向协议层校验，热更替换产物后内容变化即换 ETag；
+    // 未变化的资源走 304，不重复传输
+    const stat = statSync(resolved)
+    const etag = `"${stat.size}-${Math.floor(stat.mtimeMs)}"`
+    const headers = { 'content-type': mime, etag, 'cache-control': 'no-cache' }
+    if (request.headers.get('if-none-match') === etag) {
+      return new Response(null, { status: 304, headers })
+    }
+    return new Response(readFileSync(resolved), { headers })
   })
 }

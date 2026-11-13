@@ -28,7 +28,6 @@ export function registerShellInfoIpc(deps: ShellInfoIpcDeps): void {
       name: deps.flavor.name,
       version: deps.version(),
       defaultAppId: deps.flavor.defaultAppId,
-      chrome: deps.flavor.mode === 'kiosk' ? 'solo' : deps.flavor.chrome,
       mode: deps.flavor.mode,
       // 门禁快照：渲染层启动即知是否阻断，后续变化经 update.force-required 事件推送
       forceUpdate: deps.forceGate?.snapshot,

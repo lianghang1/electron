@@ -77,7 +77,7 @@ export function registerShellIpc(deps: ShellIpcDeps): void {
   registerNotificationsIpc({ callers: deps.callers, permissions: deps.permissions, notifications: deps.notifications })
   registerUpdateIpc({ callers: deps.callers, updateCenter: deps.updateCenter, markGracefulExit: deps.markGracefulExit })
   registerPermissionsIpc({ callers: deps.callers, permissions: deps.permissions })
-  registerDeviceConfigIpc({ callers: deps.callers, devices: deps.devices, flavor: deps.flavor })
+  registerDeviceConfigIpc({ callers: deps.callers, permissions: deps.permissions, devices: deps.devices })
   registerCaptureDialogIpc({ callers: deps.callers, apps: deps.apps, devices: deps.devices })
   registerRouterIpc({ callers: deps.callers, logger: deps.logger, router: deps.router, apps: deps.apps })
 

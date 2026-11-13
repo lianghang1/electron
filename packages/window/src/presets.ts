@@ -4,6 +4,7 @@
  */
 import type { BrowserWindowConstructorOptions } from 'electron'
 import process from 'node:process'
+import { SECURE_WEB_PREFERENCES } from './security'
 
 /** 主窗底色透明：启动期透出桌面/系统材质；应用根面不透明，材质只在透明处可见。 */
 function shellVisualOptions(): BrowserWindowConstructorOptions {
@@ -47,11 +48,8 @@ export const shellBase: BrowserWindowConstructorOptions = {
   ...shellVisualOptions(),
   minWidth: 960,
   minHeight: 600,
-  webPreferences: {
-    contextIsolation: true,
-    nodeIntegration: false,
-    sandbox: true,
-  },
+  // 平台自绘窗口与应用容器同一份安全基线（security.ts），不因「自家页面」豁免
+  webPreferences: { ...SECURE_WEB_PREFERENCES },
 }
 
 /** 浮层基础：透明 + 无边框 + 不抢焦点显示 */
@@ -61,11 +59,7 @@ export const overlayBase: BrowserWindowConstructorOptions = {
   resizable: false,
   show: false,
   backgroundColor: '#00000000',
-  webPreferences: {
-    contextIsolation: true,
-    nodeIntegration: false,
-    sandbox: true,
-  },
+  webPreferences: { ...SECURE_WEB_PREFERENCES },
 }
 
 /** Windows 全屏浮层防停止合成（浮层盖住主窗时主窗画面冻结的 Chromium 特性） */
