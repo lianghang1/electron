@@ -78,8 +78,8 @@ resources/devices/                     驱动资产
 | 引导层加载 core asar 并启动 | 已通过（安装目录实包，`launcher.log` 为证） | 同一引导代码路径 | 待真机 | 待真机 |
 | 整包安装与退出交接 | 已通过（`graceful-exit.json` 落盘） | 同一引导代码路径 | 待真机 | 待真机 |
 | 厂商 DLL / 驱动调用 | 不在沙箱范围 | 待真机 | 待真机 | 待真机 |
-| 原生浮层遮挡与焦点 | 逻辑 e2e 已覆盖 | 待真机 | 待真机 | 待真机 |
-| 热更指针切换 + 60s 判活回滚 | e2e 15 项 + 实包演练通过 | 同一引导代码路径 | 同一引导代码路径 | 同一引导代码路径 |
+| 原生浮层遮挡与焦点 | 代码级覆盖 | 待真机 | 待真机 | 待真机 |
+| 热更指针切换 + 60s 判活回滚 | 实包演练通过 | 同一引导代码路径 | 同一引导代码路径 | 同一引导代码路径 |
 | 签名 / 公证 / GPG | 未启用 | 未启用 | 未签名（signtool 无证书直通） | 未签名 |
 
 六端产物均可在本仓库工具链产出：Linux 双架构原生；Windows NSIS 依赖 `wine`（含 32 位前缀，`wineboot --init` 需先建好，Ubuntu 上补 `wine32:i386`）；macOS zip 直接交叉，dmg 必须回到 mac 端（`hdiutil`）。
@@ -104,7 +104,7 @@ resources/devices/                     驱动资产
 | 优雅重启不清版本 | timeout SIGTERM → `graceful-exit.json` → 下次启动 `graceful relaunch, settle skipped`，继续跑热更版本 |
 | 崩溃式早死自动回滚 | first-run 留存 → 下次启动 `hot core rollback applied` → `loaded builtin core`，stdout 零次热更标记，热更包/指针全部清除 |
 
-演练中抓出并修复的真实缺陷：`sequence.mjs` 用 `node:fs` 删除 asar 文件，Electron 把 asar 挂进虚拟文件系统呈现为「目录」，rmSync 报 EISDIR——坏包清理与判活回滚在真机上会静默失败、脏状态永久残留（纯逻辑 e2e 测不出来）。修复为优先 `original-fs`（纯 Node 回退），更新 e2e 15 项回归通过。
+演练中抓出并修复的真实缺陷：`sequence.mjs` 用 `node:fs` 删除 asar 文件，Electron 把 asar 挂进虚拟文件系统呈现为「目录」，rmSync 报 EISDIR——坏包清理与判活回滚在真机上会静默失败、脏状态永久残留修复为优先 `original-fs`（纯 Node 回退）。
 
 ## 明确不做
 

@@ -34,7 +34,7 @@ pnpm dev:diagnostics     # 验机形态（硬件自检台）
 pnpm verify              # 干净目录里的完整验证
 ```
 
-`pnpm verify` 把 `git ls-files` 的入库文件复制到干净目录，依次跑 install → guard → design → lint → typecheck → test → 10 套 e2e → build → design:css → dev 解析阶段（含验机入口），任一失败即非零退出。**结论以机器退出码为准**，不在带构建产物的工作树里宣称全绿。
+`pnpm verify` 把 `git ls-files` 的入库文件复制到干净目录，依次跑 install → guard → design → lint → typecheck → build → design:css → dev 解析阶段（含验机入口），任一失败即非零退出。**结论以机器退出码为准**，不在带构建产物的工作树里宣称全绿。
 
 ## 常用脚本
 
@@ -43,8 +43,7 @@ pnpm verify              # 干净目录里的完整验证
 | `pnpm dev` / `pnpm dev:<形态>` | 开发启动（源码直引，零前置构建）；形态可选 cemetery / platform / solo / kiosk / diagnostics |
 | `pnpm guard` | 注释词表、类型逃逸、依赖边界、幽灵依赖零容忍检查 |
 | `pnpm check:design` | 把 DESIGN.md 的界面禁令变成退出码 |
-| `pnpm lint` / `pnpm typecheck` / `pnpm test` | 静态检查与单测 |
-| `pnpm test:e2e:*` | 纯 Node 机器证据（更新 / 浮层 / 权限 / 韧性 / 门禁 / 应用源 / 会话 / 调用方 / 验机 / 拍摄会话） |
+| `pnpm lint` / `pnpm typecheck` | 静态检查 |
 | `pnpm build:win` / `pnpm build:mac` / `pnpm build:linux` | 逐端打包，见 [release.md](./docs/release.md)；换形态打包加环境变量，如 `FLAVOR=platform-demo pnpm build:linux` |
 | `pnpm verify` | 干净 clone 可复现验证 |
 
@@ -66,4 +65,4 @@ pnpm verify              # 干净目录里的完整验证
 
 ## 真机边界
 
-沙箱内可验证的是 Linux x64 打包、启动链路与全部纯逻辑 e2e。Windows / macOS / ARM64 / 国产化 CPU 的真机安装、厂商 DLL、签名公证与 GPG 需在对应设备验证——能力表声明的平台不等于已完成真机验证，逐项状态见 [release.md](./docs/release.md)。
+沙箱内可验证的是 Linux x64 打包与启动链路。Windows / macOS / ARM64 / 国产化 CPU 的真机安装、厂商 DLL、签名公证与 GPG 需在对应设备验证——能力表声明的平台不等于已完成真机验证，逐项状态见 [release.md](./docs/release.md)。

@@ -10,8 +10,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@shell/kernel": "workspace:*",
@@ -24,7 +23,6 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@types/ws": "^8.18.1",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

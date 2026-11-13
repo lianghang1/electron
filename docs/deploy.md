@@ -68,4 +68,4 @@ koffi 原生依赖随整包落 `resources/node_modules/`，**热更包禁止携�
 
 ## 验机形态
 
-`diagnostics: true` 的形态启动硬件自检台：设备连接、平台能力矩阵、驱动寻址、IPC 调用均可人工触发，是现场排障入口而非调试开关。调试台方法名只从 `DIAGNOSTIC_CATALOG` 取，e2e 双向比对其与真实域定义。
+`diagnostics: true` 的形态启动硬件自检台：设备连接、平台能力矩阵、驱动寻址、IPC 调用均可人工触发，是现场排障入口而非调试开关。调试台方法名只从 `DIAGNOSTIC_CATALOG` 取，与真实域定义保持单一来源对齐。

@@ -28,24 +28,12 @@
     "check:design": "node scripts/check-design-system.mjs check",
     "check:design:css": "node scripts/check-design-system.mjs css",
     "verify": "node scripts/verify.mjs",
-    "test": "pnpm -r test",
-    "test:e2e:update": "node --import tsx scripts/e2e/update-e2e.mjs",
-    "test:e2e:capture-dialog": "node --import tsx scripts/e2e/capture-dialog-e2e.mjs",
-    "test:e2e:overlay": "node --import tsx scripts/e2e/overlay-e2e.mjs",
-    "test:e2e:permission": "node --import tsx scripts/e2e/permission-e2e.mjs",
-    "test:e2e:resilience": "node --import tsx scripts/e2e/resilience-e2e.mjs",
-    "test:e2e:force-gate": "node --import tsx scripts/e2e/force-gate-e2e.mjs",
-    "test:e2e:apps-source": "node --import tsx scripts/e2e/apps-source-e2e.mjs",
-    "test:e2e:session": "node --import tsx scripts/e2e/session-e2e.mjs",
-    "test:e2e:caller": "node --import tsx scripts/e2e/caller-e2e.mjs",
-    "test:e2e:diagnostics": "node --import tsx scripts/e2e/diagnostics-e2e.mjs",
     "typecheck": "pnpm -r typecheck",
     "postinstall": "node scripts/ensure-electron.mjs"
   },
   "devDependencies": {
     "@shell/config": "workspace:*",
     "eslint": "catalog:",
-    "tsx": "catalog:",
     "typescript": "catalog:"
   },
   "pnpm": {

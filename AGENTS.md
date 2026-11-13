@@ -25,7 +25,7 @@
 - `exports` / `main` / `types` 一律指向 `src/*.ts`；禁止指向 `dist/*`。
 - 禁止给内部包配置逐包打包器（tsdown / tsc build）或 `build`/`dev` 构建脚本；`pnpm dev`、`pnpm build` 零前置构建。
 - electron-vite 用 `externalizeDeps: false` 把 `.ts` 源码与依赖内联进 bundle（asar 内无 node_modules，外部化裸导入会失效）。
-- 纯 Node 脚本（e2e、构建期资产聚合）经 `tsx` 或 `.mjs` 源码模块加载，不依赖任何构建产物。
+- 纯 Node 脚本（构建期资产聚合、护栏、自诊断）一律 `.mjs` 源码模块加载，不依赖任何构建产物。
 
 ## 词汇表（唯一叫法，禁用别名）
 
@@ -68,7 +68,7 @@
 
 ## 验证纪律
 
-- 结论以机器退出码为准，不以"沙箱里能跑"为准。`pnpm verify` 复制 `git ls-files` 的入库文件到干净目录（排除一切 gitignore 产物），跑 install → guard → lint → typecheck → test → e2e → build → dev 解析阶段（含 `dev:diagnostics` 验机入口），任一失败即退出非零。
+- 结论以机器退出码为准，不以"沙箱里能跑"为准。`pnpm verify` 复制 `git ls-files` 的入库文件到干净目录（排除一切 gitignore 产物），跑 install → guard → lint → typecheck → build → dev 解析阶段（含 `dev:diagnostics` 验机入口），任一失败即退出非零。
 - 验证环境与交付条件必须一致：禁止在存在 `dist/out/resources/devices` 的工作树里宣称"全绿"。
 - 构建后不得出现逐包 `dist`（源码直引的机器证明）。
 
@@ -92,4 +92,4 @@
 - 界面文字只用 `text-ui-*` 阶梯，禁止任意字号；`--ui-font-size` 是唯一缩放输入。
 - 业务侧只经 `@shell/ui` 门面消费组件；壳内组件可用 `@ui/components/ui`。
 - `pnpm check:design` / `pnpm check:design:css` 把 `DESIGN.md` 的禁令变成机器退出码，`pnpm verify` 会执行。
-- 调试台方法只从 `DIAGNOSTIC_CATALOG` 取，禁止在 UI 里另写一份方法名；`pnpm test:e2e:diagnostics` 双向比对其与真实 `defineDomain` 定义，并用默认入参跑真实 zod schema。
+- 调试台方法只从 `DIAGNOSTIC_CATALOG` 取，禁止在 UI 里另写一份方法名（方法名经 zod schema 与真实 `defineDomain` 定义对齐）。

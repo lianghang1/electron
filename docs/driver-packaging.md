@@ -40,7 +40,7 @@ system   不随包携带（系统驱动），present() = false，原生域降级
 
 **单一规则**：声明格式 `devices/<域>/<厂商>/<平台>/<文件>` ↔ 聚合产物布局 ↔
 `asset-audit` 对账，三处共用 `collectAssetSources` 推导，不存在第二套目录规则。
-目录名打错 / SDK 漏放由 `auditDeviceAssets()`（单测 `asset-audit.test.ts`）暴露。
+目录名打错 / SDK 漏放由 `auditDeviceAssets()` 对账暴露。
 
 ## 真机边界
 
