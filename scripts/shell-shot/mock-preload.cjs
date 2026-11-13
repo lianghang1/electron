@@ -72,7 +72,7 @@ const shell = {
   invoke: () => Promise.resolve({}),
   shell: {
     // introGate 与主进程同规则：solo 直出（清单恰一个应用）时启动层等首应用开好再撤
-    appearance: () => ({ accent: '#4f46e5', theme: 'light', chrome, ...(chrome === 'solo' && catalog.length === 1 ? { introGate: 'app' } : {}) }),
+    appearance: () => ({ accent: '#2563eb', theme: 'light', chrome, ...(chrome === 'solo' && catalog.length === 1 ? { introGate: 'app' } : {}) }),
     info: () => Promise.resolve({
       name: '壳平台',
       flavor: { id: 'shot', name: '截图形态' },

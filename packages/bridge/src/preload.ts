@@ -22,7 +22,7 @@ function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'syst
   const pick = (prefix: string, fallback: string) =>
     process.argv.find(a => a.startsWith(prefix))?.slice(prefix.length) ?? fallback
   // fallback 与 tokens.css 的 --dt-accent 默认一致：argv 异常缺失时不引入第二色源
-  const accent = pick('--shell-accent=', '#3b82f6')
+  const accent = pick('--shell-accent=', '#2563eb')
   const theme = pick('--shell-theme=', 'system')
   const chrome = pick('--shell-chrome=', 'platform')
   const introGate = pick('--shell-intro-gate=', '')
