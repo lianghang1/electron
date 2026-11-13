@@ -101,9 +101,6 @@ importers:
       '@shell/devices':
         specifier: workspace:*
         version: link:../../packages/devices
-      '@shell/embedded':
-        specifier: workspace:*
-        version: link:../../packages/embedded
       '@shell/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
@@ -234,19 +231,6 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.8.3
-
-  packages/embedded:
-    dependencies:
-      vue:
-        specifier: 'catalog:'
-        version: 3.5.25(typescript@5.8.3)
-    devDependencies:
-      typescript:
-        specifier: 'catalog:'
-        version: 5.8.3
-      vue-tsc:
-        specifier: 'catalog:'
-        version: 3.3.11(typescript@5.8.3)
 
   packages/kernel:
     dependencies:
