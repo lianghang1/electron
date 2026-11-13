@@ -148,6 +148,7 @@ interface Assembly {
   devices?: DeviceGateway
   telemetry?: DeviceTelemetry
   catalog?: AppManifest[]
+  externalApps?: AppManifest[]
   permissions?: PermissionService
   downloads?: DownloadManager
   appSessions?: AppSessionRegistry
@@ -340,6 +341,7 @@ function setupDevices(a: Assembly): void {
 function setupPermissions(a: Assembly): void {
   // 能写配置目录即可注册应用并声明权限，目录写权限须由部署侧管控；未声明的权限一律拒绝
   const externalApps = loadAppsJson(configDir(), a.logger, { excludeIds: a.flavor.apps.map(app => app.id) })
+  a.externalApps = externalApps
   a.catalog = [...a.flavor.apps, ...externalApps]
 
   a.permissions = new PermissionService({
@@ -423,7 +425,7 @@ function setupAppRuntime(a: Assembly): void {
     a.events,
   )
   for (const appManifest of a.flavor.apps) { a.apps.register(appManifest, 'flavor') }
-  for (const appManifest of a.catalog!) { a.apps.register(appManifest, 'apps.json') }
+  for (const appManifest of a.externalApps!) { a.apps.register(appManifest, 'apps.json') }
 
   // 应用先建分区：窗口系统按 partition 取到的就是已注册协议与门控的 Session
   for (const manifest of a.catalog!) {
