@@ -61,7 +61,7 @@ pnpm verify              # 干净目录里的完整验证
 - [部署说明](./docs/deploy.md)：形态、应用注册、权限、数据目录、驱动资产、更新开关
 - [构建与发布](./docs/release.md)：六端矩阵、逐端命令、产物结构、真机验证清单
 - [更新服务器契约](./docs/update-server.md)：清单格式、安全边界、指针与判活
-- [设备边界](./docs/device-boundary.md)、[驱动打包](./docs/driver-packaging.md)
+- [驱动打包](./docs/driver-packaging.md)
 
 ## 真机边界
 
