@@ -34,12 +34,13 @@
 | 壳主窗 | ShellWindow / 工作台 | 主窗、main 窗 |
 | 全屏锁定模式 | KioskMode（行为，不是窗口类型） | kiosk 窗口 |
 | 浮层窗 | Overlay（Capture/Permission/Menu/AppCenter/Settings） | popup |
-| 应用定义 | AppManifest（entry: embedded/packaged/remote 三形态） | app config |
+| 应用定义 | AppManifest（entry: local/remote 两形态 + permissions 声明） | app config |
 | 运行中应用 | AppInstance | session、context |
 | 应用会话容器 | AppSessionRegistry（`persist:app-<id>` 分区 + cookie 快照） | 每应用一个 session、cookie 垫片 |
 | 设备域 | Domain | module、feature |
 | 产品形态 | Flavor | app、edition |
-| 验机形态 | diagnostics Flavor（`diagnostics: true`） | 调试模式、dev 开关 |
+| 本地应用 | local entry（`app://` 产物服务 + devUrl 开发态直连） | packaged |
+| 远程应用 | remote entry（origin 白名单 + 受管弹窗） | web app |
 | 构建目标平台 | BuildPlatform（win32 / darwin / linux） | 与 Platform（硬件能力平台）混用 |
 | 整包落地策略 | PackageInstaller（组合根按平台注入） | 通道内写死 `.exe` / `/S` / spawn |
 | 窗口创建 | 目的命名函数（createShellWindow / openCaptureOverlay...） | 裸 new BrowserWindow |
@@ -68,7 +69,7 @@
 
 ## 验证纪律
 
-- 结论以机器退出码为准，不以"沙箱里能跑"为准。`pnpm verify` 复制 `git ls-files` 的入库文件到干净目录（排除一切 gitignore 产物），跑 install → guard → lint → typecheck → build → dev 解析阶段（含 `dev:diagnostics` 验机入口），任一失败即退出非零。
+- 结论以机器退出码为准，不以"沙箱里能跑"为准。`pnpm verify` 复制 `git ls-files` 的入库文件到干净目录（排除一切 gitignore 产物），跑 install → guard → lint → typecheck → build → dev 解析阶段，任一失败即退出非零。
 - 验证环境与交付条件必须一致：禁止在存在 `dist/out/resources/devices` 的工作树里宣称"全绿"。
 - 构建后不得出现逐包 `dist`（源码直引的机器证明）。
 

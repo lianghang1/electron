@@ -22,13 +22,13 @@
 Linux 双架构可在任意机器交叉产出；macOS 公证与 Windows NSIS 需要对应平台工具链（见下）在 Linux 上不等价：
 
 ```bash
-FLAVOR=cemetery pnpm build:win                       # win32 / x64
-FLAVOR=cemetery TARGET_ARCH=arm64 pnpm build:win    # win32 / arm64
-FLAVOR=cemetery pnpm build:mac                      # darwin / x64
-FLAVOR=cemetery TARGET_ARCH=arm64 pnpm build:mac    # darwin / arm64
-FLAVOR=cemetery pnpm build:linux                    # linux / x64
-FLAVOR=cemetery TARGET_ARCH=arm64 pnpm build:linux  # linux / arm64
-FLAVOR=cemetery TARGET_RPM=1 pnpm build:linux       # 追加 rpm（需 rpmbuild）
+FLAVOR=kiosk pnpm build:win                       # win32 / x64
+FLAVOR=kiosk TARGET_ARCH=arm64 pnpm build:win    # win32 / arm64
+FLAVOR=kiosk pnpm build:mac                      # darwin / x64
+FLAVOR=kiosk TARGET_ARCH=arm64 pnpm build:mac    # darwin / arm64
+FLAVOR=kiosk pnpm build:linux                    # linux / x64
+FLAVOR=kiosk TARGET_ARCH=arm64 pnpm build:linux  # linux / arm64
+FLAVOR=kiosk TARGET_RPM=1 pnpm build:linux       # 追加 rpm（需 rpmbuild）
 ```
 
 产物名 `<flavor>-<version>-<os>-<arch>.<ext>`，输出目录 `release/<flavor>/`。带平台与架构信息后，同一版本六端产物不会互相覆盖，也便于按 `update/<platform>/<arch>/` 契约组织目录。
