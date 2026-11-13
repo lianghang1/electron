@@ -2,8 +2,8 @@
 // 干净 clone 全链路验证：复制「git 会入库的文件」到临时目录，排除一切 gitignore 产物，
 // 再跑 install → guard → design → lint → typecheck → build → design:css → dev 解析阶段。
 // 退出码说话，结论不依赖任何人的口述；这一步专门防「沙箱里有产物、用户本地没有」。
-import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -57,24 +57,64 @@ function run(label, cmd, args, opts = {}) {
   return { ok, out }
 }
 
-// dev 解析阶段：只验证「模块能解析、构建能起」，不要求 Electron 窗口真的显示（无显示器环境）
-function devResolve(script = 'dev', label = 'dev-resolve') {
+// dev 解析阶段：只验证「模块能解析、构建能起」，不要求 Electron 窗口真的显示（无显示器环境）。
+// 跨平台限时起 dev：Windows 无 GNU timeout，spawn 后自计时、到点杀进程树再判输出；
+// 根无 dev 脚本，dev 入口在壳应用（electron-vite dev）
+function devResolve(label = 'dev-resolve') {
   const t0 = Date.now()
-  const r = spawnSync('timeout', ['--signal=TERM', '25s', 'pnpm', script], {
-    cwd: WORK,
-    encoding: 'utf8',
-    timeout: 60000,
+  return new Promise((resolveP) => {
+    const child = spawn('pnpm', ['--filter', '@app/shell', 'dev'], {
+      cwd: WORK,
+      shell: process.platform === 'win32',
+      // POSIX 需要独立进程组才能负 pid 群杀；Windows 靠 taskkill /T
+      detached: process.platform !== 'win32',
+    })
+    let out = ''
+    const drain = (chunk) => { out += chunk }
+    child.stdout?.on('data', drain)
+    child.stderr?.on('data', drain)
+    const timer = setTimeout(() => {
+      // detached 进程组：POSIX 负 pid 群杀；Windows 用 taskkill 连子进程
+      if (process.platform === 'win32') {
+        spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'])
+      }
+      else {
+        try { process.kill(-child.pid, 'SIGTERM') }
+        catch { child.kill('SIGTERM') }
+      }
+    }, 25000)
+    child.on('close', () => {
+      clearTimeout(timer)
+      const fail = /Rolldown failed|failed to resolve|Error:\s*\[vite\]/i.test(out)
+      const resolved = /modules transformed|Local:\s*http|ready in|VITE.*ready/i.test(out)
+      const ok = !fail && resolved
+      console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(16)} ${((Date.now() - t0) / 1000).toFixed(1)}s  (解析=${resolved ? 'ok' : 'n/a'}, 报错=${fail ? 'yes' : 'no'})`)
+      if (!ok) { console.log(out.split('\n').slice(-25).map(l => `        ${l}`).join('\n')) }
+      resolveP({ ok, out })
+    })
   })
-  const out = `${r.stdout || ''}${r.stderr || ''}`
-  const fail = /Rolldown failed|failed to resolve|Error:\s*\[vite\]/i.test(out)
-  const resolved = /modules transformed|Local:\s*http|ready in|VITE.*ready/i.test(out)
-  const ok = !fail && resolved
-  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(16)} ${((Date.now() - t0) / 1000).toFixed(1)}s  (解析=${resolved ? 'ok' : 'n/a'}, 报错=${fail ? 'yes' : 'no'})`)
-  if (!ok) { console.log(out.split('\n').slice(-25).map(l => `        ${l}`).join('\n')) }
-  return { ok, out }
 }
 
-function main() {
+// 构建后不得重新出现逐包 dist（源码直引约定的反向证明）；Node 自遍历，不依赖 Unix 工具
+function countDistDirs(root) {
+  let count = 0
+  const stack = [root]
+  while (stack.length) {
+    const dir = stack.pop()
+    let entries
+    try { entries = readdirSync(dir, { withFileTypes: true }) }
+    catch { continue }
+    for (const e of entries) {
+      if (!e.isDirectory()) { continue }
+      if (e.name === 'node_modules') { continue }
+      if (e.name === 'dist') { count++ }
+      else { stack.push(join(dir, e.name)) }
+    }
+  }
+  return count
+}
+
+async function main() {
   console.log('=== 干净 clone 全链路验证 ===\n')
   const { copied, hasLock } = stageCleanTree()
   console.log(`[stage] 复制 ${copied} 个入库文件 -> ${basename(WORK)}  lockfile=${hasLock ? '有' : '无'}`)
@@ -90,12 +130,10 @@ function main() {
   results.push(['typecheck', run('typecheck', 'pnpm', ['typecheck'])])
   results.push(['build', run('build', 'pnpm', ['build'], { show: true })])
   results.push(['design:css', run('design:css', 'pnpm', ['check:design:css'], { show: true })])
-  results.push(['dev-resolve', devResolve()])
+  results.push(['dev-resolve', await devResolve()])
 
   // 构建后不得重新出现中间 dist（源码直引约定的反向证明）
-  const distCount = existsSync(join(WORK, 'packages'))
-    ? execFileSync('sh', ['-c', `find "${join(WORK, 'packages')}" -type d -name dist 2>/dev/null | wc -l`], { encoding: 'utf8' }).trim()
-    : '0'
+  const distCount = existsSync(join(WORK, 'packages')) ? String(countDistDirs(join(WORK, 'packages'))) : '0'
   console.log(`\n[check] 构建后中间 dist 目录数 = ${distCount}（应为 0）`)
 
   const failed = results.filter(([, r]) => !r.ok).map(([n]) => n)
