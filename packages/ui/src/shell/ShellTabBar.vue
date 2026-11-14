@@ -101,7 +101,7 @@ function onDragEnd() {
       <!-- 徽标：应用图标优先，缺席退首字；哈希色只作底，顶栏彩色面积收敛到 14px -->
       <span class="tab-mark grid size-3.5 shrink-0 place-items-center overflow-hidden rounded-sm" :style="{ background: tab.iconColor }" aria-hidden="true">
         <img v-if="tab.icon" :src="tab.icon" alt="" class="size-3.5 object-cover">
-        <span v-else class="text-[8px] leading-none font-semibold text-white">{{ tab.title.slice(0, 1) }}</span>
+        <span v-else class="text-ui-xs leading-none font-semibold text-white">{{ tab.title.slice(0, 1) }}</span>
       </span>
       <span v-if="tab.key === activeKey" class="max-w-32 truncate">{{ tab.title }}</span>
       <span v-else class="sr-only">{{ tab.title }}</span>

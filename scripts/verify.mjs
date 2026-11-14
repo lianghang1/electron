@@ -125,6 +125,7 @@ async function main() {
   const results = []
   results.push(['install', run('install', 'pnpm', ['install', '--prefer-offline'], { timeout: 300000 })])
   results.push(['guard', run('guard', 'pnpm', ['guard'], { show: true })])
+  results.push(['devconsole', run('devconsole', 'pnpm', ['check:devconsole'], { show: true })])
   results.push(['design', run('design', 'pnpm', ['check:design'], { show: true })])
   results.push(['lint', run('lint', 'pnpm', ['lint'])])
   results.push(['typecheck', run('typecheck', 'pnpm', ['typecheck'])])
