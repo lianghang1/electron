@@ -537,7 +537,12 @@ export class WindowSystem implements Startable, ViewHost {
     const win = this.shellWindow
     const view = this.views.get(instanceId)
     if (!win || !view) { return }
-    if (this.activeViewId && this.activeViewId !== instanceId) { this.views.get(this.activeViewId)?.setVisible(false) }
+    // 不变量「激活外全隐藏」必须在此强制维持：只藏前任激活视图会漏掉加载竞态
+    // reveal 抢跑与漏 deactivate 留下的可见残影——残影保留旧激活期 bounds，新视图
+    // 盖不到其底边，切换应用时在窗口底部露出一条旧页面
+    for (const [id, v] of this.views) {
+      if (id !== instanceId && !v.webContents.isDestroyed()) { v.setVisible(false) }
+    }
     this.activeViewId = instanceId
     // 全屏中的视图切回时铺满整窗（期间窗口处于 OS 全屏），否则按工作区矩形落位
     view.setBounds(this.htmlFullscreen === instanceId ? win.getContentBounds() : this.contentRect)
