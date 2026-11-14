@@ -390,8 +390,10 @@ function setupPermissions(a: Assembly): void {
 
 /** 应用运行时：下载门控 / 会话分区 / 审计 / AppService 与 openers 装配 */
 function setupAppRuntime(a: Assembly): void {
-  // 下载门控走同一张权限策略表：未声明 download 权限即拒绝。
-  // 决策允许异步返回，期间下载照常进行；拒绝时取消并清理部分文件。
+  // 下载门控混合语义：声明 downloads → 静默放行；未声明 → 放行下载同时弹运行时授权卡，
+  // 决策异步返回期间下载照常进行（kernel 先 beginTask 后问门控，不 pause），
+  // 拒绝时 kernel 取消并清理部分文件。requestRuntime 先读持久化结论：
+  // 允许过一次即记忆不再询问，拒绝/超时不落盘、下次仍询问。
   a.downloads = new DownloadManager({
     events: a.events,
     logger,
@@ -403,9 +405,13 @@ function setupAppRuntime(a: Assembly): void {
       catch {
         // blob:/data: 等非标准 URL，原值仅作审计线索
       }
-      // 权限键与 flavor permissions / facility 路由同名（downloads），声明即放行、未声明即拒
-      return a.permissions!.decide({ appId, origin, permission: 'downloads' })
-        .then(allowed => (allowed ? 'allow' : 'deny'))
+      // 权限键与 flavor permissions / facility 路由同名（downloads）
+      return a.permissions!.decide({ appId, origin, permission: 'downloads' }).then((allowed) => {
+        if (allowed) { return 'allow' as const }
+        return a.permissions!
+          .requestRuntime({ appId, origin, permission: 'downloads' })
+          .then(granted => (granted ? 'allow' as const : 'deny' as const))
+      })
     },
     downloadsDir: app.getPath('downloads'),
   })
