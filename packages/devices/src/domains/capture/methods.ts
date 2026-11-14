@@ -82,8 +82,12 @@ export function createCaptureMethods(capture: CaptureSystem, deps: DomainDeps, g
         const resolved = input.deviceId
           ?? (await capture.findDefaultDevice() as { id?: string } | undefined)?.id
         if (!resolved) { throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备') }
+        // 预览分辨率档位与快拍 resolutionIndex 同语义（camsdk/ws 通道消费；未带档位走设备默认）
+        const opts = typeof (input as { resolutionNum?: unknown }).resolutionNum === 'number'
+          ? { resolutionNum: (input as { resolutionNum: number }).resolutionNum }
+          : undefined
         return capture.startPreview(resolved, frame =>
-          ctx.push?.('capture.frame', { deviceId: resolved, frame }))
+          ctx.push?.('capture.frame', { deviceId: resolved, frame }), opts)
       },
     },
     stopPreview: {
