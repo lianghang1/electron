@@ -45,6 +45,7 @@ import {
 } from '@shell/update'
 import { OverlayService, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
 import { app, session } from 'electron'
+import { createInfoDomain, INFO_DOMAIN_ID } from './ipc/info-domain'
 import { registerShellIpc } from './shell-ipc'
 
 /**
@@ -86,6 +87,7 @@ const PLATFORM_SELF_PERMISSIONS: readonly PermissionRule[] = [
   'permissions',
   'media',
   'deviceConfig',
+  'info',
 ].map(permission => ({ app: SHELL_APP_ID, permission, verdict: 'allow' as const }))
 
 // app:// 协议的特权声明必须在 app ready 前（Electron 时序硬约束）
@@ -93,17 +95,23 @@ registerAppScheme()
 
 function loadFlavor() {
   // 打包：构建期把 flavor.json 注入 resources/（见 electron-builder.config.mjs extraResources）；
-  // dev：--flavor=<id> 指向仓库 apps/flavors/<id>/flavor.json，缺省 solo-demo。
+  // dev：flavor 来源优先级 argv --flavor=<id> → 环境变量 SHELL_FLAVOR → 缺省 devconsole
+  // （pnpm dev -- --flavor=<id> 或 $env:SHELL_FLAVOR='<id>'; pnpm dev）。
   const packaged = join(process.resourcesPath ?? '', 'flavor.json')
   if (existsSync(packaged)) {
-    return flavorManifestSchema.parse(JSON.parse(readFileSync(packaged, 'utf-8')) as unknown)
+    const manifest = flavorManifestSchema.parse(JSON.parse(readFileSync(packaged, 'utf-8')) as unknown)
+    logger.info('flavor 装配', { flavorId: manifest.id, source: 'packaged' })
+    return manifest
   }
   const flavorArg = process.argv.find(a => a.startsWith('--flavor='))
-  const flavorId = flavorArg?.split('=')[1] ?? 'solo-demo'
+  const envFlavor = process.env.SHELL_FLAVOR
+  const flavorId = flavorArg?.split('=')[1] ?? envFlavor ?? 'devconsole'
   assertSafeSegment(flavorId, 'flavorId')
   const flavorPath = join(app.getAppPath(), '../../apps/flavors', flavorId, 'flavor.json')
   const raw = JSON.parse(readFileSync(flavorPath, 'utf-8')) as unknown
-  return flavorManifestSchema.parse(raw)
+  const manifest = flavorManifestSchema.parse(raw)
+  logger.info('flavor 装配', { flavorId: manifest.id, source: flavorArg ? 'argv' : envFlavor ? 'env' : 'default' })
+  return manifest
 }
 
 // 单实例锁：kiosk 自愈 relaunch 与重复启动都汇到唯一实例
@@ -438,34 +446,49 @@ function setupIpc(a: Assembly): void {
   a.windows.registerWindowControls()
   a.windows.attachEventBroadcast(a.events)
 
-  // 域方法调用：身份从账本反查（页面无法伪造），授权与能力闸门在路由层统一判定
-  a.router = createDomainRouter(a.devices!.domains, logger, {
-    availableDomains: a.capability!.availableDomains,
-    authorize: (grant, ctx) => a.permissions!.decide({
-      appId: ctx.appId,
-      origin: `app://${ctx.appId}`,
-      permission: grant,
-    }),
-    telemetry: a.telemetry!,
-    observation: {
-      publish(observation) {
-        if (observation.kind === 'call') {
-          a.events.emit('devices.call-recorded', {
-            capabilityId: observation.record.capabilityId,
-            methodName: observation.record.methodName,
-            appId: observation.record.appId,
-            ok: observation.record.ok,
-            durationMs: observation.record.durationMs,
-            at: observation.record.startedAt,
-            errorCode: observation.record.errorCode,
-          })
-        }
-        else {
-          a.events.emit('devices.telemetry-changed', observation.snapshot)
-        }
+  // 域方法调用：身份从账本反查（页面无法伪造），授权与能力闸门在路由层统一判定。
+  // info 自描述域与设备域同表路由；开放域清单在此扩名（能力矩阵闸门仍只约束设备域）
+  a.router = createDomainRouter(
+    [
+      ...a.devices!.domains,
+      createInfoDomain({
+        version: a.version,
+        flavorId: a.flavor.id,
+        platform: a.capability!.platform,
+        availableDomains: a.capability!.availableDomains,
+        deviceStatuses: () => a.devices!.deviceStatuses,
+        manifestOf: appId => a.apps!.list().find(r => r.manifest.id === appId)?.manifest,
+      }),
+    ],
+    logger,
+    {
+      availableDomains: [...a.capability!.availableDomains, INFO_DOMAIN_ID],
+      authorize: (grant, ctx) => a.permissions!.decide({
+        appId: ctx.appId,
+        origin: `app://${ctx.appId}`,
+        permission: grant,
+      }),
+      telemetry: a.telemetry!,
+      observation: {
+        publish(observation) {
+          if (observation.kind === 'call') {
+            a.events.emit('devices.call-recorded', {
+              capabilityId: observation.record.capabilityId,
+              methodName: observation.record.methodName,
+              appId: observation.record.appId,
+              ok: observation.record.ok,
+              durationMs: observation.record.durationMs,
+              at: observation.record.startedAt,
+              errorCode: observation.record.errorCode,
+            })
+          }
+          else {
+            a.events.emit('devices.telemetry-changed', observation.snapshot)
+          }
+        },
       },
     },
-  })
+  )
 
   // 壳设施通道注册集中在 shell-ipc 模块（组合根只装配，不做通道接线）：
   // 契约通道经 shellHandle/shellOn 注册（见 packages/shared/src/ipc/AGENTS.md），
