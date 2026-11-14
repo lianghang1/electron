@@ -75,8 +75,10 @@ function retryActive() {
   if (id) { void shell().tabs.reload(id) }
 }
 
-/** tab 条归属 chrome 形态：platform = 多 tab 工作台，tab 条常驻（0 tab 也显示 ＋ 入口）；
- * solo = 单应用窗口框，无导航语义 */
+/**
+ * tab 条归属 chrome 形态：platform = 多 tab 工作台，tab 条常驻（0 tab 也显示 ＋ 入口）；
+ * solo = 单应用窗口框，无导航语义
+ */
 const showTabStrip = computed(() => chrome.value === 'platform')
 
 /** solo 档的窗口控制条：仅桌面形态需要，kiosk 全屏锁定无控制条 */

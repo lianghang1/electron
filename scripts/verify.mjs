@@ -23,7 +23,6 @@ function git(args) {
 function cleanupWork() {
   try {
     rmSync(WORK, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
-    return
   }
   catch (err) {
     const trash = `${WORK}-trash-${Date.now()}`
@@ -32,7 +31,6 @@ function cleanupWork() {
     }
     catch {
       console.warn(`[verify] 清理被占用但无法改名，保留现场：${err.code ?? ''}`)
-      return
     }
     try {
       rmSync(trash, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })
