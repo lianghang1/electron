@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import type { DownloadTask } from '@shell/shared'
 import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
 import { shell } from '@shell/bridge/client'
@@ -221,8 +221,17 @@ function reportHeight(): void {
   void shell().overlay.resize(panel.scrollHeight + PANEL_PADDING)
 }
 
+/** 面板超高内部滚动时新消息在底部：追加后自动滚到底，保证最新通知可见（master 同款） */
+function scrollPanelToBottom(): void {
+  const panel = panelRef.value
+  if (panel) { panel.scrollTop = panel.scrollHeight }
+}
+
 watch(() => [state.value?.notifications, state.value?.downloads], () => {
-  void nextTick(reportHeight)
+  void nextTick(() => {
+    reportHeight()
+    scrollPanelToBottom()
+  })
 }, { deep: true, immediate: true })
 </script>
 
@@ -231,7 +240,8 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
     <template v-if="kind === 'panel'">
       <div
         ref="panelRef"
-        class="flex max-h-full w-[320px] flex-col gap-2 overflow-y-auto [scrollbar-width:none]"
+        class="panel-scroll flex w-[320px] flex-col gap-2 overflow-y-auto"
+        style="max-height: calc(100vh - 24px)"
       >
         <div
           v-for="task in state?.downloads ?? []"
@@ -459,19 +469,6 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
         </div>
       </div>
     </template>
-
-    <template v-else>
-      <div class="w-[420px] rounded-xl border bg-background p-5 shadow-2xl">
-        <div class="text-ui-base font-semibold text-foreground">
-          平台提示
-        </div>
-        <div class="mt-5 flex justify-end">
-          <Button variant="outline" @click="close">
-            关闭
-          </Button>
-        </div>
-      </div>
-    </template>
   </div>
 </template>
 
@@ -485,5 +482,17 @@ body {
   padding: 0;
   background: transparent;
   overflow: hidden;
+}
+
+/* 面板超高内部滚动：滚动条无视觉意义，直接隐藏（tokens.css 的 * { scrollbar-width: thin }
+   是未分层规则，级联优先级高于 @layer utilities 的工具类，必须在此以未分层规则反压）。
+   100vh 钳制不依赖父链高度（html/body 无高度，max-h-full 百分比会失效），master 同款 */
+.panel-scroll {
+  scrollbar-width: none;
+}
+
+.panel-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 </style>
