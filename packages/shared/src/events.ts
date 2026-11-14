@@ -34,6 +34,8 @@ export interface PlatformEvents {
   // 守护进程预热完成：设备相关入口据此从「初始化中」过渡态切换为可交互
   'devices.ready': Record<string, never>
   'scanner.scanned': { code: string }
+  /** 扫码枪连接态推送（模式/连接/通道）；设备服务直推全 webContents，不经事件总线 */
+  'scanner.statusUpdated': { mode: string, connected: boolean, channel?: string }
   'signature.stroke': { point: unknown }
   'capture.frame': { deviceId: string, frame: unknown }
   // 设备运行时观测：域调用打点与汇总快照推给诊断台
@@ -102,3 +104,21 @@ export interface PlatformEvents {
 }
 
 export type PlatformEventName = keyof PlatformEvents
+
+/**
+ * 应用页可订阅的平台事件白名单（JSAPI 受控桥与主进程接力器双端引用的唯一事实源）：
+ * capture.frame 由域调用 ctx.push 直达发起方（event:capture.frame 通道），从不进总线，
+ * 接力器对它是空操作；scanner.scanned / scanner.statusUpdated 是设备服务直推通道，
+ * 总线接力对它们同样为空操作。
+ */
+export const APP_EVENT_WHITELIST: readonly PlatformEventName[] = [
+  'devices.ready',
+  'capture.frame',
+  'scanner.scanned',
+  'scanner.statusUpdated',
+  'signature.stroke',
+  'notification.updated',
+  'update.state-changed',
+  'download.tasks-changed',
+  'tabs.state-changed',
+]

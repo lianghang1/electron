@@ -401,7 +401,8 @@ function setupAppRuntime(a: Assembly): void {
       catch {
         // blob:/data: 等非标准 URL，原值仅作审计线索
       }
-      return a.permissions!.decide({ appId, origin, permission: 'download' })
+      // 权限键与 flavor permissions / facility 路由同名（downloads），声明即放行、未声明即拒
+      return a.permissions!.decide({ appId, origin, permission: 'downloads' })
         .then(allowed => (allowed ? 'allow' : 'deny'))
     },
     downloadsDir: app.getPath('downloads'),
