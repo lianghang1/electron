@@ -75,8 +75,9 @@ function retryActive() {
   if (id) { void shell().tabs.reload(id) }
 }
 
-/** 多应用态：≥2 个 tab 时顶栏出现 tab 条；单应用态退化为 36px 窗口框（v2 定稿） */
-const multiApp = computed(() => tabs.value.length >= 2)
+/** tab 条归属 chrome 形态：platform = 多 tab 工作台，tab 条常驻（0 tab 也显示 ＋ 入口）；
+ * solo = 单应用窗口框，无导航语义 */
+const showTabStrip = computed(() => chrome.value === 'platform')
 
 /** solo 档的窗口控制条：仅桌面形态需要，kiosk 全屏锁定无控制条 */
 const soloWindowControls = computed(() => chrome.value === 'solo' && mode.value === 'windowed')
@@ -174,10 +175,10 @@ onBeforeUnmount(() => {
         <svg class="brand-mark shrink-0" viewBox="0 0 48 48" aria-hidden="true">
           <path fill="currentColor" d="M6 6h15l14 14h6L27 6h15v36H6Z" />
         </svg>
-        <Separator v-if="multiApp" orientation="vertical" class="mx-0.5 h-4 shrink-0" />
+        <Separator v-if="showTabStrip" orientation="vertical" class="mx-0.5 h-4 shrink-0" />
 
         <ShellTabBar
-          v-if="multiApp"
+          v-if="showTabStrip"
           :tabs="tabs"
           :active-key="activeKey"
           @activate="activate"
