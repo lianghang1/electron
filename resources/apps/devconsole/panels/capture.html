@@ -25,6 +25,7 @@
         </div>
       </div>
       <div class="dc-preview">
+        <span v-if="previewing" class="dc-rec">LIVE</span>
         <img v-if="frameUrl" :src="frameUrl" alt="预览帧">
         <div v-else class="dc-empty">{{ previewing ? '等待帧推送…' : '预览未启动' }}</div>
       </div>

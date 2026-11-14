@@ -1,38 +1,26 @@
 <div>
-  <div class="dc-note">
-    这是壳平台对应用暴露的<b>受控桥面</b>：应用页只有 <code>window.jsapi.invokeDevice('&lt;域&gt;.&lt;方法&gt;', input)</code>
-    与白名单事件订阅，没有完整壳桥。当前桥形态：<b>{{ bridgeReal ? '真实桥（app:// 壳内加载）' : '模拟桥（浏览器直开，数据为 mock）' }}</b>。
-    <a href="#" @click.prevent="refresh" style="margin-left:8px">刷新快照</a>
-  </div>
-
   <div v-if="loadError" class="dc-card">
     <h2>info.get 失败</h2>
     <span class="dc-badge err">{{ loadError.code }}</span>
     <span style="margin-left:8px;font-size:12px">{{ loadError.message }}</span>
   </div>
 
-  <div v-if="info" class="dc-grid-2">
-    <div class="dc-card">
-      <h2>运行环境</h2>
-      <dl class="dc-kv">
-        <dt>壳版本</dt><dd>{{ info.version }}</dd>
-        <dt>产品形态</dt><dd>{{ info.flavorId }}</dd>
-        <dt>构建平台</dt><dd>{{ info.platform }}</dd>
-        <dt>本应用 id</dt><dd>{{ info.appId }}</dd>
-      </dl>
+  <div v-if="info" class="dc-stat-strip">
+    <div class="dc-stat">
+      <div class="dc-stat-label">壳版本 VERSION</div>
+      <div class="dc-stat-value">v{{ info.version }}</div>
     </div>
-    <div class="dc-card">
-      <h2>本应用声明与放行 <span class="dc-hint">manifest 声明即放行，未声明一律拒绝</span></h2>
-      <div style="margin-bottom:8px">
-        <span style="font-size:11px;color:var(--dc-text-sub)">设备域：</span>
-        <span v-for="d in info.declaredDevices" :key="d" class="dc-badge accent" style="margin-right:6px">{{ d }}</span>
-        <span v-if="!info.declaredDevices.length" class="dc-badge">无</span>
-      </div>
-      <div>
-        <span style="font-size:11px;color:var(--dc-text-sub)">平台权限：</span>
-        <span v-for="p in info.declaredPermissions" :key="p" class="dc-badge ok" style="margin-right:6px">{{ p }}</span>
-        <span v-if="!info.declaredPermissions.length" class="dc-badge">无</span>
-      </div>
+    <div class="dc-stat">
+      <div class="dc-stat-label">产品形态 FLAVOR</div>
+      <div class="dc-stat-value">{{ info.flavorId }}</div>
+    </div>
+    <div class="dc-stat">
+      <div class="dc-stat-label">构建平台 PLATFORM</div>
+      <div class="dc-stat-value">{{ info.platform }}</div>
+    </div>
+    <div class="dc-stat">
+      <div class="dc-stat-label">本应用 APP ID</div>
+      <div class="dc-stat-value">{{ info.appId }}</div>
     </div>
   </div>
 
@@ -51,6 +39,33 @@
     </table>
   </div>
 
+  <div v-if="info" class="dc-grid-2">
+    <div class="dc-card">
+      <h2>本应用声明与放行 <span class="dc-hint">manifest 声明即放行</span></h2>
+      <div style="margin-bottom:8px">
+        <span style="font-size:11px;color:var(--dc-text-sub)">设备域：</span>
+        <span v-for="d in info.declaredDevices" :key="d" class="dc-badge accent" style="margin-right:6px">{{ d }}</span>
+        <span v-if="!info.declaredDevices.length" class="dc-badge">无</span>
+      </div>
+      <div>
+        <span style="font-size:11px;color:var(--dc-text-sub)">平台权限：</span>
+        <span v-for="p in info.declaredPermissions" :key="p" class="dc-badge ok" style="margin-right:6px">{{ p }}</span>
+        <span v-if="!info.declaredPermissions.length" class="dc-badge">无</span>
+      </div>
+    </div>
+    <div class="dc-card">
+      <h2>安全边界</h2>
+      <dl class="dc-kv">
+        <dt>调用身份</dt><dd>webContents 身份账本反查 appId，页面无法伪造</dd>
+        <dt>域闸门</dt><dd>manifest.devices 未声明的域直接拒绝</dd>
+        <dt>事件白名单</dt><dd>{{ DEVICE_EVENT_NAMES.join(' / ') }}</dd>
+        <dt>点对点推送</dt><dd>capture.frame 只送发起方视图</dd>
+        <dt>打印 URL</dt><dd>origin 白名单 + SSRF 防线（内网始终拦截）</dd>
+        <dt>演示模式</dt><dd>scanner.simulateScan 仅演示模式放行</dd>
+      </dl>
+    </div>
+  </div>
+
   <div class="dc-card">
     <h2>桥面清单 <span class="dc-hint">平台对应用暴露的全部 {{ catalogRows.length }} 个方法（与主进程域定义机器对齐）</span></h2>
     <table class="dc-table">
@@ -65,15 +80,9 @@
     </table>
   </div>
 
-  <div class="dc-card">
-    <h2>安全边界</h2>
-    <dl class="dc-kv">
-      <dt>调用身份</dt><dd>webContents 身份账本反查 appId，页面无法伪造；origin 白名单二次校验</dd>
-      <dt>域闸门</dt><dd>manifest.devices 未声明的域直接拒绝；方法未声明的 grant 同理</dd>
-      <dt>事件白名单</dt><dd>{{ DEVICE_EVENT_NAMES.join(' / ') }}（jsapi 桥仅放行这些事件名）</dd>
-      <dt>点对点推送</dt><dd>capture.frame 等高频帧只送发起方视图，不经全量广播</dd>
-      <dt>打印 URL</dt><dd>flavor.print.urlOrigins 白名单 + SSRF 防线（内网始终拦截）</dd>
-      <dt>演示模式</dt><dd>scanner.simulateScan 仅在平台演示模式开启时放行（壳内调试台切换）</dd>
-    </dl>
+  <div class="dc-note">
+    受控桥面说明：应用页只有 <code>window.jsapi.invokeDevice('&lt;域&gt;.&lt;方法&gt;', input)</code>
+    与白名单事件订阅，没有完整壳桥。当前桥形态：<b>{{ bridgeReal ? '真实桥（app:// 壳内加载）' : '模拟桥（浏览器直开，数据为 mock）' }}</b>。
+    <a href="#" @click.prevent="refresh" style="margin-left:8px">刷新快照</a>
   </div>
 </div>

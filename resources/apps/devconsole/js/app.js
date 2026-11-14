@@ -20,6 +20,8 @@ const Root = {
     const info = computed(() => store.info)
     const logCount = computed(() => store.logs.length)
     const clock = ref('')
+    // 会话号：进程本次启动生成（参考 HDC 控制台的会话标识），仅用于日志/截图对账
+    const sessionId = `LOCAL-${String(new Date().getMinutes() % 8 + 1).padStart(2, '0')}`
     const tick = () => {
       const d = new Date()
       const p = n => String(n).padStart(2, '0')
@@ -27,6 +29,19 @@ const Root = {
     }
     tick()
     setInterval(tick, 1000)
+
+    // F1-F8 直切模块、ESC 收起/展开流水：硬件调试台的键盘操作语义
+    function onKey(e) {
+      const fn = /^F([1-8])$/.exec(e.key)
+      if (fn) {
+        e.preventDefault()
+        const target = PANELS[Number(fn[1]) - 1]
+        if (target) { open(target.id) }
+        return
+      }
+      if (e.key === 'Escape') { logOpen.value = !logOpen.value }
+    }
+    window.addEventListener('keydown', onKey)
 
     async function load(id) {
       loadError.value = ''
@@ -52,7 +67,7 @@ const Root = {
     watch(current, load)
     onMounted(() => { load(current.value) })
 
-    return { panels: PANELS, current, panelComp, loadError, logOpen, currentPanel, info, bridgeReal, logCount, clock, open }
+    return { panels: PANELS, current, panelComp, loadError, logOpen, currentPanel, info, bridgeReal, logCount, clock, sessionId, open }
   },
 }
 

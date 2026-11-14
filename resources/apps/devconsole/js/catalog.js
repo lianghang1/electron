@@ -5,14 +5,14 @@
  */
 
 export const PANELS = [
-  { id: 'overview', label: '总览', en: 'OVERVIEW', desc: '运行时快照 · 桥面清单 · 安全边界' },
-  { id: 'print', label: '打印', en: 'PRINT', desc: '设备枚举 · 参数下发 · 任务簿管理' },
-  { id: 'capture', label: '拍摄', en: 'CAPTURE', desc: '设备枚举 · 实时预览 · 抓拍保存' },
-  { id: 'idcard', label: '身份证', en: 'ID CARD', desc: '阅读器枚举 · 读卡 · 档案配置' },
-  { id: 'iccard', label: 'IC 卡', en: 'IC CARD', desc: '扇区读写 · 文本块 · 档案配置' },
-  { id: 'scanner', label: '扫码枪', en: 'SCANNER', desc: '配置下发 · 扫码事件 · 演示注入' },
-  { id: 'signature', label: '签名 mock', en: 'SIGNATURE', desc: '契约形状演示 · 笔画采样 · 会话结果' },
-  { id: 'events', label: '事件流', en: 'EVENTS', desc: '白名单订阅 · 事件流水 · 模拟触发' },
+  { id: 'overview', label: '总览', en: 'OVERVIEW', fn: 'F1', desc: '运行时快照 · 桥面清单 · 安全边界' },
+  { id: 'print', label: '打印', en: 'PRINT', fn: 'F2', desc: '设备枚举 · 参数下发 · 任务簿管理' },
+  { id: 'capture', label: '拍摄', en: 'CAPTURE', fn: 'F3', desc: '设备枚举 · 实时预览 · 抓拍保存' },
+  { id: 'idcard', label: '身份证', en: 'ID CARD', fn: 'F4', desc: '阅读器枚举 · 读卡 · 档案配置' },
+  { id: 'iccard', label: 'IC 卡', en: 'IC CARD', fn: 'F5', desc: '扇区读写 · 文本块 · 档案配置' },
+  { id: 'scanner', label: '扫码枪', en: 'SCANNER', fn: 'F6', desc: '配置下发 · 扫码事件 · 演示注入' },
+  { id: 'signature', label: '签名 mock', en: 'SIGNATURE', fn: 'F7', desc: '契约形状演示 · 笔画采样 · 会话结果' },
+  { id: 'events', label: '事件流', en: 'EVENTS', fn: 'F8', desc: '白名单订阅 · 事件流水 · 模拟触发' },
 ]
 
 export const DEVICE_EVENT_NAMES = ['capture.frame', 'scanner.scanned', 'signature.stroke', 'devices.ready']

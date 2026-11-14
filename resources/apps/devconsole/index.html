@@ -11,48 +11,60 @@
 </head>
 <body>
   <div id="app" v-cloak>
-    <aside class="dc-side">
-      <div class="dc-brand">
-        <span class="dc-brand-dot"></span>
-        <span class="dc-brand-name">开发者控制台</span>
+    <header class="dc-statusbar">
+      <div class="dc-status-left">
+        <span class="dc-logo">◆</span>
+        <span class="dc-status-name">开发者控制台</span>
+        <span class="dc-status-en">Hardware Debug Console</span>
       </div>
-      <nav class="dc-nav">
-        <button
-          v-for="p in panels"
-          :key="p.id"
-          class="dc-nav-item"
-          :class="{ active: current === p.id }"
-          @click="open(p.id)"
-        >{{ p.label }}</button>
-      </nav>
-    </aside>
+      <div class="dc-status-right">
+        <span class="dc-status-item">版本 <b>v{{ info?.version ?? '—' }}</b></span>
+        <span class="dc-status-item">会话 <b>{{ sessionId }}</b></span>
+        <span class="dc-status-item"><i class="dc-lamp" :class="bridgeReal ? 'on' : 'off'"></i>{{ bridgeReal ? '真实桥' : '模拟桥' }}</span>
+        <span class="dc-status-clock">{{ clock }}</span>
+      </div>
+    </header>
 
-    <main class="dc-main">
-      <header class="dc-head">
-        <div class="dc-head-title">
-          <h1 class="dc-title">{{ currentPanel?.label }}<span class="dc-title-en" v-if="currentPanel?.en">{{ currentPanel.en }}</span></h1>
-          <p class="dc-sub" v-if="currentPanel?.desc">{{ currentPanel.desc }}</p>
-        </div>
-        <div class="dc-head-status">
-          <span class="dc-badge" :class="bridgeReal ? 'ok' : 'mock'">{{ bridgeReal ? '真实桥' : '模拟桥' }}</span>
-          <span class="dc-head-version" v-if="info">v{{ info.version }}</span>
-          <span class="dc-head-clock">{{ clock }}</span>
-        </div>
-      </header>
-      <section class="dc-body">
-        <div v-if="loadError" class="dc-empty">面板加载失败：{{ loadError }}</div>
-        <component v-else-if="panelComp" :is="panelComp"></component>
-        <div v-else class="dc-empty">加载中…</div>
-      </section>
-      <footer class="dc-logbar" :class="{ collapsed: !logOpen }">
-        <div class="dc-logbar-head" @click="logOpen = !logOpen">
-          <span>调用流水</span>
-          <span class="dc-logbar-count">{{ logCount }}</span>
-          <span class="dc-logbar-toggle">{{ logOpen ? '▾' : '▴' }}</span>
-        </div>
-        <log-view v-show="logOpen"></log-view>
-      </footer>
-    </main>
+    <div class="dc-layout">
+      <aside class="dc-side">
+        <div class="dc-side-head">调试模块 <span>MODULES</span></div>
+        <nav class="dc-nav">
+          <button
+            v-for="p in panels"
+            :key="p.id"
+            class="dc-nav-item"
+            :class="{ active: current === p.id }"
+            @click="open(p.id)"
+          >
+            <span class="dc-nav-fn">{{ p.fn }}</span>
+            <span class="dc-nav-text">{{ p.label }}<em>{{ p.en }}</em></span>
+          </button>
+        </nav>
+        <div class="dc-side-foot">F1-F8 切换模块 · ESC 收起日志</div>
+      </aside>
+
+      <main class="dc-main">
+        <header class="dc-head">
+          <div class="dc-head-title">
+            <h1 class="dc-title">{{ currentPanel?.label }}<span class="dc-title-en" v-if="currentPanel?.en">{{ currentPanel.en }}</span></h1>
+            <p class="dc-sub" v-if="currentPanel?.desc">{{ currentPanel.desc }}</p>
+          </div>
+        </header>
+        <section class="dc-body">
+          <div v-if="loadError" class="dc-empty">面板加载失败：{{ loadError }}</div>
+          <component v-else-if="panelComp" :is="panelComp"></component>
+          <div v-else class="dc-empty">加载中…</div>
+        </section>
+        <footer class="dc-logbar" :class="{ collapsed: !logOpen }">
+          <div class="dc-logbar-head" @click="logOpen = !logOpen">
+            <span>调用流水 CALL TRACE</span>
+            <span class="dc-logbar-count">{{ logCount }}</span>
+            <span class="dc-logbar-toggle">{{ logOpen ? '▾' : '▴' }}</span>
+          </div>
+          <log-view v-show="logOpen"></log-view>
+        </footer>
+      </main>
+    </div>
   </div>
   <script type="module" src="js/app.js"></script>
 </body>
