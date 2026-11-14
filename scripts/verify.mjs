@@ -3,7 +3,7 @@
 // 再跑 install → guard → design → lint → typecheck → build → design:css → dev 解析阶段。
 // 退出码说话，结论不依赖任何人的口述；这一步专门防「沙箱里有产物、用户本地没有」。
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -15,11 +15,46 @@ function git(args) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' })
 }
 
+/**
+ * 收尾清理：rmSync 重试（taskkill 返回 ≠ 句柄释放）吸收短窗口；仍有存活进程
+ * 抓着目录（esbuild 常驻服务等）时，改名为 trash 目录让出 WORK 路径——
+ * 清理是家务事，绝不让全绿的 verify 以退出码 1 告终，残留由下次运行扫除。
+ */
+function cleanupWork() {
+  try {
+    rmSync(WORK, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
+    return
+  }
+  catch (err) {
+    const trash = `${WORK}-trash-${Date.now()}`
+    try {
+      renameSync(WORK, trash)
+    }
+    catch {
+      console.warn(`[verify] 清理被占用但无法改名，保留现场：${err.code ?? ''}`)
+      return
+    }
+    try {
+      rmSync(trash, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 })
+    }
+    catch {
+      console.warn(`[verify] 残留待清：${basename(trash)}（下次运行扫除）`)
+    }
+  }
+}
+
+function sweepTrash() {
+  for (const name of readdirSync(ROOT)) {
+    if (name.startsWith('.verify-work-trash-')) {
+      rmSync(join(ROOT, name), { recursive: true, force: true, maxRetries: 10, retryDelay: 500 })
+    }
+  }
+}
+
 // 只复制 git 会入库的文件（含已暂存/未跟踪但非 ignore 的），天然排除 dist/out/resources/devices
 function stageCleanTree() {
-  // Windows：taskkill 返回 ≠ 句柄释放，electron（CWD 在 WORK 内）消亡期间 rmdir 报 EBUSY，
-  // 用 rmSync 内建重试吸收进程消亡窗口
-  rmSync(WORK, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
+  sweepTrash()
+  cleanupWork()
   mkdirSync(WORK, { recursive: true })
   const list = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
     .split('\0')
@@ -148,7 +183,7 @@ async function main() {
   }
   console.log('[verify] 全绿')
   // 收尾清理同 start：dev-resolve 刚杀掉 electron 进程树，句柄释放有延迟
-  rmSync(WORK, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
+  cleanupWork()
 }
 
 main()
