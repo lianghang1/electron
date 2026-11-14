@@ -17,7 +17,9 @@ function git(args) {
 
 // 只复制 git 会入库的文件（含已暂存/未跟踪但非 ignore 的），天然排除 dist/out/resources/devices
 function stageCleanTree() {
-  rmSync(WORK, { recursive: true, force: true })
+  // Windows：taskkill 返回 ≠ 句柄释放，electron（CWD 在 WORK 内）消亡期间 rmdir 报 EBUSY，
+  // 用 rmSync 内建重试吸收进程消亡窗口
+  rmSync(WORK, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
   mkdirSync(WORK, { recursive: true })
   const list = git(['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
     .split('\0')
@@ -145,7 +147,8 @@ async function main() {
     process.exit(1)
   }
   console.log('[verify] 全绿')
-  rmSync(WORK, { recursive: true, force: true })
+  // 收尾清理同 start：dev-resolve 刚杀掉 electron 进程树，句柄释放有延迟
+  rmSync(WORK, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
 }
 
 main()
