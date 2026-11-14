@@ -367,7 +367,12 @@ function setupPermissions(a: Assembly): void {
       set: async (key, verdict) => { a.appKv!.set(SHELL_APP_ID, `permission:${key}`, verdict) },
       delete: async (key) => { a.appKv!.remove(SHELL_APP_ID, `permission:${key}`) },
     },
-    prompt: { ask: request => a.overlays!.requestPermission(request) },
+    prompt: {
+      ask: request => a.overlays!.requestPermission({
+        ...request,
+        appName: a.catalog?.find(m => m.id === request.appId)?.name,
+      }),
+    },
     audit: (decision) => {
       a.events.emit('permission.decided', {
         appId: decision.request.appId,

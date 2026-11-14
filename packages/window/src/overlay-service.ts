@@ -8,6 +8,8 @@ import { overlayDomain } from '@shell/shared/ipc'
 export interface PermissionRequestView {
   requestId: string
   appId: string
+  /** 应用展示名（组合根按 catalog 解析）；未提供时回退 appId */
+  appName?: string
   origin: string
   permission: string
 }
@@ -63,7 +65,8 @@ export class OverlayService implements Startable {
   readonly name = 'overlay'
   private notifications: readonly PlatformNotification[] = []
   private downloads: readonly DownloadTask[] = []
-  private permission: PermissionRequestView | null = null
+  /** 授权请求队列：只渲染队首，决策完自动出队（master dialogs 语义） */
+  private permissions: PermissionRequestView[] = []
   private menu: MenuView | null = null
   private capture: CaptureSessionView | null = null
   private config: string | null = null
@@ -97,10 +100,10 @@ export class OverlayService implements Startable {
     this.clearTimers.clear()
   }
 
-  /** PermissionPrompt.ask 实现：打开原生授权弹窗，等待用户决策 / 超时（缺省拒绝） */
+  /** PermissionPrompt.ask 实现：请求入队逐条决策，等待用户决策 / 超时（缺省拒绝） */
   requestPermission(request: Omit<PermissionRequestView, 'requestId'>): Promise<boolean> {
     const requestId = `p-${++this.seq}`
-    this.permission = { ...request, requestId }
+    this.permissions = [...this.permissions, { ...request, requestId }]
     const promise = new Promise<boolean>((resolve) => {
       const timer = setTimeout(() => this.resolvePermission(requestId, false), PERMISSION_TIMEOUT_MS)
       timer.unref?.()
@@ -151,7 +154,7 @@ export class OverlayService implements Startable {
   }
 
   dismiss(kind: OverlayKind): void {
-    if (kind === 'permission') { this.permission = null }
+    if (kind === 'permission') { this.permissions = [] }
     if (kind === 'menu') { this.menu = null }
     if (kind === 'capture') { this.capture = null }
     if (kind === 'config') { this.config = null }
@@ -179,7 +182,7 @@ export class OverlayService implements Startable {
       params: this.options.windows.overlayParamsOf(senderId),
       notifications: kind === 'panel' ? this.notifications : [],
       downloads: kind === 'panel' ? this.downloads : [],
-      permission: kind === 'permission' ? this.permission : null,
+      permission: kind === 'permission' ? this.permissions[0] ?? null : null,
       menu: kind === 'menu' ? this.menu : null,
       capture: kind === 'capture' ? this.capture : null,
       config: kind === 'config' ? this.config : null,
@@ -208,9 +211,12 @@ export class OverlayService implements Startable {
     const resolve = this.pendingPermissions.get(requestId)
     if (!resolve) { return }
     this.pendingPermissions.delete(requestId)
+    this.permissions = this.permissions.filter(r => r.requestId !== requestId)
     this.options.events.emit('permission.resolved', { requestId, granted })
     resolve(granted)
-    this.dismiss('permission')
+    // 队列非空继续展示队首；全部清空才收场（清场延迟防残帧）
+    if (this.permissions.length) { this.push('permission') }
+    else { this.dismiss('permission') }
   }
 
   private registerIpc(): void {

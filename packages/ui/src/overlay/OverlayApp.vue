@@ -2,8 +2,9 @@
 import type { DownloadTask } from '@shell/shared'
 import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
 import { shell } from '@shell/bridge/client'
+import { permissionLabel } from '@shell/shared'
 import { Badge, Button } from '@ui/components/ui'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CommandPalette from '../shell/CommandPalette.vue'
 import SettingsDialog from '../shell/SettingsDialog.vue'
 
@@ -18,6 +19,7 @@ interface NotificationItem {
 interface PermissionView {
   requestId: string
   appId: string
+  appName?: string
   permission: string
   origin: string
 }
@@ -70,7 +72,29 @@ const kind = computed(() => state.value?.kind ?? 'dialog')
 const fullscreen = computed(() => kind.value !== 'panel')
 const paletteItems = computed(() => apps.value.map(a => ({ id: a.manifest.id, name: a.manifest.name, kind: 'app' })))
 
+/** 授权卡倒计时：与 Main 的 30s 超时同源，归零由 Main 按拒绝收尾（master 同款语义） */
+const REQUEST_TIMEOUT_S = 30
+const countdown = ref(REQUEST_TIMEOUT_S)
+let countdownTimer: ReturnType<typeof setInterval> | undefined
+
+watch(() => state.value?.permission?.requestId, (id) => {
+  clearInterval(countdownTimer)
+  if (!id) { return }
+  countdown.value = REQUEST_TIMEOUT_S
+  countdownTimer = setInterval(() => {
+    if (countdown.value > 0) { countdown.value -= 1 }
+  }, 1000)
+}, { immediate: true })
+
+/** ESC = 拒绝当前请求（超时不持久化语义一致；遮罩/外点不关闭，必须显式决策或等超时） */
+function onOverlayKeydown(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && kind.value === 'permission' && state.value?.permission) {
+    action('resolve-permission', { requestId: state.value.permission.requestId, granted: false })
+  }
+}
+
 onMounted(async () => {
+  window.addEventListener('keydown', onOverlayKeydown)
   state.value = await shell().overlay.sync() as OverlayState
   unsubscribe = shell().overlay.onUpdated((next) => {
     state.value = next as OverlayState
@@ -90,6 +114,8 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onOverlayKeydown)
+  clearInterval(countdownTimer)
   unsubscribe?.()
   offFrame?.()
   void stopPreview()
@@ -164,7 +190,7 @@ const levelTone: Record<string, string> = {
 </script>
 
 <template>
-  <div class="h-full w-full" :class="fullscreen ? 'flex items-center justify-center' : 'flex flex-col justify-end gap-2 p-3'">
+  <div class="relative h-full w-full" :class="fullscreen ? 'flex items-center justify-center' : 'flex flex-col justify-end gap-2 p-3'">
     <template v-if="kind === 'panel'">
       <div
         v-for="item in state?.notifications ?? []"
@@ -211,22 +237,31 @@ const levelTone: Record<string, string> = {
     </template>
 
     <template v-else-if="kind === 'permission' && state?.permission">
-      <div class="w-[420px] rounded-xl border bg-background p-5 shadow-2xl">
-        <div class="text-ui-base font-semibold text-foreground">
-          权限请求
+      <div class="absolute inset-0 bg-black/30" />
+      <div
+        :key="state.permission.requestId"
+        class="relative w-[400px] rounded-xl border border-t-[3px] border-t-primary bg-background p-5 shadow-2xl"
+      >
+        <div class="flex items-center gap-2">
+          <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
+          </span>
+          <div class="text-ui-base font-semibold text-foreground">
+            权限请求
+          </div>
         </div>
-        <div class="mt-2 text-ui-sm text-muted-foreground">
-          应用 <span class="font-medium text-foreground">{{ state?.permission?.appId }}</span> 请求
-          <span class="font-medium text-foreground">{{ state?.permission?.permission }}</span>
+        <div class="mt-2 text-ui-sm leading-relaxed text-muted-foreground">
+          <span class="font-medium text-foreground">{{ state.permission.appName ?? state.permission.appId }}</span>
+          请求使用「<span class="font-medium text-foreground">{{ permissionLabel(state.permission.permission) }}</span>」，请确认是否允许。
         </div>
-        <div class="mt-1 text-ui-xs text-muted-foreground">
-          来源：{{ state?.permission?.origin }}
+        <div class="mt-2 text-ui-xs text-muted-foreground">
+          <span class="font-semibold tabular-nums text-primary">{{ countdown }}</span> 秒内未处理将按本次拒绝，不影响下次使用
         </div>
         <div class="mt-5 flex justify-end gap-2">
-          <Button variant="outline" @click="action('resolve-permission', { requestId: state?.permission?.requestId, granted: false })">
+          <Button variant="outline" @click="action('resolve-permission', { requestId: state.permission.requestId, granted: false })">
             拒绝
           </Button>
-          <Button @click="action('resolve-permission', { requestId: state?.permission?.requestId, granted: true })">
+          <Button @click="action('resolve-permission', { requestId: state.permission.requestId, granted: true })">
             允许
           </Button>
         </div>
