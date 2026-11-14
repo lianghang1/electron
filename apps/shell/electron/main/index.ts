@@ -279,6 +279,9 @@ function setupPlatformSystems(a: Assembly): void {
   a.events.on('download.completed', ({ filename }) => {
     notifications.push({ title: '下载完成', body: filename, level: 'success' })
   })
+  a.events.on('download.open-failed', ({ filename }) => {
+    notifications.push({ title: '文件无法打开', body: `${filename} 可能已被移动或删除`, level: 'warning' })
+  })
 
   // 托盘（kiosk 全屏形态不创建——现场不该有逃逸入口）
   if (a.flavor.mode === 'windowed') {

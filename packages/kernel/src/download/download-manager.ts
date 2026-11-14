@@ -86,9 +86,25 @@ export class DownloadManager implements Startable {
   }
 
   async open(taskId: string): Promise<void> {
-    const path = this.completedPath(taskId)
+    // 文件被移动/删除等场景用户必须有反馈（master 只记日志，现场表现为点了没反应）；
+    // resolveCompletedPath 对缺失文件直接抛错，必须在此拦下转为通知而非向上抛
+    let path: string
+    try {
+      path = this.completedPath(taskId)
+    }
+    catch (err) {
+      this.emitOpenFailed(taskId, err instanceof Error ? err.message : String(err))
+      return
+    }
     const err = await shell.openPath(path)
-    if (err) { throw new Error(err) }
+    if (!err) { return }
+    this.emitOpenFailed(taskId, err)
+  }
+
+  private emitOpenFailed(taskId: string, reason: string): void {
+    const filename = this.tasks.get(taskId)?.filename ?? ''
+    this.options.logger.warn('打开下载文件失败', { taskId, error: reason })
+    this.options.events.emit('download.open-failed', { taskId, filename, reason })
   }
 
   async reveal(taskId: string): Promise<void> {

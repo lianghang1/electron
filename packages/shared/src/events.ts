@@ -74,6 +74,8 @@ export interface PlatformEvents {
   'download.completed': { taskId: string, appId: string, filename: string }
   'download.cancelled': { taskId: string, appId: string, reason: 'user' | 'policy' | 'interrupted' }
   'download.failed': { taskId: string, appId: string, reason: string }
+  /** 已完成的下载文件打不开（被移动/删除/关联程序异常）：消息区据此给用户提示 */
+  'download.open-failed': { taskId: string, filename: string, reason: string }
   // 会话容器
   'session.cleared': { appId: string, scope: 'cache' | 'site-data' }
   'session.cookies-restored': { appId: string, count: number }
