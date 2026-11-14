@@ -474,3 +474,16 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
     </template>
   </div>
 </template>
+
+<style>
+/* 浮层窗口页面基座：透明背景 + 无边距（Shell 本体与浮层共用 index.html）。
+   浮层窗 transparent:true 依赖页面自身透明——全局 tokens 的 body 底色会把透明窗
+   填成不透明色块，整块盖住下层 WebContentsView（master OverlayApp.vue 同款基座） */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+}
+</style>
