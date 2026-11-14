@@ -467,7 +467,8 @@ onBeforeUnmount(() => {
 }
 
 .cu-dialog__chip--live {
-  color: #7ee2b8;
+  /* 徽标悬在深色视频面上：主色提亮保证可读，状态语义由文字与圆点表达，不再引入第二品牌色 */
+  color: color-mix(in srgb, var(--primary) 55%, #fff);
 }
 
 .cu-dialog__chip-dot {
@@ -478,7 +479,7 @@ onBeforeUnmount(() => {
 }
 
 .cu-dialog__chip--live .cu-dialog__chip-dot {
-  background: #22c55e;
+  background: color-mix(in srgb, var(--primary) 75%, #fff);
 }
 
 /* ---- 控制栏 ---- */
