@@ -105,7 +105,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
 <template>
   <div
     v-if="open"
-    class="cp-overlay fixed inset-0 z-[60] flex items-start justify-center bg-overlay backdrop-blur-[2px]"
+    class="cp-overlay fixed inset-0 z-[60] flex items-start justify-center bg-overlay"
     @click.self="close"
   >
     <div

@@ -59,10 +59,14 @@ interface OverlayState {
   updatePrompt: string | null
 }
 
-interface AppSummary { manifest: { id: string, name: string } }
+interface AppSummary {
+  manifest: { id: string, name: string, version: string, icon?: string }
+  source: string
+}
 
 const state = ref<OverlayState | null>(null)
 const apps = ref<AppSummary[]>([])
+const runningIds = ref<string[]>([])
 let unsubscribe: (() => void) | undefined
 
 const kind = computed(() => state.value?.kind ?? 'dialog')
@@ -90,16 +94,25 @@ function onOverlayKeydown(event: KeyboardEvent): void {
   }
 }
 
+/** 应用清单与运行态按需拉取：浮层窗预热后常驻，不能只在 mounted 拉一次（运行态会过期） */
+async function loadApps(): Promise<void> {
+  try {
+    apps.value = await shell().apps.list() as AppSummary[]
+    runningIds.value = await shell().apps.running() as string[]
+  }
+  catch { apps.value = [] }
+}
+
+watch(kind, (next) => {
+  if (next === 'command-palette' || next === 'app-center') { void loadApps() }
+}, { immediate: true })
+
 onMounted(async () => {
   window.addEventListener('keydown', onOverlayKeydown)
   state.value = await shell().overlay.sync() as OverlayState
   unsubscribe = shell().overlay.onUpdated((next) => {
     state.value = next as OverlayState
   })
-  if (kind.value === 'command-palette' || kind.value === 'app-center') {
-    try { apps.value = await shell().apps.list() as AppSummary[] }
-    catch { apps.value = [] }
-  }
   // panel 的透明区穿透由窗口策略设定，卡片自身经 mouseenter/mouseleave 临时解除
   if (kind.value === 'panel') { shell().overlay.mouseIgnore(true) }
 })
@@ -163,9 +176,24 @@ const dlIconClass: Record<string, string> = {
   failed: 'bg-rose-500',
 }
 
+/** 通知卡图标底色（按级别）：kernel level 字段的呈现投影，未识别级别回退 info */
+const levelIconClass: Record<string, string> = {
+  info: 'bg-primary',
+  success: 'bg-emerald-500',
+  warning: 'bg-amber-500',
+  error: 'bg-rose-500',
+}
+
+/** 应用注册来源中文标签（master SOURCE_LABELS 语义） */
+const sourceLabels: Record<string, string> = {
+  'flavor': '内置',
+  'apps.json': '本地配置',
+  'remote': '远程',
+}
+
 /**
- * 面板量高回报：量「自然内容高度」（超高内部滚动时的 scrollHeight 含溢出部分），
- * 回报 Main 调整窗口尺寸——回报裁剪值会引发窗口收缩死循环（master 同款教训）
+ * 面板量高回报：回报自然内容高度，Main 据此调整窗口尺寸并锚定右上角；
+ * 通知在列数由 kernel 上限封顶，面板不内部滚动也不裁剪
  */
 const PANEL_PADDING = 24
 const panelRef = ref<HTMLElement | null>(null)
@@ -176,17 +204,8 @@ function reportHeight(): void {
   void shell().overlay.resize(panel.scrollHeight + PANEL_PADDING)
 }
 
-/** 面板超高内部滚动时新消息在底部：追加后自动滚到底，保证最新通知可见（master 同款） */
-function scrollPanelToBottom(): void {
-  const panel = panelRef.value
-  if (panel) { panel.scrollTop = panel.scrollHeight }
-}
-
 watch(() => [state.value?.notifications, state.value?.downloads], () => {
-  void nextTick(() => {
-    reportHeight()
-    scrollPanelToBottom()
-  })
+  void nextTick(reportHeight)
 }, { deep: true, immediate: true })
 </script>
 
@@ -195,13 +214,12 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
     <template v-if="kind === 'panel'">
       <div
         ref="panelRef"
-        class="panel-scroll flex w-[320px] flex-col gap-2 overflow-y-auto"
-        style="max-height: calc(100vh - 24px)"
+        class="flex w-[320px] flex-col gap-2"
       >
         <div
           v-for="task in state?.downloads ?? []"
           :key="task.id"
-          class="relative flex rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur"
+          class="relative flex rounded-lg border bg-popover p-2.5 shadow-lg"
           :title="task.path"
           @mouseenter="shell().overlay.mouseIgnore(false)"
           @mouseleave="shell().overlay.mouseIgnore(true)"
@@ -244,18 +262,18 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
         <div
           v-for="item in state?.notifications ?? []"
           :key="item.id"
-          class="relative flex rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur"
+          class="relative flex rounded-lg border bg-popover p-2.5 shadow-lg"
           @mouseenter="shell().overlay.mouseIgnore(false)"
           @mouseleave="shell().overlay.mouseIgnore(true)"
         >
-          <span class="mr-2 mt-0.5 flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md bg-primary text-white">
+          <span class="mr-2 mt-0.5 flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md text-white" :class="levelIconClass[item.level] ?? levelIconClass.info">
             <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
           </span>
           <div class="min-w-0 flex-1">
             <div v-if="item.appName" class="text-ui-xs text-muted-foreground">
               {{ item.appName }}
             </div>
-            <div class="text-ui-sm font-medium text-foreground">
+            <div class="text-ui-sm font-semibold text-foreground">
               {{ item.title }}
             </div>
             <div v-if="item.body" class="mt-0.5 text-ui-xs leading-relaxed text-muted-foreground">
@@ -273,7 +291,7 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
       <div class="absolute inset-0 bg-black/30" />
       <div
         :key="state.permission.requestId"
-        class="relative w-[400px] rounded-xl border border-t-[3px] border-t-primary bg-background p-5 shadow-2xl"
+        class="relative w-[400px] rounded-xl border border-t-[3px] border-t-primary bg-popover p-5 shadow-2xl"
       >
         <div class="flex items-center gap-2">
           <span class="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -336,7 +354,7 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
     </template>
 
     <template v-else-if="kind === 'app-center'">
-      <div class="w-[560px] rounded-xl border bg-background p-5 shadow-2xl">
+      <div class="w-[380px] rounded-xl border bg-popover p-4 shadow-2xl">
         <div class="flex items-center justify-between">
           <div class="text-ui-base font-semibold text-foreground">
             应用中心
@@ -345,17 +363,41 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
             ✕
           </button>
         </div>
-        <div class="mt-4 grid gap-2">
+        <div class="mt-3 flex flex-col gap-0.5">
           <button
             v-for="app in apps"
             :key="app.manifest.id"
-            class="flex items-center justify-between rounded-lg border px-3 py-2 text-ui-sm hover:bg-muted"
+            class="flex items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted"
+            :title="`打开 ${app.manifest.name}`"
             @click="openApp(app.manifest.id)"
           >
-            <span>{{ app.manifest.name }}</span>
-            <span class="text-ui-xs text-muted-foreground">{{ app.manifest.id }}</span>
+            <img
+              v-if="app.manifest.icon"
+              :src="app.manifest.icon"
+              alt=""
+              class="h-8 w-8 flex-none rounded-lg object-cover"
+            >
+            <span
+              v-else
+              class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-primary text-ui-sm font-semibold text-primary-foreground"
+            >
+              {{ app.manifest.name.slice(0, 1) }}
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="flex items-center gap-1.5">
+                <span class="truncate text-ui-sm font-medium text-foreground">{{ app.manifest.name }}</span>
+                <span
+                  v-if="runningIds.includes(app.manifest.id)"
+                  class="h-1.5 w-1.5 flex-none rounded-full bg-emerald-500"
+                  title="运行中"
+                />
+              </span>
+              <span class="mt-0.5 block truncate text-ui-xs text-muted-foreground">
+                v{{ app.manifest.version }} · {{ sourceLabels[app.source] ?? app.source }}
+              </span>
+            </span>
           </button>
-          <div v-if="!apps.length" class="text-ui-sm text-muted-foreground">
+          <div v-if="!apps.length" class="px-2 py-6 text-center text-ui-sm text-muted-foreground">
             暂无已注册应用
           </div>
         </div>
@@ -363,7 +405,7 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
     </template>
 
     <template v-else-if="kind === 'update-prompt'">
-      <div class="w-[420px] rounded-xl border bg-background p-5 shadow-2xl">
+      <div class="w-[420px] rounded-xl border bg-popover p-5 shadow-2xl">
         <div class="text-ui-base font-semibold text-foreground">
           更新已就绪
         </div>
@@ -382,7 +424,7 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
     </template>
 
     <template v-else-if="kind === 'config'">
-      <div class="w-[420px] rounded-xl border bg-background p-5 shadow-2xl">
+      <div class="w-[420px] rounded-xl border bg-popover p-5 shadow-2xl">
         <div class="text-ui-base font-semibold text-foreground">
           设备配置
         </div>
@@ -409,17 +451,5 @@ body {
   padding: 0;
   background: transparent;
   overflow: hidden;
-}
-
-/* 面板超高内部滚动：滚动条无视觉意义，直接隐藏（tokens.css 的 * { scrollbar-width: thin }
-   是未分层规则，级联优先级高于 @layer utilities 的工具类，必须在此以未分层规则反压）。
-   100vh 钳制不依赖父链高度（html/body 无高度，max-h-full 百分比会失效），master 同款 */
-.panel-scroll {
-  scrollbar-width: none;
-}
-
-.panel-scroll::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 </style>
