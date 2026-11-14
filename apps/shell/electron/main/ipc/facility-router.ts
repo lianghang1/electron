@@ -85,9 +85,13 @@ const FACILITY_ROUTES = {
       }).passthrough(),
       handler: (
         input: { title: string, body?: string, level?: 'info' | 'success' | 'warning' | 'error', ttlMs?: number },
-        _ctx: DomainCallContext,
+        ctx: DomainCallContext,
         deps: FacilityDeps,
-      ) => ({ id: deps.notifications.push(input) }),
+      ) => {
+        // toast 顶行展示来源应用名（master toast appName 语义），平台内找不到时回退 appId
+        const appName = deps.apps.list().find(r => r.manifest.id === ctx.appId)?.manifest.name ?? ctx.appId
+        return { id: deps.notifications.push({ ...input, appName }) }
+      },
     },
     list: {
       permission: 'notification',

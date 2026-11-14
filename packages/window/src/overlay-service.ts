@@ -55,6 +55,8 @@ export interface OverlayServiceOptions {
 const CLEAR_DELAY_MS = 100
 /** 授权弹窗超时：无人值守形态不能永久挂起 */
 const PERMISSION_TIMEOUT_MS = 30_000
+/** 终态下载卡停留时长：到点自动消失，不靠 kernel 的账本保留期 */
+const DOWNLOAD_TTL_MS = 8_000
 
 /**
  * 统一原生浮层宿主（A2 实测：WebContentsView 会盖住壳内 DOM 浮层）。
@@ -65,6 +67,9 @@ export class OverlayService implements Startable {
   readonly name = 'overlay'
   private notifications: readonly PlatformNotification[] = []
   private downloads: readonly DownloadTask[] = []
+  /** 终态下载卡的消失时点；手动关闭的任务 id 永不再展示 */
+  private readonly downloadDeadlines = new Map<string, number>()
+  private readonly dismissedDownloads = new Set<string>()
   /** 授权请求队列：只渲染队首，决策完自动出队（master dialogs 语义） */
   private permissions: PermissionRequestView[] = []
   private menu: MenuView | null = null
@@ -87,7 +92,21 @@ export class OverlayService implements Startable {
       this.refreshPanel()
     }))
     this.unsubscribers.push(this.options.events.on('download.tasks-changed', ({ tasks }) => {
-      this.downloads = tasks
+      const now = Date.now()
+      for (const task of tasks) {
+        if (task.status !== 'progressing' && !this.downloadDeadlines.has(task.id)) {
+          this.downloadDeadlines.set(task.id, now + DOWNLOAD_TTL_MS)
+        }
+      }
+      this.downloads = tasks.filter((task) => {
+        if (this.dismissedDownloads.has(task.id)) { return false }
+        const deadline = this.downloadDeadlines.get(task.id)
+        if (deadline !== undefined && task.status !== 'progressing' && now >= deadline) {
+          this.dismissedDownloads.add(task.id)
+          return false
+        }
+        return true
+      })
       this.refreshPanel()
     }))
     this.options.windows.prewarmOverlays()

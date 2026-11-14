@@ -7,6 +7,8 @@ export interface PlatformNotification {
   id: string
   title: string
   body?: string
+  /** 来源应用展示名（toast 顶行）；平台自身推送可省略 */
+  appName?: string
   level: NotificationLevel
   createdAt: number
   ttlMs: number
@@ -15,6 +17,7 @@ export interface PlatformNotification {
 export interface NotificationInput {
   title: string
   body?: string
+  appName?: string
   level?: NotificationLevel
   ttlMs?: number
 }
@@ -47,7 +50,7 @@ export class NotificationCenter implements Startable {
     const now = this.options.now?.() ?? Date.now()
     const id = `n-${++this.seq}-${now}`
     const ttlMs = input.ttlMs ?? this.options.defaultTtlMs ?? 8000
-    this.items = [...this.items, { id, title: input.title, body: input.body, level: input.level ?? 'info', createdAt: now, ttlMs }]
+    this.items = [...this.items, { id, title: input.title, body: input.body, appName: input.appName, level: input.level ?? 'info', createdAt: now, ttlMs }]
     const timer = setTimeout(() => this.dismiss(id), ttlMs)
     timer.unref?.()
     this.timers.set(id, timer)

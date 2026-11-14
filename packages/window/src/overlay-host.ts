@@ -18,7 +18,7 @@ export interface OverlayPolicy<K extends string = OverlayKind> {
   readonly route: string
   /** 同类浮层复用已存在实例（至多一个） */
   readonly singleton: boolean
-  /** fullscreen = 铺满主窗内容区；anchored = 右下角消息区 */
+  /** fullscreen = 铺满主窗内容区；anchored = 右上角消息区 */
   readonly bounds: 'fullscreen' | 'anchored'
   /** 显示时是否抢焦点；消息区不抢焦点 */
   readonly focus: boolean

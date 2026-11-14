@@ -2,9 +2,9 @@
 import type { DownloadTask } from '@shell/shared'
 import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
 import { shell } from '@shell/bridge/client'
-import { permissionLabel } from '@shell/shared'
-import { Badge, Button } from '@ui/components/ui'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { formatBytes, permissionLabel } from '@shell/shared'
+import { Button } from '@ui/components/ui'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CommandPalette from '../shell/CommandPalette.vue'
 import SettingsDialog from '../shell/SettingsDialog.vue'
 
@@ -12,6 +12,7 @@ interface NotificationItem {
   id: string
   title: string
   body?: string
+  appName?: string
   level: string
   ttlMs: number
 }
@@ -181,57 +182,124 @@ function dismissDownload(taskId: string): void {
   void shell().downloads.dismiss(taskId)
 }
 
-const levelTone: Record<string, string> = {
-  info: 'bg-sky-500',
-  success: 'bg-emerald-500',
-  warning: 'bg-amber-500',
-  error: 'bg-rose-500',
+async function openDownload(taskId: string): Promise<void> {
+  await shell().downloads.open(taskId)
 }
+
+function revealDownload(taskId: string): void {
+  void shell().downloads.reveal(taskId)
+}
+
+/** 下载卡中文状态（master STATUS_TEXT 语义） */
+const statusText: Record<string, string> = {
+  progressing: '下载中',
+  completed: '已完成',
+  cancelled: '已取消',
+  interrupted: '已中断',
+  failed: '已失败',
+}
+
+/** 下载卡图标底色（按状态）：进行中品牌色 / 完成绿 / 失败红 */
+const dlIconClass: Record<string, string> = {
+  progressing: 'bg-primary',
+  completed: 'bg-emerald-500',
+  cancelled: 'bg-rose-500',
+  interrupted: 'bg-rose-500',
+  failed: 'bg-rose-500',
+}
+
+/**
+ * 面板量高回报：量「自然内容高度」（超高内部滚动时的 scrollHeight 含溢出部分），
+ * 回报 Main 调整窗口尺寸——回报裁剪值会引发窗口收缩死循环（master 同款教训）
+ */
+const PANEL_PADDING = 24
+const panelRef = ref<HTMLElement | null>(null)
+
+function reportHeight(): void {
+  const panel = panelRef.value
+  if (!panel || kind.value !== 'panel') { return }
+  void shell().overlay.resize(panel.scrollHeight + PANEL_PADDING)
+}
+
+watch(() => [state.value?.notifications, state.value?.downloads], () => {
+  void nextTick(reportHeight)
+}, { deep: true, immediate: true })
 </script>
 
 <template>
   <div class="relative h-full w-full" :class="fullscreen ? 'flex items-center justify-center' : 'flex flex-col justify-end gap-2 p-3'">
     <template v-if="kind === 'panel'">
       <div
-        v-for="item in state?.notifications ?? []"
-        :key="item.id"
-        class="relative rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur"
-        @mouseenter="shell().overlay.mouseIgnore(false)"
-        @mouseleave="shell().overlay.mouseIgnore(true)"
+        ref="panelRef"
+        class="flex max-h-full w-[320px] flex-col gap-2 overflow-y-auto [scrollbar-width:none]"
       >
-        <div class="absolute left-0 top-3 h-6 w-1 rounded-r" :class="levelTone[item.level] ?? levelTone.info" />
-        <div class="flex items-start justify-between gap-2">
-          <div class="text-ui-sm font-medium text-foreground">
-            {{ item.title }}
+        <div
+          v-for="task in state?.downloads ?? []"
+          :key="task.id"
+          class="relative flex rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur"
+          :title="task.path"
+          @mouseenter="shell().overlay.mouseIgnore(false)"
+          @mouseleave="shell().overlay.mouseIgnore(true)"
+        >
+          <span class="mr-2 mt-0.5 flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md text-white" :class="dlIconClass[task.status] ?? dlIconClass.progressing">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-ui-sm font-medium text-foreground">
+              {{ task.filename }}
+            </div>
+            <div class="mt-0.5 text-ui-xs text-muted-foreground">
+              {{ statusText[task.status] ?? task.status }}
+              <template v-if="task.status === 'progressing' && task.percent >= 0">
+                · {{ task.percent }}%
+              </template>
+              <template v-if="task.total > 0">
+                · {{ formatBytes(task.total) }}
+              </template>
+            </div>
+            <div
+              v-if="task.status === 'progressing' && task.percent >= 0"
+              class="mt-1.5 h-1 overflow-hidden rounded-full bg-muted"
+            >
+              <div class="h-full rounded-full bg-primary transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
+            </div>
+            <div v-if="task.status === 'completed'" class="mt-1.5 flex justify-end gap-1.5">
+              <Button variant="outline" class="h-6 px-2 text-ui-xs" @click="openDownload(task.id)">
+                打开
+              </Button>
+              <Button variant="outline" class="h-6 px-2 text-ui-xs" @click="revealDownload(task.id)">
+                文件夹
+              </Button>
+            </div>
           </div>
-          <button class="text-ui-xs text-muted-foreground" aria-label="关闭通知" @click="dismissNotification(item.id)">
+          <button class="absolute right-1.5 top-1.5 text-ui-xs text-muted-foreground" aria-label="关闭下载卡" @click="dismissDownload(task.id)">
             ✕
           </button>
         </div>
-        <div v-if="item.body" class="mt-1 text-ui-xs text-muted-foreground">
-          {{ item.body }}
-        </div>
-      </div>
-      <div
-        v-for="task in state?.downloads ?? []"
-        :key="task.id"
-        class="rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur"
-        @mouseenter="shell().overlay.mouseIgnore(false)"
-        @mouseleave="shell().overlay.mouseIgnore(true)"
-      >
-        <div class="flex items-start justify-between gap-2">
-          <div class="truncate text-ui-sm font-medium text-foreground">
-            {{ task.filename }}
+        <div
+          v-for="item in state?.notifications ?? []"
+          :key="item.id"
+          class="relative flex rounded-lg border bg-background/95 p-3 shadow-lg backdrop-blur"
+          @mouseenter="shell().overlay.mouseIgnore(false)"
+          @mouseleave="shell().overlay.mouseIgnore(true)"
+        >
+          <span class="mr-2 mt-0.5 flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md bg-primary text-white">
+            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <div v-if="item.appName" class="text-ui-xs text-muted-foreground">
+              {{ item.appName }}
+            </div>
+            <div class="text-ui-sm font-medium text-foreground">
+              {{ item.title }}
+            </div>
+            <div v-if="item.body" class="mt-0.5 text-ui-xs leading-relaxed text-muted-foreground">
+              {{ item.body }}
+            </div>
           </div>
-          <button class="text-ui-xs text-muted-foreground" aria-label="关闭下载卡" @click="dismissDownload(task.id)">
+          <button class="absolute right-1.5 top-1.5 text-ui-xs text-muted-foreground" aria-label="关闭通知" @click="dismissNotification(item.id)">
             ✕
           </button>
-        </div>
-        <div class="mt-1 flex items-center gap-2">
-          <Badge variant="secondary" class="text-ui-xs">
-            {{ task.status }}
-          </Badge>
-          <span v-if="task.percent >= 0 && task.status === 'progressing'" class="text-ui-xs text-muted-foreground">{{ task.percent }}%</span>
         </div>
       </div>
     </template>

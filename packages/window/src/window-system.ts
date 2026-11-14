@@ -344,7 +344,7 @@ export class WindowSystem implements Startable, ViewHost {
     return win
   }
 
-  /** 消息区右下角锚定：顶部让出 Shell 顶栏，高度钳制在主窗内容区内 */
+  /** 消息区右上角锚定：顶部让出 Shell 顶栏，高度钳制在主窗内容区内 */
   private anchorPanel(parent: BrowserWindow, height: number): Electron.Rectangle {
     const content = parent.getContentBounds()
     const width = PANEL_WIDTH + SHADOW * 2
@@ -397,7 +397,7 @@ export class WindowSystem implements Startable, ViewHost {
     win.setBounds(policy.bounds === 'fullscreen' ? parent.getContentBounds() : this.anchorPanel(parent, win.getBounds().height))
   }
 
-  /** 消息区页面量高回报：重设窗口高度，保持右下角锚定 */
+  /** 消息区页面量高回报：重设窗口高度，保持右上角锚定 */
   resizePanel(senderId: number, height: number): void {
     const win = this.overlays.get('panel')
     if (!win || win.isDestroyed() || win.webContents.id !== senderId || !Number.isFinite(height) || height <= 0) { return }
