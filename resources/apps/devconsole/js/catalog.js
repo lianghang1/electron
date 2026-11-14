@@ -12,9 +12,8 @@ export const PANELS = [
   { id: 'iccard', label: 'IC 卡', en: 'IC CARD', fn: 'F5', desc: '扇区读写 · 文本块 · 档案配置' },
   { id: 'scanner', label: '扫码枪', en: 'SCANNER', fn: 'F6', desc: '配置下发 · 扫码事件 · 连接态推送' },
   { id: 'signature', label: '签名 mock', en: 'SIGNATURE', fn: 'F7', desc: '契约形状演示 · 笔画采样 · 会话结果' },
-  { id: 'platform', label: '平台设施', en: 'PLATFORM', fn: 'F8', desc: '通知 · 应用页签 · 更新 · 下载' },
+  { id: 'lab', label: '平台功能实验室', en: 'PLATFORM LAB', fn: 'F8', desc: '运行环境 · 存储 · 权限 · 下载 · 网络弹窗 · 平台 API · 安全边界' },
   { id: 'events', label: '事件流', en: 'EVENTS', fn: 'F9', desc: '白名单订阅 · 事件流水 · 模拟触发' },
-  { id: 'selftest', label: '自检', en: 'SELF-TEST', fn: 'F10', desc: '运行时授权 · 存储隔离 · 网络弹窗 · 越权拒绝' },
 ]
 
 export const DEVICE_EVENT_NAMES = [

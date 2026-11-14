@@ -374,3 +374,24 @@ code, .mono { font-family: var(--dc-mono); }
 .dc-event-row { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed var(--dc-border); font-size: 12px; }
 .dc-event-name { flex: none; width: 130px; font-weight: 600; color: var(--dc-data); font-family: var(--dc-mono); font-size: 11px; }
 .dc-event-payload { flex: 1; font-family: var(--dc-mono); font-size: 11px; color: var(--dc-text-sub); word-break: break-all; }
+
+/* ── 平台功能实验室：页头条 / 字段行 / 媒体预览 / 预期拦截按钮 ───────── */
+.dc-lab-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dc-lab-head b { font-family: var(--dc-mono); color: var(--dc-accent); font-variant-numeric: tabular-nums; }
+.dc-lab-legend { margin-left: auto; font-family: var(--dc-mono); font-size: 10px; letter-spacing: 0.06em; color: var(--dc-text-sub); }
+.dc-lab-fields { display: flex; flex-direction: column; gap: 6px; font-size: 12px; margin-top: 10px; }
+.dc-lab-field { display: flex; gap: 12px; align-items: baseline; }
+.dc-lab-field .k { flex: none; width: 150px; font-family: var(--dc-mono); font-size: 11px; color: var(--dc-text-faint); }
+.dc-lab-field .v { font-family: var(--dc-mono); font-size: 11px; color: var(--dc-data); word-break: break-all; }
+.dc-btn.warn { color: var(--dc-warn); border-color: color-mix(in srgb, var(--dc-warn) 35%, var(--dc-border-strong)); }
+.dc-btn.warn:hover { background: var(--dc-warn-soft); }
+.dc-link { color: var(--dc-accent); font-family: var(--dc-mono); font-size: 12px; text-decoration: none; align-self: center; }
+.dc-link:hover { text-decoration: underline; }
+.dc-media-box { display: none; align-items: flex-start; gap: 16px; margin: 10px 0 0; }
+.dc-media-box.show { display: flex; }
+.dc-media-box video { width: 220px; border-radius: 5px; background: #10151b; }
+.dc-media-side { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; font-family: var(--dc-mono); font-size: 11px; color: var(--dc-text-faint); }
+.dc-meter { width: 200px; height: 10px; border-radius: 5px; background: var(--dc-inset); border: 1px solid var(--dc-border); overflow: hidden; }
+.dc-meter div { height: 100%; width: 0; background: linear-gradient(90deg, var(--dc-accent), #9a3412); transition: width 80ms linear; }
+.dc-log-state.block { color: var(--dc-warn); background: var(--dc-warn-soft); }
+.dc-log-state.info { color: var(--dc-text-sub); background: var(--dc-inset); }

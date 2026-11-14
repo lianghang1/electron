@@ -24,3 +24,11 @@ export function pushEvent(name, payload) {
   store.events.unshift({ id: ++eventSeq, ts: Date.now(), name, payload })
   if (store.events.length > MAX_EVENTS) { store.events.length = MAX_EVENTS }
 }
+
+/**
+ * 实验流水（平台功能实验室）：语义色由实验预期决定而非调用成败——
+ * state: ok=符合预期 / fail=不符 / block=预期拦截 / info=说明。
+ */
+export function pushTrace(op, state, detail) {
+  pushLog({ method: op, ok: state !== 'fail', state, ms: 0, result: detail })
+}

@@ -30,7 +30,7 @@ const Root = {
     tick()
     setInterval(tick, 1000)
 
-    // F1-F9 直切模块（F10 保留系统语义，点击直达）、ESC 收起/展开流水：调试台键盘操作语义
+    // F1-F9 直切模块、ESC 收起/展开流水：调试台键盘操作语义
     function onKey(e) {
       const fn = /^F([1-9])$/.exec(e.key)
       if (fn) {

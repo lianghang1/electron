@@ -16,7 +16,13 @@ export default defineComponent({
       return JSON.stringify(value, null, 2) ?? 'undefined'
     }
     function toggle(id) { expandedId.value = expandedId.value === id ? null : id }
-    return { store, expandedId, selected, fmtTime, fmtValue, toggle }
+    /** 实验流水带 state 语义色（ok/fail/block/info）；普通调用按成败与 mock 归色 */
+    function stateClass(log) { return log.state ?? (log.ok ? (log.mocked ? 'mock' : 'ok') : 'err') }
+    function stateText(log) {
+      if (log.state) { return log.state }
+      return log.ok ? (log.mocked ? 'mock' : 'ok') : (log.error?.code ?? 'err')
+    }
+    return { store, expandedId, selected, fmtTime, fmtValue, toggle, stateClass, stateText }
   },
   template: `
     <div class="dc-logs">
@@ -25,10 +31,10 @@ export default defineComponent({
         <div class="dc-log-row" @click="toggle(log.id)">
           <span class="dc-log-ts">{{ fmtTime(log.ts) }}</span>
           <span class="dc-log-method">{{ log.method }}</span>
-          <span class="dc-log-state" :class="log.ok ? 'ok' : 'err'">{{ log.ok ? (log.mocked ? 'mock' : 'ok') : log.error.code }}</span>
+          <span class="dc-log-state" :class="stateClass(log)">{{ stateText(log) }}</span>
           <span class="dc-log-ms">{{ log.ms }}ms</span>
         </div>
-        <div v-if="expandedId === log.id" class="dc-log-detail">入参：{{ fmtValue(log.input) }}<br>{{ log.ok ? '结果：' + fmtValue(log.result) : '错误：' + fmtValue(log.error) }}</div>
+        <div v-if="expandedId === log.id" class="dc-log-detail"><template v-if="log.input != null">入参：{{ fmtValue(log.input) }}<br></template>{{ log.error ? '错误：' + fmtValue(log.error) : '结果：' + fmtValue(log.result) }}</div>
       </template>
       <div v-if="selected" style="height:0"></div>
     </div>

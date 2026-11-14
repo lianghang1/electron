@@ -1,0 +1,138 @@
+<div>
+  <div class="dc-note dc-lab-head">
+    <span class="dc-badge accent">APP ID: {{ appId }}</span>
+    <span>本次加载 <b>{{ loadedAt }}</b> · persist:app-{{ appId }} 分区</span>
+    <span class="dc-lab-legend">流水语义：绿=符合预期 · 红=不符 · 橙=预期拦截（底部 CALL TRACE）</span>
+  </div>
+
+  <div class="dc-card">
+    <h2>运行环境 <span class="dc-hint">容器基础信息自检 · resize / 网络状态实时刷新</span></h2>
+    <div class="dc-lab-fields">
+      <div class="dc-lab-field"><span class="k">URL</span><span class="v">{{ env.href }}</span></div>
+      <div class="dc-lab-field"><span class="k">UA</span><span class="v">{{ env.ua }}</span></div>
+      <div class="dc-lab-field"><span class="k">语言 / 时区</span><span class="v">{{ env.locale }}</span></div>
+      <div class="dc-lab-field"><span class="k">屏幕 / DPR</span><span class="v">{{ env.screen }}</span></div>
+      <div class="dc-lab-field"><span class="k">视口</span><span class="v">{{ env.viewport }}</span></div>
+      <div class="dc-lab-field"><span class="k">网络状态</span><span class="v">{{ env.online }}</span></div>
+    </div>
+    <div class="dc-actions" style="margin-top:10px">
+      <button class="dc-btn" @click="loadSnapshot">info.get 运行时快照</button>
+    </div>
+    <pre v-if="snapshot" class="dc-log-detail" style="max-height:200px">{{ JSON.stringify(snapshot, null, 2) }}</pre>
+    <div v-else class="dc-empty">未拉取——版本 / 平台 / 声明授权 / 设备状态</div>
+  </div>
+
+  <div class="dc-card">
+    <h2>存储 <span class="dc-hint">业务数据走 localStorage / sessionStorage（按 App 持久隔离，重启保留）；cookie 对 app:// 源不可用——Chromium 仅对 http(s) 开放 cookie，属平台限制</span></h2>
+    <div class="dc-actions">
+      <button class="dc-btn" @click="storageAdd">localStorage +1</button>
+      <button class="dc-btn" @click="storageReset">localStorage 清零</button>
+      <button class="dc-btn" @click="sessionAdd">sessionStorage +1</button>
+      <button class="dc-btn" @click="cookieAdd">cookie 写入</button>
+      <button class="dc-btn" @click="cookieRead">cookie 读取</button>
+    </div>
+    <div class="dc-lab-fields">
+      <div class="dc-lab-field"><span class="k">localStorage 计数</span><span class="v">{{ counters.ls }}</span></div>
+      <div class="dc-lab-field"><span class="k">sessionStorage 计数</span><span class="v">{{ counters.ss }}</span></div>
+      <div class="dc-lab-field"><span class="k">cookie</span><span class="v">{{ counters.cookie }}</span></div>
+    </div>
+  </div>
+
+  <div class="dc-card">
+    <h2>权限 · 已声明直接放行 <span class="dc-hint">devconsole 声明了 notification → 平台通知直接执行不弹授权条；写剪贴板属复制粘贴基础语义放行；读剪贴板未声明 → 声明制拒绝（橙）；系统通知按 Chromium 声明制判定</span></h2>
+    <div class="dc-actions">
+      <button class="dc-btn" @click="clipWrite">写剪贴板</button>
+      <button class="dc-btn" @click="clipRead">读剪贴板</button>
+      <button class="dc-btn" @click="notifyShow">平台通知（Shell toast）</button>
+      <button class="dc-btn" @click="sysNotify">系统通知（OS toast）</button>
+      <button class="dc-btn" @click="permQuery">permissions 全量自检</button>
+    </div>
+    <div class="dc-lab-fields">
+      <div class="dc-lab-field"><span class="k">剪贴板最近读写</span><span class="v">{{ clipLast }}</span></div>
+      <div class="dc-lab-field"><span class="k">最近一次通知</span><span class="v">{{ notifyLast }}</span></div>
+    </div>
+  </div>
+
+  <div class="dc-card">
+    <h2>权限 · 运行时授权 <span class="dc-hint">媒体 / 位置 / 屏幕捕获未在 manifest 声明 → 首次点击弹授权浮层，允许后执行成功，拒绝或超时失败；决策持久化，重启后不再询问。全屏 / 鼠标锁定属会话级同步放行（浏览器语义本不询问）</span></h2>
+    <div class="dc-actions">
+      <button class="dc-btn" @click="mediaStart">摄像头 + 麦克风（实时预览）</button>
+      <button class="dc-btn" :disabled="!mediaActive" @click="mediaStop">停止预览</button>
+      <button class="dc-btn" @click="geoLocate">获取地理位置</button>
+      <button class="dc-btn" @click="fsOnce">请求全屏（1.5s 后自动退出）</button>
+      <button class="dc-btn" @click="lockPointer">锁定鼠标（1.5s 后自动退出）</button>
+      <button class="dc-btn" @click="displayCapture">屏幕捕获 getDisplayMedia</button>
+    </div>
+    <div class="dc-media-box" :class="{ show: mediaActive }">
+      <video ref="videoEl" autoplay muted playsinline></video>
+      <div class="dc-media-side">
+        <span>麦克风实时电平（对麦克风说话）</span>
+        <div class="dc-meter"><div :style="{ width: `${micLevel}%` }"></div></div>
+      </div>
+    </div>
+    <div class="dc-lab-fields">
+      <div class="dc-lab-field"><span class="k">媒体流</span><span class="v">{{ mediaField }}</span></div>
+      <div class="dc-lab-field"><span class="k">位置</span><span class="v">{{ geoField }}</span></div>
+    </div>
+  </div>
+
+  <div class="dc-card">
+    <h2>下载 <span class="dc-hint">devconsole 未声明 downloads → 首次下载弹运行时授权卡，允许后任务进右上角 Shell 下载浮窗（完成后可打开文件 / 定位文件夹），拒绝或超时取消本次；决策持久化</span></h2>
+    <div class="dc-actions">
+      <button class="dc-btn" @click="downloadBlob">小文件下载（blob，瞬时完成）</button>
+      <button class="dc-btn" @click="downloadRemote">远程文件下载（约 3MB，看进度）</button>
+    </div>
+  </div>
+
+  <div class="dc-card">
+    <h2>网络请求 <span class="dc-hint">渲染进程直发 fetch（平台不做 HTTP 代理）；跨域取决于目标服务器的 CORS 头</span></h2>
+    <div class="dc-actions">
+      <button class="dc-btn" @click="fetchOk">fetch 公开 API（CORS 开放 → 应成功）</button>
+      <button class="dc-btn warn" @click="fetchBlocked">fetch 无 CORS 的站点（应被浏览器拦截）</button>
+    </div>
+  </div>
+
+  <div class="dc-card">
+    <h2>弹窗与导航 <span class="dc-hint">外部导航 → 拦截转系统浏览器；origin 内弹窗 → 平台受管弹窗（同 Session 登录态）；外部弹窗 → 拒绝；alert / confirm 由 Chromium 渲染，prompt 为 Electron 平台限制不可用</span></h2>
+    <div class="dc-actions">
+      <button class="dc-btn" @click="popupInternal">window.open 本站弹窗（应受管创建）</button>
+      <button class="dc-btn warn" @click="popupExternal">window.open 外部弹窗（应拒绝）</button>
+      <button class="dc-btn warn" @click="navExternal">导航到外部网站（应被拦截）</button>
+      <a class="dc-link" href="https://example.com" target="_blank" rel="noreferrer">target=_blank 外链（应转系统浏览器）</a>
+      <button class="dc-btn" @click="dialogAlert">alert</button>
+      <button class="dc-btn" @click="dialogConfirm">confirm</button>
+    </div>
+  </div>
+
+  <div class="dc-card">
+    <h2>平台 API <span class="dc-hint">App 侧能力全览：应用清单 / 多 tab 工作台 / 更新——主进程按调用方身份执行；Tab 会话状态经 tabs.state-changed 推送观察，身份证读卡在「身份证」面板（F4）实测</span></h2>
+    <div class="dc-actions">
+      <button class="dc-btn" @click="appList">app.list 应用清单</button>
+      <button class="dc-btn" @click="appCurrent">app.getCurrent 当前身份</button>
+      <button class="dc-btn" @click="appManifest">app.getManifest</button>
+      <button class="dc-btn" @click="appOpen">app.open 打开外链页签（多 tab 工作台）</button>
+      <button class="dc-btn" @click="updateState">update.state 快照</button>
+      <button class="dc-btn" @click="updateCheck">update.check 检查更新</button>
+    </div>
+    <div class="dc-lab-fields">
+      <div class="dc-lab-field"><span class="k">tabs.state-changed 推送</span><span class="v">{{ tabsPush }}</span></div>
+      <div class="dc-lab-field"><span class="k">自己的实例</span><span class="v">{{ selfInstance }}</span></div>
+    </div>
+  </div>
+
+  <div class="dc-card">
+    <h2>安全边界 <span class="dc-hint">App 无权执行的平台动作应全部被拒（橙=预期拦截）——任何一条「意外成功」都是越权漏洞</span></h2>
+    <div class="dc-actions">
+      <button class="dc-btn warn" @click="denyTabsSuppress">tabs.setViewSuppressed（Shell 专属）</button>
+      <button class="dc-btn warn" @click="denyOverlayRemoved">Shell 桥 / overlay 通道不可达</button>
+      <button class="dc-btn warn" @click="denyCache">cache.clear 清缓存（Shell 专属）</button>
+      <button class="dc-btn warn" @click="denyCacheSite">cache.clearSite 清站点数据</button>
+      <button class="dc-btn warn" @click="denyPermReset">permission.reset 撤销授权</button>
+      <button class="dc-btn warn" @click="denyRespond">permission.respond 伪造决策</button>
+      <button class="dc-btn warn" @click="denyGenericInvoke">通用 $invoke 通道未暴露</button>
+      <button class="dc-btn warn" @click="denyUndeclaredDomain">未声明设备域 signature.startSession</button>
+      <button class="dc-btn warn" @click="denyUnknownDomain">未知设备域 fingerprint.enroll</button>
+      <button class="dc-btn warn" @click="denyBadEventChannel">订阅白名单外事件 shell.internal</button>
+    </div>
+  </div>
+</div>
