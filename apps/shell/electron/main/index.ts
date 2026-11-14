@@ -26,7 +26,7 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { AppSessionRegistry } from '@shell/kernel/session'
 import { applySettingsSideEffects, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, cookiesDir, filesDir, logsDir, platformDataRoot } from '@shell/kernel/storage'
-import { assertSafeSegment, CallerRegistry, flavorManifestSchema, SHELL_APP_ID } from '@shell/shared'
+import { assertSafeSegment, CallerRegistry, flavorManifestSchema, isDevLoad, originOf, SHELL_APP_ID } from '@shell/shared'
 import {
   AsarHotChannel,
   collectEffectiveAppVersions,
@@ -66,11 +66,6 @@ export interface BootContext {
 }
 
 const logger = createRootLogger()
-
-// dev 态判定：electron-vite dev 给主进程注入 renderer dev server 地址（打包态无此 env）。
-// 本机 electron.exe 经 default_app 引导加载目录 app 时 app.isPackaged 恒为 true
-// （process.defaultApp=true），不能用作 dev 分支判定。
-const isDevLoad = process.env.ELECTRON_RENDERER_URL !== undefined
 
 // 整包落地策略：平台差异收敛为数据表，组合根查表唯一创建并注入通道
 const INSTALLERS: Record<string, new () => PackageInstaller> = {
@@ -188,8 +183,8 @@ function buildAssembly(context: BootContext, flavor: FlavorManifest): Assembly {
 
   // 内置应用 dist 根：asar 外的 extraResources 落点（<resources>/apps），只读基线。
   // dist-hot 产物落 userData，app:// 协议按 apps-current.json 指针取目录，读写同源。
-  const builtinAppsRoot = isDevLoad
-    ? join(app.getAppPath(), 'resources/apps')
+  const builtinAppsRoot = isDevLoad()
+    ? join(app.getAppPath(), '../../resources/apps')
     : join(process.resourcesPath ?? '.', 'apps')
   const resolveAppRoot: AppRootResolver = (appId) => {
     const entry = readAppsPointer()[appId]
@@ -311,7 +306,7 @@ function setupDevices(a: Assembly): void {
   a.capability = resolvePlatformCapability(detectDevicePlatform().id, process.arch)
   // 声明格式是 devices/<域>/...，故资源根 = 包含 devices/ 的那个父目录。
   // dev/打包差异只在此处解析一次（唯一组装现场），域内部零感知。
-  const bundledRoot = isDevLoad
+  const bundledRoot = isDevLoad()
     ? join(app.getAppPath(), '../../resources')
     : (process.resourcesPath ?? app.getAppPath())
   a.driver = createDriverResolver(a.capability, {
@@ -401,7 +396,7 @@ function setupAppRuntime(a: Assembly): void {
     gate: ({ appId, url }) => {
       let origin = url
       try {
-        origin = new URL(url).origin
+        origin = originOf(url)
       }
       catch {
         // blob:/data: 等非标准 URL，原值仅作审计线索
@@ -579,7 +574,7 @@ export async function boot(context: BootContext): Promise<void> {
   await main(context)
 }
 
-if (isDevLoad) {
+if (isDevLoad()) {
   const devRoot = app.getAppPath()
   void boot({
     artifactRoot: devRoot,
