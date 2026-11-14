@@ -58,10 +58,18 @@ export async function call(method, input = undefined) {
 /* ---------------- mock：模拟数据（浏览器自测用；形状与真实契约一致） ---------------- */
 
 const MOCK_DEVICES = {
-  print: [{ name: 'Microsoft Print to PDF', isDefault: true, status: 'ready' }, { name: 'Demo LaserJet', status: 'idle' }],
+  print: [{
+    id: 'Microsoft Print to PDF', displayName: 'Microsoft Print to PDF', isDefault: true, status: 'unknown',
+    capabilities: {
+      paperList: [{ name: 'A4', widthMm: 210, heightMm: 297 }, { name: 'A5', widthMm: 148, heightMm: 210 }, { name: '80mm 收据', widthMm: 80 }],
+      defaults: { formName: 'A4', color: true },
+      duplexSupported: true,
+      colorSupported: true,
+    },
+  }, { id: 'Demo LaserJet', displayName: 'Demo LaserJet', status: 'unknown', capabilities: { paperList: [], defaults: {}, duplexSupported: false, colorSupported: false } }],
   capture: [{ id: 'capture-demo-1', displayName: '高拍仪 Demo', status: 'ready', resolutions: [{ width: 1920, height: 1080 }, { width: 1280, height: 720 }] }],
-  idcard: [{ id: 'idcard-demo-1', displayName: '身份证阅读器 Demo', status: 'ready' }],
-  iccard: [{ id: 'iccard-demo-1', displayName: 'IC 卡读写器 Demo', status: 'ready' }],
+  idcard: [{ id: 'idcard-demo-1', displayName: '身份证阅读器 Demo', transport: 'dll', status: 'ready' }],
+  iccard: [{ id: 'iccard-demo-1', displayName: 'IC 卡读写器 Demo', transport: 'dll', status: 'ready', capabilities: ['iccard-write'] }],
 }
 
 const MOCK_INFO = {
@@ -82,8 +90,8 @@ const MOCK_INFO = {
 }
 
 const MOCK_JOBS = [
-  { printJobId: 'job-mock-001', status: 'done', createdAt: Date.now() - 86400000, kind: 'html' },
-  { printJobId: 'job-mock-002', status: 'archived', createdAt: Date.now() - 3600000, kind: 'url' },
+  { jobId: 'job-mock-001', jobName: '测试页 · Microsoft Print to PDF', state: 'done', createdAt: new Date(Date.now() - 86400000).toISOString(), result: { jobId: 'job-mock-001', channel: 'simulated', printerId: 'Microsoft Print to PDF' } },
+  { jobId: 'job-mock-002', jobName: 'PDF/图片链接', state: 'failed', createdAt: new Date(Date.now() - 3600000).toISOString(), error: { code: 'CHANNEL_FAILED', message: 'mock：通道执行失败' } },
 ]
 
 function mockCall(method, input = {}) {
@@ -92,9 +100,9 @@ function mockCall(method, input = {}) {
   switch (method) {
     case 'info.get': return structuredClone(MOCK_INFO)
     case 'print.listDevices': return structuredClone(MOCK_DEVICES.print)
-    case 'print.submitPrintJob': return { printJobId: `job-mock-${Math.random().toString(36).slice(2, 8)}` }
+    case 'print.submitPrintJob': return { jobId: `job-mock-${Math.random().toString(36).slice(2, 8)}`, channel: 'simulated', printerId: input.printOptions?.printerId ?? 'Microsoft Print to PDF' }
     case 'print.listPrintJobs': return structuredClone(MOCK_JOBS)
-    case 'print.getJobStatus': return { printJobId: input.printJobId, status: 'done' }
+    case 'print.getJobStatus': return { jobId: input.printJobId, state: 'done', createdAt: new Date().toISOString() }
     case 'print.removePrintJob':
     case 'print.reprintJob': return true
     case 'print.clearPrintJobs': return MOCK_JOBS.length
@@ -114,7 +122,13 @@ function mockCall(method, input = {}) {
     case 'idcard.getConfig': return { devices: [{ id: 'idcard-demo-1', displayName: '身份证阅读器 Demo', ws: { url: 'ws://127.0.0.1:9201' } }] }
     case 'idcard.setConfig': return echo
     case 'iccard.listDevices': return structuredClone(MOCK_DEVICES.iccard)
-    case 'iccard.readSector': return { sector: input.sectorNumber ?? 1, blocks: ['A1B2C3D4E5F60718293A4B5C6D7E8F90'.toLowerCase()] }
+    case 'iccard.readSector': return {
+      uid: '04a1b2c3d4',
+      cardNumber: '3153601021',
+      cardType: '0044',
+      blocks: { 4: '31323334353637383930414243444546', 5: '00000000000000000000000000000000', 6: '00000000000000000000000000000000' },
+      texts: ['demo'],
+    }
     case 'iccard.writeSector':
     case 'iccard.writeTextBlocks': return echo
     case 'iccard.getConfig': return { devices: [{ id: 'iccard-demo-1', displayName: 'IC 卡读写器 Demo', ws: { url: 'ws://127.0.0.1:9301' } }] }
@@ -122,17 +136,36 @@ function mockCall(method, input = {}) {
     case 'scanner.getConfig': return { enabled: true, activeId: 'scanner-default', devices: [{ id: 'scanner-default', displayName: '扫码枪 Demo', timeout: 100, minLength: 4, endKey: 'Enter', prefixes: [], requirePrefix: false }] }
     case 'scanner.setConfig': return echo
     case 'scanner.simulateScan': return { simulated: true, code: input.scannedCode }
+    // 壳设施 mock：形状与 facility-router / kernel 服务一致
+    case 'notification.show': return { id: `n-mock-${Math.random().toString(36).slice(2, 8)}` }
+    case 'notification.list': return []
+    case 'notification.dismiss': return {}
+    case 'app.list': return [
+      { id: 'devconsole', name: '开发者控制台', version: '1.0.0', kind: 'local' },
+      { id: 'dev-doc', name: '外链页签', version: '1.0.0', kind: 'remote' },
+    ]
+    case 'app.getCurrent': return { appId: 'devconsole', appName: '开发者控制台', instanceId: 'mock-1' }
+    case 'app.getManifest': return { id: 'devconsole', name: '开发者控制台', version: '1.0.0', entry: { kind: 'local' }, permissions: ['info', 'notification', 'tabs', 'downloads', 'update'] }
+    case 'app.open': return { appId: input.appId, instanceId: `mock-${input.appId}` }
+    case 'update.state': return { state: 'idle', currentVersion: '0.0.0-mock' }
+    case 'update.check': return { state: 'idle', currentVersion: '0.0.0-mock', mocked: true }
+    case 'download.list': return []
+    case 'download.open':
+    case 'download.reveal':
+    case 'download.cancel':
+    case 'download.dismiss': return {}
     default: return echo
   }
 }
 
 function mockIdCard() {
   return {
-    name: '张三', sex: '男', nation: '汉', birth: '1990-01-01',
+    name: '张三', gender: '男', nation: '汉', birthDate: '1990-01-01',
     address: '广东省深圳市南山区科技园 mock 路 1 号',
     idNumber: '440300199001010000',
-    issuingAuthority: '深圳市公安局南山分局',
+    issuer: '深圳市公安局南山分局',
     validFrom: '2015-06-01', validTo: '2035-06-01',
+    photoDataUrl: demoImageDataUrl(),
   }
 }
 

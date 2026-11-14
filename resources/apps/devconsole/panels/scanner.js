@@ -11,11 +11,13 @@ export default defineComponent({
     const config = ref(null)
     const scans = ref([])
     const listening = ref(false)
+    const gunStatus = ref(null)
 
     const setConfigDef = CATALOG.scanner.methods.setConfig
     const simulateDef = CATALOG.scanner.methods.simulateScan
 
     let unsubscribe = null
+    let unsubscribeStatus = null
 
     function listen() {
       unsubscribe?.()
@@ -26,11 +28,18 @@ export default defineComponent({
       })
       listening.value = true
     }
+    // 连接态推送（HID 连接/断开/通道切换）：真实桥由设备服务直推，mock 桥无推送源
+    unsubscribeStatus = onDeviceEvent('scanner.statusUpdated', (payload) => {
+      pushEvent('scanner.statusUpdated', payload)
+      gunStatus.value = payload
+    })
     listen()
 
     onUnmounted(() => {
       unsubscribe?.()
       unsubscribe = null
+      unsubscribeStatus?.()
+      unsubscribeStatus = null
     })
 
     async function loadConfig() {
@@ -40,6 +49,6 @@ export default defineComponent({
       emitMockEvent('scanner.scanned', { code: `MOCK-${Math.random().toString(36).slice(2, 12)}` })
     }
 
-    return { config, scans, listening, bridgeReal, setConfigDef, simulateDef, loadConfig, mockScan }
+    return { config, scans, listening, gunStatus, bridgeReal, setConfigDef, simulateDef, loadConfig, mockScan }
   },
 })
