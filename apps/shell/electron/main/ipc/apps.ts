@@ -12,6 +12,7 @@ export interface AppsIpcDeps {
 export function registerAppsIpc(deps: AppsIpcDeps): void {
   registerIpcDomain(appsDomain, {
     list: () => deps.apps.list(),
+    running: () => deps.apps.runningAppIds(),
     open: async (_e, appId) => {
       const instance = await deps.apps.open(appId)
       return {

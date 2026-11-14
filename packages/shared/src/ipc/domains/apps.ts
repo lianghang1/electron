@@ -21,6 +21,8 @@ export interface AppOpenProjection {
  */
 export const appsDomain = defineIpcDomain('apps', {
   list: invoke<() => AppRegistrationRow[]>(),
+  /** 有活跃实例的应用 id（应用中心「运行中」标记的数据源） */
+  running: invoke<() => string[]>(),
   open: invoke<(appId: string) => AppOpenProjection>(),
   close: invoke<(instanceId: string) => void>(),
   /** 切到某实例的视图（embedded 切换由渲染层本地完成，无需过桥） */

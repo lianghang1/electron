@@ -40,6 +40,13 @@ export class AppService implements Startable {
     return [...this.registry.values()]
   }
 
+  /** 有活跃实例的应用 id：同 App 复用实例，activeByApp 即运行态唯一账本 */
+  runningAppIds(): string[] {
+    return [...this.activeByApp.entries()]
+      .filter(([, instanceId]) => this.instances.get(instanceId)?.state !== 'closed')
+      .map(([appId]) => appId)
+  }
+
   find(instanceId: string): { instance: AppInstance, registered: RegisteredApp } | undefined {
     const instance = this.instances.get(instanceId)
     if (!instance) { return undefined }
