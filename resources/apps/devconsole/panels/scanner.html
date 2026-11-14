@@ -1,0 +1,27 @@
+<div>
+  <div class="dc-card">
+    <h2>扫码枪配置</h2>
+    <div class="dc-actions" style="margin-bottom:10px">
+      <button class="dc-btn" @click="loadConfig">scanner.getConfig</button>
+    </div>
+    <pre v-if="config" class="dc-log-detail" style="max-height:160px">{{ JSON.stringify(config, null, 2) }}</pre>
+    <invoke-form method="scanner.setConfig" :def="setConfigDef" label="scanner.setConfig" />
+  </div>
+
+  <div class="dc-card">
+    <h2>扫码事件流 <span class="dc-hint">scanner.scanned 点对点推送（{{ listening ? '监听中' : '未监听' }}）</span></h2>
+    <div v-if="scans.length">
+      <div v-for="(s, i) in scans" :key="i" class="dc-event-row">
+        <span class="dc-log-ts">{{ new Date(s.ts).toLocaleTimeString() }}</span>
+        <span class="dc-event-payload">{{ s.code }}</span>
+      </div>
+    </div>
+    <div v-else class="dc-empty">等待扫码…</div>
+    <button v-if="!bridgeReal" class="dc-btn sm" style="margin-top:10px" @click="mockScan">模拟扫码</button>
+  </div>
+
+  <div class="dc-card">
+    <h2>演示注入 <span class="dc-hint">走真枪同链路，需平台演示模式开启（壳内调试台切换）</span></h2>
+    <invoke-form method="scanner.simulateScan" :def="simulateDef" label="scanner.simulateScan" />
+  </div>
+</div>

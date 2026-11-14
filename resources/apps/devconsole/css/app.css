@@ -1,0 +1,206 @@
+/* 开发者控制台：独立应用样式，观感对齐壳设计系统（灰阶 + 单强调色 #2563eb，13px 基准） */
+:root {
+  --dc-accent: #2563eb;
+  --dc-accent-soft: color-mix(in srgb, var(--dc-accent) 10%, white);
+  --dc-bg: #f6f7f9;
+  --dc-card: #ffffff;
+  --dc-border: #e4e7ec;
+  --dc-text: #1a2233;
+  --dc-text-sub: #5b6472;
+  --dc-text-faint: #98a1b0;
+  --dc-ok: #16803c;
+  --dc-ok-soft: #e8f6ec;
+  --dc-warn: #b45309;
+  --dc-warn-soft: #fdf3e7;
+  --dc-err: #b42318;
+  --dc-err-soft: #fdecec;
+  --dc-radius: 8px;
+  --dc-font: 13px;
+}
+[v-cloak] { display: none; }
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  font-size: var(--dc-font);
+  color: var(--dc-text);
+  background: var(--dc-bg);
+}
+
+#app { display: flex; height: 100vh; }
+
+/* 侧栏 */
+.dc-side {
+  width: 176px; flex: none;
+  display: flex; flex-direction: column;
+  background: var(--dc-card);
+  border-right: 1px solid var(--dc-border);
+}
+.dc-brand { display: flex; align-items: center; gap: 8px; padding: 14px 14px 10px; }
+.dc-brand-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--dc-accent); }
+.dc-brand-name { font-size: 13px; font-weight: 600; }
+.dc-nav { flex: 1; padding: 4px 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.dc-nav-item {
+  appearance: none; border: 0; background: none; cursor: pointer;
+  text-align: left; font-size: 13px; color: var(--dc-text-sub);
+  padding: 7px 10px; border-radius: 6px;
+}
+.dc-nav-item:hover { background: var(--dc-bg); color: var(--dc-text); }
+.dc-nav-item.active { background: var(--dc-accent-soft); color: var(--dc-accent); font-weight: 600; }
+
+/* 主区 */
+.dc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dc-head {
+  padding: 12px 20px 10px; border-bottom: 1px solid var(--dc-border); background: var(--dc-card);
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+}
+.dc-title { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
+.dc-title-en {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--dc-text-faint); font-family: Consolas, monospace;
+}
+.dc-sub { margin: 3px 0 0; font-size: 12px; color: var(--dc-text-sub); }
+.dc-head-status { display: flex; align-items: center; gap: 10px; flex: none; padding-top: 1px; }
+.dc-head-version { font-size: 11px; color: var(--dc-text-faint); font-family: Consolas, monospace; }
+.dc-head-clock { font-size: 11px; color: var(--dc-text-sub); font-family: Consolas, monospace; letter-spacing: 0.02em; }
+.dc-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+/* 卡片 */
+.dc-card {
+  background: var(--dc-card); border: 1px solid var(--dc-border);
+  border-radius: var(--dc-radius); padding: 14px 16px; margin-bottom: 14px;
+}
+.dc-card > h2 { margin: 0 0 10px; font-size: 13px; font-weight: 600; }
+.dc-card > h2 .dc-hint { font-weight: 400; color: var(--dc-text-faint); font-size: 11px; margin-left: 8px; }
+.dc-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.dc-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+@media (max-width: 1100px) { .dc-grid-2, .dc-grid-3 { grid-template-columns: 1fr; } }
+
+/* 设备卡片列表 */
+.dc-device-list { display: flex; flex-direction: column; gap: 8px; }
+.dc-device-card {
+  border: 1px solid var(--dc-border); border-radius: 6px; background: var(--dc-card);
+  overflow: hidden;
+}
+.dc-device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; cursor: pointer; }
+.dc-device-row:hover { background: var(--dc-bg); }
+.dc-device-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dc-device-name { font-size: 12px; font-weight: 600; }
+.dc-device-desc { font-size: 11px; color: var(--dc-text-faint); font-family: Consolas, monospace; word-break: break-all; }
+.dc-device-tags { display: flex; align-items: center; gap: 6px; flex: none; }
+.dc-device-more { font-size: 11px; color: var(--dc-text-faint); }
+.dc-device-detail { border-top: 1px solid var(--dc-border); background: var(--dc-bg); padding: 8px 12px; margin: 0; }
+
+/* 表格 */
+.dc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dc-table th {
+  text-align: left; font-weight: 500; color: var(--dc-text-sub);
+  padding: 6px 8px; border-bottom: 1px solid var(--dc-border); white-space: nowrap;
+}
+.dc-table td { padding: 6px 8px; border-bottom: 1px solid var(--dc-border); vertical-align: top; }
+.dc-table tr:last-child td { border-bottom: 0; }
+.dc-table code { font-family: Consolas, monospace; font-size: 11px; }
+
+/* 表单 */
+.dc-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
+.dc-field { display: flex; flex-direction: column; gap: 3px; min-width: 130px; }
+.dc-field.wide { min-width: 320px; flex: 1; }
+.dc-field label { font-size: 11px; color: var(--dc-text-sub); }
+.dc-field input, .dc-field select, .dc-field textarea {
+  font: inherit; font-size: 12px; color: var(--dc-text);
+  border: 1px solid var(--dc-border); border-radius: 6px; padding: 5px 8px; background: var(--dc-card);
+  outline: none;
+}
+.dc-field textarea { min-height: 64px; font-family: Consolas, monospace; }
+.dc-field input:focus, .dc-field select:focus, .dc-field textarea:focus { border-color: var(--dc-accent); }
+.dc-field .dc-err-text { font-size: 11px; color: var(--dc-err); }
+
+/* 按钮 */
+.dc-btn {
+  appearance: none; cursor: pointer; font: inherit; font-size: 12px;
+  border: 1px solid var(--dc-border); background: var(--dc-card); color: var(--dc-text);
+  border-radius: 6px; padding: 5px 12px;
+}
+.dc-btn:hover { background: var(--dc-bg); }
+.dc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.dc-btn.primary { background: var(--dc-accent); border-color: var(--dc-accent); color: #fff; }
+.dc-btn.primary:hover { background: color-mix(in srgb, var(--dc-accent) 88%, black); }
+.dc-btn.danger { color: var(--dc-err); border-color: color-mix(in srgb, var(--dc-err) 30%, var(--dc-border)); }
+.dc-btn.danger:hover { background: var(--dc-err-soft); }
+.dc-btn.sm { padding: 3px 8px; font-size: 11px; }
+.dc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 徽标 */
+.dc-badge {
+  display: inline-block; font-size: 10px; font-weight: 600; line-height: 1;
+  padding: 3px 7px; border-radius: 999px;
+  background: var(--dc-bg); color: var(--dc-text-sub); border: 1px solid var(--dc-border);
+}
+.dc-badge.ok { background: var(--dc-ok-soft); color: var(--dc-ok); border-color: transparent; }
+.dc-badge.warn { background: var(--dc-warn-soft); color: var(--dc-warn); border-color: transparent; }
+.dc-badge.err { background: var(--dc-err-soft); color: var(--dc-err); border-color: transparent; }
+.dc-badge.mock { background: var(--dc-warn-soft); color: var(--dc-warn); border-color: transparent; }
+.dc-badge.accent { background: var(--dc-accent-soft); color: var(--dc-accent); border-color: transparent; }
+
+/* 空态与提示 */
+.dc-empty { color: var(--dc-text-faint); text-align: center; padding: 40px 0; }
+.dc-note {
+  font-size: 12px; color: var(--dc-text-sub); background: var(--dc-bg);
+  border: 1px dashed var(--dc-border); border-radius: 6px; padding: 8px 12px; margin-bottom: 10px;
+}
+.dc-kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; font-size: 12px; }
+.dc-kv dt { color: var(--dc-text-sub); }
+.dc-kv dd { margin: 0; font-family: Consolas, monospace; font-size: 11px; word-break: break-all; }
+
+/* 预览画布区 */
+.dc-preview {
+  border: 1px solid var(--dc-border); border-radius: 6px; background: #10141c;
+  min-height: 220px; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative;
+}
+.dc-preview img { max-width: 100%; max-height: 320px; object-fit: contain; }
+.dc-preview .dc-empty { color: #5b6472; }
+.dc-canvas-wrap { display: flex; justify-content: center; }
+.dc-canvas-wrap canvas { border: 1px solid var(--dc-border); border-radius: 6px; background: #fff; touch-action: none; cursor: crosshair; }
+
+/* 日志抽屉 */
+.dc-logbar {
+  flex: none; height: 230px; border-top: 1px solid var(--dc-border);
+  background: var(--dc-card); display: flex; flex-direction: column;
+  transition: height 0.15s ease;
+}
+.dc-logbar.collapsed { height: 32px; }
+.dc-logbar-head {
+  flex: none; height: 32px; display: flex; align-items: center; gap: 8px;
+  padding: 0 14px; cursor: pointer; user-select: none;
+  font-size: 12px; font-weight: 600; color: var(--dc-text-sub);
+  border-bottom: 1px solid var(--dc-border);
+}
+.dc-logbar-count {
+  font-size: 10px; font-weight: 600; background: var(--dc-accent-soft); color: var(--dc-accent);
+  border-radius: 999px; padding: 2px 7px;
+}
+.dc-logbar-toggle { margin-left: auto; color: var(--dc-text-faint); }
+.dc-logs { flex: 1; overflow-y: auto; font-family: Consolas, monospace; font-size: 11px; }
+.dc-log-row {
+  display: flex; gap: 10px; padding: 3px 14px; border-bottom: 1px solid var(--dc-bg);
+  cursor: pointer; align-items: center;
+}
+.dc-log-row:hover { background: var(--dc-bg); }
+.dc-log-ts { color: var(--dc-text-faint); flex: none; }
+.dc-log-method { color: var(--dc-accent); min-width: 210px; }
+.dc-log-ms { color: var(--dc-text-faint); flex: none; width: 56px; text-align: right; }
+.dc-log-state { flex: none; width: 52px; font-size: 10px; font-weight: 600; text-align: center; line-height: 1; padding: 3px 0; border-radius: 999px; align-self: center; }
+.dc-log-state.ok { color: var(--dc-ok); background: var(--dc-ok-soft); }
+.dc-log-state.err { color: var(--dc-err); background: var(--dc-err-soft); }
+.dc-log-state.mock { color: var(--dc-warn); background: var(--dc-warn-soft); }
+.dc-log-detail {
+  padding: 8px 14px; background: #10141c; color: #d7dce5;
+  white-space: pre-wrap; word-break: break-all; max-height: 180px; overflow-y: auto;
+}
+
+/* 事件面板 */
+.dc-event-row { display: flex; gap: 10px; align-items: baseline; padding: 4px 0; border-bottom: 1px dashed var(--dc-border); font-size: 12px; }
+.dc-event-name { flex: none; width: 130px; font-weight: 600; color: var(--dc-accent); font-family: Consolas, monospace; font-size: 11px; }
+.dc-event-payload { flex: 1; font-family: Consolas, monospace; font-size: 11px; color: var(--dc-text-sub); word-break: break-all; }

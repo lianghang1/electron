@@ -1,0 +1,43 @@
+<div>
+  <div class="dc-card">
+    <h2>白名单事件 <span class="dc-hint">受控桥仅放行这 4 个事件名；离开面板自动退订</span></h2>
+    <table class="dc-table">
+      <thead><tr><th>事件名</th><th>订阅</th><th>计数</th><th>最近负载</th><th>手动触发</th></tr></thead>
+      <tbody>
+        <tr v-for="row in eventRows" :key="row.name">
+          <td><code>{{ row.name }}</code></td>
+          <td>
+            <button class="dc-btn sm" :class="row.listening ? '' : 'primary'" @click="toggle(row.name)">
+              {{ row.listening ? '退订' : '订阅' }}
+            </button>
+          </td>
+          <td>{{ row.count }}</td>
+          <td class="dc-event-payload">{{ summarize(row.last) }}</td>
+          <td>
+            <button class="dc-btn sm" :disabled="bridgeReal" :title="bridgeReal ? '真实桥下请用真实设备产生事件' : '模拟桥手动触发'" @click="fire(row.name)">触发</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="dc-card">
+    <h2>事件流水 <span class="dc-hint">最近 {{ store.events.length }} 条</span></h2>
+    <div v-if="store.events.length">
+      <div v-for="e in store.events" :key="e.id" class="dc-event-row">
+        <span class="dc-log-ts">{{ new Date(e.ts).toLocaleTimeString() }}</span>
+        <span class="dc-event-name">{{ e.name }}</span>
+        <span class="dc-event-payload">{{ summarize(e.payload) }}</span>
+      </div>
+    </div>
+    <div v-else class="dc-empty">暂无事件</div>
+  </div>
+
+  <div class="dc-card">
+    <h2>桥探测</h2>
+    <div class="dc-actions">
+      <button class="dc-btn" @click="probe">info.get 探测</button>
+      <span v-if="probeReady" class="dc-badge ok">桥可用 · {{ probeReady.appId }} @ {{ probeReady.flavorId }}</span>
+    </div>
+  </div>
+</div>

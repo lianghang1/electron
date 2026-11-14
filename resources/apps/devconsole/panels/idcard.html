@@ -1,0 +1,28 @@
+<div>
+  <div class="dc-card">
+    <h2>阅读器枚举</h2>
+    <div class="dc-actions" style="margin-bottom:10px">
+      <button class="dc-btn" @click="loadDevices">idcard.listDevices</button>
+    </div>
+    <device-list :devices="devices"></device-list>
+  </div>
+
+  <div class="dc-card">
+    <h2>读取身份证 <span class="dc-hint">deviceId 留空 = 自动定位首个就绪设备</span></h2>
+    <invoke-form method="idcard.readCard" :def="readCardDef" label="idcard.readCard" @result="onRead" />
+    <dl v-if="card" class="dc-kv" style="margin-top:12px">
+      <template v-for="[key, label] in CARD_FIELDS" :key="key">
+        <dt>{{ label }}</dt><dd>{{ card[key] ?? '—' }}</dd>
+      </template>
+    </dl>
+  </div>
+
+  <div class="dc-card">
+    <h2>档案配置</h2>
+    <div class="dc-actions" style="margin-bottom:10px">
+      <button class="dc-btn" @click="loadConfig">idcard.getConfig</button>
+    </div>
+    <pre v-if="config" class="dc-log-detail" style="max-height:140px">{{ JSON.stringify(config, null, 2) }}</pre>
+    <invoke-form method="idcard.setConfig" :def="setConfigDef" label="idcard.setConfig" />
+  </div>
+</div>

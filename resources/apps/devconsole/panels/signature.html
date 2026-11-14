@@ -1,0 +1,40 @@
+<div>
+  <div class="dc-note">
+    平台暂无 signature 设备域：本页为<b>应用内 mock</b>，数据形状与 <code>@shell/shared/devices/signature</code>
+    契约一致（SignStrokePoint / SignStartResult / SignSessionResult）。真实域接入后采样源替换为
+    <code>signature.stroke</code> 事件流，交互不变。
+  </div>
+
+  <div class="dc-card">
+    <h2>签名会话 <span class="dc-hint">mock 模式：鼠标 / 触屏 / 手写笔压感采样</span></h2>
+    <div class="dc-actions" style="margin-bottom:10px">
+      <button class="dc-btn primary" :disabled="!!session" @click="startSession">开始会话</button>
+      <button class="dc-btn" :disabled="!session" @click="endSession">结束会话</button>
+      <button class="dc-btn danger" :disabled="!!session" @click="startSession">清屏重来</button>
+    </div>
+    <div class="dc-canvas-wrap">
+      <canvas
+        id="sign-canvas"
+        :width="CANVAS_W" :height="CANVAS_H"
+        @pointerdown="onDown" @pointermove="onMove" @pointerup="onUp"
+      ></canvas>
+    </div>
+    <p style="margin:8px 0 0;font-size:12px;color:var(--dc-text-sub)">
+      {{ session ? `会话中（板面 ${session.width}×${session.height}，transport=${session.meta.transport}）` : '未开始会话' }}
+      · 已采集 {{ strokes.length }} 笔
+    </p>
+  </div>
+
+  <div v-if="result" class="dc-card">
+    <h2>会话结果（SignSessionResult 形状）</h2>
+    <dl class="dc-kv">
+      <dt>strokeCount</dt><dd>{{ result.strokeCount }}</dd>
+      <dt>width × height</dt><dd>{{ result.width }} × {{ result.height }}</dd>
+      <dt>点集规模</dt><dd>{{ result.strokes.reduce((n, s) => n + s.points.length, 0) }} 个采样点</dd>
+    </dl>
+    <details style="margin-top:8px">
+      <summary style="font-size:12px;cursor:pointer">strokes 点集 JSON</summary>
+      <pre class="dc-log-detail" style="max-height:200px">{{ JSON.stringify(result.strokes, null, 2) }}</pre>
+    </details>
+  </div>
+</div>

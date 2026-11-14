@@ -1,0 +1,51 @@
+{
+  "id": "devconsole",
+  "name": "开发者控制台",
+  "mode": "windowed",
+  "chrome": "platform",
+  "apps": [
+    {
+      "id": "devconsole",
+      "name": "开发者控制台",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "local"
+      },
+      "devices": [
+        "print",
+        "capture",
+        "idcard",
+        "iccard",
+        "scanner"
+      ],
+      "permissions": [
+        "info"
+      ]
+    },
+    {
+      "id": "dev-doc",
+      "name": "外链页签",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.dev",
+        "origins": [
+          "https://vite.dev"
+        ]
+      },
+      "devices": [],
+      "permissions": []
+    }
+  ],
+  "branding": {
+    "accent": "#2563eb"
+  },
+  "update": {
+    "allowedOrigins": []
+  },
+  "print": {
+    "urlOrigins": [
+      "*"
+    ]
+  }
+}
