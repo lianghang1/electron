@@ -1,17 +1,26 @@
-import type { AppService } from '@shell/app-runtime'
+import type { AppService, PermissionService } from '@shell/app-runtime'
 import type { DomainRouter } from '@shell/devices'
+import type { EventBus, NotificationCenter } from '@shell/kernel'
+import type { DownloadManager } from '@shell/kernel/download'
 import type { Logger } from '@shell/kernel/logger'
 import type { CallerRegistry } from '@shell/shared'
+import type { UpdateCenter } from '@shell/update'
 import { DomainRouteError } from '@shell/devices'
 import { matchesOrigin, originOf } from '@shell/shared'
 import { ipcMain } from 'electron'
 import { domainCallContext } from './caller'
+import { callFacility, hasFacilityRoute } from './facility-router'
 
 export interface RouterIpcDeps {
   callers: CallerRegistry
   logger: Logger
   router: DomainRouter
   apps: AppService
+  permissions: PermissionService
+  notifications: NotificationCenter
+  downloads: DownloadManager
+  events: EventBus
+  update?: UpdateCenter
 }
 
 /**
@@ -54,6 +63,13 @@ export function registerRouterIpc(deps: RouterIpcDeps): void {
       throw new DomainRouteError('METHOD_NOT_FOUND', 'origin 未授权')
     }
     const ctx = domainCallContext(deps, event, method, 'jsapi', () => new DomainRouteError('PERMISSION_DENIED', '调用方未登记'))
+    // 壳设施路由优先（app/notification/download/update），未命中回落设备域路由
+    if (hasFacilityRoute(method)) {
+      return callFacility(deps, method, input, ctx).catch((err: unknown) => {
+        deps.logger.warn('jsapi facility call failed', { method, appId: caller.appId, err })
+        throw err
+      })
+    }
     return deps.router.call(method, input, ctx).catch((err: unknown) => {
       deps.logger.warn('jsapi call failed', { method, appId: caller.appId, err })
       throw err

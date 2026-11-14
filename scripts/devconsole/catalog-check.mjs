@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-// devconsole 应用目录与主进程域定义的方法名机器比对：
-// 应用 catalog.js 的域.方法集合必须与 packages/devices 五域 methods.ts 顶层方法、
-// info 域定义严格一致——壳侧加删方法而应用目录未同步时，此处退出非零。
+// devconsole 应用目录与主进程能力定义的方法名机器比对：
+// 应用 catalog.js 的域.方法集合必须与设备五域 methods.ts 顶层方法、info 域定义、
+// 壳设施路由（app/notification/download/update）严格一致——主进程加删方法而应用
+// 目录未同步时，此处退出非零。
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
@@ -12,6 +13,8 @@ const CATALOG = join(ROOT, 'resources/apps/devconsole/js/catalog.js')
 const METHODS_DIR = join(ROOT, 'packages/devices/src/domains')
 const DOMAIN_FILES = ['print', 'capture', 'idcard', 'iccard', 'scanner']
 const INFO_DOMAIN = join(ROOT, 'apps/shell/electron/main/ipc/info-domain.ts')
+const FACILITY_ROUTER = join(ROOT, 'apps/shell/electron/main/ipc/facility-router.ts')
+const FACILITY_DOMAINS = ['app', 'notification', 'download', 'update']
 
 const problems = []
 
@@ -67,13 +70,25 @@ function parseInfoMethods() {
   return names
 }
 
+/** 壳设施域：facility-router.ts 的 FACILITY_ROUTES 字面量内方法键（域行 2 空格 / 方法行 4 空格）。 */
+function parseFacilityMethods(domain) {
+  const lines = readFileSync(FACILITY_ROUTER, 'utf-8').split('\n')
+  const start = lines.findIndex(l => l.startsWith('const FACILITY_ROUTES'))
+  const end = lines.findIndex(l => l.includes('} satisfies'))
+  return collectByIndent(lines.slice(start, end), DOMAIN_LINE, DOMAIN_METHOD_LINE).get(domain) ?? new Set()
+}
+
 if (!existsSync(CATALOG)) {
   console.error(`[catalog-check] 应用目录缺失: ${CATALOG}`)
   process.exit(1)
 }
 
 const catalog = parseCatalog()
-const expected = new Map([['info', parseInfoMethods()], ...DOMAIN_FILES.map(d => [d, parseDomainMethods(d)])])
+const expected = new Map([
+  ['info', parseInfoMethods()],
+  ...DOMAIN_FILES.map(d => [d, parseDomainMethods(d)]),
+  ...FACILITY_DOMAINS.map(d => [d, parseFacilityMethods(d)]),
+])
 
 for (const [domain, methods] of expected) {
   const actual = catalog.get(domain)

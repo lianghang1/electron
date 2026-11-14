@@ -9,6 +9,7 @@ export type PlatformErrorCode
     | 'STORAGE_ERROR'
     | 'IPC_ERROR'
     | 'VALIDATION_FAILED'
+    | 'DOMAIN_UNAVAILABLE'
 
 /**
  * 平台统一错误。跨 IPC 传递时序列化为 { code, message, details }，

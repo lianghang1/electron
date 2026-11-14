@@ -19,7 +19,11 @@
         "scanner"
       ],
       "permissions": [
-        "info"
+        "info",
+        "notification",
+        "tabs",
+        "downloads",
+        "update"
       ]
     },
     {

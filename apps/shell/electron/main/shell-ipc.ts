@@ -14,6 +14,7 @@ import { registerAppsIpc } from './ipc/apps'
 import { registerCaptureDialogIpc } from './ipc/capture-dialog'
 import { registerDeviceConfigIpc } from './ipc/device-config'
 import { registerDownloadsIpc } from './ipc/downloads'
+import { registerAppEventRelay } from './ipc/facility-router'
 import { registerNotificationsIpc } from './ipc/notifications'
 import { registerPermissionsIpc } from './ipc/permissions'
 import { registerRouterIpc } from './ipc/router'
@@ -79,7 +80,18 @@ export function registerShellIpc(deps: ShellIpcDeps): void {
   registerPermissionsIpc({ callers: deps.callers, permissions: deps.permissions })
   registerDeviceConfigIpc({ callers: deps.callers, permissions: deps.permissions, devices: deps.devices })
   registerCaptureDialogIpc({ callers: deps.callers, apps: deps.apps, devices: deps.devices })
-  registerRouterIpc({ callers: deps.callers, logger: deps.logger, router: deps.router, apps: deps.apps })
+  registerRouterIpc({
+    callers: deps.callers,
+    logger: deps.logger,
+    router: deps.router,
+    apps: deps.apps,
+    permissions: deps.permissions,
+    notifications: deps.notifications,
+    downloads: deps.downloads,
+    events: deps.kernel.ctx.events,
+    update: deps.updateCenter,
+  })
+  registerAppEventRelay({ callers: deps.callers, events: deps.kernel.ctx.events })
 
   // 设置通道（schema 驱动）：kernel settings 服务经注入的 ipc 接口注册
   registerSettingsIpc(ipcMain)

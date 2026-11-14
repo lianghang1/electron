@@ -33,6 +33,11 @@ export class CallerRegistry {
   tryResolve(webContentsId: number): CallerContext | undefined {
     return this.contexts.get(webContentsId)
   }
+
+  /** 登记项遍历（主进程事件接力器按 kind 过滤投递目标） */
+  * entries(): IterableIterator<[number, CallerContext]> {
+    yield* this.contexts.entries()
+  }
 }
 
 /** Chromium 权限名 → 平台权限名；未列出的权限无对应平台能力，一律拒绝 */
