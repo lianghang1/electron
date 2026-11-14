@@ -1,9 +1,10 @@
-import { defineAsyncComponent, defineComponent, onMounted, ref } from 'vue'
-import { CATALOG } from '../js/catalog.js'
+import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
 import { call } from '../js/jsapi.js'
+import { toast } from '../js/toast.js'
+import { registerRefresher } from '../js/store.js'
 
 /**
- * 身份证：阅读器枚举 + 读卡结构化渲染（照片 + 证面字段）+ 档案配置。
+ * 身份证：读卡器下拉（接入方式 + 离线/不可用后缀）+ 读取操作与结果（照片 + 证面字段行式渲染）。
  * 字段名与 IdCardData 契约一致（gender/birthDate/issuer），PII 仅内存展示、不入日志。
  */
 
@@ -21,20 +22,30 @@ const TRANSPORT_LABEL = { dll: 'SDK 直连', ws: '本地服务' }
 
 export default defineComponent({
   name: 'IdcardPanel',
-  components: { DeviceList: defineAsyncComponent(() => import('../js/components/device-list.js').then(m => m.default)), InvokeForm: defineAsyncComponent(() => import('../js/components/invoke-form.js').then(m => m.default)) },
   setup() {
     const devices = ref(null)
+    const loadError = ref('')
     const readerId = ref('')
     const card = ref(null)
     const reading = ref(false)
     const status = ref('选择读卡器后点击读取')
-    const config = ref(null)
-    const setConfigDef = CATALOG.idcard.methods.setConfig
 
     async function loadDevices() {
-      devices.value = await call('idcard.listDevices')
+      try {
+        devices.value = await call('idcard.listDevices')
+        loadError.value = ''
+      }
+      catch (e) {
+        devices.value = []
+        loadError.value = e.message ?? String(e)
+        return
+      }
       if (readerId.value && !devices.value?.some(d => d.id === readerId.value)) { readerId.value = '' }
     }
+
+    const unregister = registerRefresher(loadDevices)
+    onMounted(() => { void loadDevices() })
+    onUnmounted(unregister)
 
     async function readCard() {
       reading.value = true
@@ -42,10 +53,12 @@ export default defineComponent({
       try {
         card.value = await call('idcard.readCard', readerId.value ? { deviceId: readerId.value } : undefined)
         status.value = '读取成功'
+        toast('证卡读取成功')
       }
       catch (e) {
-        status.value = `读取失败：[${e.code}] ${e.message}`
+        status.value = `读取失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`
         card.value = null
+        toast(status.value, false)
       }
       finally {
         reading.value = false
@@ -54,21 +67,18 @@ export default defineComponent({
 
     function clearCard() {
       card.value = null
-      status.value = '已清空读卡结果'
+      status.value = '选择读卡器后点击读取'
+      toast('已清空读卡结果')
     }
 
-    async function loadConfig() {
-      config.value = await call('idcard.getConfig')
+    function openConfig() {
+      void call('overlay.openConfig', { category: 'idcard' })
     }
-
-    onMounted(() => {
-      void loadDevices()
-    })
 
     return {
       ID_FIELDS, TRANSPORT_LABEL,
-      devices, readerId, card, reading, status, config, setConfigDef,
-      loadDevices, readCard, clearCard, loadConfig,
+      devices, loadError, readerId, card, reading, status,
+      loadDevices, readCard, clearCard, openConfig,
     }
   },
 })

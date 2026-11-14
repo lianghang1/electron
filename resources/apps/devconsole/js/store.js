@@ -8,6 +8,8 @@ export const store = reactive({
   logs: [],
   events: [],
   info: null,
+  /** 顶栏「更新于」时间戳：全局「刷新设备」按钮最近一次触发完成时刻 */
+  updatedAt: '',
 })
 
 const MAX_LOGS = 300
@@ -31,4 +33,22 @@ export function pushEvent(name, payload) {
  */
 export function pushTrace(op, state, detail) {
   pushLog({ method: op, ok: state !== 'fail', state, ms: 0, result: detail })
+}
+
+/** 记录时间格式：M-D HH:mm:ss（月/日省前导零，区别于顶栏时钟的完整格式） */
+export function fmtTime(v) {
+  if (!v) { return '—' }
+  const d = new Date(v)
+  const p = n => String(n).padStart(2, '0')
+  return `${d.getMonth() + 1}-${d.getDate()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`
+}
+
+/** 全局「刷新设备」编排：面板在挂载时登记各自的设备枚举刷新函数，顶栏按钮统一触发全部 */
+const refreshers = new Set()
+export function registerRefresher(fn) {
+  refreshers.add(fn)
+  return () => { refreshers.delete(fn) }
+}
+export function runRefreshers() {
+  return Promise.all([...refreshers].map(fn => fn()))
 }

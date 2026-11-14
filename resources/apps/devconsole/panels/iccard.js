@@ -1,10 +1,11 @@
-import { defineAsyncComponent, defineComponent, onMounted, ref } from 'vue'
-import { CATALOG } from '../js/catalog.js'
+import { defineComponent, onMounted, onUnmounted, ref } from 'vue'
 import { call } from '../js/jsapi.js'
+import { toast } from '../js/toast.js'
+import { registerRefresher } from '../js/store.js'
 
 /**
- * IC 卡（Mifare Classic）：读写器枚举（能力联动）+ 读扇区结构化渲染（hex/ASCII/文本预览）+
- * 写块安全流（危险块前置拦截 + confirm + 写后回读）+ 字符串组写入（扇区级覆盖 + 校验）。
+ * IC 卡（Mifare Classic）：读写器下拉（能力联动）+ 读扇区结构化渲染（UID/卡号/卡类型 + hex/ASCII/文本预览）+
+ * 写块安全流（危险块前置拦截 + confirm + 写后回读）+ 字符串组读/写（独立结果区，读失败不污染主结果）。
  * 危险块规则与驱动一致：每扇区末块 = 密钥控制块，0 扇区 0 块 = 厂商块（UID 区）。
  */
 
@@ -35,14 +36,12 @@ function toCString(hex) {
 
 export default defineComponent({
   name: 'IccardPanel',
-  components: { DeviceList: defineAsyncComponent(() => import('../js/components/device-list.js').then(m => m.default)), InvokeForm: defineAsyncComponent(() => import('../js/components/invoke-form.js').then(m => m.default)) },
   setup() {
     const devices = ref(null)
+    const loadError = ref('')
     const readerId = ref('')
     const status = ref('选择读写器后操作')
     const busy = ref(false)
-    const config = ref(null)
-    const setConfigDef = CATALOG.iccard.methods.setConfig
 
     // 读扇区
     const readSector = ref(1)
@@ -56,7 +55,7 @@ export default defineComponent({
     const writeKey = ref('')
     const writeKeyType = ref('')
 
-    // 字符串组
+    // 字符串组（独立结果区：读失败置 null 隐藏，不回填主扇区结果）
     const textsSector = ref(1)
     const textsInput = ref('')
     const textsKey = ref('')
@@ -71,9 +70,31 @@ export default defineComponent({
     }
 
     async function loadDevices() {
-      devices.value = await call('iccard.listDevices')
+      try {
+        devices.value = await call('iccard.listDevices')
+        loadError.value = ''
+      }
+      catch (e) {
+        devices.value = []
+        loadError.value = e.message ?? String(e)
+        canWrite.value = false
+        return
+      }
       if (readerId.value && !devices.value?.some(d => d.id === readerId.value)) { readerId.value = '' }
       syncCaps()
+    }
+
+    const unregister = registerRefresher(loadDevices)
+    onMounted(() => { void loadDevices() })
+    onUnmounted(unregister)
+
+    /** 读卡前置：无设备显式拦截（自动定位由主进程按首个就绪设备完成） */
+    function ensureDevice() {
+      if (!devices.value?.length) {
+        toast('未检测到可用 IC 读卡器', false)
+        return false
+      }
+      return true
     }
 
     function devicePayload(key, keyType) {
@@ -100,25 +121,29 @@ export default defineComponent({
     }
 
     async function read() {
+      if (!ensureDevice()) { return }
       try {
         const r = await doReadSector()
         sectorData.value = r
         status.value = '读取成功'
+        toast('IC 卡读取成功')
       }
       catch (e) {
         sectorData.value = null
-        status.value = `读取失败：[${e.code}] ${e.message}`
+        status.value = `读取失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`
+        toast(status.value, false)
       }
     }
 
     /** 写块安全流：不合法不弹 confirm、不发 IPC；写后同密钥回读展示 */
     async function writeBlockData() {
+      if (!ensureDevice()) { return }
       const block = Number(writeBlock.value)
       const data = writeData.value.trim().toUpperCase()
-      if (!Number.isInteger(block) || block < 0 || block > 63) { status.value = '块地址应为 0-63'; return }
-      if (block % 4 === 3) { status.value = `块 ${block} 是密钥控制块，禁止写入`; return }
-      if (block === 0) { status.value = '块 0 是厂商块（UID 区），禁止写入'; return }
-      if (!/^[0-9A-F]{32}$/.test(data)) { status.value = '数据应为 32 位 hex（16 字节）'; return }
+      if (!Number.isInteger(block) || block < 0 || block > 63) { status.value = '块地址应为 0-63'; toast(status.value, false); return }
+      if (block % 4 === 3) { status.value = `块 ${block} 是密钥控制块，禁止写入`; toast(status.value, false); return }
+      if (block === 0) { status.value = '块 0 是厂商块（UID 区），禁止写入'; toast(status.value, false); return }
+      if (!/^[0-9A-F]{32}$/.test(data)) { status.value = '数据应为 32 位 hex（16 字节）'; toast(status.value, false); return }
       if (!window.confirm(`确认写入块 ${block}？该操作覆盖原数据 16 字节、不可恢复。`)) { return }
       busy.value = true
       status.value = `写入块 ${block} 中…`
@@ -129,15 +154,16 @@ export default defineComponent({
           blockData: data,
         })
         status.value = `块 ${block} 写入成功`
+        toast(`块 ${block} 写入成功`)
         // 写后回读验证（同扇区同密钥），结果展示在读取区
         readSector.value = Math.floor(block / 4)
         readKey.value = writeKey.value
         readKeyType.value = writeKeyType.value
-        const r = await doReadSector()
-        sectorData.value = r
+        sectorData.value = await doReadSector()
       }
       catch (e) {
-        status.value = `写入失败：[${e.code}] ${e.message}`
+        status.value = `写入失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`
+        toast(status.value, false)
       }
       finally {
         busy.value = false
@@ -152,25 +178,27 @@ export default defineComponent({
     }
 
     async function readTexts() {
+      if (!ensureDevice()) { return }
       const sector = Number(textsSector.value)
       try {
         const r = await doReadSector(sector, textsKey, textsKeyType)
         textsResult.value = r.texts ?? []
-        sectorData.value = r
+        toast('字符串组读取成功')
       }
       catch (e) {
         textsResult.value = null
-        status.value = `字符串组读取失败：[${e.code}] ${e.message}`
+        toast(`读取失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`, false)
       }
     }
 
     async function writeTexts() {
+      if (!ensureDevice()) { return }
       const sector = Number(textsSector.value)
       const texts = parseTexts()
-      if (!Number.isInteger(sector) || sector < 1 || sector > 15) { status.value = '扇区应为 1-15（0 扇区首块为厂商块，不可写）'; return }
-      if (texts.length > 3) { status.value = '最多 3 行（每扇区 3 个数据块）'; return }
+      if (!Number.isInteger(sector) || sector < 1 || sector > 15) { status.value = '扇区应为 1-15（0 扇区首块为厂商块，不可写）'; toast(status.value, false); return }
+      if (texts.length > 3) { status.value = '最多 3 行（每扇区 3 个数据块）'; toast(status.value, false); return }
       const tooLong = texts.find(t => new TextEncoder().encode(t).length > 16)
-      if (tooLong !== undefined) { status.value = `"${tooLong}" 超出单块容量（UTF-8 16 字节）`; return }
+      if (tooLong !== undefined) { status.value = `"${tooLong}" 超出单块容量（UTF-8 16 字节）`; toast(status.value, false); return }
       if (!window.confirm(`确认写入扇区 ${sector}？整扇区覆盖（未占用块清零）、不可恢复。`)) { return }
       busy.value = true
       status.value = `写入扇区 ${sector} 中…`
@@ -181,35 +209,39 @@ export default defineComponent({
           textBlocks: texts,
         })
         status.value = `扇区 ${sector} 字符串组写入成功`
-        // 写后回读验证，结果展示在字符串组区
+        toast(`扇区 ${sector} 写入成功`)
+        // 写后回读验证（同一扇区密钥），结果只进字符串组区
         const r = await doReadSector(sector, textsKey, textsKeyType)
         textsResult.value = r.texts ?? []
-        sectorData.value = r
       }
       catch (e) {
-        status.value = `写入失败：[${e.code}] ${e.message}`
+        status.value = `写入失败：${e.code ?? 'UNKNOWN'} · ${e.message ?? '未知错误'}`
+        toast(status.value, false)
       }
       finally {
         busy.value = false
       }
     }
 
-    async function loadConfig() {
-      config.value = await call('iccard.getConfig')
+    function clearAll() {
+      sectorData.value = null
+      textsResult.value = null
+      status.value = '选择读写器后操作'
+      toast('已清空 IC 卡结果')
     }
 
-    onMounted(() => {
-      void loadDevices()
-    })
+    function openConfig() {
+      void call('overlay.openConfig', { category: 'iccard' })
+    }
 
     return {
       TRANSPORT_LABEL, toPrintableAscii, toCString,
-      devices, readerId, status, busy, config, setConfigDef,
+      devices, loadError, readerId, status, busy,
       readSector, readKey, readKeyType, sectorData,
       writeBlock, writeData, writeKey, writeKeyType,
       textsSector, textsInput, textsKey, textsKeyType, textsResult,
       canWrite,
-      loadDevices, syncCaps, read, writeBlockData, readTexts, writeTexts, loadConfig,
+      loadDevices, syncCaps, read, writeBlockData, readTexts, writeTexts, clearAll, openConfig,
     }
   },
 })

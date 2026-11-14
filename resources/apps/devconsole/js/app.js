@@ -1,7 +1,7 @@
 import { createApp, computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { PANELS } from './catalog.js'
 import { bridgeReal } from './jsapi.js'
-import { store } from './store.js'
+import { store, fmtTime, runRefreshers } from './store.js'
 import LogView from './components/log-view.js'
 
 /**
@@ -19,6 +19,13 @@ const Root = {
     const currentPanel = computed(() => PANELS.find(p => p.id === current.value))
     const info = computed(() => store.info)
     const logCount = computed(() => store.logs.length)
+    const updatedAt = computed(() => store.updatedAt)
+
+    // 全局「刷新设备」：逐面板登记的枚举刷新并发跑一遍，完成后盖时间戳
+    async function refreshDevices() {
+      await runRefreshers()
+      store.updatedAt = `更新于 ${fmtTime(Date.now())}`
+    }
     const clock = ref('')
     // 会话号：进程本次启动生成（参考 HDC 控制台的会话标识），仅用于日志/截图对账
     const sessionId = `LOCAL-${String(new Date().getMinutes() % 8 + 1).padStart(2, '0')}`
@@ -67,7 +74,7 @@ const Root = {
     watch(current, load)
     onMounted(() => { load(current.value) })
 
-    return { panels: PANELS, current, panelComp, loadError, logOpen, currentPanel, info, bridgeReal, logCount, clock, sessionId, open }
+    return { panels: PANELS, current, panelComp, loadError, logOpen, currentPanel, info, bridgeReal, logCount, clock, sessionId, updatedAt, refreshDevices, open }
   },
 }
 

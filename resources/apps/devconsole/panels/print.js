@@ -1,15 +1,18 @@
-import { computed, defineComponent, onMounted, reactive, ref } from 'vue'
+import { computed, defineComponent, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { call } from '../js/jsapi.js'
+import { toast } from '../js/toast.js'
+import { fmtTime, registerRefresher } from '../js/store.js'
 
 /**
- * 打印：统一信封提交（html / url / file 三种负载）+ 全量版式选项 + 打印机能力列表与真实测试页 + 任务簿。
- * 纸型下拉随所选打印机驱动上报联动（custom:宽x高 → paper '宽x高'），查询失败显式提示、不回落伪装数据。
+ * 打印：统一信封提交（图片/PDF 文件/PDF 链接/HTML 四类负载）+ 打印机能力列表与测试页 + 任务簿。
+ * 切换内容类型时按纸宽自动匹配驱动表单（如小票 80mm 切 80 宽纸型），纸型只随驱动上报联动、不回落伪装数据。
  */
 
 const KINDS = [
-  { id: 'html', label: 'HTML 内容', payload: 'html' },
-  { id: 'url', label: 'PDF/图片链接', payload: 'url' },
-  { id: 'file', label: '本地文件', payload: 'file' },
+  { id: 'image', label: '图片文件', payload: 'file', paperWidth: 210 },
+  { id: 'pdf', label: 'PDF 文件', payload: 'file', paperWidth: 210 },
+  { id: 'pdfurl', label: 'PDF 链接', payload: 'url', paperWidth: 210 },
+  { id: 'html', label: 'HTML', payload: 'html', paperWidth: 210 },
 ]
 
 const DEFAULT_TEST_HTML = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
@@ -28,9 +31,10 @@ td { border: 1px solid #ccc; padding: 8px 10px; } .swatch { height: 34px; }
 </body></html>`
 
 const CHANNELS = ['auto', 'system', 'ipp', 'simulated', 'preview', 'dry-run']
-const DUPLEX = ['simplex', 'duplex', 'duplexshort', 'duplexlong']
+const SOURCE_LABEL = { system: '系统打印机', ipp: 'IPP', simulated: '模拟通道' }
+const PRINTER_STATE = { ready: '已就绪', offline: '离线' }
 const STATE_TONE = { done: 'ok', failed: 'err' }
-const STATE_LABEL = { accepted: '已受理', printing: '打印中', done: '完成', failed: '失败' }
+const STATE_LABEL = { accepted: '已受理', printing: '打印中', done: '已完成', failed: '失败' }
 
 export default defineComponent({
   name: 'PrintPanel',
@@ -39,10 +43,11 @@ export default defineComponent({
     const jobs = ref([])
     const loaded = ref(false)
     const result = ref('')
+    const resultOk = ref(true)
     const submitting = ref(false)
 
     const form = reactive({
-      kind: 'html',
+      kind: 'image',
       html: DEFAULT_TEST_HTML,
       url: '',
       fileType: '',
@@ -52,26 +57,30 @@ export default defineComponent({
       copies: 1,
       silent: true,
       grayscale: false,
-      channel: '',
-      landscape: false,
+      channel: 'auto',
+      landscape: '',
       duplex: '',
       pages: '',
-      margin: 'default',
-      marginTop: 0,
-      marginRight: 0,
-      marginBottom: 0,
-      marginLeft: 0,
+      margin: '',
+      marginTop: 10,
+      marginRight: 10,
+      marginBottom: 10,
+      marginLeft: 10,
       jobName: '',
       subset: '',
       scale: '',
       bin: '',
     })
 
+    const activeKind = computed(() => KINDS.find(k => k.id === form.kind))
     const selectedPrinter = computed(() => printers.value.find(p => p.id === form.printerId))
 
-    /** 驱动上报纸型 → 下拉项：无尺寸表单无法换算提交参数，置灰；custom: 前缀提交时转 '宽x高' */
+    /** 驱动上报纸型 → 下拉项：无尺寸表单无法换算提交参数，置灰；custom: 前缀提交时转 '宽x高'；无数据给占位项显式说明 */
     const paperOptions = computed(() => {
       const forms = selectedPrinter.value?.capabilities?.paperList ?? []
+      if (!forms.length) {
+        return [{ value: '', label: selectedPrinter.value ? '未读取到该打印机的纸型数据' : '先选择打印机', disabled: true }]
+      }
       return forms.map((f) => {
         const size = f.widthMm ? `${f.widthMm}×${f.heightMm ? `${f.heightMm}mm` : '连续'}` : ''
         return {
@@ -80,6 +89,11 @@ export default defineComponent({
           disabled: !f.widthMm,
         }
       })
+    })
+
+    // 打印机切换/刷新后保留仍有效的纸型选中项，失效则清空（提交时回落 a4）
+    watch(paperOptions, (opts) => {
+      if (form.paper && !opts.some(o => o.value === form.paper && !o.disabled)) { form.paper = '' }
     })
 
     function capsText(p) {
@@ -104,20 +118,51 @@ export default defineComponent({
       return parts.join(' / ')
     }
 
+    function printerTone(p) {
+      return p.status === 'ready' ? 'ok' : p.status === 'offline' ? 'err' : ''
+    }
+
+    /** 切换内容类型：数据区随 payload 显隐；尽量选中宽度匹配的驱动表单，匹配不上保持当前选择 */
+    function switchKind(id) {
+      form.kind = id
+      const width = activeKind.value?.paperWidth
+      if (width != null) {
+        const hit = paperOptions.value.find(o => !o.disabled && o.value.startsWith(`custom:${width}x`))
+        if (hit) { form.paper = hit.value }
+      }
+    }
+
     async function loadPrinters() {
-      printers.value = /** @type {any[]} */ (await call('print.listDevices'))
-      // 选中项失效（离线拔除）时回系统默认
-      if (form.printerId && !printers.value.some(p => p.id === form.printerId)) { form.printerId = '' }
-      loaded.value = true
+      try {
+        printers.value = /** @type {any[]} */ (await call('print.listDevices'))
+        // 选中项失效（离线拔除）时回系统默认
+        if (form.printerId && !printers.value.some(p => p.id === form.printerId)) { form.printerId = '' }
+        loaded.value = true
+      }
+      catch (e) {
+        toast(`读取打印机失败：${e.message ?? String(e)}`, false)
+      }
     }
 
     async function loadJobs() {
-      jobs.value = /** @type {any[]} */ (await call('print.listPrintJobs', { maxCount: 100 }))
+      try {
+        jobs.value = /** @type {any[]} */ (await call('print.listPrintJobs', { maxCount: 100 }))
+      }
+      catch (e) {
+        toast(`读取任务失败：${e.message ?? String(e)}`, false)
+      }
     }
 
-    onMounted(() => {
-      void loadPrinters()
-      void loadJobs()
+    const unregisterPrinters = registerRefresher(loadPrinters)
+    const unregisterJobs = registerRefresher(loadJobs)
+    onMounted(async () => {
+      await loadPrinters()
+      switchKind(form.kind)
+      await loadJobs()
+    })
+    onUnmounted(() => {
+      unregisterPrinters()
+      unregisterJobs()
     })
 
     /** custom:宽x高 → '宽x高'（高 0 = 连续纸），其余原样 */
@@ -128,57 +173,67 @@ export default defineComponent({
 
     function buildContent() {
       if (form.kind === 'html') { return { kind: 'html', html: form.html } }
-      if (form.kind === 'url') {
+      if (form.kind === 'pdfurl') {
         return { kind: 'url', url: form.url.trim(), ...(form.fileType ? { fileType: form.fileType } : {}) }
       }
       return { kind: 'file', path: form.path.trim() }
     }
 
-    function buildOptions() {
-      const options = {
-        paper: parsePaper(form.paper),
-        copies: Math.max(1, Math.min(999, Number(form.copies) || 1)),
-        silent: form.silent,
-        grayscale: form.grayscale,
-        jobName: form.jobName.trim() || KINDS.find(k => k.id === form.kind)?.label,
-      }
-      if (form.printerId) { options.printerId = form.printerId }
-      if (form.channel) { options.channel = form.channel }
-      if (form.margin === 'none') { options.margin = 'none' }
-      else if (form.margin === 'custom') {
-        options.margin = {
+    function buildMargin() {
+      if (form.margin === 'none') { return 'none' }
+      if (form.margin === 'custom') {
+        return {
           topMm: Number(form.marginTop) || 0,
           rightMm: Number(form.marginRight) || 0,
           bottomMm: Number(form.marginBottom) || 0,
           leftMm: Number(form.marginLeft) || 0,
         }
       }
-      if (form.landscape) { options.landscape = true }
-      if (form.duplex) { options.duplex = form.duplex }
-      if (form.pages.trim()) { options.pages = form.pages.trim() }
-      // PDF 直通专有（SumatraPDF/CUPS）：非 PDF 负载不发送
-      const pdfDirect = form.kind === 'file' || (form.kind === 'url' && form.fileType === 'pdf')
-      if (pdfDirect) {
-        if (form.subset) { options.subset = form.subset }
-        if (form.scale) { options.scale = form.scale }
-        if (form.bin.trim()) { options.bin = form.bin.trim() }
+      return 'default'
+    }
+
+    function buildOptions() {
+      const kind = activeKind.value
+      const options = {
+        paper: parsePaper(form.paper) || kind?.paper || 'a4',
+        copies: Math.max(1, Math.min(999, Number(form.copies) || 1)),
+        silent: form.silent,
+        grayscale: form.grayscale,
+        channel: form.channel,
+        margin: buildMargin(),
+        printerId: form.printerId || undefined,
+        jobName: form.jobName.trim() || kind?.label,
+      }
+      options.landscape = form.landscape === '1'
+      options.duplex = form.duplex || undefined
+      options.pages = form.pages.trim() || undefined
+      // PDF 文件直通专有（SumatraPDF -print-settings）：其余类型不发送
+      if (form.kind === 'pdf') {
+        options.subset = form.subset || undefined
+        options.scale = form.scale || undefined
+        options.bin = form.bin.trim() || undefined
       }
       return options
     }
 
     async function submitPrint() {
-      if (form.kind === 'html' && !form.html.trim()) { result.value = '请先填写 HTML 内容'; return }
-      if (form.kind === 'url' && !form.url.trim()) { result.value = '请先填写链接'; return }
-      if (form.kind === 'file' && !form.path.trim()) { result.value = '请先填写文件绝对路径'; return }
+      const kind = activeKind.value
+      if (kind?.payload === 'file' && !form.path.trim()) { toast('请先填写文件绝对路径', false); return }
+      if (kind?.payload === 'url' && !form.url.trim()) { toast('请先填写 PDF 链接', false); return }
+      if (kind?.payload === 'html' && !form.html.trim()) { toast('请先填写 HTML 内容', false); return }
       submitting.value = true
       result.value = '提交中…'
+      resultOk.value = true
       try {
         const r = /** @type {{ jobId: string, channel: string, printerId: string }} */ (await call('print.submitPrintJob', { printContent: buildContent(), printOptions: buildOptions() }))
         result.value = `已提交：${r.jobId}（通道 ${r.channel} → ${r.printerId}）`
+        toast('已提交打印')
         await loadJobs()
       }
       catch (e) {
-        result.value = `失败：[${e.code}] ${e.message}`
+        result.value = `失败：${e.message ?? '未知错误'}`
+        resultOk.value = false
+        toast(`打印失败：${e.message ?? '未知错误'}`, false)
       }
       finally {
         submitting.value = false
@@ -193,44 +248,53 @@ export default defineComponent({
         `<div class="meta">编号 TEST-${Date.now().toString(36).toUpperCase()} · 目标 ${esc(printer.displayName)} · ${new Date().toLocaleString()}</div>`,
       )
       try {
-        const r = /** @type {{ jobId: string }} */ (await call('print.submitPrintJob', {
+        await call('print.submitPrintJob', {
           printContent: { kind: 'html', html },
           printOptions: { paper: 'a4', copies: 1, silent: true, printerId: printer.id, jobName: `测试页 · ${printer.displayName}` },
-        }))
-        result.value = `测试页已提交到 ${printer.displayName}：${r.jobId}`
+        })
+        toast(`已提交到 ${printer.displayName}`)
         await loadJobs()
       }
       catch (e) {
-        result.value = `测试页提交失败：[${e.code}] ${e.message}`
+        toast(`提交失败：${e.message ?? '未知错误'}`, false)
       }
     }
 
     async function reprint(job) {
       try {
         await call('print.reprintJob', { printJobId: job.jobId })
+        toast('已重新提交打印')
         await loadJobs()
       }
-      catch (e) { result.value = `重打失败：[${e.code}] ${e.message}` }
+      catch (e) { toast(`重试失败：${e.message ?? '未知错误'}`, false) }
     }
 
     async function removeJob(job) {
-      if (!window.confirm(`删除任务 ${job.jobId}？记录与归档 PDF 将一并删除，不可恢复。`)) { return }
-      await call('print.removePrintJob', { printJobId: job.jobId })
-      await loadJobs()
+      if (!window.confirm('删除该任务记录？记录与归档 PDF 将一并删除，不可恢复。')) { return }
+      const ok = /** @type {boolean} */ (await call('print.removePrintJob', { printJobId: job.jobId }))
+      if (ok) {
+        toast('任务记录已删除')
+        await loadJobs()
+      }
     }
 
     async function clearJobs() {
       if (!jobs.value.length) { return }
       if (!window.confirm(`清空全部 ${jobs.value.length} 条任务记录？归档 PDF 将一并删除，不可恢复。`)) { return }
-      await call('print.clearPrintJobs')
-      await loadJobs()
+      try {
+        const n = /** @type {number} */ (await call('print.clearPrintJobs'))
+        toast(`已清空 ${n} 条任务记录`)
+        await loadJobs()
+      }
+      catch (e) { toast(e.message ?? String(e), false) }
     }
 
     return {
-      KINDS, CHANNELS, DUPLEX, STATE_TONE, STATE_LABEL,
-      printers, jobs, loaded, result, submitting, form,
-      selectedPrinter, paperOptions, capsText,
-      loadPrinters, loadJobs, submitPrint, submitTestPage, reprint, removeJob, clearJobs,
+      KINDS, CHANNELS, SOURCE_LABEL, PRINTER_STATE, STATE_TONE, STATE_LABEL,
+      printers, jobs, loaded, result, resultOk, submitting, form,
+      activeKind, selectedPrinter, paperOptions, capsText, printerTone,
+      switchKind, loadPrinters, loadJobs, submitPrint, submitTestPage, reprint, removeJob, clearJobs,
+      fmtTime,
     }
   },
 })

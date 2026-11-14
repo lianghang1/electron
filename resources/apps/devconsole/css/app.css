@@ -395,3 +395,59 @@ code, .mono { font-family: var(--dc-mono); }
 .dc-meter div { height: 100%; width: 0; background: linear-gradient(90deg, var(--dc-accent), #9a3412); transition: width 80ms linear; }
 .dc-log-state.block { color: var(--dc-warn); background: var(--dc-warn-soft); }
 .dc-log-state.info { color: var(--dc-text-sub); background: var(--dc-inset); }
+
+/* ── 全局 toast：底部居中横条（成败双色，show 类驱动显隐过渡） ──────── */
+.dc-toast {
+  position: fixed; left: 50%; bottom: 26px; z-index: 60;
+  transform: translateX(-50%) translateY(8px);
+  background: var(--dc-text); color: #fff;
+  font-size: 12px; line-height: 1.4;
+  padding: 8px 16px; border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(27, 39, 51, 0.22);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  max-width: 70vw; word-break: break-all;
+}
+.dc-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.dc-toast.err { background: var(--dc-err); }
+
+/* ── 行式列表：名称/副标 + 徽章 + 行内操作（打印机/任务/读卡/扫码历史共用节奏） ── */
+.dc-list {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--dc-border); border-radius: 5px;
+  background: var(--dc-panel); overflow: hidden;
+}
+.dc-list-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; }
+.dc-list-row + .dc-list-row { border-top: 1px dashed var(--dc-border); }
+.dc-list-row .grow { flex: 1; min-width: 0; }
+.dc-list-row .name { font-size: 12px; font-weight: 600; letter-spacing: 0.02em; }
+.dc-list-row .sub {
+  font-size: 11px; color: var(--dc-text-faint); font-family: var(--dc-mono);
+  margin-top: 1px; word-break: break-all;
+}
+.dc-list-row .row-hint {
+  flex: none; width: 80px;
+  font-family: var(--dc-mono); font-size: 11px; color: var(--dc-text-faint);
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+.dc-list-row .sel { user-select: all; color: var(--dc-data); }
+.dc-list-row .sel-strong {
+  font-size: 12px; font-weight: 600; letter-spacing: 0.02em;
+  user-select: all; color: var(--dc-data); font-family: var(--dc-mono);
+}
+.dc-chip {
+  display: inline-flex; align-items: center; flex: none;
+  padding: 1px 7px; border-radius: 999px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.04em;
+  background: var(--dc-inset); color: var(--dc-text-sub); border: 1px solid var(--dc-border);
+}
+.dc-chip.brand { background: var(--dc-accent-soft); color: var(--dc-accent); border-color: transparent; }
+.dc-list-empty { padding: 18px 12px; text-align: center; color: var(--dc-text-faint); font-size: 12px; }
+
+/* ── 面板操作行补充：复选选项 / 行内状态字 / 分组竖线 ───────────────── */
+.dc-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dc-text-sub); cursor: pointer; user-select: none; }
+.dc-check input { width: auto; margin: 0; }
+.dc-hint-inline { font-size: 11px; color: var(--dc-text-faint); }
+.dc-result { font-size: 12px; color: var(--dc-text-sub); font-family: var(--dc-mono); word-break: break-all; }
+.dc-result.err { color: var(--dc-err); }
+.dc-ops-sep { flex: none; width: 1px; height: 18px; align-self: center; background: var(--dc-border-strong); }

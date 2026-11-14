@@ -1,36 +1,36 @@
 <div>
   <div class="dc-card">
-    <h2>连接状态 <span class="dc-hint">scanner.statusUpdated 直推（插拔 / 通道切换即变）</span></h2>
-    <div v-if="gunStatus" class="dc-event-row">
-      <span class="dc-log-state" :class="gunStatus.connected ? 'ok' : 'err'">{{ gunStatus.connected ? '在线' : '离线' }}</span>
-      <span class="dc-event-payload">模式 {{ gunStatus.mode }}<template v-if="gunStatus.channel"> · 通道 {{ gunStatus.channel }}</template></span>
+    <h2>扫码枪 <span class="dc-hint">scanner.statusUpdated 直推（插拔 / 通道切换即变）</span></h2>
+    <div class="dc-form" style="align-items:center">
+      <span class="dc-hint-inline">{{ hidStatus || '等待推送（未插枪则保持空态）' }}</span>
+      <span style="flex:1"></span>
+      <button class="dc-btn" @click="openConfig">配置</button>
     </div>
-    <div v-else class="dc-empty">等待推送（未插枪则保持空态）</div>
   </div>
 
   <div class="dc-card">
-    <h2>扫码枪配置</h2>
+    <h2>模拟扫码 <span class="dc-hint">scanner.simulateScan · 与真枪走完全相同的缓冲 → 广播链路，需平台演示模式开启（壳内调试台切换）</span></h2>
+    <div class="dc-form" style="align-items:center">
+      <input v-model="scanInput" placeholder="如 PB:1234567890" style="min-width:240px;font-family:var(--dc-mono)" @keyup.enter="simulate">
+      <button class="dc-btn primary" @click="simulate">模拟一次扫码</button>
+      <button v-if="!bridgeReal" class="dc-btn sm" @click="mockScan">模拟事件（mock 桥）</button>
+    </div>
+  </div>
+
+  <div class="dc-card">
+    <h2>扫码历史（最近 20 条） <span class="dc-hint">scanner.scanned 点对点推送（{{ listening ? '监听中' : '未监听' }}）</span></h2>
     <div class="dc-actions" style="margin-bottom:10px">
-      <button class="dc-btn" @click="loadConfig">scanner.getConfig</button>
+      <button class="dc-btn danger" @click="clearScans">清空</button>
     </div>
-    <pre v-if="config" class="dc-log-detail" style="max-height:160px">{{ JSON.stringify(config, null, 2) }}</pre>
-    <invoke-form method="scanner.setConfig" :def="setConfigDef" label="scanner.setConfig" />
-  </div>
-
-  <div class="dc-card">
-    <h2>扫码事件流 <span class="dc-hint">scanner.scanned 点对点推送（{{ listening ? '监听中' : '未监听' }}）</span></h2>
-    <div v-if="scans.length">
-      <div v-for="(s, i) in scans" :key="i" class="dc-event-row">
-        <span class="dc-log-ts">{{ new Date(s.ts).toLocaleTimeString() }}</span>
-        <span class="dc-event-payload">{{ s.code }}</span>
+    <div class="dc-list" v-if="scans.length">
+      <div v-for="(s, i) in scans" :key="i" class="dc-list-row">
+        <div class="grow">
+          <div class="name sel-strong" style="word-break:break-all">{{ s.code }}</div>
+          <div class="sub">{{ fmtTime(s.ts) }}<template v-if="s.prefix"> · 去前缀 {{ s.rawCode }}</template></div>
+        </div>
+        <span v-if="s.prefix" class="dc-chip brand">前缀 {{ s.prefix }}</span>
       </div>
     </div>
-    <div v-else class="dc-empty">等待扫码…</div>
-    <button v-if="!bridgeReal" class="dc-btn sm" style="margin-top:10px" @click="mockScan">模拟扫码</button>
-  </div>
-
-  <div class="dc-card">
-    <h2>演示注入 <span class="dc-hint">走真枪同链路，需平台演示模式开启（壳内调试台切换）</span></h2>
-    <invoke-form method="scanner.simulateScan" :def="simulateDef" label="scanner.simulateScan" />
+    <div v-else class="dc-list-empty">用扫码枪扫一下，或先模拟一条</div>
   </div>
 </div>
