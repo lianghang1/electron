@@ -74,6 +74,13 @@ export const CATALOG = {
       startPreview: { desc: '启动预览（帧经 capture.frame 点对点推送）', fields: [{ key: 'deviceId', label: '设备 id', type: 'text', optional: true }] },
       stopPreview: { desc: '停止预览', fields: [{ key: 'deviceId', label: '设备 id', type: 'text' }] },
       listDeviceCameras: { desc: '设备下相机清单', fields: [{ key: 'deviceId', label: '设备 id', type: 'text', optional: true }] },
+      openCaptureDialog: { desc: '打开原生拍摄浮层（invoke 挂起至确认回传结果数组 / 取消空数组）', fields: [
+        { key: 'deviceId', label: '预选设备 id', type: 'text', optional: true },
+        { key: 'deviceLabel', label: '预选设备名', type: 'text', optional: true },
+        { key: 'title', label: '浮层标题', type: 'text', optional: true, placeholder: '拍摄' },
+        { key: 'maxCount', label: '可拍张数', type: 'number', optional: true },
+        { key: 'format', label: '格式', type: 'select', options: ['', 'jpg', 'png', 'bmp'], default: '' },
+      ] },
     },
   },
   idcard: {

@@ -13,6 +13,12 @@ export default defineComponent({
     const frameUrl = ref('')
     const frameCount = ref(0)
     const shot = ref(null)
+    const dlgTitle = ref('拍摄浮层')
+    const dlgMax = ref(3)
+    const dlgDeviceId = ref('')
+    const dlgBusy = ref(false)
+    const dlgDone = ref(false)
+    const dlgResults = ref([])
 
     const captureImageDef = CATALOG.capture.methods.captureImage
 
@@ -23,6 +29,29 @@ export default defineComponent({
     async function loadDevices() {
       devices.value = await call('capture.listDevices')
       if (!previewDeviceId.value && devices.value?.length) { previewDeviceId.value = devices.value[0].id }
+    }
+
+    /** 原生浮层拍摄：invoke 挂起至确认（结果数组）/取消（空数组），发起 tab 销毁平台自动作废 */
+    async function openDialog() {
+      dlgBusy.value = true
+      dlgDone.value = false
+      dlgResults.value = []
+      try {
+        const input = {
+          title: dlgTitle.value || undefined,
+          maxCount: dlgMax.value > 0 ? dlgMax.value : undefined,
+          deviceId: dlgDeviceId.value || undefined,
+          deviceLabel: dlgDeviceId.value
+            ? devices.value?.find(d => d.id === dlgDeviceId.value)?.displayName
+            : undefined,
+        }
+        const results = await call('capture.openCaptureDialog', input)
+        dlgResults.value = Array.isArray(results) ? results : []
+        dlgDone.value = !dlgResults.value.length
+      }
+      finally {
+        dlgBusy.value = false
+      }
     }
 
     async function startPreview() {
@@ -83,6 +112,7 @@ export default defineComponent({
     return {
       devices, previewing, previewDeviceId, frameUrl, frameCount, shot, bridgeReal,
       captureImageDef,
+      dlgTitle, dlgMax, dlgDeviceId, dlgBusy, dlgDone, dlgResults, openDialog,
       loadDevices, startPreview, stopPreview, onCaptured, saveShot, mockFrame,
     }
   },

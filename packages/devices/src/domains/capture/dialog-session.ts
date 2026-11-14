@@ -1,4 +1,4 @@
-import type { CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSession, CaptureResult } from '@shell/shared'
+import type { CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSession, CaptureResult, DomainIpcSender } from '@shell/shared'
 import type { WebContents } from 'electron'
 import type { CaptureSystem } from './index'
 import type { CaptureOverlayHost } from './overlay-host'
@@ -10,7 +10,7 @@ const CONFIRM_SETTLE_MS = 300
 
 /** 拍摄浮层发起方身份（Main 侧从 CallerContext 提取，渲染层无法伪造） */
 export interface CaptureDialogOrigin {
-  wc: WebContents
+  wc: DomainIpcSender
   tabId?: string
   appId: string
   appName: string

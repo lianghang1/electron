@@ -120,6 +120,8 @@ interface AssemblyContext {
   printOrigins: { site: readonly string[] }
   getParent?: () => BrowserWindow | undefined
   captureOverlay?: CaptureOverlayHost
+  /** 拍摄浮层会话延迟取用：对话框服务晚于域装配创建，域方法调用时经此解析 */
+  captureDialogRef?: { current?: CaptureDialogSessionService }
 }
 
 interface AssembledDomain {
@@ -214,7 +216,7 @@ export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
       })
       return {
         id: 'capture',
-        definition: createCaptureDomain(system, domainDeps(ctx)),
+        definition: createCaptureDomain(system, domainDeps(ctx), () => ctx.captureDialogRef?.current),
         dispose: () => system.destroy(),
         capture: system,
       }
@@ -319,6 +321,8 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
   const captureDialog = options.captureOverlay && capture
     ? new CaptureDialogSessionService({ capture, overlay: options.captureOverlay })
     : undefined
+  // 域定义在装配期已固化，openCaptureDialog 经此引用调用期解析浮层会话
+  ctx.captureDialogRef = { current: captureDialog }
 
   // 三维注册表与平台档案求交，产出各能力状态与原因码；诊断台读同一份结果
   const deviceRegistry = createDeviceRegistry(createChannelRegistry())

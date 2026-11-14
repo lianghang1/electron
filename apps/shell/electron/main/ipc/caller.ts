@@ -1,4 +1,4 @@
-import type { PermissionService } from '@shell/app-runtime'
+import type { AppService, PermissionService } from '@shell/app-runtime'
 import type { Logger } from '@shell/kernel/logger'
 import type { CallerRegistry, DomainCallContext } from '@shell/shared'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -13,9 +13,9 @@ export function callerOf(callers: CallerRegistry, senderId: number): IpcCaller {
   return caller
 }
 
-/** 域单通道路由上下文（domain-call / jsapi:call 共用）：身份反查 + 域日志 scope + 高频帧点对点送达 */
+/** 域单通道路由上下文（domain-call / jsapi:call 共用）：身份反查 + 应用署名 + 发起窗 + 域日志 scope + 高频帧点对点送达 */
 export function domainCallContext(
-  deps: { callers: CallerRegistry, logger: Logger },
+  deps: { callers: CallerRegistry, logger: Logger, apps?: AppService },
   event: IpcMainInvokeEvent,
   method: string,
   scope: string,
@@ -26,6 +26,8 @@ export function domainCallContext(
   return {
     appId: caller.appId,
     instanceId: caller.instanceId,
+    appName: deps.apps?.list().find(r => r.manifest.id === caller.appId)?.manifest.name,
+    sender: event.sender,
     log: message => deps.logger.scope(scope).info(message, { method, appId: caller.appId }),
     push: (name, payload) => {
       if (!event.sender.isDestroyed()) { event.sender.send(`event:${name}`, payload) }

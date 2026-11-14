@@ -18,6 +18,12 @@ export interface DomainMethodDef<S extends AnySchema = AnySchema, R = unknown> {
   handler: (input: z.output<S>, ctx: DomainCallContext) => R | Promise<R>
 }
 
+/** 发起方窗口的最小结构视图：域内挂接窗口生命周期行为（如浮层随发起 tab 销毁自动作废） */
+export interface DomainIpcSender {
+  isDestroyed(): boolean
+  once(event: 'destroyed', listener: () => void): unknown
+}
+
 export interface DomainCallContext {
   appId: string
   instanceId: string
@@ -25,6 +31,10 @@ export interface DomainCallContext {
   log: (message: string, fields?: Record<string, unknown>) => void
   /** 发起方单播推送：高频流式数据（预览帧）点对点送达调用窗，不经事件总线广播；缺省 = 无推送能力（帧静默丢弃） */
   push?: (event: PlatformEventName, payload: PlatformEvents[PlatformEventName]) => void
+  /** 发起方窗口（Main 侧 IPC 路由反查注入；缺省 = 经纯内部通道调用，无窗口生命周期可挂接） */
+  sender?: DomainIpcSender
+  /** 发起应用展示名（平台 UI 署名来源；缺省回落 appId） */
+  appName?: string
 }
 
 export interface DomainDefinition {
