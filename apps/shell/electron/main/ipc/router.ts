@@ -6,7 +6,7 @@ import type { Logger } from '@shell/kernel/logger'
 import type { CallerRegistry } from '@shell/shared'
 import type { UpdateCenter } from '@shell/update'
 import { DomainRouteError } from '@shell/devices'
-import { matchesOrigin, originOf } from '@shell/shared'
+import { matchesOrigin, originOf, PlatformError } from '@shell/shared'
 import { ipcMain } from 'electron'
 import { domainCallContext } from './caller'
 import { callFacility, hasFacilityRoute } from './facility-router'
@@ -28,14 +28,19 @@ export interface RouterIpcDeps {
  * 不走契约域包装，保留各自错误语义。路由上下文（身份反查 + 域日志 + 帧推送）两通道共用。
  */
 export function registerRouterIpc(deps: RouterIpcDeps): void {
+  // IPC 边界只可靠保留 Error.message：把错误码编进 message（[CODE] 前缀），
+  // 渲染层 normalizeError 据此还原结构化原因；与 domain-call 通道同一编码
+  const encodeIpcMessage = (err: unknown): Error => {
+    const code = err instanceof DomainRouteError || err instanceof PlatformError ? err.code : 'DOMAIN_ERROR'
+    return new Error(`[${code}] ${err instanceof Error ? err.message : String(err)}`)
+  }
+
   // 设备域通用调用端：域级放行交给路由层授权闸门，不在桥里另写 devices 判定
   ipcMain.handle('domain-call', (event, method: string, input: unknown) => {
     const ctx = domainCallContext(deps, event, method, 'domain', () => new DomainRouteError('PERMISSION_DENIED', '调用方未登记'))
     return deps.router.call(method, input, ctx).catch((err: unknown) => {
-      const code = err instanceof DomainRouteError ? err.code : 'DOMAIN_ERROR'
-      deps.logger.warn('domain call failed', { method, code, err })
-      // 错误码编进 message：IPC 边界只可靠保留 Error.message，调试台据此展示结构化原因
-      throw new Error(`[${code}] ${err instanceof Error ? err.message : String(err)}`)
+      deps.logger.warn('domain call failed', { method, code: err instanceof DomainRouteError ? err.code : 'DOMAIN_ERROR', err })
+      throw encodeIpcMessage(err)
     })
   })
 
@@ -67,12 +72,12 @@ export function registerRouterIpc(deps: RouterIpcDeps): void {
     if (hasFacilityRoute(method)) {
       return callFacility(deps, method, input, ctx).catch((err: unknown) => {
         deps.logger.warn('jsapi facility call failed', { method, appId: caller.appId, err })
-        throw err
+        throw encodeIpcMessage(err)
       })
     }
     return deps.router.call(method, input, ctx).catch((err: unknown) => {
       deps.logger.warn('jsapi call failed', { method, appId: caller.appId, err })
-      throw err
+      throw encodeIpcMessage(err)
     })
   })
 }
