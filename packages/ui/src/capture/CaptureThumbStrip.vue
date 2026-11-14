@@ -61,8 +61,8 @@ const emit = defineEmits<{ remove: [index: number], view: [index: number] }>()
 }
 
 .cu-thumbs__thumb--active img {
-  border-color: #0f766e;
-  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.35);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 35%, transparent);
 }
 
 @keyframes cu-thumb-in {

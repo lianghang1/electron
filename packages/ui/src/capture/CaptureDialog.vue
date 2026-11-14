@@ -288,14 +288,17 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+/* 颜色全部走语义层变量（tokens 随浮层页加载）：与权限/应用中心等浮层卡同一配色体系，
+   禁止出现组件自带的品牌色——主色由 flavor 注入，浮层间保持一致 */
 .cu-dialog {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 640px;
+  width: 760px;
   padding: 18px;
   border-radius: 14px;
-  background: #fff;
+  background: var(--popover);
+  color: var(--popover-foreground);
   box-shadow: 0 18px 60px rgba(2, 8, 20, 0.35);
   font-family: system-ui, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
   user-select: none;
@@ -318,14 +321,14 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1f2328;
+  color: var(--foreground);
 }
 
 .cu-dialog__count {
   padding: 1px 8px;
   border-radius: 999px;
-  background: #ccfbf1;
-  color: #0f766e;
+  background: var(--accent);
+  color: var(--accent-foreground);
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -333,7 +336,7 @@ onBeforeUnmount(() => {
 .cu-dialog__sub {
   margin: 2px 0 0;
   font-size: 12px;
-  color: #8a919c;
+  color: var(--muted-foreground);
 }
 
 .cu-dialog__close {
@@ -344,7 +347,7 @@ onBeforeUnmount(() => {
   padding: 0;
   font-size: 17px;
   line-height: 26px;
-  color: #8a919c;
+  color: var(--muted-foreground);
   cursor: pointer;
   border-radius: 7px;
   flex-shrink: 0;
@@ -352,8 +355,8 @@ onBeforeUnmount(() => {
 }
 
 .cu-dialog__close:hover {
-  color: #1f2328;
-  background: #f3f6f9;
+  color: var(--foreground);
+  background: var(--muted);
 }
 
 /* ---- 浮动错误提示（覆盖预览区顶部，不占布局，4s 自动消失） ---- */
@@ -369,8 +372,8 @@ onBeforeUnmount(() => {
   max-width: calc(100% - 20px);
   padding: 7px 12px;
   border-radius: 8px;
-  background: rgba(190, 18, 60, 0.92);
-  color: #fff;
+  background: var(--destructive);
+  color: var(--destructive-foreground);
   font-size: 12px;
   box-shadow: 0 8px 24px rgba(2, 8, 20, 0.28);
   animation: cu-toast-in 0.16s ease-out;
@@ -495,60 +498,60 @@ onBeforeUnmount(() => {
 
 .cu-dialog__label {
   font-size: 11px;
-  color: #8a919c;
+  color: var(--muted-foreground);
 }
 
 .cu-dialog__select {
   height: 32px;
   padding: 0 8px;
-  border: 1px solid #d4dae2;
+  border: 1px solid var(--input);
   border-radius: 8px;
-  background: #fff;
+  background: var(--popover);
   font-size: 12.5px;
-  color: #1f2328;
+  color: var(--foreground);
 }
 
 .cu-dialog__select:disabled {
-  color: #a5adb8;
-  background: #f6f8fa;
+  color: var(--muted-foreground);
+  background: var(--muted);
 }
 
 .cu-dialog__btn {
   height: 32px;
   padding: 0 12px;
-  border: 1px solid #d4dae2;
+  border: 1px solid var(--input);
   border-radius: 8px;
-  background: #fff;
+  background: var(--popover);
   font-size: 12.5px;
-  color: #1f2328;
+  color: var(--foreground);
   cursor: pointer;
   transition: background-color 0.12s, border-color 0.12s;
 }
 
 .cu-dialog__btn:hover:not(:disabled) {
-  background: #f3f6f9;
+  background: var(--muted);
 }
 
 .cu-dialog__btn:disabled {
-  color: #a5adb8;
-  background: #f6f8fa;
+  color: var(--muted-foreground);
+  background: var(--muted);
   cursor: not-allowed;
 }
 
 .cu-dialog__btn--active {
-  border-color: #0f766e;
-  color: #0f766e;
-  background: #f0fdfa;
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--accent);
 }
 
 .cu-dialog__btn--primary {
-  border-color: #0f766e;
-  background: #0f766e;
-  color: #fff;
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 
 .cu-dialog__btn--primary:hover:not(:disabled) {
-  background: #115e59;
+  background: color-mix(in srgb, var(--primary) 88%, #000);
 }
 
 .cu-dialog__fx {
@@ -563,7 +566,7 @@ onBeforeUnmount(() => {
 .cu-dialog__panel-hint {
   font-size: 11px;
   line-height: 1.5;
-  color: #8a919c;
+  color: var(--muted-foreground);
 }
 
 /* ---- 底部 ---- */
