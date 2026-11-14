@@ -92,6 +92,16 @@ export function matchesOrigin(url: string, allowed: readonly string[]): boolean 
   return matchOriginPattern(url, allowed) !== undefined
 }
 
+/**
+ * origin 提取：Node URL 对非特型 scheme（app: 等 standard+secure 自定义协议）
+ * 的 origin 恒序列化为 'null'，不能拿去做白名单比较——按协议+主机重组；
+ * http(s) 等特型 scheme 仍走原生 .origin（含端口语义）。
+ */
+export function originOf(url: string): string {
+  const u = new URL(url)
+  return u.origin === 'null' ? `${u.protocol}//${u.hostname}` : u.origin
+}
+
 /** 校验 URL 落在源站白名单内，否则抛（清单/下载地址统一经此闸门）。 */
 export function assertAllowedUrl(url: string, allowedOrigins: readonly string[]): void {
   if (!matchesOrigin(url, allowedOrigins)) {

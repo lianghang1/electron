@@ -3,7 +3,7 @@ import type { DomainRouter } from '@shell/devices'
 import type { Logger } from '@shell/kernel/logger'
 import type { CallerRegistry } from '@shell/shared'
 import { DomainRouteError } from '@shell/devices'
-import { matchesOrigin } from '@shell/shared'
+import { matchesOrigin, originOf } from '@shell/shared'
 import { ipcMain } from 'electron'
 import { domainCallContext } from './caller'
 
@@ -35,7 +35,7 @@ export function registerRouterIpc(deps: RouterIpcDeps): void {
     const frameUrl = event.senderFrame?.url ?? ''
     let origin: string
     try {
-      origin = new URL(frameUrl).origin
+      origin = originOf(frameUrl)
     }
     catch {
       throw new DomainRouteError('METHOD_NOT_FOUND', '无法解析调用方 origin')

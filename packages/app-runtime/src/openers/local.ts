@@ -1,7 +1,7 @@
 import type { AppInstance, AppManifest } from '@shell/shared'
 import type { AppOpener } from '../opener'
 import type { ViewHost } from '../view-host'
-import { app } from 'electron'
+import { isDevLoad } from '@shell/shared'
 
 /**
  * local 形态：构建产物经 app:// 协议服务（协议由组合根在该应用的会话分区注册）。
@@ -25,7 +25,7 @@ export class LocalOpener implements AppOpener {
   async open(manifest: AppManifest, instance: AppInstance): Promise<void> {
     const entry = manifest.entry as { kind: 'local', dir?: string, devUrl?: string }
     const host = entry.dir ?? manifest.id
-    const url = !app.isPackaged && entry.devUrl ? entry.devUrl : `app://${host}/index.html`
+    const url = isDevLoad() && entry.devUrl ? entry.devUrl : `app://${host}/index.html`
     instance.handle.view = this.views.create({
       instanceId: instance.instanceId,
       appId: manifest.id,

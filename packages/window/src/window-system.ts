@@ -5,7 +5,7 @@ import type { OverlayKind, OverlayPolicy } from './overlay-host'
 import { join } from 'node:path'
 import process from 'node:process'
 import { registerIpcDomain } from '@shell/bridge/handle'
-import { effectiveChrome, SHELL_APP_ID } from '@shell/shared'
+import { effectiveChrome, isDevLoad, SHELL_APP_ID } from '@shell/shared'
 import { windowDomain } from '@shell/shared/ipc'
 import { app, BrowserWindow, WebContentsView } from 'electron'
 import { createKioskMode, createWindowedMode } from './modes'
@@ -99,9 +99,9 @@ export class WindowSystem implements Startable, ViewHost {
     this.windows.clear()
   }
 
-  /** dev 模式 F12 切换 devtools（Electron 窗口默认不绑定 F12，仅未打包时注册） */
+  /** dev 模式 F12 切换 devtools（Electron 窗口默认不绑定 F12，仅 dev 态注册） */
   private installDevToolsShortcut(win: BrowserWindow): void {
-    if (app.isPackaged) { return }
+    if (!isDevLoad()) { return }
     win.webContents.on('before-input-event', (_event, input) => {
       if (input.type === 'keyDown' && input.key === 'F12') {
         win.webContents.toggleDevTools()

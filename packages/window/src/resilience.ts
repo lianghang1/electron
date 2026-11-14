@@ -2,6 +2,7 @@ import type { EventBus, Startable } from '@shell/kernel'
 import type { Logger } from '@shell/kernel/logger'
 import type { BrowserWindow, Event } from 'electron'
 import type { ResiliencePolicy, ResilienceRestartDeps } from './resilience-policy'
+import { isDevLoad } from '@shell/shared'
 import { app } from 'electron'
 import {
   CRASH_WINDOW_MS,
@@ -100,8 +101,8 @@ export class ResilienceSystem implements Startable {
       this.logger.info('autoLaunch removed')
       return
     }
-    if (!app.isPackaged) {
-      this.logger.debug('autoLaunch skipped (not packaged)')
+    if (!isDevLoad()) {
+      this.logger.debug('autoLaunch skipped (dev load)')
       return
     }
     app.setLoginItemSettings({ openAtLogin: true })
