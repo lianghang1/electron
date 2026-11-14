@@ -10,7 +10,7 @@ import { windowDomain } from '@shell/shared/ipc'
 import { app, BrowserWindow, WebContentsView } from 'electron'
 import { createKioskMode, createWindowedMode } from './modes'
 import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
-import { overlayBase, shellBase, win32OcclusionSwitch } from './presets'
+import { overlayBase, shellBase } from './presets'
 import { applyNavigationGuards, installSessionGuards, parsePopupFeatures, SECURE_WEB_PREFERENCES } from './security'
 
 /** 消息窗内容宽度与透明窗阴影余量：透明窗会硬裁超出位图的内容 */
@@ -112,10 +112,8 @@ export class WindowSystem implements Startable, ViewHost {
   /** 工作台主窗：tab 条 + 左导航的产品主体 */
   createShellWindow(): BrowserWindow {
     const mode = this.flavor.mode === 'kiosk' ? createKioskMode() : createWindowedMode()
-    // 浮层/视图体系需要 Windows 停止合成补偿
     const win = new BrowserWindow({
       ...shellBase,
-      ...win32OcclusionSwitch,
       width: 1280,
       height: 800,
       // shell 桥必须注入：preload 与 main/preload 产物同层（out/preload/index.cjs）。

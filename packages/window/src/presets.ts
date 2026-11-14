@@ -65,6 +65,3 @@ export const overlayBase: BrowserWindowConstructorOptions = {
   backgroundColor: '#00000000',
   webPreferences: { ...SECURE_WEB_PREFERENCES },
 }
-
-/** Windows 全屏浮层防停止合成（浮层盖住主窗时主窗画面冻结的 Chromium 特性） */
-export const win32OcclusionSwitch = { disableFeatures: 'CalculateNativeWinOcclusion' } as const

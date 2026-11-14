@@ -48,6 +48,11 @@ import { app, session } from 'electron'
 import { createInfoDomain, INFO_DOMAIN_ID } from './ipc/info-domain'
 import { registerShellIpc } from './shell-ipc'
 
+// Windows 全屏浮层盖住应用视图（WebContentsView）时，Chromium 原生遮挡计算会把应用页
+// 判为被遮挡并停止合成，部分机器上渲染为黑块（边界恰为视图矩形）。进程级禁用该计算
+// （master 同款）；该特性没有 webPreferences 层开关，appendSwitch 必须发生在 app ready 前
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion')
+
 /**
  * 组合根：全仓库唯一的组装现场。
  * 读本文件 = 读产品目录；除此之外任何模块不得创建跨系统对象。
