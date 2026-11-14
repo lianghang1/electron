@@ -379,10 +379,12 @@ function setupPermissions(a: Assembly): void {
   })
 
   // 身份账本与系统权限闸门同源：窗口/视图创建时登记 webContents → appId，
-  // 系统权限请求（摄像头/剪贴板等）按真实调用方查同一张策略表，页面无法伪造身份
+  // 系统权限请求（摄像头/剪贴板等）按真实调用方判定，页面无法伪造身份。
+  // 闸门只接未声明的敏感能力（声明放行已在 session handler 短路），
+  // 走 requestRuntime：持久化结论 → 授权浮层（master requestRuntime/respond 语义）
   a.windows.bindCallerRegistry(
     a.callers,
-    (appId, permission) => a.permissions!.decide({ appId, origin: `app://${appId}`, permission }),
+    (appId, permission) => a.permissions!.requestRuntime({ appId, origin: `app://${appId}`, permission }),
   )
 }
 
@@ -576,6 +578,8 @@ export async function boot(context: BootContext): Promise<void> {
 }
 
 if (isDevLoad()) {
+  // dev 态开放 CDP 调试口：真机界面功能自动化测试的入口（Runtime.evaluate 驱动面板调用链）
+  app.commandLine.appendSwitch('remote-debugging-port', '9222')
   const devRoot = app.getAppPath()
   void boot({
     artifactRoot: devRoot,

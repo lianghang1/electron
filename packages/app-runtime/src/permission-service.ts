@@ -103,11 +103,11 @@ export class PermissionService {
     const granted = this.options.prompt
       ? await this.options.prompt.ask(request).catch(() => false)
       : false
-    const verdict: PermissionVerdict = granted ? 'allow' : 'deny'
-    if (this.options.store) {
-      await this.options.store.set(key, verdict).catch(() => {})
+    // 只持久化 allow（master respond 语义）：拒绝/超时不落盘，下次请求仍走浮层询问
+    if (granted && this.options.store) {
+      await this.options.store.set(key, 'allow').catch(() => {})
     }
-    this.options.audit?.({ request, verdict, source: 'prompt' })
+    this.options.audit?.({ request, verdict: granted ? 'allow' : 'deny', source: 'prompt' })
     return granted
   }
 
@@ -152,8 +152,9 @@ export class PermissionService {
         const granted = await this.options.prompt.ask(request).catch(() => false)
         verdict = granted ? 'allow' : 'deny'
         source = 'prompt'
-        if (this.options.store) {
-          await this.options.store.set(key, verdict).catch(() => {})
+        // 只持久化 allow：拒绝不落盘，下次请求仍走浮层（master respond 语义）
+        if (granted && this.options.store) {
+          await this.options.store.set(key, 'allow').catch(() => {})
         }
       }
       else {

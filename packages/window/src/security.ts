@@ -55,7 +55,9 @@ export function installSessionGuards(session: Electron.Session, options: Session
     declared === 'all' || declared.includes(permission)
 
   session.setPermissionRequestHandler((requesting, chromiumPermission, callback) => {
-    if (chromiumPermission === BASE_GRANT || SYNC_GRANT.has(chromiumPermission)) {
+    // 声明即放行；未声明的敏感能力（media/geolocation/display-capture）转闸门做运行时授权，
+    // 闸门链路（持久化结论 → 授权浮层）异常一律按拒绝落定，页面请求不悬挂
+    if (chromiumPermission === BASE_GRANT || SYNC_GRANT.has(chromiumPermission) || isDeclared(chromiumPermission)) {
       callback(true)
       return
     }
