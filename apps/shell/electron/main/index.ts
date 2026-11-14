@@ -527,6 +527,7 @@ function setupIpc(a: Assembly): void {
     flavor: a.flavor,
     version: a.version,
     markGracefulExit,
+    overlays: a.overlays,
   })
   // 应用 dist 分区协议：主 Session 注册（壳自身页面不经应用分区）
   registerAppProtocol(session.defaultSession, a.resolveAppRoot)

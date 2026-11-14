@@ -22,7 +22,8 @@
         "info",
         "notification",
         "tabs",
-        "update"
+        "update",
+        "deviceConfig"
       ]
     },
     {
