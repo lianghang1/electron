@@ -23,15 +23,9 @@ export class DomainRouteError extends Error {
   }
 }
 
-/** 演示模式：平台级运行时开关，由诊断台切换；仿真注入类方法据此放行。 */
-export interface DemoModeState {
-  enabled: boolean
-}
-
-/** 域工厂共用现场数据：事件总线（流式数据广播）与共享演示模式状态。 */
+/** 域工厂共用现场数据：事件总线（流式数据广播）。 */
 export interface DomainDeps {
   events: EventBus
-  demoMode: DemoModeState
 }
 
 /** 域调用路由："<域>.<方法>" → 能力闸门 → zod 校验 → handler */

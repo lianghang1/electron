@@ -1,13 +1,13 @@
 import type { DomainDefinition } from '@shell/shared'
-import type { DomainDeps } from '../../domain-kit'
 import type { ScannerSystem } from './index'
+import { isDevLoad } from '@shell/shared'
 import { z } from 'zod'
 import { DomainRouteError } from '../../domain-kit'
 import { noInput, scannerConfigInput, simulateInput } from '../input-schemas'
 
 /** scanner 域：扫码枪（扫码内容由 ScanService 直推 webContents）。 */
 
-export function createScannerMethods(scanner: ScannerSystem, deps: DomainDeps): DomainDefinition['methods'] {
+export function createScannerMethods(scanner: ScannerSystem): DomainDefinition['methods'] {
   return {
     getConfig: {
       input: noInput,
@@ -25,12 +25,12 @@ export function createScannerMethods(scanner: ScannerSystem, deps: DomainDeps): 
       }),
     },
     simulateScan: {
-      /** 正式演示能力：走与真枪相同的缓冲 → 广播链路，由平台演示模式开关放行。 */
+      /** 诊断工具，不进生产 API 面：dev 态放行（master ipc/scanner.ts 同款门控）。 */
       input: simulateInput,
       output: z.unknown(),
       handler: ({ scannedCode }) => {
-        if (!deps.demoMode.enabled) {
-          throw new DomainRouteError('INVALID_INPUT', '扫码演示模式未开启，请在设备配置页启用')
+        if (!isDevLoad()) {
+          throw new DomainRouteError('PERMISSION_DENIED', '扫码模拟仅开发态可用')
         }
         return scanner.simulateScan(scannedCode)
       },

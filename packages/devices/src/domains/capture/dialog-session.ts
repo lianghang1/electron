@@ -1,4 +1,4 @@
-import type { CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSession, CaptureResult, DomainIpcSender } from '@shell/shared'
+import type { CaptureCameraInfo, CaptureDevice, CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSession, CaptureResult, DomainIpcSender } from '@shell/shared'
 import type { WebContents } from 'electron'
 import type { CaptureSystem } from './index'
 import type { CaptureOverlayHost } from './overlay-host'
@@ -116,6 +116,18 @@ export class CaptureDialogSessionService {
     if (deviceId) {
       await this.deps.capture.stopPreview(deviceId)
     }
+  }
+
+  /** 浮层自取设备枚举（独立功能面，与发起方状态无关；仅拍摄窗可调） */
+  listDevices(sender: WebContents): Promise<CaptureDevice[]> {
+    this.assertCaptureWindow(sender)
+    return this.deps.capture.listDevices()
+  }
+
+  /** 浮层自取 ws/camsdk 设备的摄像头档位（仅拍摄窗可调） */
+  listDeviceCameras(sender: WebContents, deviceId: string): Promise<CaptureCameraInfo[]> {
+    this.assertCaptureWindow(sender)
+    return this.deps.capture.listDeviceCameras(deviceId)
   }
 
   /**

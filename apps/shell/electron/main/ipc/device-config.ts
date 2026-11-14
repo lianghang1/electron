@@ -33,14 +33,5 @@ export function registerDeviceConfigIpc(deps: DeviceConfigIpcDeps): void {
       await deps.devices.resetConfig(capabilityId)
       return deps.devices.configCenter.snapshot()
     },
-    demoMode: async (e) => {
-      await manage(e.sender.id)
-      return deps.devices.isDemoMode()
-    },
-    setDemoMode: async (e, enabled) => {
-      await manage(e.sender.id)
-      deps.devices.setDemoMode(Boolean(enabled))
-      return deps.devices.isDemoMode()
-    },
   })
 }

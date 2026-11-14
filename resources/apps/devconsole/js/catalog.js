@@ -170,7 +170,7 @@ export const CATALOG = {
         { key: 'overrides.endKey', label: '结束键', type: 'text', optional: true, placeholder: 'Enter' },
         { key: 'overrides.requirePrefix', label: '要求前缀', type: 'checkbox', default: false },
       ] },
-      simulateScan: { desc: '演示注入（需平台演示模式开启，走真枪同链路）', fields: [{ key: 'scannedCode', label: '码值', type: 'text', default: 'DEVCONSOLE-6901234567892' }] },
+      simulateScan: { desc: '演示注入（仅开发态放行，走真枪同链路）', fields: [{ key: 'scannedCode', label: '码值', type: 'text', default: 'DEVCONSOLE-6901234567892' }] },
     },
   },
   app: {

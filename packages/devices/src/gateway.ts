@@ -3,7 +3,7 @@ import type { Logger } from '@shell/kernel/logger'
 import type { DeviceCapabilityId, DomainCallContext, DomainDefinition } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
 import type { DeviceCapabilitySpec, DeviceConfigCenter, StoredConfigDocument } from './config-center'
-import type { DemoModeState, DomainDeps } from './domain-kit'
+import type { DomainDeps } from './domain-kit'
 import type { CaptureSystem } from './domains/capture'
 import type { CaptureOverlayHost } from './domains/capture/overlay-host'
 import type { DriverResolver } from './drivers'
@@ -90,9 +90,6 @@ export interface DeviceGateway {
   applyConfig: (capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) => Promise<void>
   /** 恢复出厂：清覆盖并把出厂值写回域运行时 */
   resetConfig: (capabilityId?: string) => Promise<void>
-  /** 演示模式状态查询与切换：仿真注入类方法据此放行 */
-  isDemoMode: () => boolean
-  setDemoMode: (enabled: boolean) => void
   /** 拍摄浮层会话服务：注入宿主后才创建，组合根据此注册会话通道 */
   captureDialog?: CaptureDialogSessionService
   /** 预热守护进程（含 koffi 加载）；完成即打 t2DeviceHostReady */
@@ -113,7 +110,6 @@ interface AssemblyContext {
   storageRoot: string
   filesRoot: string
   allowedOrigins: readonly string[]
-  demoMode: DemoModeState
   /** 现场默认打印参数：配置中心写入时同步，打印系统提交时读取 */
   printDefaults: { options: Record<string, unknown> }
   /** 现场追加的打印 URL 白名单：配置中心 urlOrigins 覆盖项，打印系统每次提交时读取 */
@@ -137,7 +133,7 @@ interface AssembledDomain {
 type DomainAssembler = (ctx: AssemblyContext) => AssembledDomain
 
 function domainDeps(ctx: AssemblyContext): DomainDeps {
-  return { events: ctx.events, demoMode: ctx.demoMode }
+  return { events: ctx.events }
 }
 
 /** 档案覆盖持久化：出厂默认 + 现场覆盖，读写共用一份存储。 */
@@ -270,7 +266,7 @@ export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
       })
       return {
         id: 'scanner',
-        definition: createScannerDomain(system, domainDeps(ctx)),
+        definition: createScannerDomain(system),
         dispose: () => system.destroy(),
         attachWindow: win => system.attachWindow(win),
       }
@@ -294,7 +290,6 @@ export function channelIdFor(capabilityId: string, platformId: string): string |
 export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGateway {
   const log = options.logger.scope('devices')
   const host = new DeviceHost(options.logger, options.hostEntryPath)
-  const demoMode: DemoModeState = { enabled: false }
   const printDefaults = { options: {} as Record<string, unknown> }
   const printOrigins = { site: [] as readonly string[] }
   const sumatraFile = selectSumatraPdfFile(process.arch, rel => existsSync(options.driver.resolve(rel)))
@@ -307,7 +302,6 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     storageRoot: options.paths.storageRoot,
     filesRoot: options.paths.filesRoot,
     allowedOrigins: options.allowedOrigins,
-    demoMode,
     printDefaults,
     printOrigins,
     getParent: options.getParent,
@@ -389,9 +383,6 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
       }
       syncRuntimeDefaults()
     },
-
-    isDemoMode() { return demoMode.enabled },
-    setDemoMode(enabled) { demoMode.enabled = enabled },
 
     warmup(onReady) {
       return host.warmup().then(() => { onReady() })

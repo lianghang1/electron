@@ -9,7 +9,7 @@
   </div>
 
   <div class="dc-card">
-    <h2>模拟扫码 <span class="dc-hint">scanner.simulateScan · 与真枪走完全相同的缓冲 → 广播链路，需平台演示模式开启（壳内调试台切换）</span></h2>
+    <h2>模拟扫码 <span class="dc-hint">scanner.simulateScan · 与真枪走完全相同的缓冲 → 广播链路，仅开发态可用</span></h2>
     <div class="dc-form" style="align-items:center">
       <input v-model="scanInput" placeholder="如 PB:1234567890" style="min-width:240px;font-family:var(--dc-mono)" @keyup.enter="simulate">
       <button class="dc-btn primary" @click="simulate">模拟一次扫码</button>
