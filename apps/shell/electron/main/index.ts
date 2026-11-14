@@ -44,7 +44,7 @@ import {
   Win32Installer,
 } from '@shell/update'
 import { OverlayService, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
-import { app, session } from 'electron'
+import { app, screen, session } from 'electron'
 import { createInfoDomain, INFO_DOMAIN_ID } from './ipc/info-domain'
 import { registerShellIpc } from './shell-ipc'
 
@@ -256,7 +256,11 @@ function setupUpdate(a: Assembly): void {
 
 /** 平台自管服务：通知 / 应用 KV / 保留期 / 原生浮层 / 托盘 / 运行韧性，及跨系统事件接线 */
 function setupPlatformSystems(a: Assembly): void {
-  const notifications = new NotificationCenter({ events: a.events })
+  // 通知面板不内部滚动：在列上限按主屏可用高度估算（卡高约 84px 含间距，留出顶栏与边距），
+  // 超限销毁最旧而不是堆积滚动
+  const workArea = screen.getPrimaryDisplay().workArea
+  const notificationCap = Math.max(4, Math.floor((workArea.height - 120) / 84))
+  const notifications = new NotificationCenter({ events: a.events, maxItems: notificationCap })
   a.notifications = notifications
   void a.kernel.register(notifications)
   a.appKv = new AppKvStore(join(configDir(), 'app-storage'))

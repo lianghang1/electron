@@ -25,6 +25,8 @@ export interface NotificationInput {
 export interface NotificationOptions {
   events: EventBus
   defaultTtlMs?: number
+  /** 同时在列上限：超限销毁最旧一条（清其 TTL 计时器）；不设则不封顶 */
+  maxItems?: number
   now?: () => number
 }
 
@@ -54,6 +56,7 @@ export class NotificationCenter implements Startable {
     const timer = setTimeout(() => this.dismiss(id), ttlMs)
     timer.unref?.()
     this.timers.set(id, timer)
+    this.evictOverflow()
     this.emit()
     return id
   }
@@ -77,6 +80,18 @@ export class NotificationCenter implements Startable {
 
   list(): readonly PlatformNotification[] {
     return this.items
+  }
+
+  /** 超限逐出最旧：栈底先走（面板不再内部滚动，堆积即销毁） */
+  private evictOverflow(): void {
+    const max = this.options.maxItems
+    if (!max || this.items.length <= max) { return }
+    for (const item of this.items.slice(0, this.items.length - max)) {
+      const timer = this.timers.get(item.id)
+      if (timer) { clearTimeout(timer) }
+      this.timers.delete(item.id)
+    }
+    this.items = this.items.slice(this.items.length - max)
   }
 
   private emit(): void {
