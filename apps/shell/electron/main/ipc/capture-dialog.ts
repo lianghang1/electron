@@ -40,10 +40,12 @@ export function registerCaptureDialogIpc(deps: CaptureDialogIpcDeps): void {
         appName,
       })
     },
-    close: (event) => {
-      const caller = callerOf(deps.callers, event.sender.id)
-      dialog().cancelByCaller({ appId: caller.appId, tabId: caller.instanceId })
+    close: () => {
+      // 浮层页 × / ESC 回传的取消：按浮层窗身份 finish 账本，不能用发起方身份匹配
+      dialog().cancelByOverlay()
     },
+    listDevices: event => dialog().listDevices(event.sender),
+    listDeviceCameras: (event, deviceId) => dialog().listDeviceCameras(event.sender, String(deviceId ?? '')),
     startPreview: (event, input) =>
       dialog().startPreview(event.sender, String(input.deviceId ?? ''), typeof input.resolutionNum === 'number' ? { resolutionNum: input.resolutionNum } : undefined),
     stopPreview: event => dialog().stopPreview(event.sender),

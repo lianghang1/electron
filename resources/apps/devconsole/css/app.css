@@ -215,6 +215,9 @@ code, .mono { font-family: var(--dc-mono); }
 .dc-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; }
 .dc-field { display: flex; flex-direction: column; gap: 4px; min-width: 130px; }
 .dc-field.wide { min-width: 320px; flex: 1; }
+/* 行内变体：label 与控件同行，整行单一高度——与同排按钮垂直对齐 */
+.dc-field--inline { flex-direction: row; align-items: center; gap: 6px; }
+.dc-field--inline label { margin: 0; white-space: nowrap; }
 .dc-field label {
   font-family: var(--dc-mono); font-size: 10px; letter-spacing: 0.08em;
   color: var(--dc-text-faint); text-transform: uppercase;

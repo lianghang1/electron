@@ -1,10 +1,11 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import type { DownloadTask } from '@shell/shared'
 import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
 import { shell } from '@shell/bridge/client'
 import { formatBytes, permissionLabel } from '@shell/shared'
 import { Button } from '@ui/components/ui'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import CaptureDialog from '../capture/CaptureDialog.vue'
 import CommandPalette from '../shell/CommandPalette.vue'
 import SettingsDialog from '../shell/SettingsDialog.vue'
 
@@ -62,12 +63,7 @@ interface AppSummary { manifest: { id: string, name: string } }
 
 const state = ref<OverlayState | null>(null)
 const apps = ref<AppSummary[]>([])
-const frame = ref('')
-const shots = ref<{ imagePath: string, thumbDataUrl?: string }[]>([])
-const busy = ref(false)
 let unsubscribe: (() => void) | undefined
-let offFrame: (() => void) | undefined
-let previewing = false
 
 const kind = computed(() => state.value?.kind ?? 'dialog')
 const fullscreen = computed(() => kind.value !== 'panel')
@@ -104,12 +100,6 @@ onMounted(async () => {
     try { apps.value = await shell().apps.list() as AppSummary[] }
     catch { apps.value = [] }
   }
-  if (kind.value === 'capture') {
-    offFrame = shell().captureDialog.onFrame(({ base64 }) => {
-      frame.value = `data:image/jpeg;base64,${base64}`
-    })
-    await startPreview()
-  }
   // panel 的透明区穿透由窗口策略设定，卡片自身经 mouseenter/mouseleave 临时解除
   if (kind.value === 'panel') { shell().overlay.mouseIgnore(true) }
 })
@@ -118,46 +108,11 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', onOverlayKeydown)
   clearInterval(countdownTimer)
   unsubscribe?.()
-  offFrame?.()
-  void stopPreview()
 })
 
-async function startPreview(): Promise<void> {
-  const session = state.value?.capture
-  if (!session?.deviceId) { return }
-  try {
-    await shell().captureDialog.startPreview({ deviceId: session.deviceId, resolutionNum: session.resolutionNum })
-    previewing = true
-  }
-  catch { frame.value = '' }
-}
-
-async function stopPreview(): Promise<void> {
-  if (!previewing) { return }
-  previewing = false
-  await shell().captureDialog.stopPreview()
-}
-
-async function snap(): Promise<void> {
-  if (busy.value) { return }
-  busy.value = true
-  try {
-    const input = frame.value ? { dataUrl: frame.value } : {}
-    const result = await shell().captureDialog.snap(input) as { imagePath: string, thumbDataUrl?: string }
-    const max = state.value?.capture?.maxCount ?? 1
-    shots.value = max <= 1 ? [result] : [...shots.value, result].slice(-max)
-  }
-  finally { busy.value = false }
-}
-
-async function confirmCapture(): Promise<void> {
-  if (!shots.value.length) { return }
-  // 主进程在结果交付后延迟收场：发起页先拿到结果，浮层不会秒关
-  await shell().captureDialog.confirm(shots.value)
-}
-
+/** 浮层内取消：走 captureDialog.close 清发起方账本并回传空结果，overlay.dismiss 只 hide 窗口不清账 */
 function cancelCapture(): void {
-  void stopPreview()
+  void shell().captureDialog.close()
   close()
 }
 
@@ -365,39 +320,11 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
     </template>
 
     <template v-else-if="kind === 'capture' && state?.capture">
-      <div class="w-[560px] rounded-xl border bg-background p-5 shadow-2xl">
-        <div class="text-ui-base font-semibold text-foreground">
-          {{ state?.capture?.title }}
-        </div>
-        <div class="mt-1 text-ui-xs text-muted-foreground">
-          {{ state?.capture?.appName }} · {{ state?.capture?.deviceLabel ?? state?.capture?.deviceId ?? '默认采集设备' }}
-        </div>
-        <div class="mt-4 flex h-64 items-center justify-center overflow-hidden rounded-lg border border-dashed bg-muted/30">
-          <img v-if="frame" :src="frame" alt="实时预览" class="h-full w-full object-contain">
-          <span v-else class="text-ui-sm text-muted-foreground">预览未就绪，可直接拍摄</span>
-        </div>
-        <div class="mt-2 flex items-center gap-2 overflow-x-auto">
-          <img
-            v-for="(shot, i) in shots"
-            :key="shot.imagePath"
-            :src="shot.thumbDataUrl ?? ''"
-            :alt="`拍摄 ${i + 1}`"
-            class="h-12 w-12 rounded border object-cover"
-          >
-          <span class="text-ui-xs text-muted-foreground">{{ shots.length }} / {{ state?.capture?.maxCount ?? 1 }} 张</span>
-        </div>
-        <div class="mt-5 flex justify-end gap-2">
-          <Button variant="outline" @click="cancelCapture">
-            取消
-          </Button>
-          <Button variant="outline" :disabled="busy" @click="snap">
-            拍摄
-          </Button>
-          <Button :disabled="!shots.length" @click="confirmCapture">
-            确认回传
-          </Button>
-        </div>
-      </div>
+      <CaptureDialog
+        :key="state.capture.sessionId"
+        :session="state.capture"
+        @close="cancelCapture"
+      />
     </template>
 
     <template v-else-if="kind === 'settings'">

@@ -33,7 +33,7 @@
       <button class="dc-btn primary" @click="shot">{{ shotLabel }}</button>
       <button v-if="canClose" class="dc-btn" @click="closeLive">关闭</button>
       <span class="dc-ops-sep"></span>
-      <div class="dc-field" style="min-width:130px">
+      <div class="dc-field dc-field--inline">
         <label>分辨率</label>
         <select v-model="resSel" @change="onResChange" :disabled="resDisabled">
           <option v-for="o in resOptions" :key="`${o.value}:${o.label}`" :value="o.value">{{ o.label }}</option>
@@ -59,11 +59,11 @@
   <div class="dc-card">
     <h2>拍摄浮层 <span class="dc-hint">capture.openCaptureDialog · 自动携带当前所选设备与名称，结果进拍摄记录</span></h2>
     <div class="dc-form" style="align-items:center">
-      <div class="dc-field">
+      <div class="dc-field dc-field--inline" style="min-width:260px">
         <label>浮层标题</label>
         <input v-model="dlgTitle" placeholder="拍摄浮层">
       </div>
-      <div class="dc-field">
+      <div class="dc-field dc-field--inline">
         <label>可拍张数</label>
         <input v-model.number="dlgMax" type="number" min="1">
       </div>
