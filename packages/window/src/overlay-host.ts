@@ -13,14 +13,20 @@ export type { OverlayKind, OverlaySurfaceKind, OverlayWindowKind } from '@shell/
 
 export interface OverlayPolicy<K extends string = OverlayWindowKind> {
   readonly kind: K
-  /** 父窗缺失时的兜底尺寸（fullscreen 落位以父窗内容区为准） */
+  /**
+   * 窗口内容尺寸 = 页面卡片的完整落位（卡片 + 四周透明边距，页面在边距里画投影；
+   * 透明窗会硬裁超位内容，master overlay-window SHADOW 注释）。创建时按父窗内容区
+   * 居中落位一次，此后窗口可被用户拖走（movable），不再跟随父窗重铺。
+   */
   readonly width: number
   readonly height: number
+  /** OS 级拖动开关：卡片窗为 true，拖动把手由页面 header 的 app-region 声明 */
+  readonly movable: boolean
   /** 渲染层路由（含自身标识的 hash query） */
   readonly route: string
   /** 同类浮层复用已存在实例（至多一个） */
   readonly singleton: boolean
-  /** 父窗：级联销毁与相对定位由窗口系统统一处理 */
+  /** 父窗：级联销毁与 z 序（OS 级子窗恒在父窗之上）由窗口系统统一处理 */
   readonly parent?: () => BrowserWindow | undefined
 }
 
@@ -30,10 +36,13 @@ export type OverlayFactory<K extends string> = (
   params: Readonly<Record<string, string>>,
 ) => BrowserWindow
 
-/** 独立浮层窗策略表：capture/settings 全屏透明窗，其余表面归 plane 平面 */
+/**
+ * 独立浮层窗策略表：capture/settings 是可拖动卡片窗（拖动把手在页面 header），
+ * 其余表面归 plane 平面。尺寸 = 卡片完整落位（卡片 760×580 / 560×600 + 32px 投影边距）。
+ */
 export const DEFAULT_OVERLAY_POLICIES: readonly OverlayPolicy<OverlayWindowKind>[] = [
-  { kind: 'capture', width: 800, height: 600, route: '#/overlay?kind=capture', singleton: true },
-  { kind: 'settings', width: 800, height: 600, route: '#/overlay?kind=settings', singleton: true },
+  { kind: 'capture', width: 824, height: 644, movable: true, route: '#/overlay?kind=capture', singleton: true },
+  { kind: 'settings', width: 624, height: 664, movable: true, route: '#/overlay?kind=settings', singleton: true },
 ]
 
 /**

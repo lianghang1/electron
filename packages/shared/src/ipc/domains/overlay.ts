@@ -2,9 +2,9 @@ import type { IpcDefs, IpcDomainValue } from '../contract'
 import { defineIpcDomain, invoke, push } from '../contract'
 
 /**
- * 浮层载体只有两种：capture/settings 是独立浮层窗（窗口系统 overlay-host 策略表）；
- * 其余是 plane 平面（常驻全屏透明子窗，master overlay-window 单窗承载全部浮层）内的
- * 表面，主进程按状态渲染，渲染层按 kind 寻址动作与关闭。
+ * 浮层载体只有两种：capture/settings 是独立浮层窗（可拖动卡片窗，窗口系统
+ * overlay-host 策略表）；其余是 plane 平面（常驻全屏透明子窗，master overlay-window
+ * 单窗承载全部浮层）内的表面，主进程按状态渲染，渲染层按 kind 寻址动作与关闭。
  * （packages/window overlay-host 复用此定义，IPC 边界形状唯一真源。）
  */
 export type OverlayWindowKind = 'capture' | 'settings'

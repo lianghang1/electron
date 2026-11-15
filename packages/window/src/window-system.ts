@@ -13,6 +13,16 @@ import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 import { overlayBase, shellBase } from './presets'
 import { applyNavigationGuards, installSessionGuards, parsePopupFeatures, SECURE_WEB_PREFERENCES } from './security'
 
+/** 矩形内居中一次落位（createOverlay 卡片窗初始位置用，非持续锚定） */
+function centeredIn(bounds: Electron.Rectangle, width: number, height: number): Electron.Rectangle {
+  return {
+    x: Math.round(bounds.x + (bounds.width - width) / 2),
+    y: Math.round(bounds.y + (bounds.height - height) / 2),
+    width,
+    height,
+  }
+}
+
 /**
  * WindowSystem：全仓库唯一 new BrowserWindow / new WebContentsView 的地方。
  * 对外只暴露目的命名 API——读调用处即读产品动作。
@@ -224,9 +234,9 @@ export class WindowSystem implements Startable, ViewHost {
     return this.overlays.open('capture')
   }
 
-  /** 应用中心/设置等表面归 plane 平面，不再有独立窗口入口 */
+  /** 应用中心等表面归 plane 平面，不再有独立窗口入口；独立窗只剩 capture/settings */
 
-  /** 通用宿主入口：独立浮层窗按种类开显；plane 平面由 showPlane/hidePlane 管理 */
+  /** 通用宿主入口：独立浮层窗（可拖动卡片窗）按种类开显；plane 平面由 OverlayService 经 focusPlane/blurPlane 管理 */
   openOverlay(kind: OverlayWindowKind, params?: Readonly<Record<string, string>>): BrowserWindow {
     const win = this.overlays.open(kind, params)
     this.showOverlay(kind)
@@ -290,8 +300,9 @@ export class WindowSystem implements Startable, ViewHost {
 
   private createOverlay(policy: OverlayPolicy<OverlayWindowKind>, params: Readonly<Record<string, string>>): BrowserWindow {
     const parent = policy.parent?.()
+    // 卡片窗一次落位：按父窗内容区居中（一次性计算，非持续锚定），此后可拖、不随父窗重铺
     const initial = parent
-      ? parent.getContentBounds()
+      ? centeredIn(parent.getContentBounds(), policy.width, policy.height)
       : { x: 0, y: 0, width: policy.width, height: policy.height }
     const win = new BrowserWindow({
       ...overlayBase,
@@ -299,6 +310,7 @@ export class WindowSystem implements Startable, ViewHost {
       y: initial.y,
       width: initial.width,
       height: initial.height,
+      movable: policy.movable,
       hasShadow: false,
       skipTaskbar: true,
       minimizable: false,
@@ -327,7 +339,23 @@ export class WindowSystem implements Startable, ViewHost {
     this.track(win, { appId: SHELL_APP_ID, instanceId: `overlay-${policy.kind}`, kind: 'overlay' })
     this.applySessionGuards(win.webContents.session, 'all')
     this.installDevToolsShortcut(win)
+    // kiosk 钳制：owned 子窗 OS 不限制在父窗内（真机验证：右/下/负坐标三方向 setPosition
+    // 均原样落位不被钳制），kiosk 全屏壳下拖出即不可达，moved 事件按父窗内容区回拉
+    if (this.flavor.mode === 'kiosk' && policy.movable) { this.installKioskBoundsClamp(win) }
     return win
+  }
+
+  /** kiosk 拖出钳制：事件驱动回拉（拖完校正，非持续测量），仅 kiosk 模式安装 */
+  private installKioskBoundsClamp(win: BrowserWindow): void {
+    win.on('moved', () => {
+      const parent = this.shellWindow
+      if (!parent || win.isDestroyed() || parent.isDestroyed()) { return }
+      const b = win.getBounds()
+      const c = parent.getContentBounds()
+      const x = Math.min(Math.max(b.x, c.x), c.x + c.width - b.width)
+      const y = Math.min(Math.max(b.y, c.y), c.y + c.height - b.height)
+      if (x !== b.x || y !== b.y) { win.setPosition(x, y) }
+    })
   }
 
   /** 常驻浮层窗预创建：页面提前加载，首次弹出无加载延迟；全部保持隐藏直到 showOverlay */
@@ -341,7 +369,6 @@ export class WindowSystem implements Startable, ViewHost {
     if (!win || win.isDestroyed()) { return }
     const reveal = () => {
       if (win.isDestroyed()) { return }
-      this.applyOverlayBounds(kind)
       win.show()
       win.focus()
       this.events?.emit('overlay.opened', { kind })
@@ -353,13 +380,6 @@ export class WindowSystem implements Startable, ViewHost {
   hideOverlay(kind: OverlayWindowKind): void {
     this.overlays.hide(kind)
     this.events?.emit('overlay.closed', { kind })
-  }
-
-  applyOverlayBounds(kind: OverlayWindowKind): void {
-    const win = this.overlays.get(kind)
-    const parent = this.shellWindow
-    if (!win || win.isDestroyed() || !parent) { return }
-    win.setBounds(parent.getContentBounds())
   }
 
   sendToOverlay(kind: OverlayWindowKind, channel: string, payload: unknown): void {

@@ -294,7 +294,10 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 760px;
+  /* 卡片窗自持落位：窗口 = 卡片 + 32px 透明边距（overlay-host 策略表 824×644），
+     边距里画投影——透明窗会硬裁超位内容（master overlay-window SHADOW 注释） */
+  position: fixed;
+  inset: 32px;
   padding: 18px;
   border-radius: 14px;
   background: var(--popover);
@@ -309,6 +312,8 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  /* 拖动把手：窗口 movable 时 header 整条拖动（OS 级移动，零几何计算） */
+  -webkit-app-region: drag;
 }
 
 .cu-dialog__title-row {
@@ -352,6 +357,8 @@ onBeforeUnmount(() => {
   border-radius: 7px;
   flex-shrink: 0;
   transition: background-color 0.12s, color 0.12s;
+  /* 拖动把手内的交互元素豁免（否则点击落进窗口拖动） */
+  -webkit-app-region: no-drag;
 }
 
 .cu-dialog__close:hover {

@@ -278,7 +278,7 @@ function cardHover(hovering: boolean): void {
 
 <template>
   <div class="relative h-full w-full">
-    <!-- 独立浮层窗：拍摄会话 -->
+    <!-- 独立浮层窗：拍摄会话（可拖动卡片窗，卡片自持落位 + header 拖动区） -->
     <template v-if="kind === 'capture' && state?.capture">
       <CaptureDialog
         :key="state.capture.sessionId"
@@ -287,7 +287,7 @@ function cardHover(hovering: boolean): void {
       />
     </template>
 
-    <!-- 独立浮层窗：设置 -->
+    <!-- 独立浮层窗：设置（可拖动卡片窗，同拍摄） -->
     <template v-else-if="kind === 'settings'">
       <SettingsDialog :open="true" @update:open="close('settings')" />
     </template>
