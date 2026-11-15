@@ -27,6 +27,7 @@ packages/*/lib/
 # Editor directories and files
 .idea
 .hbuilderx
+.trae
 *.suo
 *.ntvs*
 *.njsproj
