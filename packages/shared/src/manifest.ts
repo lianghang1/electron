@@ -64,6 +64,12 @@ export const flavorManifestSchema = z.object({
    * solo = 容器隐形（单应用直出、全屏 chrome 归零）。kiosk 运行模式强制 solo。
    */
   chrome: z.enum(['platform', 'solo']).default('platform'),
+  /**
+   * 窗口锚定：shell = 锚定工作台（通知平面/浮层窗为主窗子窗，落位与 z 序随父窗）；
+   * screen = 无壳屏锚（agent 服务形态：不建工作台主窗，浮层按主屏工作区落位，
+   * alwaysOnTop 保证盖在用户当前应用之上）。
+   */
+  anchor: z.enum(['shell', 'screen']).default('shell'),
   /** 内置应用清单（apps.json 同构，也可远程下发） */
   apps: z.array(appManifestSchema).default([]),
   branding: z
@@ -110,6 +116,28 @@ export const flavorManifestSchema = z.object({
         })
         .strict()
         .optional(),
+    })
+    .strict()
+    .optional(),
+  /**
+   * HTTP 服务网关（agent 屏锚形态）：外部产品经回环地址调平台服务，
+   * token → appId 即调用方身份，授权与遥测走统一域路由闸门；未声明 = 不监听任何端口。
+   */
+  http: z
+    .object({
+      port: z.number().int().min(1).max(65535),
+      tokens: z
+        .array(
+          z
+            .object({
+              /** 访问令牌：部署侧生成，调用方经 Authorization: Bearer 携带 */
+              token: z.string().min(1),
+              /** 令牌对应的调用方 appId：权限须在 flavor.apps / apps.json 中声明，未声明一律拒绝 */
+              appId: z.string().regex(/^[a-z][a-z0-9-]*$/),
+            })
+            .strict(),
+        )
+        .default([]),
     })
     .strict()
     .optional(),

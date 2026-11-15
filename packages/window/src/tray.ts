@@ -1,9 +1,16 @@
 import type { EventBus, Startable } from '@shell/kernel'
 import { app, Menu, nativeImage, Tray } from 'electron'
 
+/** 托盘菜单项（退出由本系统统一追加）：组合根按 flavor 查表装配 */
+export interface TrayEntry {
+  label: string
+  click: () => void
+}
+
 /**
  * TraySystem：桌面形态的系统托盘（kiosk 全屏形态不创建）。
- * 职责：快速入口（显示工作台 / 打开应用中心）+ 退出。
+ * 菜单与图标点击动作由组合根按锚定档位注入：shell 锚 = 显示工作台，
+ * screen 锚（agent 服务形态）= 打开设置卡等托盘入口。
  * 关闭到托盘的行为由设置项驱动（general.closeToTray）。
  */
 export class TraySystem implements Startable {
@@ -12,7 +19,9 @@ export class TraySystem implements Startable {
 
   constructor(
     private readonly events: EventBus,
-    private readonly showShell: () => void,
+    private readonly entries: readonly TrayEntry[],
+    /** 托盘图标左键点击动作（与首项同义，快速入口） */
+    private readonly onClick: () => void,
   ) {}
 
   async start(): Promise<void> {
@@ -21,7 +30,7 @@ export class TraySystem implements Startable {
     this.tray = new Tray(icon)
     this.tray.setToolTip(app.getName())
     this.tray.setContextMenu(Menu.buildFromTemplate([
-      { label: '显示工作台', click: () => this.showShell() },
+      ...this.entries.map(entry => ({ label: entry.label, click: () => entry.click() })),
       { type: 'separator' },
       {
         label: '退出',
@@ -31,7 +40,7 @@ export class TraySystem implements Startable {
         },
       },
     ]))
-    this.tray.on('click', () => this.showShell())
+    this.tray.on('click', () => this.onClick())
   }
 
   async stop(): Promise<void> {
