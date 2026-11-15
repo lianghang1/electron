@@ -3,22 +3,7 @@
   "name": "托盘服务代理",
   "mode": "windowed",
   "anchor": "screen",
-  "apps": [
-    {
-      "id": "agent-partner",
-      "name": "外部接入方",
-      "version": "1.0.0",
-      "entry": {
-        "kind": "local"
-      },
-      "devices": [
-        "capture"
-      ],
-      "permissions": [
-        "info"
-      ]
-    }
-  ],
+  "apps": [],
   "branding": {
     "accent": "#2563eb"
   },
@@ -27,14 +12,5 @@
   },
   "print": {
     "urlOrigins": []
-  },
-  "http": {
-    "port": 17365,
-    "tokens": [
-      {
-        "token": "dev-agent-token",
-        "appId": "agent-partner"
-      }
-    ]
   }
 }

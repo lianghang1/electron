@@ -46,7 +46,6 @@ import {
 } from '@shell/update'
 import { OverlayService, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
 import { app, screen, session } from 'electron'
-import { HttpGateway } from './http-gateway'
 import { createInfoDomain, INFO_DOMAIN_ID } from './ipc/info-domain'
 import { registerShellIpc } from './shell-ipc'
 
@@ -550,19 +549,6 @@ function setupIpc(a: Assembly): void {
   registerAppProtocol(session.defaultSession, a.resolveAppRoot)
 }
 
-/** agent 服务面：flavor 声明 http 才监听回环端口；token→appId 即调用方身份，闸门与 IPC 同源 */
-function setupHttpGateway(a: Assembly): void {
-  if (!a.flavor.http) { return }
-  void a.kernel.register(new HttpGateway({
-    port: a.flavor.http.port,
-    tokens: a.flavor.http.tokens,
-    router: a.router!,
-    overlays: a.overlays!,
-    appNameOf: appId => a.apps!.list().find(r => r.manifest.id === appId)?.manifest.name,
-    logger,
-  }))
-}
-
 /** 主窗创建后的韧性接线与退出屏障 */
 function setupResilienceAndExit(a: Assembly): void {
   // 韧性接线：更新择优依赖闭包注入——整包看通道实例状态，asar 看暂存标记
@@ -594,7 +580,6 @@ async function main(context: BootContext): Promise<void> {
   setupPermissions(a)
   setupAppRuntime(a)
   setupIpc(a)
-  setupHttpGateway(a)
 
   // 窗口先行：主窗在后台加载启动层，设备预热（守护进程 spawn + koffi 加载）
   // 与内核其余系统并行——暖机耗时不再表现为一段屏幕空窗。

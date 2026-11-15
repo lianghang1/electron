@@ -119,28 +119,6 @@ export const flavorManifestSchema = z.object({
     })
     .strict()
     .optional(),
-  /**
-   * HTTP 服务网关（agent 屏锚形态）：外部产品经回环地址调平台服务，
-   * token → appId 即调用方身份，授权与遥测走统一域路由闸门；未声明 = 不监听任何端口。
-   */
-  http: z
-    .object({
-      port: z.number().int().min(1).max(65535),
-      tokens: z
-        .array(
-          z
-            .object({
-              /** 访问令牌：部署侧生成，调用方经 Authorization: Bearer 携带 */
-              token: z.string().min(1),
-              /** 令牌对应的调用方 appId：权限须在 flavor.apps / apps.json 中声明，未声明一律拒绝 */
-              appId: z.string().regex(/^[a-z][a-z0-9-]*$/),
-            })
-            .strict(),
-        )
-        .default([]),
-    })
-    .strict()
-    .optional(),
 }).strict()
 
 export type FlavorManifest = z.infer<typeof flavorManifestSchema>
