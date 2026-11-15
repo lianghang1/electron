@@ -13,9 +13,12 @@ import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 import { overlayBase, shellBase } from './presets'
 import { applyNavigationGuards, installSessionGuards, parsePopupFeatures, SECURE_WEB_PREFERENCES } from './security'
 
-/** 消息窗内容宽度与透明窗阴影余量：透明窗会硬裁超出位图的内容 */
-const PANEL_WIDTH = 320
-const SHADOW = 12
+/** 消息窗卡片内容宽度 */
+const PANEL_WIDTH = 304
+/** 面板窗口四周外扩的投影余量：须容纳浮层阴影 --dt-shadow-2 的 fade 半径，否则投影被窗口边界裁出方形直边 */
+const SHADOW = 72
+/** 卡片右缘与屏幕右边的距离：贴边卡片的投影会被屏幕裁出直边，卡片须离边一个投影半径以上 */
+const PANEL_MARGIN = 64
 const SCREEN_MARGIN = 8
 /** Shell 顶栏高度：消息窗从顶栏之下开始，不遮挡顶部导航 */
 const TOPBAR_HEIGHT = 44
@@ -342,15 +345,15 @@ export class WindowSystem implements Startable, ViewHost {
     return win
   }
 
-  /** 消息区右上角锚定：顶部让出 Shell 顶栏，高度钳制在主窗内容区内 */
+  /** 消息区右上角锚定：卡片让出顶栏与屏幕右边距（各留一个投影半径以上），窗口四周外扩 SHADOW 容纳投影 */
   private anchorPanel(parent: BrowserWindow, height: number): Electron.Rectangle {
     const content = parent.getContentBounds()
     const width = PANEL_WIDTH + SHADOW * 2
     return {
-      x: Math.round(content.x + content.width - width - SCREEN_MARGIN),
-      y: Math.round(content.y + TOPBAR_HEIGHT + SCREEN_MARGIN),
+      x: Math.round(content.x + content.width - PANEL_MARGIN - PANEL_WIDTH - SHADOW),
+      y: Math.round(Math.max(content.y, content.y + TOPBAR_HEIGHT + SCREEN_MARGIN - SHADOW)),
       width,
-      height: Math.round(Math.min(height, content.height - TOPBAR_HEIGHT - SCREEN_MARGIN * 2)),
+      height: Math.round(Math.min(height, content.height - TOPBAR_HEIGHT - SCREEN_MARGIN + SHADOW)),
     }
   }
 

@@ -36,7 +36,7 @@ export type OverlayFactory<K extends string> = (
 
 /** 默认策略表：浮层差异全部是数据，不是分支 */
 export const DEFAULT_OVERLAY_POLICIES: readonly OverlayPolicy<OverlayKind>[] = [
-  { kind: 'panel', width: 344, height: 240, route: '#/overlay?kind=panel', singleton: true, bounds: 'anchored', focus: false, mouseIgnore: true },
+  { kind: 'panel', width: 448, height: 384, route: '#/overlay?kind=panel', singleton: true, bounds: 'anchored', focus: false, mouseIgnore: true },
   { kind: 'dialog', width: 0, height: 0, route: '#/overlay?kind=dialog', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
   { kind: 'menu', width: 0, height: 0, route: '#/overlay?kind=menu', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
   { kind: 'capture', width: 0, height: 0, route: '#/overlay?kind=capture', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
