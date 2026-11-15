@@ -4,7 +4,6 @@ import { Kbd, Separator } from '@ui/components/ui'
 import { Minus, Search, Settings, Square, X } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import EmptyState from '../apps/pages/EmptyState.vue'
-import CommandPalette from './CommandPalette.vue'
 import ForceGate from './ForceGate.vue'
 import ShellTabBar from './ShellTabBar.vue'
 import { useShellTabs } from './use-shell-tabs'
@@ -18,7 +17,6 @@ const {
   tabs,
   activeKey,
   activeTab,
-  recentIds,
   appList,
   activate,
   openApp,
@@ -84,13 +82,10 @@ const showTabStrip = computed(() => chrome.value === 'platform')
 /** solo 档的窗口控制条：仅桌面形态需要，kiosk 全屏锁定无控制条 */
 const soloWindowControls = computed(() => chrome.value === 'solo' && mode.value === 'windowed')
 
-/** 命令面板：⌘K / 点击 omnibox 唤起；应用中心走 ＋ 按钮，浏览与跳转分工 */
-const paletteOpen = ref(false)
-const paletteItems = computed(() => appList.value.map(a => ({
-  id: a.manifest.id,
-  name: a.manifest.name,
-  kind: a.manifest.entry.kind === 'remote' ? '远程' : '本地',
-})))
+/** 命令面板：⌘K / 点击 omnibox 唤起独立浮层窗——页内渲染会被应用的 WebContentsView 整体遮挡；应用中心走 ＋ 按钮 */
+function openPalette() {
+  void shell().overlay.open({ kind: 'command-palette' })
+}
 
 function openSettings() {
   void shell().overlay.open({ kind: 'settings' })
@@ -107,7 +102,7 @@ function onGlobalKeydown(e: KeyboardEvent) {
 
   if (e.key === 'k' || e.key === 'K') {
     e.preventDefault()
-    paletteOpen.value = !paletteOpen.value
+    openPalette()
     return
   }
   if (e.key === 'Tab' && tabs.value.length > 1) {
@@ -199,7 +194,7 @@ onBeforeUnmount(() => {
         <button
           class="omnibox flex h-6.5 w-72 items-center gap-2 rounded-full bg-surface-hover px-3 text-left text-ui-sm text-foreground-subtle transition-colors hover:bg-hover"
           title="搜索、跳转或执行命令（Ctrl+K）"
-          @click="paletteOpen = true"
+          @click="openPalette"
         >
           <Search :size="12" class="shrink-0" />
           <span class="flex-1 truncate">搜索、跳转或执行命令</span>
@@ -294,14 +289,6 @@ onBeforeUnmount(() => {
           </div>
         </div>
       </main>
-
-      <CommandPalette
-        v-if="chrome === 'platform'"
-        v-model:open="paletteOpen"
-        :items="paletteItems"
-        :recent-ids="recentIds"
-        @select="id => void openApp(id)"
-      />
     </div>
   </div>
 </template>
