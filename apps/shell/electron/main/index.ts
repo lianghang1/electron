@@ -285,11 +285,10 @@ function setupPlatformSystems(a: Assembly): void {
   a.events.on('update.failed', ({ channel, reason }) => {
     notifications.push({ title: `更新失败（${channel}）`, body: reason, level: 'error' })
   })
-  a.events.on('download.completed', ({ filename }) => {
-    notifications.push({ title: '下载完成', body: filename, level: 'success' })
-  })
-  a.events.on('download.open-failed', ({ filename }) => {
+  // 下载收尾不带独立「下载完成」提示：任务卡自带文件信息与打开/文件夹动作，重复提示属噪音
+  a.events.on('download.open-failed', ({ taskId, filename }) => {
     notifications.push({ title: '文件无法打开', body: `${filename} 可能已被移动或删除`, level: 'warning' })
+    a.downloads?.dismiss(taskId)
   })
 
   // 托盘（kiosk 全屏形态不创建——现场不该有逃逸入口）

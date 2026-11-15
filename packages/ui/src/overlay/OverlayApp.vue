@@ -5,7 +5,7 @@ import type { Component } from 'vue'
 import { shell } from '@shell/bridge/client'
 import { formatBytes, permissionLabel } from '@shell/shared'
 import { Button, Kbd } from '@ui/components/ui'
-import { AlertCircle, AlertTriangle, Bell, Check, Search, X } from 'lucide-vue-next'
+import { AlertCircle, AlertTriangle, Bell, Check, Download, FileText, Search, X } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CaptureDialog from '../capture/CaptureDialog.vue'
 import CommandPalette from '../shell/CommandPalette.vue'
@@ -164,6 +164,8 @@ onMounted(async () => {
   // 浮层窗体是透明窗口，全局 body 的 --background 底色会把整窗画出方形底板，浮层页必须透掉
   document.body.style.background = 'transparent'
   window.addEventListener('keydown', onOverlayKeydown)
+  // Main 等面板量高后才显示窗口；复用实例高度未变时不会再触发 watch，靠可见性变化补报
+  document.addEventListener('visibilitychange', reportHeight)
   state.value = await shell().overlay.sync() as OverlayState
   unsubscribe = shell().overlay.onUpdated((next) => {
     state.value = next as OverlayState
@@ -174,6 +176,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onOverlayKeydown)
+  document.removeEventListener('visibilitychange', reportHeight)
   clearInterval(countdownTimer)
   unsubscribe?.()
 })
@@ -286,32 +289,37 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
           <div
             v-for="task in state?.downloads ?? []"
             :key="task.id"
-            class="group relative rounded-lg bg-muted p-3"
+            class="group relative flex gap-2 rounded-lg p-2 transition-colors hover:bg-hover"
             :title="task.path"
           >
-            <div class="flex items-center gap-2">
-              <span class="min-w-0 flex-1 truncate text-ui-sm font-semibold text-foreground">{{ task.filename }}</span>
-              <span class="flex-none text-ui-xs text-muted-foreground">
-                {{ statusText[task.status] ?? task.status }}<template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template><template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
-              </span>
-              <button class="flex-none text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭下载卡" @click="dismissDownload(task.id)">
-                <X :size="12" />
-              </button>
+            <span class="mt-0.5 flex size-5 flex-none items-center justify-center rounded-md" :class="task.status === 'completed' ? 'bg-ok/15 text-ok' : 'bg-accent text-accent-foreground'">
+              <component :is="task.status === 'completed' ? FileText : Download" :size="11" />
+            </span>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-baseline gap-2 pr-4">
+                <span class="min-w-0 flex-1 truncate text-ui-caption font-semibold text-foreground">{{ task.filename }}</span>
+                <span class="flex-none text-ui-xs text-foreground-subtle">
+                  {{ statusText[task.status] ?? task.status }}<template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template><template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
+                </span>
+              </div>
+              <div
+                v-if="task.status === 'progressing' && task.percent >= 0"
+                class="mt-1.5 h-0.5 overflow-hidden rounded-full bg-hover"
+              >
+                <div class="h-full rounded-full bg-primary transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
+              </div>
+              <div v-if="task.status === 'completed'" class="mt-1 flex gap-1">
+                <button class="rounded-md px-1.5 py-0.5 text-ui-xs font-medium text-primary transition-colors hover:bg-hover" @click="openDownload(task.id)">
+                  打开
+                </button>
+                <button class="rounded-md px-1.5 py-0.5 text-ui-xs font-medium text-primary transition-colors hover:bg-hover" @click="revealDownload(task.id)">
+                  文件夹
+                </button>
+              </div>
             </div>
-            <div
-              v-if="task.status === 'progressing' && task.percent >= 0"
-              class="mt-2 h-1 overflow-hidden rounded-full bg-hover"
-            >
-              <div class="h-full rounded-full bg-primary transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
-            </div>
-            <div v-if="task.status === 'completed'" class="mt-2 flex justify-end gap-1.5">
-              <Button variant="outline" class="h-6 px-2 text-ui-xs" @click="openDownload(task.id)">
-                打开
-              </Button>
-              <Button variant="outline" class="h-6 px-2 text-ui-xs" @click="revealDownload(task.id)">
-                文件夹
-              </Button>
-            </div>
+            <button class="absolute right-2 top-2 text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭下载卡" @click="dismissDownload(task.id)">
+              <X :size="12" />
+            </button>
           </div>
           <div
             v-for="item in state?.notifications ?? []"

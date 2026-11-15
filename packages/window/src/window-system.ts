@@ -241,9 +241,21 @@ export class WindowSystem implements Startable, ViewHost {
     return this.overlays.open('settings')
   }
 
+  /** 面板按内容量高后才可见：先按策略尺寸显窗再收缩，视觉上是「掉落后再定位」的跳变 */
+  private panelAwaitingFirstResize = false
+
   /** 通用宿主入口：会话/授权服务按种类取窗、带参数开窗、收场；新增浮层只改策略表 */
   openOverlay(kind: OverlayKind, params?: Readonly<Record<string, string>>): BrowserWindow {
     const win = this.overlays.open(kind, params)
+    if (kind === 'panel') {
+      if (win.isVisible()) {
+        this.showOverlay(kind)
+      }
+      else {
+        this.panelAwaitingFirstResize = true
+      }
+      return win
+    }
     this.showOverlay(kind)
     return win
   }
@@ -253,6 +265,7 @@ export class WindowSystem implements Startable, ViewHost {
   }
 
   dismissOverlay(kind: OverlayKind): void {
+    if (kind === 'panel') { this.panelAwaitingFirstResize = false }
     this.hideOverlay(kind)
   }
 
@@ -404,6 +417,10 @@ export class WindowSystem implements Startable, ViewHost {
     if (!win || win.isDestroyed() || win.webContents.id !== senderId || !Number.isFinite(height) || height <= 0) { return }
     const parent = this.shellWindow
     if (parent) { win.setBounds(this.anchorPanel(parent, height)) }
+    if (this.panelAwaitingFirstResize) {
+      this.panelAwaitingFirstResize = false
+      win.showInactive()
+    }
   }
 
   setPanelMouseIgnore(senderId: number, ignore: boolean): void {
