@@ -4,7 +4,7 @@ import type { Startable } from '../lifecycle'
 import type { Logger } from '../logger'
 import { existsSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, dirname, extname, join } from 'node:path'
 import { shell } from 'electron'
 import { applyProgress, progressPercent, pruneTasks, resolveCompletedPath, resolvePolicyDenial, resolveTerminal, safeFilename, shouldPushProgress } from './download-policy'
 
@@ -46,6 +46,18 @@ export class DownloadManager implements Startable {
     this.retainMs = options.retainMs ?? 30_000
   }
 
+  /** 静默落盘重名避让：`name (1).ext` 递增（master download-service 无此步，属已知补齐） */
+  private uniqueSavePath(path: string): string {
+    if (!existsSync(path)) { return path }
+    const dir = dirname(path)
+    const ext = extname(path)
+    const stem = basename(path, ext)
+    for (let n = 1; ; n++) {
+      const candidate = join(dir, `${stem} (${n})${ext}`)
+      if (!existsSync(candidate)) { return candidate }
+    }
+  }
+
   attach(ses: Electron.Session, appId: string): void {
     if (this.attached.has(ses)) { return }
     this.attached.add(ses)
@@ -53,7 +65,7 @@ export class DownloadManager implements Startable {
       const url = item.getURL()
       const filename = safeFilename(item.getFilename())
       if (!item.getSavePath()) {
-        const defaultPath = join(this.options.downloadsDir, filename)
+        const defaultPath = this.uniqueSavePath(join(this.options.downloadsDir, filename))
         if (this.options.saveAs) { item.setSaveDialogOptions({ title: '保存下载', defaultPath }) }
         else { item.setSavePath(defaultPath) }
       }
