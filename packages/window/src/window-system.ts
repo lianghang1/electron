@@ -404,6 +404,9 @@ export class WindowSystem implements Startable, ViewHost {
     })
     this.plane = plane
     plane.setIgnoreMouseEvents(true, { forward: true })
+    // 恒可见：透明空态 + 穿透是惰性的，显隐只会冻结平面内 CSS 过渡
+    // （transitionend 不触发 → 离场元素滞留 DOM → 下次显示叠出旧卡虚影）
+    plane.showInactive()
     const hash = '#/overlay?kind=plane'
     const devUrl = process.env.ELECTRON_RENDERER_URL
     if (devUrl) { void plane.loadURL(`${devUrl}/${hash}`) }
@@ -412,36 +415,22 @@ export class WindowSystem implements Startable, ViewHost {
     this.applySessionGuards(plane.webContents.session, 'all')
   }
 
-  /** plane 显示即全屏（几何零计算）；focus = 有交互表面，需接键盘（权限 ESC / 面板检索） */
-  showPlane(opts: { focus: boolean }): void {
-    const win = this.shellWindow
-    if (!win || !this.plane || this.plane.isDestroyed()) { return }
-    this.plane.setBounds(win.getContentBounds())
-    if (opts.focus) {
-      this.planeFocusHeld = true
-      this.plane.setIgnoreMouseEvents(false)
-      this.plane.show()
-      this.plane.focus()
-    }
-    else {
-      this.plane.setIgnoreMouseEvents(true, { forward: true })
-      this.plane.showInactive()
-      if (this.planeFocusHeld) {
-        this.planeFocusHeld = false
-        this.restoreContentFocus()
-      }
-    }
-    this.events?.emit('overlay.opened', { kind: 'plane' })
+  /** plane 恒全屏（几何零计算）；交互表面在列时接手键盘（权限 ESC / 面板检索） */
+  focusPlane(): void {
+    const plane = this.plane
+    if (!plane || plane.isDestroyed()) { return }
+    this.planeFocusHeld = true
+    plane.setIgnoreMouseEvents(false)
+    plane.focus()
   }
 
-  hidePlane(): void {
-    if (!this.plane || this.plane.isDestroyed()) { return }
-    if (this.planeFocusHeld) {
-      this.planeFocusHeld = false
-      this.restoreContentFocus()
+  blurPlane(): void {
+    if (!this.planeFocusHeld) { return }
+    this.planeFocusHeld = false
+    if (this.plane && !this.plane.isDestroyed()) {
+      this.plane.setIgnoreMouseEvents(true, { forward: true })
     }
-    this.plane.hide()
-    this.events?.emit('overlay.closed', { kind: 'plane' })
+    this.restoreContentFocus()
   }
 
   /** toast 卡片悬停切换：穿透态下鼠标进卡片临时拦截，离开即交还（master 同款机制） */

@@ -221,18 +221,14 @@ export class OverlayService implements Startable {
     }
   }
 
-  /** plane 单订阅者：交互表面在列时不穿透（遮罩/卡片要收点击），toast 独占时穿透由页面按卡片悬停接管 */
+  /** plane 单订阅者：恒可见，只按表面状态切换鼠标穿透与键盘焦点；toast 独占时穿透由页面按卡片悬停接管 */
   private syncPlane(): void {
     const windows = this.options.windows
     const permission = this.permissions[0] ?? null
     const interactive = Boolean(permission || this.plane.menu || this.plane.appCenterOpen
       || this.plane.paletteOpen || this.plane.updatePrompt || this.plane.config)
-    const visible = interactive || this.plane.notifications.length > 0 || this.plane.downloads.length > 0
-    if (!visible) {
-      windows.hidePlane()
-      return
-    }
-    windows.showPlane({ focus: interactive })
+    if (interactive) { windows.focusPlane() }
+    else { windows.blurPlane() }
     windows.setPlaneMouseIgnore(!interactive)
     windows.sendToPlane('overlay:updated', this.planeState())
   }
