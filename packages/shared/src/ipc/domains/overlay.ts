@@ -2,12 +2,16 @@ import type { IpcDefs, IpcDomainValue } from '../contract'
 import { defineIpcDomain, invoke, push } from '../contract'
 
 /**
- * 浮层种类：原生浮层宿主按策略注册表开窗，渲染层按 kind 寻址。
- * （窗口系统 packages/window overlay-host 复用此定义，IPC 边界形状唯一真源。）
+ * 浮层载体只有两种：capture/settings 是独立浮层窗（窗口系统 overlay-host 策略表）；
+ * 其余是 plane 平面（常驻全屏透明子窗，master overlay-window 单窗承载全部浮层）内的
+ * 表面，主进程按状态渲染，渲染层按 kind 寻址动作与关闭。
+ * （packages/window overlay-host 复用此定义，IPC 边界形状唯一真源。）
  */
-export type OverlayKind
-  = | 'panel' | 'dialog' | 'menu' | 'capture' | 'permission' | 'config'
-    | 'app-center' | 'settings' | 'command-palette' | 'update-prompt'
+export type OverlayWindowKind = 'capture' | 'settings'
+export type OverlaySurfaceKind
+  = | 'menu' | 'permission' | 'app-center' | 'command-palette'
+    | 'update-prompt' | 'config'
+export type OverlayKind = OverlayWindowKind | OverlaySurfaceKind
 
 /** 浮层页回传给宿主的动作（按钮点击 / 菜单选择 / 权限结论 / 关闭拍摄会话等） */
 export interface OverlayAction {
@@ -39,9 +43,7 @@ export const overlayDomain = defineIpcDomain('overlay', {
   open: invoke<(input: OverlayOpenInput) => void>(),
   dismiss: invoke<(kind: OverlayKind) => void>(),
   action: invoke<(action: OverlayAction) => void>(),
-  /** 浮层页上报内容高度，宿主据此调整窗口尺寸 */
-  resize: invoke<(height: number) => void>(),
-  /** 浮层穿透态切换：鼠标事件穿透 / 恢复拦截 */
+  /** plane 穿透态切换：toast 独占时鼠标穿透，鼠标进卡片临时拦截（WebContentsView 无逐像素命中） */
   mouseIgnore: invoke<(ignore: boolean) => void>(),
   updated: push<[state: unknown]>(),
 }) satisfies IpcDomainValue<'overlay', IpcDefs>

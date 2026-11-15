@@ -94,7 +94,7 @@ export {
 export type { InvokeSig, IpcContract, IpcDefs, IpcDomainValue, IpcPushContract, IpcSendContract, PushSig, SendArgsOf, SendSig, ShellDomainApi, SigOf } from './contract'
 export { defineIpcDomain, invoke, push, send } from './contract'
 // 契约内的 IPC 边界形状（window / renderer 跨包复用，避免重复定义）
-export type { OverlayAction, OverlayKind } from './domains/overlay'
+export type { OverlayAction, OverlayKind, OverlaySurfaceKind, OverlayWindowKind } from './domains/overlay'
 export type { IpcErrorPayload } from './errors'
 
 export { decodeIpcError, encodeIpcError, IpcRemoteError } from './errors'

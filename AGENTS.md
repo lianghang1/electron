@@ -44,7 +44,8 @@
 |---|---|---|
 | 壳主窗 | ShellWindow / 工作台 | 主窗、main 窗 |
 | 全屏锁定模式 | KioskMode（行为，不是窗口类型） | kiosk 窗口 |
-| 浮层窗 | Overlay（Capture/Permission/Menu/AppCenter/Settings） | popup |
+| 通知平面 | OverlayPlane（常驻全屏透明子窗：通知/下载/权限/菜单/应用中心/命令面板/更新/配置） | 每种弹层一个窗 |
+| 独立浮层窗 | Overlay（Capture/Settings） | popup |
 | 应用定义 | AppManifest（entry: local/remote 两形态 + permissions 声明） | app config |
 | 运行中应用 | AppInstance | session、context |
 | 应用会话容器 | AppSessionRegistry（`persist:app-<id>` 分区 + cookie 快照） | 每应用一个 session、cookie 垫片 |

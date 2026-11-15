@@ -1,29 +1,25 @@
-import type { OverlayKind } from '@shell/shared/ipc'
+import type { OverlayWindowKind } from '@shell/shared/ipc'
 import type { BrowserWindow } from 'electron'
 
-export type { OverlayKind } from '@shell/shared/ipc'
+export type { OverlayKind, OverlaySurfaceKind, OverlayWindowKind } from '@shell/shared/ipc'
 
 /**
- * 浮层种类：新增浮层 = 注册一条策略，窗口系统零分发。
- * WebContentsView 是原生合成层，永远盖在 Shell DOM 之上——所有要盖过应用区的
- * 弹窗、菜单、提示、通知必须走同一套原生窗宿主（master overlay-window.ts 注释）。
+ * 浮层种类：独立浮层窗只有 capture/settings；其余表面（通知/下载/权限/菜单/应用中心/
+ * 命令面板/更新/配置）由常驻 plane 平面渲染，不走窗口策略。
+ * 盖过应用区的两种性质：独立浮层窗与 plane 是有父窗口（OS 级子窗恒在父窗内容之上）；
+ * 应用视图是 WebContentsView，原生合成层永远盖在 Shell DOM 之上（master overlay-window.ts 注释）。
  * 联合成员定义在 @shell/shared ipc 契约（IPC 边界形状唯一真源），此处只转发。
  */
 
-export interface OverlayPolicy<K extends string = OverlayKind> {
+export interface OverlayPolicy<K extends string = OverlayWindowKind> {
   readonly kind: K
+  /** 父窗缺失时的兜底尺寸（fullscreen 落位以父窗内容区为准） */
   readonly width: number
   readonly height: number
   /** 渲染层路由（含自身标识的 hash query） */
   readonly route: string
   /** 同类浮层复用已存在实例（至多一个） */
   readonly singleton: boolean
-  /** fullscreen = 铺满主窗内容区；anchored = 右上角消息区 */
-  readonly bounds: 'fullscreen' | 'anchored'
-  /** 显示时是否抢焦点；消息区不抢焦点 */
-  readonly focus: boolean
-  /** 透明区鼠标穿透，仅消息区需要 */
-  readonly mouseIgnore: boolean
   /** 父窗：级联销毁与相对定位由窗口系统统一处理 */
   readonly parent?: () => BrowserWindow | undefined
 }
@@ -34,25 +30,17 @@ export type OverlayFactory<K extends string> = (
   params: Readonly<Record<string, string>>,
 ) => BrowserWindow
 
-/** 默认策略表：浮层差异全部是数据，不是分支 */
-export const DEFAULT_OVERLAY_POLICIES: readonly OverlayPolicy<OverlayKind>[] = [
-  { kind: 'panel', width: 448, height: 384, route: '#/overlay?kind=panel', singleton: true, bounds: 'anchored', focus: false, mouseIgnore: true },
-  { kind: 'dialog', width: 0, height: 0, route: '#/overlay?kind=dialog', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
-  { kind: 'menu', width: 0, height: 0, route: '#/overlay?kind=menu', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
-  { kind: 'capture', width: 0, height: 0, route: '#/overlay?kind=capture', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
-  { kind: 'permission', width: 0, height: 0, route: '#/overlay?kind=permission', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
-  { kind: 'config', width: 0, height: 0, route: '#/overlay?kind=config', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
-  { kind: 'app-center', width: 0, height: 0, route: '#/overlay?kind=app-center', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
-  { kind: 'settings', width: 0, height: 0, route: '#/overlay?kind=settings', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
-  { kind: 'command-palette', width: 0, height: 0, route: '#/overlay?kind=command-palette', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
-  { kind: 'update-prompt', width: 0, height: 0, route: '#/overlay?kind=update-prompt', singleton: true, bounds: 'fullscreen', focus: true, mouseIgnore: false },
+/** 独立浮层窗策略表：capture/settings 全屏透明窗，其余表面归 plane 平面 */
+export const DEFAULT_OVERLAY_POLICIES: readonly OverlayPolicy<OverlayWindowKind>[] = [
+  { kind: 'capture', width: 800, height: 600, route: '#/overlay?kind=capture', singleton: true },
+  { kind: 'settings', width: 800, height: 600, route: '#/overlay?kind=settings', singleton: true },
 ]
 
 /**
  * 通用浮层宿主：按种类登记策略，按种类开窗/取窗/收场。
  * 业务服务（通知、授权、拍摄会话）只依赖取到的窗口句柄，不认识窗口创建细节。
  */
-export class OverlayHost<K extends string = OverlayKind> {
+export class OverlayHost<K extends string = OverlayWindowKind> {
   private readonly policies = new Map<K, OverlayPolicy<K>>()
   /** 按种类记录的当前实例：单例复用、get/dismiss 的对象 */
   private readonly instances = new Map<K, BrowserWindow>()

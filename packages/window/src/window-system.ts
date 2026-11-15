@@ -1,7 +1,7 @@
 import type { ViewHost, ViewSpec } from '@shell/app-runtime'
 import type { EventBus, Startable } from '@shell/kernel'
 import type { CallerRegistry, FlavorManifest } from '@shell/shared'
-import type { OverlayKind, OverlayPolicy } from './overlay-host'
+import type { OverlayPolicy, OverlayWindowKind } from './overlay-host'
 import { join } from 'node:path'
 import process from 'node:process'
 import { registerIpcDomain } from '@shell/bridge/handle'
@@ -13,18 +13,8 @@ import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 import { overlayBase, shellBase } from './presets'
 import { applyNavigationGuards, installSessionGuards, parsePopupFeatures, SECURE_WEB_PREFERENCES } from './security'
 
-/** 消息窗卡片内容宽度 */
-const PANEL_WIDTH = 304
-/** 面板窗口四周外扩的投影余量：须容纳浮层阴影 --dt-shadow-2 的 fade 半径，否则投影被窗口边界裁出方形直边 */
-const SHADOW = 72
-/** 卡片右缘与屏幕右边的距离：贴边卡片的投影会被屏幕裁出直边，卡片须离边一个投影半径以上 */
-const PANEL_MARGIN = 64
-const SCREEN_MARGIN = 8
-/** Shell 顶栏高度：消息窗从顶栏之下开始，不遮挡顶部导航 */
-const TOPBAR_HEIGHT = 44
-
 /**
- * WindowSystem：全仓库唯一 new BrowserWindow 的地方。
+ * WindowSystem：全仓库唯一 new BrowserWindow / new WebContentsView 的地方。
  * 对外只暴露目的命名 API——读调用处即读产品动作。
  * 同时实现 ViewHost SPI：packaged/remote 应用的 WebContentsView 容器。
  */
@@ -43,8 +33,8 @@ export class WindowSystem implements Startable, ViewHost {
   private readonly rendererDir: string
   private readonly initialTheme: 'light' | 'dark' | 'system'
   private readonly initialAccent: string
-  /** 通用浮层宿主：新增浮层 = 注册一条策略，本类零分发 */
-  readonly overlays: OverlayHost<OverlayKind>
+  /** 独立浮层窗宿主（capture/settings）：其余表面由 plane 平面承载，本类零分发 */
+  readonly overlays: OverlayHost<OverlayWindowKind>
 
   private callers?: CallerRegistry
   private permissionGate?: (appId: string, permission: string) => Promise<boolean>
@@ -61,7 +51,7 @@ export class WindowSystem implements Startable, ViewHost {
     this.rendererDir = rendererDir
     this.initialTheme = initialTheme
     this.initialAccent = initialAccent || flavor.branding.accent
-    this.overlays = new OverlayHost<OverlayKind>((policy, params) => this.createOverlay(policy, params))
+    this.overlays = new OverlayHost<OverlayWindowKind>((policy, params) => this.createOverlay(policy, params))
     for (const policy of DEFAULT_OVERLAY_POLICIES) {
       this.overlays.register({ ...policy, parent: () => this.shellWindow })
     }
@@ -96,6 +86,8 @@ export class WindowSystem implements Startable, ViewHost {
   async start(): Promise<void> {}
   async stop(): Promise<void> {
     this.overlays.closeAll()
+    if (this.plane && !this.plane.isDestroyed()) { this.plane.destroy() }
+    this.plane = undefined
     for (const view of this.views.values()) { this.removeView(view) }
     this.views.clear()
     for (const win of this.windows.values()) { win.destroy() }
@@ -173,7 +165,13 @@ export class WindowSystem implements Startable, ViewHost {
     // 从最小化/隐藏恢复时重放工作区：系统可能丢弃恢复前施加的 view bounds
     win.on('restore', () => this.replayContentRect())
     win.on('show', () => this.replayContentRect())
+    // plane 几何恒等于内容区：窗口尺寸变化即跟随（零计算，无锚定测量）
+    win.on('resize', () => {
+      const w = this.shellWindow
+      if (w) { this.plane?.setBounds(w.getContentBounds()) }
+    })
     this.shellWindowId = win.id
+    this.createPlane()
     if (this.flavor.mode === 'kiosk') { this.installKioskWatchdog(win) }
     return win
   }
@@ -226,46 +224,20 @@ export class WindowSystem implements Startable, ViewHost {
     return this.overlays.open('capture')
   }
 
-  /** 授权弹窗 */
-  openPermissionDialog(): BrowserWindow {
-    return this.overlays.open('permission')
-  }
+  /** 应用中心/设置等表面归 plane 平面，不再有独立窗口入口 */
 
-  /** 应用中心浮窗 */
-  openAppCenterOverlay(): BrowserWindow {
-    return this.overlays.open('app-center')
-  }
-
-  /** 设置浮窗 */
-  openSettingsOverlay(): BrowserWindow {
-    return this.overlays.open('settings')
-  }
-
-  /** 面板按内容量高后才可见：先按策略尺寸显窗再收缩，视觉上是「掉落后再定位」的跳变 */
-  private panelAwaitingFirstResize = false
-
-  /** 通用宿主入口：会话/授权服务按种类取窗、带参数开窗、收场；新增浮层只改策略表 */
-  openOverlay(kind: OverlayKind, params?: Readonly<Record<string, string>>): BrowserWindow {
+  /** 通用宿主入口：独立浮层窗按种类开显；plane 平面由 showPlane/hidePlane 管理 */
+  openOverlay(kind: OverlayWindowKind, params?: Readonly<Record<string, string>>): BrowserWindow {
     const win = this.overlays.open(kind, params)
-    if (kind === 'panel') {
-      if (win.isVisible()) {
-        this.showOverlay(kind)
-      }
-      else {
-        this.panelAwaitingFirstResize = true
-      }
-      return win
-    }
     this.showOverlay(kind)
     return win
   }
 
-  getOverlay(kind: OverlayKind): BrowserWindow | undefined {
+  getOverlay(kind: OverlayWindowKind): BrowserWindow | undefined {
     return this.overlays.get(kind)
   }
 
-  dismissOverlay(kind: OverlayKind): void {
-    if (kind === 'panel') { this.panelAwaitingFirstResize = false }
+  dismissOverlay(kind: OverlayWindowKind): void {
     this.hideOverlay(kind)
   }
 
@@ -316,11 +288,11 @@ export class WindowSystem implements Startable, ViewHost {
     })
   }
 
-  private createOverlay(policy: OverlayPolicy<OverlayKind>, params: Readonly<Record<string, string>>): BrowserWindow {
+  private createOverlay(policy: OverlayPolicy<OverlayWindowKind>, params: Readonly<Record<string, string>>): BrowserWindow {
     const parent = policy.parent?.()
-    const initial = policy.bounds === 'fullscreen'
-      ? (parent ? parent.getContentBounds() : { x: 0, y: 0, width: policy.width || 800, height: policy.height || 600 })
-      : (parent ? this.anchorPanel(parent, policy.height) : { x: 0, y: 0, width: policy.width, height: policy.height })
+    const initial = parent
+      ? parent.getContentBounds()
+      : { x: 0, y: 0, width: policy.width, height: policy.height }
     const win = new BrowserWindow({
       ...overlayBase,
       x: initial.x,
@@ -358,93 +330,142 @@ export class WindowSystem implements Startable, ViewHost {
     return win
   }
 
-  /** 消息区右上角锚定：卡片让出顶栏与屏幕右边距（各留一个投影半径以上），窗口四周外扩 SHADOW 容纳投影 */
-  private anchorPanel(parent: BrowserWindow, height: number): Electron.Rectangle {
-    const content = parent.getContentBounds()
-    const width = PANEL_WIDTH + SHADOW * 2
-    return {
-      x: Math.round(content.x + content.width - PANEL_MARGIN - PANEL_WIDTH - SHADOW),
-      y: Math.round(Math.max(content.y, content.y + TOPBAR_HEIGHT + SCREEN_MARGIN - SHADOW)),
-      width,
-      height: Math.round(Math.min(height, content.height - TOPBAR_HEIGHT - SCREEN_MARGIN + SHADOW)),
-    }
-  }
-
   /** 常驻浮层窗预创建：页面提前加载，首次弹出无加载延迟；全部保持隐藏直到 showOverlay */
   prewarmOverlays(): void {
     for (const policy of DEFAULT_OVERLAY_POLICIES) { this.overlays.open(policy.kind) }
   }
 
-  /** 数据先行：页面加载完成后再显窗，避免首帧空白窗；消息区不抢焦点并整窗穿透 */
-  showOverlay(kind: OverlayKind): void {
+  /** 数据先行：页面加载完成后再显窗，避免首帧空白窗 */
+  showOverlay(kind: OverlayWindowKind): void {
     const win = this.overlays.get(kind)
     if (!win || win.isDestroyed()) { return }
-    const policy = this.overlays.policy(kind)
     const reveal = () => {
       if (win.isDestroyed()) { return }
       this.applyOverlayBounds(kind)
-      if (policy.focus) {
-        win.show()
-        win.focus()
-      }
-      else {
-        win.setIgnoreMouseEvents(policy.mouseIgnore, { forward: true })
-        win.showInactive()
-        win.moveTop()
-      }
+      win.show()
+      win.focus()
       this.events?.emit('overlay.opened', { kind })
     }
     if (win.webContents.isLoading()) { win.webContents.once('did-finish-load', reveal) }
     else { reveal() }
   }
 
-  hideOverlay(kind: OverlayKind): void {
+  hideOverlay(kind: OverlayWindowKind): void {
     this.overlays.hide(kind)
     this.events?.emit('overlay.closed', { kind })
   }
 
-  applyOverlayBounds(kind: OverlayKind): void {
+  applyOverlayBounds(kind: OverlayWindowKind): void {
     const win = this.overlays.get(kind)
     const parent = this.shellWindow
     if (!win || win.isDestroyed() || !parent) { return }
-    const policy = this.overlays.policy(kind)
-    win.setBounds(policy.bounds === 'fullscreen' ? parent.getContentBounds() : this.anchorPanel(parent, win.getBounds().height))
+    win.setBounds(parent.getContentBounds())
   }
 
-  /** 消息区页面量高回报：重设窗口高度，保持右上角锚定 */
-  resizePanel(senderId: number, height: number): void {
-    const win = this.overlays.get('panel')
-    if (!win || win.isDestroyed() || win.webContents.id !== senderId || !Number.isFinite(height) || height <= 0) { return }
-    const parent = this.shellWindow
-    if (parent) { win.setBounds(this.anchorPanel(parent, height)) }
-    if (this.panelAwaitingFirstResize) {
-      this.panelAwaitingFirstResize = false
-      win.showInactive()
-    }
-  }
-
-  setPanelMouseIgnore(senderId: number, ignore: boolean): void {
-    const win = this.overlays.get('panel')
-    if (win && !win.isDestroyed() && win.webContents.id === senderId) {
-      win.setIgnoreMouseEvents(ignore, { forward: true })
-    }
-  }
-
-  sendToOverlay(kind: OverlayKind, channel: string, payload: unknown): void {
+  sendToOverlay(kind: OverlayWindowKind, channel: string, payload: unknown): void {
     const win = this.overlays.get(kind)
     if (win && !win.isDestroyed()) { win.webContents.send(channel, payload) }
   }
 
-  isOverlaySender(kind: OverlayKind, senderId: number): boolean {
+  isOverlaySender(kind: OverlayWindowKind, senderId: number): boolean {
     return this.overlays.ownerOf(senderId) === kind
   }
 
-  overlayKindOf(senderId: number): OverlayKind | undefined {
+  overlayKindOf(senderId: number): OverlayWindowKind | undefined {
     return this.overlays.ownerOf(senderId)
   }
 
   overlayParamsOf(senderId: number): Readonly<Record<string, string>> {
     return this.overlays.paramsOf(senderId)
+  }
+
+  // ── 通知平面（plane）：常驻全屏透明子窗，承载通知/下载/权限/浮层表面 ──
+
+  private plane?: BrowserWindow
+  /** plane 是否持有焦点（权限 ESC / 面板输入依赖它；toast 独占时不持有） */
+  private planeFocusHeld = false
+
+  /** 随主窗创建通知平面：透明全屏子窗，恒在父窗内容（含应用视图）之上；穿透缺省开启 */
+  private createPlane(): void {
+    const win = this.shellWindow
+    if (!win || this.plane) { return }
+    const plane = new BrowserWindow({
+      ...overlayBase,
+      parent: win,
+      width: win.getContentBounds().width,
+      height: win.getContentBounds().height,
+      show: false,
+      webPreferences: {
+        ...overlayBase.webPreferences,
+        preload: join(this.rendererDir, '../preload/index.cjs'),
+        partition: 'persist:overlay-window',
+        backgroundThrottling: false,
+      },
+    })
+    this.plane = plane
+    plane.setIgnoreMouseEvents(true, { forward: true })
+    const hash = '#/overlay?kind=plane'
+    const devUrl = process.env.ELECTRON_RENDERER_URL
+    if (devUrl) { void plane.loadURL(`${devUrl}/${hash}`) }
+    else { void plane.loadFile(join(this.rendererDir, 'index.html'), { hash: hash.replace(/^#/, '') }) }
+    this.callers?.register(plane.webContents.id, { appId: SHELL_APP_ID, instanceId: 'overlay-plane', kind: 'overlay' })
+    this.applySessionGuards(plane.webContents.session, 'all')
+  }
+
+  /** plane 显示即全屏（几何零计算）；focus = 有交互表面，需接键盘（权限 ESC / 面板检索） */
+  showPlane(opts: { focus: boolean }): void {
+    const win = this.shellWindow
+    if (!win || !this.plane || this.plane.isDestroyed()) { return }
+    this.plane.setBounds(win.getContentBounds())
+    if (opts.focus) {
+      this.planeFocusHeld = true
+      this.plane.setIgnoreMouseEvents(false)
+      this.plane.show()
+      this.plane.focus()
+    }
+    else {
+      this.plane.setIgnoreMouseEvents(true, { forward: true })
+      this.plane.showInactive()
+      if (this.planeFocusHeld) {
+        this.planeFocusHeld = false
+        this.restoreContentFocus()
+      }
+    }
+    this.events?.emit('overlay.opened', { kind: 'plane' })
+  }
+
+  hidePlane(): void {
+    if (!this.plane || this.plane.isDestroyed()) { return }
+    if (this.planeFocusHeld) {
+      this.planeFocusHeld = false
+      this.restoreContentFocus()
+    }
+    this.plane.hide()
+    this.events?.emit('overlay.closed', { kind: 'plane' })
+  }
+
+  /** toast 卡片悬停切换：穿透态下鼠标进卡片临时拦截，离开即交还（master 同款机制） */
+  setPlaneMouseIgnore(ignore: boolean): void {
+    if (this.plane && !this.plane.isDestroyed()) {
+      this.plane.setIgnoreMouseEvents(ignore, { forward: true })
+    }
+  }
+
+  sendToPlane(channel: string, payload: unknown): void {
+    if (this.plane && !this.plane.isDestroyed()) { this.plane.webContents.send(channel, payload) }
+  }
+
+  isPlaneSender(senderId: number): boolean {
+    return this.plane?.webContents.id === senderId
+  }
+
+  /** plane 交还焦点：激活中的应用视图优先，否则回工作台 */
+  private restoreContentFocus(): void {
+    const win = this.shellWindow
+    if (!win || win.isDestroyed()) { return }
+    win.focus()
+    const view = this.activeViewId ? this.views.get(this.activeViewId) : undefined
+    if (view && view.getVisible() && !view.webContents.isDestroyed()) { view.webContents.focus() }
   }
 
   private track(win: BrowserWindow, caller: { appId: string, instanceId: string, kind: 'shell' | 'view' | 'overlay' }): void {
@@ -669,6 +690,10 @@ export class WindowSystem implements Startable, ViewHost {
 
   /** 窗口从最小化/隐藏恢复时重放工作区矩形：期间施加的 bounds 可能被系统丢弃 */
   private replayContentRect(): void {
+    const win = this.shellWindow
+    if (!win) { return }
+    // plane 几何恒等于内容区，恢复时同样可能被系统丢弃，先重放
+    this.plane?.setBounds(win.getContentBounds())
     if (!this.activeViewId) { return }
     this.applyActiveBounds(this.contentRect)
   }
