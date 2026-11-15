@@ -23,6 +23,10 @@ export function registerNotificationsIpc(deps: NotificationsIpcDeps): void {
       await authorized(deps, e.sender.id, 'notification')
       deps.notifications.dismiss(id)
     },
+    clear: async (e) => {
+      await authorized(deps, e.sender.id, 'notification')
+      deps.notifications.clear()
+    },
     list: async (e) => {
       await authorized(deps, e.sender.id, 'notification')
       return [...deps.notifications.list()]

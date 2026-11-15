@@ -19,6 +19,13 @@ const TAB_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b
 const RECENT_KEY = 'shell.recentAppIds'
 const MAX_RECENT = 8
 
+/** 应用身份色：按 appId 哈希取色，tab 徽标与应用中心徽标共用同一份数据源 */
+export function colorFor(appId: string): string {
+  let hash = 0
+  for (const ch of appId) { hash = (hash * 31 + ch.charCodeAt(0)) >>> 0 }
+  return TAB_COLORS[hash % TAB_COLORS.length]!
+}
+
 /**
  * tab 会话状态：开/切/关/排序/事件同步/最近使用，纯状态零 DOM。
  * 应用打开/关闭全量以 app.opened/closed 事件为准，本地 openApp 的重复事件靠 instanceId 去重。
@@ -30,12 +37,6 @@ export function useShellTabs() {
   const appList = ref<AppSummary[]>([])
 
   const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
-
-  function colorFor(appId: string): string {
-    let hash = 0
-    for (const ch of appId) { hash = (hash * 31 + ch.charCodeAt(0)) >>> 0 }
-    return TAB_COLORS[hash % TAB_COLORS.length]!
-  }
 
   function rememberRecent(appId: string) {
     recentIds.value = [appId, ...recentIds.value.filter(id => id !== appId)].slice(0, MAX_RECENT)

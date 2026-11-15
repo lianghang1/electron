@@ -15,5 +15,6 @@ export interface NotificationInput {
 export const notificationsDomain = defineIpcDomain('notifications', {
   show: invoke<(input: NotificationInput) => string>(),
   dismiss: invoke<(id: string) => void>(),
+  clear: invoke<() => void>(),
   list: invoke<() => any[]>(),
 }) satisfies IpcDomainValue<'notifications', IpcDefs>

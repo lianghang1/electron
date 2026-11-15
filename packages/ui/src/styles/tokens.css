@@ -38,9 +38,9 @@
   --dt-warn: #f59e0b;
   --dt-danger: #ef4444;
 
-  /* 物理层 · 阴影与边界：无边框窗口靠内描边建立边界感，浮层用两级阴影 */
+  /* 物理层 · 阴影与边界：无边框窗口靠内描边建立边界感，浮层用两级投影建立悬浮层次 */
   --dt-shadow-1: 0 1px 2px rgb(28 36 51 / 0.06), 0 4px 16px rgb(28 36 51 / 0.08);
-  --dt-shadow-2: 0 12px 40px rgb(28 36 51 / 0.18);
+  --dt-shadow-2: 0 2px 8px rgb(2 8 20 / 0.06), 0 12px 32px rgb(2 8 20 / 0.14);
   --dt-blur: blur(20px) saturate(1.4);
 
   /* 物理层 · 几何 */
@@ -103,7 +103,7 @@
   --dt-warn: #d29922;
   --dt-danger: #f85149;
   --dt-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.35);
-  --dt-shadow-2: 0 12px 40px rgb(0 0 0 / 0.55);
+  --dt-shadow-2: 0 2px 8px rgb(0 0 0 / 0.28), 0 12px 32px rgb(0 0 0 / 0.4);
   --dt-blur: blur(20px) saturate(1.2);
 
   color-scheme: dark;

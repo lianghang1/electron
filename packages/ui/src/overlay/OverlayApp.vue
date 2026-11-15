@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import type { DownloadTask } from '@shell/shared'
 import type { OverlayAction, OverlayKind } from '@shell/shared/ipc'
+import type { Component } from 'vue'
 import { shell } from '@shell/bridge/client'
 import { formatBytes, permissionLabel } from '@shell/shared'
-import { Button } from '@ui/components/ui'
+import { Button, Kbd } from '@ui/components/ui'
+import { AlertCircle, AlertTriangle, Bell, Check, Search, X } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import CaptureDialog from '../capture/CaptureDialog.vue'
 import CommandPalette from '../shell/CommandPalette.vue'
 import SettingsDialog from '../shell/SettingsDialog.vue'
+import { colorFor } from '../shell/use-shell-tabs'
 
 interface NotificationItem {
   id: string
@@ -15,6 +18,8 @@ interface NotificationItem {
   body?: string
   appName?: string
   level: string
+  /** kernel 推送的创建时点：面板按它渲染相对时间 */
+  createdAt?: number
   ttlMs: number
 }
 
@@ -73,6 +78,20 @@ const kind = computed(() => state.value?.kind ?? 'dialog')
 const fullscreen = computed(() => kind.value !== 'panel')
 const paletteItems = computed(() => apps.value.map(a => ({ id: a.manifest.id, name: a.manifest.name, kind: 'app' })))
 
+/** 应用中心检索态：/ 聚焦、↑↓ 选择、Enter 打开；过滤按名称与 appId */
+const searchQuery = ref('')
+const searchInput = ref<HTMLInputElement | null>(null)
+const activeIdx = ref(0)
+
+const filteredApps = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase()
+  if (!q) { return apps.value }
+  return apps.value.filter(a =>
+    a.manifest.name.toLowerCase().includes(q) || a.manifest.id.toLowerCase().includes(q))
+})
+
+watch(searchQuery, () => { activeIdx.value = 0 })
+
 /** 授权卡倒计时：与 Main 的 30s 超时同源，归零由 Main 按拒绝收尾（master 同款语义） */
 const REQUEST_TIMEOUT_S = 30
 const countdown = ref(REQUEST_TIMEOUT_S)
@@ -87,10 +106,37 @@ watch(() => state.value?.permission?.requestId, (id) => {
   }, 1000)
 }, { immediate: true })
 
-/** ESC = 拒绝当前请求（超时不持久化语义一致；遮罩/外点不关闭，必须显式决策或等超时） */
+/**
+ * ESC = 拒绝当前请求（超时不持久化语义一致；遮罩/外点不关闭，必须显式决策或等超时）；
+ * 应用中心：Esc 关闭、/ 聚焦搜索、↑↓ 选择、Enter 打开
+ */
 function onOverlayKeydown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && kind.value === 'permission' && state.value?.permission) {
     action('resolve-permission', { requestId: state.value.permission.requestId, granted: false })
+    return
+  }
+  if (kind.value !== 'app-center') { return }
+  if (event.key === 'Escape') {
+    close()
+    return
+  }
+  if (event.key === '/' && document.activeElement !== searchInput.value) {
+    event.preventDefault()
+    searchInput.value?.focus()
+    return
+  }
+  if (!filteredApps.value.length) { return }
+  if (event.key === 'ArrowDown') {
+    event.preventDefault()
+    activeIdx.value = Math.min(activeIdx.value + 1, filteredApps.value.length - 1)
+  }
+  else if (event.key === 'ArrowUp') {
+    event.preventDefault()
+    activeIdx.value = Math.max(activeIdx.value - 1, 0)
+  }
+  else if (event.key === 'Enter') {
+    const target = filteredApps.value[activeIdx.value]
+    if (target) { void openApp(target.manifest.id) }
   }
 }
 
@@ -107,7 +153,16 @@ watch(kind, (next) => {
   if (next === 'command-palette' || next === 'app-center') { void loadApps() }
 }, { immediate: true })
 
+/** 应用中心是单例窗口：dismiss 只翻 appCenterOpen 标志（kind 不变），开关都以此为准归零检索态 */
+watch(() => state.value?.appCenterOpen, (isOpen) => {
+  searchQuery.value = ''
+  activeIdx.value = 0
+  if (isOpen) { void nextTick(() => searchInput.value?.focus()) }
+})
+
 onMounted(async () => {
+  // 浮层窗体是透明窗口，全局 body 的 --background 底色会把整窗画出方形底板，浮层页必须透掉
+  document.body.style.background = 'transparent'
   window.addEventListener('keydown', onOverlayKeydown)
   state.value = await shell().overlay.sync() as OverlayState
   unsubscribe = shell().overlay.onUpdated((next) => {
@@ -146,6 +201,10 @@ function dismissNotification(id: string): void {
   void shell().notifications.dismiss(id)
 }
 
+function clearNotifications(): void {
+  void shell().notifications.clear()
+}
+
 function dismissDownload(taskId: string): void {
   void shell().downloads.dismiss(taskId)
 }
@@ -167,41 +226,38 @@ const statusText: Record<string, string> = {
   failed: '已失败',
 }
 
-/** 下载卡图标底色（按状态）：进行中品牌色 / 完成绿 / 失败红 */
-const dlIconClass: Record<string, string> = {
-  progressing: 'bg-primary',
-  completed: 'bg-emerald-500',
-  cancelled: 'bg-rose-500',
-  interrupted: 'bg-rose-500',
-  failed: 'bg-rose-500',
+/** 通知级别章：软色底 + 语义图标，未识别级别回退 info */
+const chipInfo = { icon: Bell, class: 'bg-accent text-accent-foreground' } as const
+const levelChip: Record<string, { icon: Component, class: string }> = {
+  info: chipInfo,
+  success: { icon: Check, class: 'bg-ok/15 text-ok' },
+  warning: { icon: AlertTriangle, class: 'bg-warn/15 text-warn' },
+  error: { icon: AlertCircle, class: 'bg-destructive/15 text-destructive' },
 }
 
-/** 通知卡图标底色（按级别）：kernel level 字段的呈现投影，未识别级别回退 info */
-const levelIconClass: Record<string, string> = {
-  info: 'bg-primary',
-  success: 'bg-emerald-500',
-  warning: 'bg-amber-500',
-  error: 'bg-rose-500',
+function levelChipOf(level: string): { icon: Component, class: string } {
+  return levelChip[level] ?? chipInfo
 }
 
-/** 应用注册来源中文标签（master SOURCE_LABELS 语义） */
-const sourceLabels: Record<string, string> = {
-  'flavor': '内置',
-  'apps.json': '本地配置',
-  'remote': '远程',
+/** 相对时间：一分钟内「刚刚」，一小时内按分钟，更早退回 HH:mm */
+function relativeTime(ts?: number): string {
+  if (!ts) { return '' }
+  const diff = Date.now() - ts
+  if (diff < 60_000) { return '刚刚' }
+  if (diff < 3_600_000) { return `${Math.floor(diff / 60_000)} 分钟前` }
+  return new Date(ts).toTimeString().slice(0, 5)
 }
 
 /**
- * 面板量高回报：回报自然内容高度，Main 据此调整窗口尺寸并锚定右上角；
- * 通知在列数由 kernel 上限封顶，面板不内部滚动也不裁剪
+ * 面板量高回报：外层留白容器的自然高 = 卡片高 + 上下投影余量（2 × window-system 的 SHADOW 72），
+ * Main 据此调整窗口尺寸并锚定右上角；通知在列数由 kernel 上限封顶，面板不内部滚动也不裁剪
  */
-const PANEL_PADDING = 24
 const panelRef = ref<HTMLElement | null>(null)
 
 function reportHeight(): void {
   const panel = panelRef.value
   if (!panel || kind.value !== 'panel') { return }
-  void shell().overlay.resize(panel.scrollHeight + PANEL_PADDING)
+  void shell().overlay.resize(panel.scrollHeight)
 }
 
 watch(() => [state.value?.notifications, state.value?.downloads], () => {
@@ -210,43 +266,45 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
 </script>
 
 <template>
-  <div class="relative h-full w-full" :class="fullscreen ? 'flex items-center justify-center' : 'flex flex-col justify-end gap-2 p-3'">
+  <div class="relative h-full w-full" :class="fullscreen ? 'flex items-center justify-center' : 'flex flex-col justify-end'">
     <template v-if="kind === 'panel'">
       <div
         ref="panelRef"
-        class="flex w-[320px] flex-col gap-2"
+        class="flex w-[448px] flex-col p-18"
+        @mouseenter="shell().overlay.mouseIgnore(false)"
+        @mouseleave="shell().overlay.mouseIgnore(true)"
       >
-        <div
-          v-for="task in state?.downloads ?? []"
-          :key="task.id"
-          class="relative flex rounded-lg border bg-popover p-2.5 shadow-lg"
-          :title="task.path"
-          @mouseenter="shell().overlay.mouseIgnore(false)"
-          @mouseleave="shell().overlay.mouseIgnore(true)"
-        >
-          <span class="mr-2 mt-0.5 flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md text-white" :class="dlIconClass[task.status] ?? dlIconClass.progressing">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
-          </span>
-          <div class="min-w-0 flex-1">
-            <div class="truncate text-ui-sm font-medium text-foreground">
-              {{ task.filename }}
-            </div>
-            <div class="mt-0.5 text-ui-xs text-muted-foreground">
-              {{ statusText[task.status] ?? task.status }}
-              <template v-if="task.status === 'progressing' && task.percent >= 0">
-                · {{ task.percent }}%
-              </template>
-              <template v-if="task.total > 0">
-                · {{ formatBytes(task.total) }}
-              </template>
+        <div class="flex w-[304px] flex-col gap-2 rounded-xl bg-popover p-4 shadow-float">
+          <div v-if="(state?.notifications?.length ?? 0) > 0" class="flex items-center gap-2">
+            <span class="text-ui-base font-semibold text-foreground">通知</span>
+            <span class="rounded-full bg-accent px-1.5 py-0.5 text-ui-xs font-medium text-accent-foreground">{{ state?.notifications?.length }}</span>
+            <span class="flex-1" />
+            <button class="text-ui-xs text-primary hover:underline" @click="clearNotifications">
+              全部清除
+            </button>
+          </div>
+          <div
+            v-for="task in state?.downloads ?? []"
+            :key="task.id"
+            class="group relative rounded-lg bg-muted p-3"
+            :title="task.path"
+          >
+            <div class="flex items-center gap-2">
+              <span class="min-w-0 flex-1 truncate text-ui-sm font-semibold text-foreground">{{ task.filename }}</span>
+              <span class="flex-none text-ui-xs text-muted-foreground">
+                {{ statusText[task.status] ?? task.status }}<template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template><template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
+              </span>
+              <button class="flex-none text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭下载卡" @click="dismissDownload(task.id)">
+                <X :size="12" />
+              </button>
             </div>
             <div
               v-if="task.status === 'progressing' && task.percent >= 0"
-              class="mt-1.5 h-1 overflow-hidden rounded-full bg-muted"
+              class="mt-2 h-1 overflow-hidden rounded-full bg-hover"
             >
               <div class="h-full rounded-full bg-primary transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
             </div>
-            <div v-if="task.status === 'completed'" class="mt-1.5 flex justify-end gap-1.5">
+            <div v-if="task.status === 'completed'" class="mt-2 flex justify-end gap-1.5">
               <Button variant="outline" class="h-6 px-2 text-ui-xs" @click="openDownload(task.id)">
                 打开
               </Button>
@@ -255,34 +313,29 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
               </Button>
             </div>
           </div>
-          <button class="absolute right-1.5 top-1.5 text-ui-xs text-muted-foreground" aria-label="关闭下载卡" @click="dismissDownload(task.id)">
-            ✕
-          </button>
-        </div>
-        <div
-          v-for="item in state?.notifications ?? []"
-          :key="item.id"
-          class="relative flex rounded-lg border bg-popover p-2.5 shadow-lg"
-          @mouseenter="shell().overlay.mouseIgnore(false)"
-          @mouseleave="shell().overlay.mouseIgnore(true)"
-        >
-          <span class="mr-2 mt-0.5 flex h-[22px] w-[22px] flex-none items-center justify-center rounded-md text-white" :class="levelIconClass[item.level] ?? levelIconClass.info">
-            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></svg>
-          </span>
-          <div class="min-w-0 flex-1">
-            <div v-if="item.appName" class="text-ui-xs text-muted-foreground">
-              {{ item.appName }}
+          <div
+            v-for="item in state?.notifications ?? []"
+            :key="item.id"
+            class="group relative flex gap-2 rounded-lg p-2 transition-colors hover:bg-hover"
+          >
+            <span class="mt-0.5 flex size-5 flex-none items-center justify-center rounded-md" :class="levelChipOf(item.level).class">
+              <component :is="levelChipOf(item.level).icon" :size="11" />
+            </span>
+            <div class="min-w-0 flex-1 pr-4">
+              <div class="flex items-baseline gap-2">
+                <span class="min-w-0 flex-1 truncate text-ui-caption font-semibold text-foreground">{{ item.title }}</span>
+                <span class="flex-none text-ui-xs text-foreground-subtle">{{ relativeTime(item.createdAt) }}</span>
+              </div>
+              <div v-if="item.appName || item.body" class="mt-0.5 truncate text-ui-xs text-muted-foreground">
+                {{ item.appName }}<template v-if="item.appName && item.body">
+                  ·
+                </template>{{ item.body }}
+              </div>
             </div>
-            <div class="text-ui-sm font-semibold text-foreground">
-              {{ item.title }}
-            </div>
-            <div v-if="item.body" class="mt-0.5 text-ui-xs leading-relaxed text-muted-foreground">
-              {{ item.body }}
-            </div>
+            <button class="absolute right-2 top-2 text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭通知" @click="dismissNotification(item.id)">
+              <X :size="12" />
+            </button>
           </div>
-          <button class="absolute right-1.5 top-1.5 text-ui-xs text-muted-foreground" aria-label="关闭通知" @click="dismissNotification(item.id)">
-            ✕
-          </button>
         </div>
       </div>
     </template>
@@ -354,52 +407,50 @@ watch(() => [state.value?.notifications, state.value?.downloads], () => {
     </template>
 
     <template v-else-if="kind === 'app-center'">
-      <div class="w-[380px] rounded-xl border bg-popover p-4 shadow-2xl">
-        <div class="flex items-center justify-between">
-          <div class="text-ui-base font-semibold text-foreground">
-            应用中心
-          </div>
-          <button class="text-ui-sm text-muted-foreground" aria-label="关闭" @click="close">
-            ✕
+      <div class="flex w-[324px] flex-col rounded-xl bg-popover p-4 shadow-float">
+        <div class="flex items-center gap-2">
+          <span class="text-ui-base font-semibold text-foreground">应用中心</span>
+          <span class="text-ui-xs text-foreground-subtle">{{ apps.length }} 个应用</span>
+          <span class="flex-1" />
+          <button class="text-muted-foreground transition-colors hover:text-foreground" aria-label="关闭" @click="close">
+            <X :size="14" />
           </button>
         </div>
-        <div class="mt-3 flex flex-col gap-0.5">
+        <div class="mt-3 flex items-center gap-2 rounded-lg bg-muted px-3 py-1.5">
+          <Search :size="13" class="flex-none text-foreground-subtle" />
+          <input
+            ref="searchInput"
+            v-model="searchQuery"
+            type="text"
+            placeholder="搜索应用…"
+            class="h-6 w-full min-w-0 bg-transparent text-ui-sm text-foreground outline-none placeholder:text-foreground-subtle"
+          >
+          <Kbd v-if="!searchQuery" class="flex-none">
+            /
+          </Kbd>
+        </div>
+        <div v-if="filteredApps.length" class="mt-3 grid grid-cols-3 gap-1">
           <button
-            v-for="app in apps"
+            v-for="(app, i) in filteredApps"
             :key="app.manifest.id"
-            class="flex items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted"
+            class="flex flex-col items-center gap-2 rounded-lg px-1 py-3 transition-colors hover:bg-hover"
+            :class="i === activeIdx ? 'bg-hover' : ''"
             :title="`打开 ${app.manifest.name}`"
             @click="openApp(app.manifest.id)"
           >
-            <img
-              v-if="app.manifest.icon"
-              :src="app.manifest.icon"
-              alt=""
-              class="h-8 w-8 flex-none rounded-lg object-cover"
-            >
-            <span
-              v-else
-              class="flex h-8 w-8 flex-none items-center justify-center rounded-lg bg-primary text-ui-sm font-semibold text-primary-foreground"
-            >
-              {{ app.manifest.name.slice(0, 1) }}
+            <span class="relative grid size-11 flex-none place-items-center rounded-icon" :style="{ background: colorFor(app.manifest.id) }" aria-hidden="true">
+              <img v-if="app.manifest.icon" :src="app.manifest.icon" alt="" class="absolute inset-0 size-full rounded-icon object-cover">
+              <span v-else class="text-ui-lg font-semibold text-white">{{ app.manifest.name.slice(0, 1) }}</span>
+              <span v-if="runningIds.includes(app.manifest.id)" class="absolute -right-0.5 -top-0.5 size-2.5 rounded-full bg-ok ring-2 ring-popover" />
             </span>
-            <span class="min-w-0 flex-1">
-              <span class="flex items-center gap-1.5">
-                <span class="truncate text-ui-sm font-medium text-foreground">{{ app.manifest.name }}</span>
-                <span
-                  v-if="runningIds.includes(app.manifest.id)"
-                  class="h-1.5 w-1.5 flex-none rounded-full bg-emerald-500"
-                  title="运行中"
-                />
-              </span>
-              <span class="mt-0.5 block truncate text-ui-xs text-muted-foreground">
-                v{{ app.manifest.version }} · {{ sourceLabels[app.source] ?? app.source }}
-              </span>
-            </span>
+            <span class="max-w-full truncate text-ui-sm text-foreground">{{ app.manifest.name }}</span>
           </button>
-          <div v-if="!apps.length" class="px-2 py-6 text-center text-ui-sm text-muted-foreground">
-            暂无已注册应用
-          </div>
+        </div>
+        <div v-else class="px-2 py-6 text-center text-ui-sm text-muted-foreground">
+          {{ apps.length ? '无匹配应用' : '暂无已注册应用' }}
+        </div>
+        <div class="mt-3 text-center text-ui-xs text-foreground-subtle">
+          Enter 打开 · Esc 关闭 · ⌘K 命令面板
         </div>
       </div>
     </template>
