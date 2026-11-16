@@ -22,18 +22,18 @@
 Linux 双架构可在任意机器交叉产出；macOS 公证与 Windows NSIS 需要对应平台工具链（见下）在 Linux 上不等价：
 
 ```bash
-FLAVOR=kiosk pnpm build:win                       # win32 / x64
-FLAVOR=kiosk TARGET_ARCH=arm64 pnpm build:win    # win32 / arm64
-FLAVOR=kiosk pnpm build:mac                      # darwin / x64
-FLAVOR=kiosk TARGET_ARCH=arm64 pnpm build:mac    # darwin / arm64
-FLAVOR=kiosk pnpm build:linux                    # linux / x64
-FLAVOR=kiosk TARGET_ARCH=arm64 pnpm build:linux  # linux / arm64
-FLAVOR=kiosk TARGET_RPM=1 pnpm build:linux       # 追加 rpm（需 rpmbuild）
+FLAVOR=kiosk-demo pnpm build:win                       # win32 / x64
+FLAVOR=kiosk-demo TARGET_ARCH=arm64 pnpm build:win    # win32 / arm64
+FLAVOR=kiosk-demo pnpm build:mac                      # darwin / x64
+FLAVOR=kiosk-demo TARGET_ARCH=arm64 pnpm build:mac    # darwin / arm64
+FLAVOR=kiosk-demo pnpm build:linux                    # linux / x64
+FLAVOR=kiosk-demo TARGET_ARCH=arm64 pnpm build:linux  # linux / arm64
+FLAVOR=kiosk-demo TARGET_RPM=1 pnpm build:linux       # 追加 rpm（需 rpmbuild）
 ```
 
 产物名 `<flavor>-<version>-<os>-<arch>.<ext>`，输出目录 `release/<flavor>/`。带平台与架构信息后，同一版本六端产物不会互相覆盖，也便于按 `update/<platform>/<arch>/` 契约组织目录。
 
-打包链路：`pnpm run build`（typecheck + electron-vite 构建）→ `electron-builder --config electron-builder.config.mjs`。CI 已删除，逐端产物由人工核对。
+打包链路：`pnpm run build`（typecheck + electron-vite 构建）→ `electron-builder --config electron-builder.config.mjs`。逐端产物由人工核对。
 
 ## 拆包结构
 
@@ -71,7 +71,7 @@ resources/devices/                     驱动资产
 
 | 项 | Linux x64 | Linux arm64 | Windows x64/arm64 | macOS x64/arm64 |
 |---|---|---|---|---|
-| 干净 clone `pnpm verify` | 已通过（19 阶段） | 同一份源码，逻辑层不随架构分叉 | 待真机 | 待真机 |
+| 干净 clone `pnpm verify` | 已通过 | 同一份源码，逻辑层不随架构分叉 | 待真机 | 待真机 |
 | 打包产物生成 | 已通过（deb + AppImage） | 已通过（deb + AppImage） | 已通过（NSIS，wine 交叉产出） | 已通过（zip，交叉产出；dmg 需 mac 端） |
 | 产物架构校验 | 实装成功 | `Architecture: arm64` 已验 | PE 产物生成，真机安装待验 | Mach-O cputype 双架构已验 |
 | deb 包名 / 依赖元数据 | 已通过（实装 `dpkg -i` 成功） | 已通过（`Package: cemetery`） | — | — |
@@ -108,4 +108,4 @@ resources/devices/                     驱动资产
 
 ## 明确不做
 
-CI 流程、龙芯 / 申威目标、旧三套业务 apps、`master` 的 CJS 引导器代码（只借结构）、公钥签名，以及旧方案中自造的中间抽象命名。
+CI 流程、龙芯 / 申威目标（无 Electron 官方二进制）、公钥签名。

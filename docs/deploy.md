@@ -2,13 +2,14 @@
 
 ## 产品形态（Flavor）
 
-一套壳对应多个产品，差异全部落在 `apps/flavors/<id>/flavor.json`，代码零分支。打包态由 `extraResources` 注入 `<resources>/flavor.json`；开发态用 `--flavor=<id>` 指定，缺省 `solo-demo`。
+一套壳对应多个产品，差异全部落在 `apps/flavors/<id>/flavor.json`，代码零分支。打包态由 `extraResources` 注入 `<resources>/flavor.json`；开发态 flavor 来源优先级 `--flavor=<id>` → `SHELL_FLAVOR` 环境变量 → 缺省 `devconsole`，打包态缺省 `solo-demo`。
 
 | 字段 | 说明 |
 |---|---|
 | `id` / `name` | 形态标识与显示名（`id` 同时决定 `appId` 与可执行文件名） |
 | `mode` | `windowed`（托盘工作台）或 `kiosk`（全屏锁定 + 看门狗） |
 | `chrome` | `platform`（工作台壳）/ `solo`（容器隐形，应用直出） |
+| `anchor` | 通知平面锚点：`shell`（缺省，平面挂壳主窗、弹层居中壳窗内容区）或 `screen`（无壳形态，平面锚定主屏工作区并置顶，托盘点击打开设置浮层） |
 | `apps` | 内置应用清单（solo 直出要求清单恰为一个，platform 可多个） |
 | `branding.accent` | 主色，经启动参数同步注入 preload，首帧零闪烁 |
 | `update.manifestUrl` / `update.allowedOrigins` | 更新清单地址与源站白名单 |

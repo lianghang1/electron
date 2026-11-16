@@ -1,8 +1,7 @@
 {
-  "id": "agent",
-  "name": "托盘服务代理",
-  "mode": "windowed",
-  "anchor": "screen",
+  "id": "kiosk-demo",
+  "name": "自助终端",
+  "mode": "kiosk",
   "apps": [],
   "branding": {
     "accent": "#2563eb"
@@ -11,6 +10,8 @@
     "allowedOrigins": []
   },
   "print": {
-    "urlOrigins": []
+    "urlOrigins": [
+      "*"
+    ]
   }
 }

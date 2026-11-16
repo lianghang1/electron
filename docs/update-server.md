@@ -1,6 +1,6 @@
 # 更新服务器契约
 
-与 `master` 的差别：`master` 用 electron-updater 6.8.9 的 `latest.yml` 整包清单 + 独立热更清单；`next` 收敛为**单份 `UpdateManifest` JSON**，三通道各取所需，无上报回调。契约源码：`packages/update/src/manifest.ts`、`packages/update/src/boot/bundle.ts`、`packages/update/src/boot/pointer.ts`。
+服务端与客户端之间的唯一契约是单份 `UpdateManifest` JSON 清单：dist 应用热更、asar 主程序热更、整包三通道各取所需，无上报回调。契约源码：`packages/update/src/manifest.ts`、`packages/update/src/boot/bundle.ts`、`packages/update/src/boot/pointer.ts`。
 
 ## 清单格式
 
@@ -48,7 +48,7 @@
 - `allowedOrigins` 为空数组时所有更新 URL 一律拒绝（fail-closed）；支持 `*.example.com` 通配。
 - `assertFetchableUrl` 拒绝内网 / 本机地址，防 SSRF。
 - 下载后对文件做 sha256 强校验，不一致即丢弃；不引入公钥签名。
-- 安全模型是 `HTTPS + 源站白名单 + 内容摘要`，与 master 源码一致。
+- 安全模型是 `HTTPS + 源站白名单 + 内容摘要`。
 - **中断安全**：任何写入先进 staging 目录，校验通过才原子换名；断电落在任一状态都有可运行版本。dist 热更以 `.old-*` 备份 + 原子 rename + 失败回滚实现。
 
 ## 下载行为

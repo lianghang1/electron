@@ -44,5 +44,5 @@ system   不随包携带（系统驱动），present() = false，原生域降级
 
 ## 真机边界
 
-DLL 协议帧（汉王签名回调、capture ws、IPP 通道）仍需真机验证，代码里标为
-`PROTOCOL_PENDING` / 预留扩展点，不假装完成。Windows 文件锁下的 asar 热更亦待真机实测。
+DLL 协议帧（汉王签名回调、capture ws、IPP 通道）与 Windows 文件锁下的 asar 热更仍待真机验证，
+不在静态验证范围。
