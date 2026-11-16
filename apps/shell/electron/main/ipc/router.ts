@@ -5,7 +5,7 @@ import type { DownloadManager } from '@shell/kernel/download'
 import type { Logger } from '@shell/kernel/logger'
 import type { CallerRegistry } from '@shell/shared'
 import type { UpdateCenter } from '@shell/update'
-import type { OverlayService } from '@shell/window'
+import type { OverlayCenter } from '@shell/window'
 import { DomainRouteError } from '@shell/devices'
 import { matchesOrigin, originOf, PlatformError } from '@shell/shared'
 import { ipcMain } from 'electron'
@@ -22,7 +22,7 @@ export interface RouterIpcDeps {
   downloads: DownloadManager
   events: EventBus
   update?: UpdateCenter
-  overlays?: OverlayService
+  overlays?: OverlayCenter
 }
 
 /**

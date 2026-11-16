@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { DownloadTask } from '@shell/shared'
 import type { Component } from 'vue'
-import type { NotificationItem } from '../../composables/use-overlay-state'
+import type { NotificationItem } from '../../overlay/types'
+import { AlertCircle, AlertTriangle, Bell, Check, Download, FileText, X } from '@lucide/vue'
 import { formatBytes } from '@shell/shared'
-import { AlertCircle, AlertTriangle, Bell, Check, Download, FileText, X } from 'lucide-vue-next'
 
 /**
  * 通知/下载 toast 堆叠：右上角顶栏之下，kernel 上限封顶，不内部滚动。

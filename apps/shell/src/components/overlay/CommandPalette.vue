@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { AppWindow, Search } from '@lucide/vue'
+import { shell } from '@shell/bridge/client'
 import { Kbd, Separator } from '@ui/components'
-import { AppWindow, Search } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 interface PaletteItem {
@@ -11,8 +12,7 @@ interface PaletteItem {
 
 const props = defineProps<{
   open: boolean
-  items: PaletteItem[]
-  recentIds: string[]
+  recentIds?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -20,22 +20,25 @@ const emit = defineEmits<{
   'select': [id: string]
 }>()
 
+/** 应用清单自取：命令面板是自包含表面，打开时按需拉取（业务只管内容） */
+const items = ref<PaletteItem[]>([])
+
 const query = ref('')
 const highlighted = ref(0)
 const inputEl = ref<HTMLInputElement | null>(null)
 
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
-  if (!q) { return props.items }
-  return props.items.filter(i =>
+  if (!q) { return items.value }
+  return items.value.filter(i =>
     i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q),
   )
 })
 
 const recentItems = computed<PaletteItem[]>(() => {
   if (query.value.trim()) { return [] }
-  return props.recentIds
-    .map(id => props.items.find(i => i.id === id))
+  return (props.recentIds ?? [])
+    .map(id => items.value.find(i => i.id === id))
     .filter((i): i is PaletteItem => i !== undefined)
     .slice(0, 5)
 })
@@ -90,11 +93,19 @@ watch(() => props.open, async (open) => {
   if (!open) { return }
   query.value = ''
   highlighted.value = 0
+  // 打开时按需拉取应用清单（AppCenter 同款自取模式）；拉取失败清空不阻塞面板
+  try {
+    const list = await shell().apps.list() as { manifest: { id: string, name: string } }[]
+    items.value = list.map(a => ({ id: a.manifest.id, name: a.manifest.name, kind: 'app' }))
+  }
+  catch {
+    items.value = []
+  }
   await nextTick()
   inputEl.value?.focus()
 })
 
-watch([query, () => props.items.length], () => {
+watch([query, () => items.value.length], () => {
   highlighted.value = 0
 })
 

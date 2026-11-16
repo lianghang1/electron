@@ -294,10 +294,9 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  /* 卡片窗自持落位：窗口 = 卡片 + 32px 透明边距（overlay-host 策略表 824×644），
-     边距里画投影——透明窗会硬裁超位内容（master overlay-window SHADOW 注释） */
-  position: fixed;
-  inset: 32px;
+  /* plane 内 dialog 表面：自然尺寸居中（容器 grid 落位），小窗内自适应收缩 */
+  width: min(824px, 100%);
+  height: min(644px, 100%);
   padding: 18px;
   border-radius: 14px;
   background: var(--popover);

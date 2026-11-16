@@ -3,7 +3,7 @@ import type { EventBus, NotificationCenter } from '@shell/kernel'
 import type { DownloadManager } from '@shell/kernel/download'
 import type { CallerRegistry, DomainCallContext } from '@shell/shared'
 import type { UpdateCenter } from '@shell/update'
-import type { OverlayService } from '@shell/window'
+import type { OverlayCenter } from '@shell/window'
 import { PlatformError } from '@shell/shared'
 import { APP_EVENT_WHITELIST } from '@shell/shared/events'
 import { webContents } from 'electron'
@@ -34,7 +34,7 @@ export interface FacilityDeps {
   notifications: NotificationCenter
   downloads: DownloadManager
   update?: UpdateCenter
-  overlays?: OverlayService
+  overlays?: OverlayCenter
 }
 
 const FACILITY_ROUTES = {
@@ -173,7 +173,7 @@ const FACILITY_ROUTES = {
       input: z.object({ category: z.string().min(1) }).passthrough(),
       handler: (input: { category: string }, _ctx: DomainCallContext, deps: FacilityDeps) => {
         if (!deps.overlays) { throw new PlatformError('DOMAIN_UNAVAILABLE', '浮层宿主未装配') }
-        deps.overlays.open('config', { kind: input.category })
+        deps.overlays.present({ surface: 'config', payload: { category: input.category } })
         return {}
       },
     },

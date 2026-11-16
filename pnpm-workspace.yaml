@@ -22,7 +22,6 @@ catalog:
   embla-carousel-vue: ^8.6.0
   eslint: 9.39.5
   koffi: ^3.3.3
-  lucide-vue-next: ^0.552.0
   reka-ui: ^2.10.5
   shiki: ^4.6.0
   tailwind-merge: ^3.7.0

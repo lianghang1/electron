@@ -83,8 +83,7 @@ function visibleFields(group: SettingGroup) {
 </script>
 
 <template>
-  <!-- 卡片窗自持落位：窗口 = 卡片 + 32px 透明边距（overlay-host 策略表 624×664），
-       边距里画投影；窗口本身即模态边界，不再有遮罩与居中定位 -->
+  <!-- plane 内 dialog 表面：容器居中落位，卡片自持自然尺寸（560×600，小窗内收缩） -->
   <div class="set-card">
     <header class="set-card__head">
       <h3 class="set-card__title">
@@ -182,9 +181,9 @@ function visibleFields(group: SettingGroup) {
 <style scoped>
 /* 颜色走语义层变量（tokens 随浮层页加载）：与拍摄卡同一浮层配色体系 */
 .set-card {
-  /* 卡片窗自持落位：窗口 624×664 = 卡片 560×600 + 四周 32px 投影边距 */
-  position: fixed;
-  inset: 32px;
+  /* plane 内 dialog 表面：自然尺寸居中（容器 grid 落位），小窗内自适应收缩 */
+  width: 560px;
+  height: min(600px, 100%);
   display: flex;
   flex-direction: column;
   border-radius: 14px;

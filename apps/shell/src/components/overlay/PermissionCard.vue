@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { PermissionView } from '../../composables/use-overlay-state'
+import type { PermissionView } from '../../overlay/types'
 import { permissionLabel } from '@shell/shared'
 import { Button } from '@ui/components'
 import { onBeforeUnmount, onMounted } from 'vue'

@@ -43,7 +43,7 @@ import {
   UpdateCenter,
   Win32Installer,
 } from '@shell/update'
-import { OverlayService, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
+import { OverlayCenter, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
 import { app, screen, session } from 'electron'
 import { createInfoDomain, INFO_DOMAIN_ID } from './ipc/info-domain'
 import { registerShellIpc } from './shell-ipc'
@@ -156,7 +156,7 @@ interface Assembly {
   forceGate?: ForceUpdateGate
   notifications?: NotificationCenter
   appKv?: AppKvStore
-  overlays?: OverlayService
+  overlays?: OverlayCenter
   resilience?: ResilienceSystem
   devices?: DeviceGateway
   telemetry?: DeviceTelemetry
@@ -272,8 +272,8 @@ function setupPlatformSystems(a: Assembly): void {
   retention.register({ id: 'audit-log', dir: () => join(logsDir(), 'audit'), maxAgeMs: 30 * DAY_MS })
   void a.kernel.register(retention)
 
-  // WebContentsView 是原生合成层：弹窗、通知、菜单、更新提示统一走原生窗，避免被应用视图遮挡
-  a.overlays = new OverlayService({
+  // WebContentsView 是原生合成层：弹窗、通知、菜单、更新提示统一走 plane 常驻子窗，避免被应用视图遮挡
+  a.overlays = new OverlayCenter({
     windows: a.windows,
     events: a.events,
     notifications,
@@ -336,7 +336,7 @@ function setupDevices(a: Assembly): void {
     getParent: () => a.windows.shellWindow,
     captureOverlay: {
       pushCaptureSession: session => a.overlays!.pushCaptureDialog(session),
-      getCaptureWindow: () => a.windows.getOverlay('capture') ?? null,
+      getCaptureWindow: () => a.overlays!.captureSurfaceWindow(),
       dismissCaptureSession: () => a.overlays!.closeCapture(),
     },
   })

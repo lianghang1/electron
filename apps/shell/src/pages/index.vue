@@ -6,17 +6,17 @@ const { chrome, mode, forceRequiredVersion, start, dispose } = useWorkbenchBoot(
 const { tabs, activeKey, activeTab, activate, closeTab, moveTab } = useShellTabs()
 const { activeViewState, retryActive } = useViewStates(activeTab)
 
-/** 命令面板：Ctrl+K / 点击 omnibox 唤起独立浮层窗——页内渲染会被应用的 WebContentsView 整体遮挡 */
+/** 命令面板：Ctrl+K / 点击 omnibox 唤起 plane 浮层表面——页内渲染会被应用的 WebContentsView 整体遮挡 */
 function openPalette() {
-  void shell().overlay.open({ kind: 'command-palette' })
+  void shell().overlay.present({ surface: 'command-palette' })
 }
 
 function openSettings() {
-  void shell().overlay.open({ kind: 'settings' })
+  void shell().overlay.present({ surface: 'settings' })
 }
 
 function openAppCenter() {
-  void shell().overlay.open({ kind: 'app-center' })
+  void shell().overlay.present({ surface: 'app-center' })
 }
 
 function minimize() {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Minus, Square, X } from 'lucide-vue-next'
+import { Minus, Square, X } from '@lucide/vue'
 
 /** solo 窗口控制条（仅桌面形态）：拖拽区 + 当前应用名 + 三控制键，纯展示组件 */
 defineProps<{

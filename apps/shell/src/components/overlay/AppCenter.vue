@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { Search, X } from '@lucide/vue'
 import { Kbd } from '@ui/components'
-import { Search, X } from 'lucide-vue-next'
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 import { useAppCenter } from '../../composables/use-app-center'
 import { colorFor } from '../../composables/use-shell-tabs'

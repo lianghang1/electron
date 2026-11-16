@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MenuView } from '../../composables/use-overlay-state'
+import type { MenuView } from '../../overlay/types'
 
 /** 页签菜单：锚点由发起方给出，遮罩外点关闭 */
 defineProps<{

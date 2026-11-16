@@ -6,7 +6,7 @@ import type { Logger } from '@shell/kernel/logger'
 import type { AppSessionRegistry } from '@shell/kernel/session'
 import type { CallerRegistry, FlavorManifest, PlatformCapability } from '@shell/shared'
 import type { ForceUpdateGate, UpdateCenter } from '@shell/update'
-import type { OverlayService, WindowSystem } from '@shell/window'
+import type { OverlayCenter, WindowSystem } from '@shell/window'
 import { attachShellHandleLogger } from '@shell/bridge/handle'
 import { registerSettingsIpc } from '@shell/kernel/settings'
 import { ipcMain } from 'electron'
@@ -53,7 +53,7 @@ export interface ShellIpcDeps {
   flavor: FlavorManifest
   version: () => string
   markGracefulExit: () => void
-  overlays?: OverlayService
+  overlays?: OverlayCenter
 }
 
 export function registerShellIpc(deps: ShellIpcDeps): void {

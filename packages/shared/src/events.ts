@@ -92,9 +92,6 @@ export interface PlatformEvents {
   }
   // 过期产物清理报告
   'retention.cleaned': { reports: { producer: string, removed: number, bytes: number }[] }
-  // 原生浮层宿主
-  'overlay.opened': { kind: string }
-  'overlay.closed': { kind: string }
   // 运行时授权：弹窗入列与决策完成
   'permission.pending': { requestId: string, appId: string, permission: string, origin: string }
   'permission.resolved': { requestId: string, granted: boolean }
