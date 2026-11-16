@@ -1,6 +1,6 @@
 # 壳设施 IPC 域契约规范
 
-本目录定义 `window.shell` 壳设施桥面契约（`defineIpcDomain` 单一真源：通道名、分组、三端类型全部自动推导）。
+`packages/shared/src/ipc/` 定义 `window.shell` 壳设施桥面契约（`defineIpcDomain` 单一真源：通道名、分组、三端类型全部自动推导）。
 主进程注册实现在 `apps/shell/electron/main/index.ts` 与 `packages/window`（经 `shellHandle` 统一注册）；
 `packages/kernel` settings 服务经注入的 ipc 接口注册（字面量与契约派生名同形）。
 新增或修改通道必须遵守以下约定。

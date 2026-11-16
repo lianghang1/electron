@@ -521,7 +521,7 @@ function setupIpc(a: Assembly): void {
   )
 
   // 壳设施通道注册集中在 shell-ipc 模块（组合根只装配，不做通道接线）：
-  // 契约通道经 shellHandle/shellOn 注册（见 packages/shared/src/ipc/AGENTS.md），
+  // 契约通道经 shellHandle/shellOn 注册（见 agents/ipc.md），
   // 设备域与 JSAPI 单通道（domain-call / jsapi:call）在模块内保留各自错误语义。
   registerShellIpc({
     logger,

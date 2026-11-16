@@ -1,8 +1,8 @@
-# 壳平台 v2
+# 壳平台
 
-一套 Electron 壳 × N 个产品形态（Flavor）。`next` 分支是 v2 颠覆性重构：不是给旧代码打补丁，而是重新梳理边界——九包 monorepo、组合根唯一组装、SPI 策略表、依赖单向、workspace 源码直引（无逐包构建）。
+一套 Electron 壳 × N 个产品形态（Flavor）：九包 monorepo、组合根唯一组装、SPI 策略表、依赖单向、workspace 源码直引（无逐包构建）。
 
-项目尚未投产。`master` 分支与 ZCode 仓库是一等参考源：功能行为、平台差异、边界条件以源码为准。工程约定见根目录 [`AGENTS.md`](./AGENTS.md)，界面约定见 [`DESIGN.md`](./DESIGN.md)。
+工程约定见根目录 [`AGENTS.md`](./AGENTS.md)（领域规则收敛在 [`agents/`](./agents) 目录），界面约定见 [`agents/design.md`](./agents/design.md)。
 
 ## 分层
 
@@ -39,7 +39,7 @@ pnpm verify              # 干净目录里的完整验证
 |---|---|
 | `pnpm --filter @app/shell dev [-- --flavor=<id>]` | 开发启动（源码直引，零前置构建）；形态缺省 devconsole，现存 kiosk / solo-demo |
 | `pnpm guard` | 注释词表、类型逃逸、依赖边界、幽灵依赖零容忍检查 |
-| `pnpm check:design` | 把 DESIGN.md 的界面禁令变成退出码 |
+| `pnpm check:design` | 把 agents/design.md 的界面禁令变成退出码 |
 | `pnpm lint` / `pnpm typecheck` | 静态检查 |
 | `pnpm build:win` / `pnpm build:mac` / `pnpm build:linux` | 逐端打包，见 [release.md](./docs/release.md)；换形态打包加环境变量，如 `FLAVOR=kiosk pnpm build:linux` |
 | `pnpm verify` | 干净 clone 可复现验证 |

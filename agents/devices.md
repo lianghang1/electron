@@ -23,9 +23,10 @@ devices/
   （print 无厂商层，直接 `print/assets/<平台>/`），**assets 的父目录名 = 厂商名**，与驱动类同目录演进；
 - 驱动声明路径格式统一 `devices/<域>/<厂商>/<平台>/<文件>`（如 `devices/idcard/huashi/win64/Termb.dll`；
   print 无厂商层为四段 `devices/print/<平台>/<文件>`），域 + 厂商双键命名空间隔离跨域同名厂商，
-  相对宿主资源根（dev = `<应用根>/resources/`，打包 = `<resourcesPath>/resources/`）；
-- `pnpm test` 里 asset-audit.test.ts 对账「代码声明 ↔ 源资产」，目录名打错 / SDK 漏放 /
-  孤儿厂商目录直接报错终止；
+  相对宿主资源根（bundled 策略由组合根唯一解析：dev = 仓库 `resources/`，打包 = `<resourcesPath>/`，
+  聚合脚本按同一声明格式落 `resources/devices/<域>/<厂商>/<平台>/<文件>`；manual 策略 = 平台数据目录 `resources/`）；
+- 构建期聚合唯一入口是 `scripts/prepare-driver-assets.mjs`（`pnpm dev` 的 predev 与打包配置都会执行，
+  幂等先清再建）；聚合失败 / 声明无对应源资产时以退出码报错；
 - 新增信创平台 = 厂商 assets 下加 `linux-arm64/` 等平台目录 + 驱动按 `detectDevicePlatform()` 选文件，
   同步链路零改动。
 

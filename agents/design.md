@@ -1,6 +1,6 @@
-# 壳平台 v2 · 设计系统
+# 壳平台 · 设计系统
 
-本文件是界面与组件的单一事实源。`AGENTS.md` 管工程约定，本文件管视觉约定；改动界面前先读这里。颜色数值只在 `packages/ui/src/styles/tokens.css` 出现一次，本文件不复制数值。
+本文件是界面与组件的单一事实源。根目录 `AGENTS.md` 管工程约定，本文件管视觉约定；改动界面前先读这里。颜色数值只在 `packages/ui/src/styles/tokens.css` 出现一次，本文件不复制数值。
 
 ## 组件体系
 
@@ -14,7 +14,7 @@
 | `@ui/*` 别名 | `packages/ui/tsconfig.json`、`apps/shell/tsconfig.web.json`、`apps/shell/electron.vite.config.ts` 三处登记（后两者解析跟随 symlink 进入 ui 源码时必需） |
 | 业务侧消费 | 只经 `@shell/ui` 单一门面；壳内组件可直接用 `@ui/components/ui` |
 
-现有组件：`Button`、`Input`、`Dialog`（含 Content/Header/Title/Description/Footer/Close）、`Tooltip`（含 Content/Provider/Trigger）、`Switch`、`Badge`、`Separator`、`Kbd`。Button 的 `soft` 变体是项目专属（accent 派生底 + accent 前景），不在官方预设内。
+现有组件：`Badge`、`Button`、`Card`、`Dialog`（含 Content/Header/Title/Description/Footer/Close）、`Input`、`Kbd`、`Label`、`Select`、`Separator`、`Switch`、`Tabs`、`Textarea`、`Tooltip`（含 Content/Provider/Trigger）。Button 的 `soft` 变体是项目专属（accent 派生底 + accent 前景），不在官方预设内。
 
 新增组件用 `pnpm dlx shadcn-vue@latest add <name>` 并指定工作目录为 `packages/ui`；生成后必须按本文件核对别名、令牌与变体，不允许直接落库就提交。
 
