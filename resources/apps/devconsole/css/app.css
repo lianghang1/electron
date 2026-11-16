@@ -23,6 +23,17 @@
 }
 [v-cloak] { display: none; }
 * { box-sizing: border-box; }
+/* 细滚动条：滚动条常透明、悬停容器才显色——主内容区与调用流水面板双滚动区并存时不再出现双条常驻 */
+.dc-body::-webkit-scrollbar, .dc-logs::-webkit-scrollbar,
+.dc-nav::-webkit-scrollbar, .dc-log-detail::-webkit-scrollbar { width: 8px; height: 8px; }
+.dc-body::-webkit-scrollbar-track, .dc-logs::-webkit-scrollbar-track,
+.dc-nav::-webkit-scrollbar-track, .dc-log-detail::-webkit-scrollbar-track { background: transparent; }
+.dc-body::-webkit-scrollbar-thumb, .dc-logs::-webkit-scrollbar-thumb,
+.dc-nav::-webkit-scrollbar-thumb, .dc-log-detail::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
+.dc-body:hover::-webkit-scrollbar-thumb, .dc-logs:hover::-webkit-scrollbar-thumb,
+.dc-nav:hover::-webkit-scrollbar-thumb, .dc-log-detail:hover::-webkit-scrollbar-thumb { background: var(--dc-border-strong); }
+.dc-body::-webkit-scrollbar-thumb:hover, .dc-logs::-webkit-scrollbar-thumb:hover,
+.dc-nav::-webkit-scrollbar-thumb:hover, .dc-log-detail::-webkit-scrollbar-thumb:hover { background: var(--dc-text-faint); }
 html, body { height: 100%; }
 body {
   margin: 0;

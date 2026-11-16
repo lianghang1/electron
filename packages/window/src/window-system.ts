@@ -104,13 +104,15 @@ export class WindowSystem implements Startable, ViewHost {
     this.windows.clear()
   }
 
-  /** dev 模式 F12 切换 devtools（Electron 窗口默认不绑定 F12，仅 dev 态注册） */
-  private installDevToolsShortcut(win: BrowserWindow): void {
+  /** dev 模式 F12 切换 devtools（Electron 窗口默认不绑定 F12，仅 dev 态注册）；
+   *  WebContentsView 不支持 dock 挂靠，devtools 独窗承载（docked=false） */
+  private installDevToolsShortcut(wc: Electron.WebContents, docked: boolean): void {
     if (!isDevLoad()) { return }
-    win.webContents.on('before-input-event', (_event, input) => {
-      if (input.type === 'keyDown' && input.key === 'F12') {
-        win.webContents.toggleDevTools()
-      }
+    wc.on('before-input-event', (event, input) => {
+      if (input.type !== 'keyDown' || input.key !== 'F12') { return }
+      event.preventDefault()
+      if (wc.isDevToolsOpened()) { wc.closeDevTools() }
+      else { wc.openDevTools(docked ? undefined : { mode: 'detach' }) }
     })
   }
 
@@ -171,7 +173,7 @@ export class WindowSystem implements Startable, ViewHost {
     })
     this.track(win, { appId: SHELL_APP_ID, instanceId: 'shell', kind: 'shell' })
     this.applySessionGuards(win.webContents.session, 'all')
-    this.installDevToolsShortcut(win)
+    this.installDevToolsShortcut(win.webContents, true)
     // 从最小化/隐藏恢复时重放工作区：系统可能丢弃恢复前施加的 view bounds
     win.on('restore', () => this.replayContentRect())
     win.on('show', () => this.replayContentRect())
@@ -339,7 +341,7 @@ export class WindowSystem implements Startable, ViewHost {
     else { void win.loadFile(join(this.rendererDir, 'index.html'), { hash: hash.replace(/^#/, '') }) }
     this.track(win, { appId: SHELL_APP_ID, instanceId: `overlay-${policy.kind}`, kind: 'overlay' })
     this.applySessionGuards(win.webContents.session, 'all')
-    this.installDevToolsShortcut(win)
+    this.installDevToolsShortcut(win.webContents, true)
     // kiosk 钳制：owned 子窗 OS 不限制在父窗内（真机验证：右/下/负坐标三方向 setPosition
     // 均原样落位不被钳制），kiosk 全屏壳下拖出即不可达，moved 事件按父窗内容区回拉。
     if (this.flavor.mode === 'kiosk' && policy.movable) { this.installKioskBoundsClamp(win) }
@@ -517,6 +519,7 @@ export class WindowSystem implements Startable, ViewHost {
     view.setVisible(false)
 
     const { webContents } = view
+    this.installDevToolsShortcut(webContents, false)
     this.callers?.register(webContents.id, { appId: spec.appId, instanceId: spec.instanceId, kind: 'view' })
     this.applySessionGuards(webContents.session, spec.permissions ?? [])
     void webContents.loadURL(spec.url)
@@ -669,6 +672,7 @@ export class WindowSystem implements Startable, ViewHost {
     win.setMenu(null)
     const instanceId = `${spec.instanceId}:popup-${++this.popupSeq}`
     this.track(win, { appId: spec.appId, instanceId, kind: 'view' })
+    this.installDevToolsShortcut(win.webContents, false)
     this.applySessionGuards(win.webContents.session, spec.permissions ?? [])
     applyNavigationGuards(win.webContents, spec.allowedOrigins, (popupUrl, popupFeatures) =>
       this.openManagedPopup(spec, popupUrl, popupFeatures))
