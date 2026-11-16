@@ -11,7 +11,6 @@
     "dev:devconsole": "cross-env SHELL_FLAVOR=devconsole pnpm --filter @app/shell dev",
     "dev:solo-demo": "cross-env SHELL_FLAVOR=solo-demo pnpm --filter @app/shell dev",
     "dev:kiosk": "cross-env SHELL_FLAVOR=kiosk pnpm --filter @app/shell dev",
-    "dev:update-e2e": "cross-env SHELL_FLAVOR=update-e2e pnpm --filter @app/shell dev",
     "build": "pnpm --filter @app/shell build",
     "build:win": "pnpm --filter @app/shell build:win",
     "build:mac": "pnpm --filter @app/shell build:mac",

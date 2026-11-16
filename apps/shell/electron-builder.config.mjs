@@ -5,7 +5,7 @@
  * 默认只发现 electron-builder.{yml,yaml,json,json5,toml,js,cjs,ts}，不认 .mjs，
  * 故由 build:* 脚本显式 --config 传入。
  *
- * 用法：FLAVOR=update-e2e pnpm build:linux（不设 FLAVOR 默认 solo-demo）
+ * 用法：FLAVOR=<id> pnpm build:linux（不设 FLAVOR 默认 solo-demo）
  * 打包态组合根读取 <resources>/flavor.json（extraResources 注入，见 main/index.ts loadFlavor）
  */
 import { readFileSync } from 'node:fs'

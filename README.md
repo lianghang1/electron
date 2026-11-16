@@ -37,7 +37,7 @@ pnpm verify              # 干净目录里的完整验证
 
 | 命令 | 用途 |
 |---|---|
-| `pnpm --filter @app/shell dev [-- --flavor=<id>]` | 开发启动（源码直引，零前置构建）；形态缺省 solo-demo，现存 kiosk / solo-demo / update-e2e |
+| `pnpm --filter @app/shell dev [-- --flavor=<id>]` | 开发启动（源码直引，零前置构建）；形态缺省 devconsole，现存 kiosk / solo-demo |
 | `pnpm guard` | 注释词表、类型逃逸、依赖边界、幽灵依赖零容忍检查 |
 | `pnpm check:design` | 把 DESIGN.md 的界面禁令变成退出码 |
 | `pnpm lint` / `pnpm typecheck` | 静态检查 |
