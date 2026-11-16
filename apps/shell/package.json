@@ -11,6 +11,7 @@
   "homepage": "https://github.com/lianghang1/electron",
   "main": "./out/main/index.js",
   "scripts": {
+    "predev": "node ../../scripts/prepare-driver-assets.mjs",
     "dev": "electron-vite dev",
     "start": "electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
