@@ -144,7 +144,7 @@ function onDragEnd() {
   -webkit-app-region: no-drag;
 }
 .tab-idle:hover {
-  background: var(--hover);
+  background: var(--accent);
   opacity: 1;
 }
 .tab-close {
@@ -162,7 +162,7 @@ function onDragEnd() {
 }
 .tab-close:hover {
   opacity: 1 !important;
-  background: var(--hover);
+  background: var(--accent);
 }
 .tab-plus {
   transition: background 0.12s ease, color 0.12s ease;

@@ -71,7 +71,6 @@ declare global {
   const useId: typeof import('vue').useId
   const useLink: typeof import('vue-router/auto').useLink
   const useModel: typeof import('vue').useModel
-  const useOverlayState: typeof import('../composables/use-overlay-state').useOverlayState
   const usePermissionCountdown: typeof import('../composables/use-permission-countdown').usePermissionCountdown
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
@@ -95,9 +94,6 @@ declare global {
   // @ts-ignore
   export type { CapturePreviewKind, ResolutionOption, CaptureSessionUi } from '../composables/use-capture-session'
   import('../composables/use-capture-session')
-  // @ts-ignore
-  export type { NotificationItem, PermissionView, MenuView, PlaneState, OverlayState } from '../composables/use-overlay-state'
-  import('../composables/use-overlay-state')
   // @ts-ignore
   export type { ShellTab, AppSummary } from '../composables/use-shell-tabs'
   import('../composables/use-shell-tabs')

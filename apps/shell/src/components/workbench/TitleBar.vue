@@ -101,10 +101,10 @@ defineEmits<{
   transition: background 0.12s ease;
 }
 .ctrl:hover {
-  background: var(--hover);
+  background: var(--accent);
 }
 .ctrl-close:hover {
   background: var(--destructive) !important;
-  color: var(--destructive-foreground) !important;
+  color: #fff !important;
 }
 </style>

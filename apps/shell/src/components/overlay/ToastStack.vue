@@ -70,7 +70,7 @@ function relativeTime(ts?: number): string {
       @mouseenter="$emit('hover', true)"
       @mouseleave="$emit('hover', false)"
     >
-      <span class="mt-0.5 flex size-6 flex-none items-center justify-center rounded-lg" :class="task.status === 'completed' ? 'bg-emerald-500/15 text-ok' : 'bg-accent text-accent-foreground'">
+      <span class="mt-0.5 flex size-6 flex-none items-center justify-center rounded-lg" :class="task.status === 'completed' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-accent text-accent-foreground'">
         <component :is="task.status === 'completed' ? FileText : Download" :size="13" />
       </span>
       <div class="min-w-0 flex-1">
