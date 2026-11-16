@@ -13,11 +13,11 @@ defineEmits<{
 
 <template>
   <div class="absolute inset-0 z-20 flex items-center justify-center" @click.self="$emit('close')">
-    <div class="w-[420px] rounded-xl bg-popover p-5 shadow-float">
-      <div class="text-ui-base font-semibold text-foreground">
+    <div class="w-[420px] rounded-xl bg-popover p-5 shadow-lg">
+      <div class="text-sm font-semibold text-foreground">
         设备配置
       </div>
-      <div class="mt-2 text-ui-sm text-muted-foreground">
+      <div class="mt-2 text-sm text-muted-foreground">
         类别：{{ category }}
       </div>
       <div class="mt-5 flex justify-end">

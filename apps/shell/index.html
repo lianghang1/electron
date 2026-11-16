@@ -11,10 +11,10 @@
       try {
         var boot = window.shell && window.shell.shell && window.shell.shell.appearance()
         if (boot && document.documentElement) {
-          document.documentElement.style.setProperty('--dt-accent', boot.accent)
+          document.documentElement.style.setProperty('--primary', boot.accent)
           var dark = boot.theme === 'dark'
             || (boot.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
-          if (dark) { document.documentElement.dataset.theme = 'dark' }
+          if (dark) { document.documentElement.classList.add('dark') }
         }
       }
       catch {}

@@ -10,16 +10,16 @@
     style="background: #0d1117; color: #e6edf3; font-family: system-ui"
   >
     <div class="flex flex-col items-center gap-3">
-      <div class="text-ui-display leading-none">
+      <div class="text-6xl leading-none">
         ⚠
       </div>
-      <div class="text-ui-lg font-semibold">
+      <div class="text-lg font-semibold">
         设备自检中
       </div>
-      <div class="text-ui-sm" style="color: #8b949e">
+      <div class="text-sm" style="color: #8b949e">
         应用连续异常已进入恢复模式，请联系现场运维
       </div>
-      <div class="text-ui-xs" style="color: #6e7681">
+      <div class="text-xs" style="color: #6e7681">
         重启终端可恢复 · 错误已上报
       </div>
     </div>

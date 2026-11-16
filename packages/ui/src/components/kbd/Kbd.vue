@@ -2,11 +2,20 @@
 import type { HTMLAttributes } from 'vue'
 import { cn } from '@ui/lib/utils'
 
-const props = defineProps<{ class?: HTMLAttributes['class'] }>()
+const props = defineProps<{
+  class?: HTMLAttributes['class']
+}>()
 </script>
 
 <template>
-  <kbd :class="cn('inline-flex h-5 min-w-5 items-center justify-center rounded border border-border bg-muted px-1.5 font-mono text-ui-xs text-foreground-subtle', props.class)">
+  <kbd
+    :class="cn(
+      'bg-muted text-muted-foreground pointer-events-none inline-flex h-5 w-fit min-w-5 items-center justify-center gap-1 rounded-sm px-1 font-sans text-xs font-medium select-none',
+      `[&_svg:not([class*='size-'])]:size-3`,
+      '[[data-slot=tooltip-content]_&]:bg-background/20 [[data-slot=tooltip-content]_&]:text-background dark:[[data-slot=tooltip-content]_&]:bg-background/10',
+      props.class,
+    )"
+  >
     <slot />
   </kbd>
 </template>

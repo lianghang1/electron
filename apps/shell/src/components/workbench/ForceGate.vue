@@ -52,18 +52,18 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="flex h-full w-full flex-col items-center justify-center gap-5 bg-background text-foreground">
-    <div class="flex size-14 items-center justify-center rounded-icon bg-primary text-primary-foreground">
+    <div class="flex size-14 items-center justify-center rounded-lg bg-primary text-primary-foreground">
       <RefreshCw :size="26" :stroke-width="2" />
     </div>
     <div class="text-center">
-      <p class="text-ui-xl font-semibold">
+      <p class="text-xl font-semibold">
         需要更新后才能继续使用
       </p>
-      <p class="mt-1.5 text-ui-sm text-foreground-subtle">
+      <p class="mt-1.5 text-sm text-muted-foreground">
         当前版本低于最低可用版本 {{ requiredVersion ? requiredVersion : '' }}，更新完成后自动恢复
       </p>
     </div>
-    <p v-if="updateError" class="text-ui-sm text-destructive">
+    <p v-if="updateError" class="text-sm text-destructive">
       {{ updateError }}
     </p>
     <Button v-if="phase === 'restart-ready'" @click="shell().shell.relaunch()">

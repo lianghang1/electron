@@ -97,7 +97,7 @@ function visibleFields(group: SettingGroup) {
 
     <div class="set-card__body">
       <div v-for="group in schema" :key="group.key" class="mb-5 last:mb-0">
-        <p class="mb-2 text-ui-sm font-medium text-foreground-subtle">
+        <p class="mb-2 text-sm font-medium text-muted-foreground">
           {{ group.label }}
         </p>
         <div class="overflow-hidden rounded-md border border-border">
@@ -107,10 +107,10 @@ function visibleFields(group: SettingGroup) {
             class="flex items-center justify-between gap-4 border-b border-border px-3.5 py-3 last:border-b-0"
           >
             <div class="min-w-0">
-              <p class="text-ui-base text-foreground">
+              <p class="text-sm text-foreground">
                 {{ field.label }}
               </p>
-              <p v-if="field.description" class="mt-0.5 text-ui-sm text-foreground-subtle">
+              <p v-if="field.description" class="mt-0.5 text-sm text-muted-foreground">
                 {{ field.description }}
               </p>
             </div>
@@ -141,7 +141,7 @@ function visibleFields(group: SettingGroup) {
       </div>
 
       <div>
-        <p class="mb-2 text-ui-sm font-medium text-foreground-subtle">
+        <p class="mb-2 text-sm font-medium text-muted-foreground">
           应用数据
         </p>
         <div class="overflow-hidden rounded-md border border-border">
@@ -151,10 +151,10 @@ function visibleFields(group: SettingGroup) {
             class="flex items-center justify-between gap-4 border-b border-border px-3.5 py-3 last:border-b-0"
           >
             <div class="min-w-0">
-              <p class="truncate text-ui-base text-foreground">
+              <p class="truncate text-sm text-foreground">
                 {{ app.manifest.name }}
               </p>
-              <p class="mt-0.5 truncate text-ui-xs text-foreground-subtle">
+              <p class="mt-0.5 truncate text-xs text-muted-foreground">
                 {{ app.manifest.id }}
               </p>
             </div>
@@ -167,11 +167,11 @@ function visibleFields(group: SettingGroup) {
               </Button>
             </div>
           </div>
-          <p v-if="apps.length === 0" class="px-3.5 py-3 text-ui-sm text-foreground-subtle">
+          <p v-if="apps.length === 0" class="px-3.5 py-3 text-sm text-muted-foreground">
             暂无已注册应用
           </p>
         </div>
-        <p v-if="actionError" class="mt-1.5 text-ui-xs text-destructive">
+        <p v-if="actionError" class="mt-1.5 text-xs text-destructive">
           {{ actionError }}
         </p>
       </div>

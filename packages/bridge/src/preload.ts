@@ -36,8 +36,10 @@ function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'syst
 
 const bootAppearance = readBootAppearance()
 
-/** 外观注入兜底：head 内联脚本（index.html）是首帧定色第一现场——preload 执行时
-    documentElement 尚不存在，本注入被推迟到 DOMContentLoaded（首帧之后），两处同值冗余 */
+/**
+     外观注入兜底：head 内联脚本（index.html）是首帧定色第一现场——preload 执行时
+    documentElement 尚不存在，本注入被推迟到 DOMContentLoaded（首帧之后），两处同值冗余
+ */
 function injectBootAppearance(): void {
   const apply = () => {
     const root = document.documentElement

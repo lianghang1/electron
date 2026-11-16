@@ -105,21 +105,21 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
 <template>
   <div
     v-if="open"
-    class="cp-overlay fixed inset-0 z-[60] flex items-start justify-center bg-overlay"
+    class="cp-overlay fixed inset-0 z-[60] flex items-start justify-center bg-black/35"
     @click.self="close"
   >
     <div
-      class="cp-panel mt-[14vh] w-[560px] max-w-[92vw] overflow-hidden rounded-window border border-border bg-popover text-popover-foreground shadow-float"
+      class="cp-panel mt-[14vh] w-[560px] max-w-[92vw] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
       role="dialog"
       aria-modal="true"
       aria-label="打开应用"
     >
       <div class="flex h-13 items-center gap-3 border-b border-border px-4">
-        <Search :size="17" class="text-foreground-subtle" />
+        <Search :size="17" class="text-muted-foreground" />
         <input
           ref="inputEl"
           v-model="query"
-          class="cp-input min-w-0 flex-1 bg-transparent text-ui-lg text-foreground outline-none"
+          class="cp-input min-w-0 flex-1 bg-transparent text-lg text-foreground outline-none"
           placeholder="搜索应用…"
           aria-label="搜索应用"
           autocomplete="off"
@@ -130,7 +130,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
 
       <div class="cp-list max-h-[46vh] overflow-y-auto py-1.5" role="listbox" aria-label="应用列表">
         <template v-if="recentItems.length">
-          <p class="px-4 py-1.5 text-ui-sm font-medium text-foreground-subtle">
+          <p class="px-4 py-1.5 text-sm font-medium text-muted-foreground">
             最近使用
           </p>
           <div
@@ -145,15 +145,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
             @click="choose(item.id)"
           >
             <AppWindow :size="16" class="text-muted-foreground" />
-            <span class="flex-1 truncate text-ui-base text-foreground">{{ item.name }}</span>
-            <span class="text-ui-sm text-foreground-subtle">{{ item.kind }}</span>
+            <span class="flex-1 truncate text-sm text-foreground">{{ item.name }}</span>
+            <span class="text-sm text-muted-foreground">{{ item.kind }}</span>
             <Kbd v-if="highlighted === i">↵</Kbd>
           </div>
           <Separator v-if="restItems.length" class="my-1.5" />
         </template>
 
         <template v-if="restItems.length">
-          <p class="px-4 py-1.5 text-ui-sm font-medium text-foreground-subtle">
+          <p class="px-4 py-1.5 text-sm font-medium text-muted-foreground">
             {{ recentItems.length ? '全部应用' : '应用' }}
           </p>
           <div
@@ -168,18 +168,18 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
             @click="choose(item.id)"
           >
             <AppWindow :size="16" class="text-muted-foreground" />
-            <span class="flex-1 truncate text-ui-base text-foreground">{{ item.name }}</span>
-            <span class="text-ui-sm text-foreground-subtle">{{ item.kind }}</span>
+            <span class="flex-1 truncate text-sm text-foreground">{{ item.name }}</span>
+            <span class="text-sm text-muted-foreground">{{ item.kind }}</span>
             <Kbd v-if="highlighted === recentItems.length + j">↵</Kbd>
           </div>
         </template>
 
-        <p v-if="flat.length === 0" class="px-4 py-8 text-center text-ui-base text-foreground-subtle">
+        <p v-if="flat.length === 0" class="px-4 py-8 text-center text-sm text-muted-foreground">
           {{ items.length === 0 ? '暂无应用——flavor.json 的 apps 清单为空' : '没有匹配的应用' }}
         </p>
       </div>
 
-      <div class="flex items-center gap-3 border-t border-border px-4 py-2 text-ui-sm text-foreground-subtle">
+      <div class="flex items-center gap-3 border-t border-border px-4 py-2 text-sm text-muted-foreground">
         <span>↑↓ 选择</span>
         <span>↵ 打开</span>
         <span>Esc 关闭</span>
@@ -191,7 +191,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
 
 <style scoped>
 .cp-input::placeholder {
-  color: var(--foreground-subtle);
+  color: var(--muted-foreground);
 }
 .cp-row-active {
   background: var(--hover);

@@ -2,8 +2,7 @@ import type { ThemePreference } from '@shell/shared'
 
 /**
  * 外观运行时：flavor 主色 + 用户主题偏好落到 :root。
- * 与 tokens.css 的分工——tokens 定义静态令牌与派生规则（color-mix），
- * 本模块只覆写两个输入变量（--dt-accent / data-theme），派生量自动跟随。
+ * 机制即 shadcn-vue 官方约定：主色注入 --primary 变量，深浅主题用 .dark class 切换。
  */
 
 let systemListener: ((e: MediaQueryListEvent) => void) | undefined
@@ -22,7 +21,7 @@ function resolve(pref: ThemePreference): 'light' | 'dark' {
 /** 应用主色：合法 Hex 生效；空值回退部署品牌色 */
 export function applyAccent(accent: string): void {
   const value = /^#[0-9a-f]{6}$/i.test(accent) ? accent : brandAccent
-  document.documentElement.style.setProperty('--dt-accent', value)
+  document.documentElement.style.setProperty('--primary', value)
 }
 
 /** 应用主题：system 时跟随系统变化；重复调用不叠加监听 */
@@ -41,8 +40,7 @@ export function applyTheme(pref: ThemePreference): void {
 }
 
 function paint(resolved: 'light' | 'dark'): void {
-  if (resolved === 'dark') { document.documentElement.dataset.theme = 'dark' }
-  else { document.documentElement.removeAttribute('data-theme') }
+  document.documentElement.classList.toggle('dark', resolved === 'dark')
 }
 
 /** 挂载前一次性 bootstrap（同步，无 IPC） */

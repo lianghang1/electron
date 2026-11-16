@@ -104,8 +104,10 @@ export class WindowSystem implements Startable, ViewHost {
     this.windows.clear()
   }
 
-  /** dev 模式 F12 切换 devtools（Electron 窗口默认不绑定 F12，仅 dev 态注册）；
-   *  WebContentsView 不支持 dock 挂靠，devtools 独窗承载（docked=false） */
+  /**
+   * dev 模式 F12 切换 devtools（Electron 窗口默认不绑定 F12，仅 dev 态注册）；
+   *  WebContentsView 不支持 dock 挂靠，devtools 独窗承载（docked=false）
+   */
   private installDevToolsShortcut(wc: Electron.WebContents, docked: boolean): void {
     if (!isDevLoad()) { return }
     wc.on('before-input-event', (event, input) => {

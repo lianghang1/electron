@@ -14,10 +14,10 @@ defineEmits<{
 </script>
 
 <template>
-  <header class="flex h-chrome-solo items-center border-b border-border bg-glass">
+  <header class="flex h-chrome-solo items-center border-b border-border bg-background/85">
     <span class="titlebar-drag h-full min-w-3 flex-1" />
     <!-- solo 直出态：名称跟平台单应用态同语义（窗口框里显示当前应用名） -->
-    <span v-if="title" class="truncate text-ui-sm font-medium text-foreground">
+    <span v-if="title" class="truncate text-sm font-medium text-foreground">
       {{ title }}
     </span>
     <span class="titlebar-drag h-full min-w-3 flex-1" />

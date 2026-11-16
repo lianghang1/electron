@@ -84,7 +84,7 @@ function onDragEnd() {
     <div
       v-for="tab in tabs"
       :key="tab.key"
-      class="tab group flex h-7 shrink-0 cursor-default items-center gap-1.5 rounded-md px-2 text-ui-sm"
+      class="tab group flex h-7 shrink-0 cursor-default items-center gap-1.5 rounded-md px-2 text-sm"
       :class="{
         'tab-active bg-accent text-accent-foreground font-medium': tab.key === activeKey,
         'tab-idle opacity-75': tab.key !== activeKey,
@@ -101,7 +101,7 @@ function onDragEnd() {
       <!-- 徽标：应用图标优先，缺席退首字；哈希色只作底，顶栏彩色面积收敛到 14px -->
       <span class="tab-mark grid size-3.5 shrink-0 place-items-center overflow-hidden rounded-sm" :style="{ background: tab.iconColor }" aria-hidden="true">
         <img v-if="tab.icon" :src="tab.icon" alt="" class="size-3.5 object-cover">
-        <span v-else class="text-ui-xs leading-none font-semibold text-white">{{ tab.title.slice(0, 1) }}</span>
+        <span v-else class="text-xs leading-none font-semibold text-white">{{ tab.title.slice(0, 1) }}</span>
       </span>
       <span v-if="tab.key === activeKey" class="max-w-32 truncate">{{ tab.title }}</span>
       <span v-else class="sr-only">{{ tab.title }}</span>
@@ -110,7 +110,7 @@ function onDragEnd() {
       </button>
     </div>
     <button
-      class="tab-plus flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-foreground-subtle transition-colors hover:bg-hover hover:text-foreground"
+      class="tab-plus flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       title="打开应用中心"
       aria-label="打开应用中心"
       @click="emit('openAppCenter')"

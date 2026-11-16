@@ -1,24 +1,19 @@
 <script setup lang="ts">
-import { TooltipRoot } from 'reka-ui'
-import TooltipContent from './TooltipContent.vue'
-import TooltipProvider from './TooltipProvider.vue'
-import TooltipTrigger from './TooltipTrigger.vue'
+import type { TooltipRootEmits, TooltipRootProps } from 'reka-ui'
+import { TooltipRoot, useForwardPropsEmits } from 'reka-ui'
 
-withDefaults(defineProps<{
-  text: string
-  side?: 'top' | 'right' | 'bottom' | 'left'
-}>(), { side: 'right' })
+const props = defineProps<TooltipRootProps>()
+const emits = defineEmits<TooltipRootEmits>()
+
+const forwarded = useForwardPropsEmits(props, emits)
 </script>
 
 <template>
-  <TooltipProvider>
-    <TooltipRoot>
-      <TooltipTrigger>
-        <slot />
-      </TooltipTrigger>
-      <TooltipContent :side="side">
-        {{ text }}
-      </TooltipContent>
-    </TooltipRoot>
-  </TooltipProvider>
+  <TooltipRoot
+    v-slot="slotProps"
+    data-slot="tooltip"
+    v-bind="forwarded"
+  >
+    <slot v-bind="slotProps" />
+  </TooltipRoot>
 </template>

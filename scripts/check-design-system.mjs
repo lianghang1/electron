@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // 设计系统护栏：源码纪律与构建产物语义类分开判定，退出码即结论。
 // check 只查 .vue 模板，css 只在 build 之后查产物；两者都不依赖网络与第三方包。
+// 组件与令牌即 shadcn-vue 官方体系（slate, Tailwind v4）——本脚本守其消费纪律。
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { extname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
@@ -15,62 +16,57 @@ const ROOT = rootAt >= 0 ? resolve(args[rootAt + 1]) : DEFAULT_ROOT
 const SCAN_DIRS = [join(ROOT, 'packages/ui/src'), join(ROOT, 'apps/shell/src')]
 const CSS_DIR = join(ROOT, 'apps/shell/out/renderer/assets')
 
-// 只卡「模板里直接绕过语义层」的三类写法；物理层定义处（.css）与注入点（.ts）不在此列
+// 模板里禁止绕过语义层的写法：不引用自造物理令牌、不写任意字号
 const SOURCE_RULES = [
-  { id: 'design/physical-token', re: /var\(--dt-/, hint: '模板直接引用物理层令牌，改用语义类' },
-  { id: 'design/arbitrary-size', re: /text-\[\d+px\]/, hint: '任意字号，改用 text-ui-* 阶梯' },
-  { id: 'design/builtin-size', re: /text-(?:xs|sm|base|lg|xl|2xl)\b/, hint: 'Tailwind 内置字号，改用 text-ui-* 阶梯' },
+  { id: 'design/physical-token', re: /var\(--dt-/, hint: '模板直接引用物理层令牌，改用官方语义类' },
+  { id: 'design/arbitrary-size', re: /text-\[\d+px\]/, hint: '任意字号，改用官方字号档位' },
 ]
 
 // 实际被消费的语义类；Tailwind 按需生成，未使用的档位不列入
 const REQUIRED_CLASSES = [
   'bg-background',
+  'bg-background\\/85',
   'text-foreground',
   'bg-primary',
-  'text-primary-foreground',
-  'bg-card',
-  'border-border',
-  'rounded-md',
-  'rounded-window',
-  'rounded-icon',
-  'shadow-card',
-  'shadow-float',
-  'shadow-window',
-  'text-ui-xs',
-  'text-ui-sm',
-  'text-ui-caption',
-  'text-ui-base',
-  'text-ui-lg',
-  'text-ui-display',
-  'h-chrome-solo',
-  'bg-overlay',
-  'bg-glass',
   'bg-popover',
-  'text-foreground-subtle',
+  'bg-card',
   'bg-accent',
-  'text-accent-foreground',
+  'border-border',
+  'text-muted-foreground',
+  'text-popover-foreground',
+  'text-xs',
+  'text-sm',
+  'text-lg',
+  'text-6xl',
+  'rounded-md',
+  'rounded-lg',
+  'rounded-xl',
+  'shadow-sm',
+  'shadow-lg',
+  'h-chrome-solo',
   'bg-destructive',
   'backdrop-blur-xl',
   'bg-linear-to-br',
 ]
 
-// inline 生效的机器证明：工具类必须引用 var()，而不是被固化成静态值
+// inline 生效的机器证明：工具类必须引用 var()（@theme inline 会把「值即 var()」
+// 内联进工具类），而不是被固化成静态值；radius 系经 calc 组合，查 --radius 引用
 const INLINE_RULES = [
   { cls: 'bg-primary', must: 'var(--primary)' },
+  { cls: 'bg-accent', must: 'var(--accent)' },
+  { cls: 'bg-popover', must: 'var(--popover)' },
   { cls: 'border-border', must: 'var(--border)' },
+  { cls: 'text-muted-foreground', must: 'var(--muted-foreground)' },
   { cls: 'rounded-md', must: 'var(--radius)' },
-  { cls: 'shadow-card', must: 'var(--elevation-card)' },
-  { cls: 'bg-overlay', must: 'var(--overlay)' },
-  { cls: 'text-ui-base', must: 'var(--ui-font-size)' },
-  { cls: 'text-ui-sm', must: 'calc(var(--ui-font-size)' },
 ]
 
+// 主题定义只在源文件可查：@theme 指令在构建时被消费，不进产物
+const TOKENS_CSS = join(ROOT, 'packages/ui/src/styles/tokens.css')
 const THEME_DEFS = [
-  '--primary: var(--dt-accent)',
-  '--background: var(--dt-page)',
-  '--ui-font-size: 13px',
-  '--dt-accent:',
-  /data-theme=['"]?dark['"]?/,
+  '--background: oklch',
+  /@theme inline/,
+  /(?<![\w-])\.dark\s*\{/,
+  /(?<![\w-])--radius:/,
 ]
 
 function* vueFiles(dir) {
@@ -117,6 +113,7 @@ function checkSource() {
 function checkCss() {
   const css = loadCss()
   if (!css) { return { bad: ['未找到 renderer CSS 产物，请先执行 pnpm build'] } }
+  const tokens = existsSync(TOKENS_CSS) ? readFileSync(TOKENS_CSS, 'utf8') : ''
   const bad = []
   for (const cls of REQUIRED_CLASSES) {
     if (!ruleBody(css, cls)) { bad.push(`design/missing-class  .${cls} 未生成`) }
@@ -128,8 +125,8 @@ function checkCss() {
     }
   }
   for (const def of THEME_DEFS) {
-    const found = typeof def === 'string' ? css.includes(def) : def.test(css)
-    if (!found) { bad.push(`design/missing-def  ${def} 缺失`) }
+    const re = def instanceof RegExp ? def : new RegExp(def.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    if (!re.test(tokens)) { bad.push(`design/missing-def  ${def} 缺失`) }
   }
   return { bad }
 }

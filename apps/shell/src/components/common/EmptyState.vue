@@ -24,13 +24,13 @@ onBeforeUnmount(() => clearInterval(timer))
 
 <template>
   <div class="relative flex h-full w-full flex-col items-center justify-center bg-linear-to-br from-secondary to-background">
-    <div class="clock text-ui-display leading-none text-foreground">
+    <div class="clock text-6xl leading-none text-foreground">
       {{ time }}
     </div>
-    <div class="mt-3 text-ui-base text-muted-foreground">
+    <div class="mt-3 text-sm text-muted-foreground">
       {{ date }}
     </div>
-    <p class="absolute bottom-2.5 right-4 text-ui-sm text-foreground-subtle">
+    <p class="absolute bottom-2.5 right-4 text-sm text-muted-foreground">
       v{{ version }}
     </p>
   </div>

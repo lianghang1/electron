@@ -36,7 +36,7 @@ const statusText: Record<string, string> = {
 const chipInfo = { icon: Bell, class: 'bg-accent text-accent-foreground' } as const
 const levelChip: Record<string, { icon: Component, class: string }> = {
   info: chipInfo,
-  success: { icon: Check, class: 'bg-ok/15 text-ok' },
+  success: { icon: Check, class: 'bg-emerald-500/15 text-ok' },
   warning: { icon: AlertTriangle, class: 'bg-warn/15 text-warn' },
   error: { icon: AlertCircle, class: 'bg-destructive/15 text-destructive' },
 }
@@ -64,44 +64,44 @@ function relativeTime(ts?: number): string {
     <div
       v-for="task in downloads"
       :key="task.id"
-      class="group pointer-events-auto relative flex gap-2 rounded-xl bg-popover p-3 shadow-float"
+      class="group pointer-events-auto relative flex gap-2 rounded-xl bg-popover p-3 shadow-lg"
       :title="task.path"
       @mouseenter="$emit('hover', true)"
       @mouseleave="$emit('hover', false)"
     >
-      <span class="mt-0.5 flex size-6 flex-none items-center justify-center rounded-lg" :class="task.status === 'completed' ? 'bg-ok/15 text-ok' : 'bg-accent text-accent-foreground'">
+      <span class="mt-0.5 flex size-6 flex-none items-center justify-center rounded-lg" :class="task.status === 'completed' ? 'bg-emerald-500/15 text-ok' : 'bg-accent text-accent-foreground'">
         <component :is="task.status === 'completed' ? FileText : Download" :size="13" />
       </span>
       <div class="min-w-0 flex-1">
         <div class="flex items-baseline gap-2 pr-4">
-          <span class="min-w-0 flex-1 truncate text-ui-caption font-semibold text-foreground">{{ task.filename }}</span>
-          <span class="flex-none text-ui-xs text-foreground-subtle">
+          <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{{ task.filename }}</span>
+          <span class="flex-none text-xs text-muted-foreground">
             {{ statusText[task.status] ?? task.status }}<template v-if="task.status === 'progressing' && task.percent >= 0"> · {{ task.percent }}%</template><template v-if="task.total > 0"> · {{ formatBytes(task.total) }}</template>
           </span>
         </div>
         <div
           v-if="task.status === 'progressing' && task.percent >= 0"
-          class="mt-1.5 h-0.5 overflow-hidden rounded-full bg-hover"
+          class="mt-1.5 h-0.5 overflow-hidden rounded-full bg-accent"
         >
           <div class="h-full rounded-full bg-primary transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
         </div>
         <div v-if="task.status === 'completed'" class="mt-1.5 flex gap-1">
-          <button class="rounded-md px-1.5 py-0.5 text-ui-xs font-medium text-primary transition-colors hover:bg-hover" @click="$emit('openDownload', task.id)">
+          <button class="rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-accent" @click="$emit('openDownload', task.id)">
             打开
           </button>
-          <button class="rounded-md px-1.5 py-0.5 text-ui-xs font-medium text-primary transition-colors hover:bg-hover" @click="$emit('revealDownload', task.id)">
+          <button class="rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-accent" @click="$emit('revealDownload', task.id)">
             文件夹
           </button>
         </div>
       </div>
-      <button class="absolute right-2 top-2 text-foreground-subtle opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100" aria-label="关闭下载卡" @click="$emit('dismissDownload', task.id)">
+      <button class="absolute right-2 top-2 text-muted-foreground opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100" aria-label="关闭下载卡" @click="$emit('dismissDownload', task.id)">
         <X :size="12" />
       </button>
     </div>
     <div
       v-for="item in notifications"
       :key="item.id"
-      class="pointer-events-auto group relative flex gap-2 rounded-xl bg-popover p-3 shadow-float"
+      class="pointer-events-auto group relative flex gap-2 rounded-xl bg-popover p-3 shadow-lg"
       @mouseenter="$emit('hover', true)"
       @mouseleave="$emit('hover', false)"
     >
@@ -110,16 +110,16 @@ function relativeTime(ts?: number): string {
       </span>
       <div class="min-w-0 flex-1 pr-4">
         <div class="flex items-baseline gap-2">
-          <span class="min-w-0 flex-1 truncate text-ui-caption font-semibold text-foreground">{{ item.title }}</span>
-          <span class="flex-none text-ui-xs text-foreground-subtle">{{ relativeTime(item.createdAt) }}</span>
+          <span class="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">{{ item.title }}</span>
+          <span class="flex-none text-xs text-muted-foreground">{{ relativeTime(item.createdAt) }}</span>
         </div>
-        <div v-if="item.appName || item.body" class="mt-0.5 line-clamp-2 text-ui-xs text-muted-foreground">
+        <div v-if="item.appName || item.body" class="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
           {{ item.appName }}<template v-if="item.appName && item.body">
             ·
           </template>{{ item.body }}
         </div>
       </div>
-      <button class="absolute right-2 top-2 text-foreground-subtle opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭通知" @click="$emit('dismissNotification', item.id)">
+      <button class="absolute right-2 top-2 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭通知" @click="$emit('dismissNotification', item.id)">
         <X :size="12" />
       </button>
     </div>
@@ -130,7 +130,7 @@ function relativeTime(ts?: number): string {
       @mouseenter="$emit('hover', true)"
       @mouseleave="$emit('hover', false)"
     >
-      <button class="rounded-md bg-popover px-2 py-1 text-ui-xs font-medium text-primary shadow-float transition-colors hover:bg-hover" @click="$emit('clearNotifications')">
+      <button class="rounded-md bg-popover px-2 py-1 text-xs font-medium text-primary shadow-lg transition-colors hover:bg-accent" @click="$emit('clearNotifications')">
         全部清除
       </button>
     </div>

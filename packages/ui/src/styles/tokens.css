@@ -1,118 +1,89 @@
 /*
- * 设计令牌单一事实源。三层结构：
- *   物理层 dt-*：原始色值、flavor 主色注入点、深浅主题覆盖。
- *   语义层：shadcn-vue 官方变量，值只引用物理层，不在此处写死颜色。
- *   消费层：@theme inline 把语义变量注册成 Tailwind 工具类。
- * 组件只消费语义类，不直接引用 dt-*；新增主题只需改物理层一处。
+ * shadcn-vue 官方默认主题（base color: slate，Tailwind v4 oklch 值，与 CLI init 同源）。
+ * 仅三处项目必需项（非样式创造）：
+ *   1. @source 显式扫描——Tailwind v4 自动检测忽略 node_modules 下的 workspace 包
+ *      （@shell/ui 以 symlink 被消费），壳组件的工具类必须手动圈进来。
+ *   2. body 不涂底色——壳窗全程磨砂材质（acrylic/vibrancy），body 不透明底会在
+ *      CSS bundle 到达时盖死系统材质（启动期黑帧根因，见 presets.ts）。
+ *   3. --spacing-chrome-solo——solo 档 30px 控制条的产品定版尺寸。
  */
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
-/* 显式声明扫描源：Tailwind v4 自动检测会忽略 node_modules 下的 workspace 包
-   （@shell/ui 以 symlink 形式被消费），壳组件的工具类必须手动圈进来。 */
 @source '../../src';
 @source '../../../../apps/shell/src';
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  /* 物理层 · 表面三层：页面底 → 窗口玻璃 → 悬浮件 */
-  --dt-page: #dfe7f6;
-  --dt-glass: rgba(240, 245, 253, 0.86);
-  --dt-surface: #ffffff;
-  --dt-surface-hover: #f2f6fd;
-  --dt-line: rgba(148, 163, 199, 0.28);
-  --dt-line-strong: rgba(148, 163, 199, 0.48);
-
-  /* 物理层 · 文字 */
-  --dt-text-1: #1c2433;
-  --dt-text-2: #5b6879;
-  --dt-text-3: #97a1b5;
-
-  /* 物理层 · 强调与语义：唯一彩色来源，派生量自动跟随注入值 */
-  --dt-accent: #3b82f6;
-  --dt-accent-soft: color-mix(in srgb, var(--dt-accent) 14%, transparent);
-  --dt-accent-hover: color-mix(in srgb, var(--dt-accent) 88%, #000);
-  --dt-on-accent: #ffffff;
-  /* 强调底上的文字色：深色主题单独提亮，避免与半透明强调底撞色 */
-  --dt-accent-ink: var(--dt-accent);
-  --dt-hover: rgba(148, 163, 199, 0.14);
-  --dt-ok: #22c55e;
-  --dt-warn: #f59e0b;
-  --dt-danger: #ef4444;
-
-  /* 物理层 · 阴影与边界：无边框窗口靠内描边建立边界感，浮层用两级投影建立悬浮层次 */
-  --dt-shadow-1: 0 1px 2px rgb(28 36 51 / 0.06), 0 4px 16px rgb(28 36 51 / 0.08);
-  --dt-shadow-2: 0 2px 8px rgb(2 8 20 / 0.06), 0 12px 32px rgb(2 8 20 / 0.14);
-  --dt-blur: blur(20px) saturate(1.4);
-
-  /* 物理层 · 几何 */
-  --dt-radius-window: 12px;
-  --dt-radius: 8px;
-  --dt-radius-icon: 10px;
-
-  /* 全局字号：唯一输入，字号阶梯由它派生 */
-  --ui-font-size: 13px;
-
-  /* 语义层 · shadcn-vue 官方变量，全部映射到物理层 */
-  --background: var(--dt-page);
-  --foreground: var(--dt-text-1);
-  --card: var(--dt-surface);
-  --card-foreground: var(--dt-text-1);
-  --popover: var(--dt-surface);
-  --popover-foreground: var(--dt-text-1);
-  --primary: var(--dt-accent);
-  --primary-foreground: var(--dt-on-accent);
-  --secondary: var(--dt-surface-hover);
-  --secondary-foreground: var(--dt-text-1);
-  --muted: var(--dt-surface-hover);
-  --muted-foreground: var(--dt-text-2);
-  --accent: var(--dt-accent-soft);
-  --accent-foreground: var(--dt-accent-ink);
-  --destructive: var(--dt-danger);
-  --destructive-foreground: var(--dt-on-accent);
-  --border: var(--dt-line);
-  --input: var(--dt-line);
-  --ring: var(--dt-accent);
-  --radius: var(--dt-radius);
-
-  /* 语义层 · 项目扩展：玻璃表面、弱化文字、悬浮底 */
-  --glass: var(--dt-glass);
-  --foreground-subtle: var(--dt-text-3);
-  --hover: var(--dt-hover);
-  --overlay: rgba(15, 23, 42, 0.32);
-  --elevation-card: var(--dt-shadow-1);
-  --elevation-float: var(--dt-shadow-2);
-
-  color-scheme: light;
-  font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.129 0.042 264.695);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.129 0.042 264.695);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.129 0.042 264.695);
+  --primary: oklch(0.208 0.042 265.755);
+  --primary-foreground: oklch(0.984 0.003 247.858);
+  --secondary: oklch(0.968 0.007 247.896);
+  --secondary-foreground: oklch(0.208 0.042 265.755);
+  --muted: oklch(0.968 0.007 247.896);
+  --muted-foreground: oklch(0.554 0.046 257.417);
+  --accent: oklch(0.968 0.007 247.896);
+  --accent-foreground: oklch(0.208 0.042 265.755);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.929 0.013 255.508);
+  --input: oklch(0.929 0.013 255.508);
+  --ring: oklch(0.704 0.04 256.788);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
+  --radius: 0.625rem;
 }
 
-/* 深色只覆盖物理层：语义层全部是变量引用，自动跟随，零重复 */
-:root[data-theme='dark'] {
-  --dt-page: #0b0f16;
-  --dt-glass: rgba(22, 27, 34, 0.86);
-  --dt-surface: #161b22;
-  --dt-surface-hover: #21262d;
-  --dt-line: rgba(139, 148, 158, 0.22);
-  --dt-line-strong: rgba(139, 148, 158, 0.38);
-  --dt-text-1: #e6edf3;
-  --dt-text-2: #a0aab5;
-  --dt-text-3: #6e7681;
-  --dt-hover: rgba(139, 148, 158, 0.16);
-  --dt-accent-soft: color-mix(in srgb, var(--dt-accent) 24%, transparent);
-  --dt-accent-ink: color-mix(in srgb, var(--dt-accent) 40%, #ffffff);
-  --dt-ok: #3fb950;
-  --dt-warn: #d29922;
-  --dt-danger: #f85149;
-  --dt-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 16px rgb(0 0 0 / 0.35);
-  --dt-shadow-2: 0 2px 8px rgb(0 0 0 / 0.28), 0 12px 32px rgb(0 0 0 / 0.4);
-  --dt-blur: blur(20px) saturate(1.2);
-
-  color-scheme: dark;
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
-/*
- * inline 关键字让工具类直接引用 var()，而不是把值固化进 --color-*。
- * 缺了它，flavor 主色注入与深浅主题切换都不会反映到已生成的类上。
- */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -129,75 +100,35 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-glass: var(--glass);
-  --color-surface: var(--dt-surface);
-  --color-surface-hover: var(--dt-surface-hover);
-  --color-page: var(--dt-page);
-  --color-hover: var(--hover);
-  --color-foreground-subtle: var(--foreground-subtle);
-  --color-ok: var(--dt-ok);
-  --color-warn: var(--dt-warn);
-  --color-overlay: var(--overlay);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 
-  /* 覆盖 Tailwind 的 md 档，让官方组件习惯的 rounded-md 与项目圆角一致 */
-  --radius-md: var(--radius);
-  --radius-window: var(--dt-radius-window);
-  --radius-icon: var(--dt-radius-icon);
-
-  --shadow-card: var(--elevation-card);
-  --shadow-float: var(--elevation-float);
-  --shadow-window: inset 0 0 0 1px var(--border);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 
   /* 布局刻度：solo 档 30px 控制条是产品定版尺寸 */
   --spacing-chrome-solo: 30px;
-
-  --text-ui-xs: calc(var(--ui-font-size) - 3px);
-  --text-ui-sm: calc(var(--ui-font-size) - 2px);
-  --text-ui-caption: calc(var(--ui-font-size) - 1px);
-  --text-ui-base: var(--ui-font-size);
-  --text-ui-lg: calc(var(--ui-font-size) + 2px);
-  --text-ui-xl: calc(var(--ui-font-size) + 5px);
-  --text-ui-display: 64px;
 }
-
-/* 键盘可达：焦点环只在键盘导航时显形（鼠标点击不触发） */
-:where(button, a, input, [tabindex]):focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-
-/* 细窄滚动条：灰阶、不抢视觉 */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--dt-line-strong) transparent;
-}
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb {
-  background: var(--dt-line-strong);
-  border-radius: 8px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-::-webkit-scrollbar-track { background: transparent; }
 
 @layer base {
-  /* body 保持透明：壳窗全程磨砂材质（acrylic/vibrancy）由页面根容器自行铺垫
-     （工作台 bg-background / overlay 刻意透明 / recovery 内联深底），
-     body 涂 page 色会在 bundle 到达时盖死启动期磨砂 */
+  /* 只定文字色，不涂底色——磨砂链路红线（见文件头注释 2） */
   body {
     color: var(--foreground);
-    font-size: var(--ui-font-size);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
   }
 }

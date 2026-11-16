@@ -49,16 +49,16 @@ const { dockEl } = useViewDock()
           <svg viewBox="0 0 24 24" width="28" height="28" class="animate-spin" aria-hidden="true">
             <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="44" />
           </svg>
-          <p v-if="activeTab" class="text-ui-sm">
+          <p v-if="activeTab" class="text-sm">
             正在加载「{{ activeTab.title }}」…
           </p>
         </div>
         <div v-else class="flex flex-col items-center gap-4 text-primary-foreground">
-          <p class="text-ui-lg font-medium">
+          <p class="text-lg font-medium">
             页面加载失败
           </p>
           <button
-            class="rounded-md bg-primary-foreground px-4 py-1.5 text-ui-base font-medium text-primary transition-colors hover:bg-surface-hover"
+            class="rounded-md bg-primary-foreground px-4 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-accent"
             @click="$emit('retry')"
           >
             重试

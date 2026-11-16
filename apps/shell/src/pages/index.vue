@@ -50,7 +50,7 @@ onBeforeUnmount(() => {
 <template>
   <WorkbenchForceGate v-if="forceRequiredVersion !== null" class="h-full w-full" />
   <div v-else class="shell h-screen w-screen overflow-hidden bg-background">
-    <div class="shell-window relative flex h-full w-full flex-col rounded-window bg-glass shadow-window backdrop-blur-xl backdrop-saturate-150">
+    <div class="shell-window relative flex h-full w-full flex-col rounded-xl bg-background/85 ring-1 ring-border backdrop-blur-xl backdrop-saturate-150">
       <!-- 平台档：自适应标题栏（logo + tabs + omnibox + 窗口控制） -->
       <WorkbenchTitleBar
         v-if="chrome === 'platform'"

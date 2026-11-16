@@ -46,7 +46,7 @@ defineEmits<{
     <!-- omnibox：两侧弹性占位让它视觉居中，剩余空白仍是拖拽区 -->
     <div class="titlebar-drag min-w-3 flex-1" />
     <button
-      class="omnibox flex h-6.5 w-72 items-center gap-2 rounded-full bg-surface-hover px-3 text-left text-ui-sm text-foreground-subtle transition-colors hover:bg-hover"
+      class="omnibox flex h-6.5 w-72 items-center gap-2 rounded-full bg-accent px-3 text-left text-sm text-muted-foreground transition-colors hover:bg-accent"
       title="搜索、跳转或执行命令（Ctrl+K）"
       @click="$emit('openPalette')"
     >
