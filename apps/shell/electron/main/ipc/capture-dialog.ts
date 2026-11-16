@@ -1,6 +1,6 @@
 import type { AppService } from '@shell/app-runtime'
-import type { DeviceGateway } from '@shell/devices'
 import type { CallerRegistry, CaptureResult } from '@shell/shared'
+import type { CaptureDialogSessionService } from '../capture-dialog'
 import { registerIpcDomain } from '@shell/bridge/handle'
 import { captureDialogDomain } from '@shell/shared/ipc'
 import { callerOf } from './caller'
@@ -8,13 +8,14 @@ import { callerOf } from './caller'
 export interface CaptureDialogIpcDeps {
   callers: CallerRegistry
   apps: AppService
-  devices: DeviceGateway
+  /** 壳层拍摄浮层会话编排（组合根装配；拍摄能力未启用时缺省） */
+  dialog?: CaptureDialogSessionService
 }
 
 /**
- * captureDialog 域注册：拍摄浮层会话（master ipc/capture.ts）——发起方身份从账本反查，
- * 浮层内操作按窗口归属校验。frame 推送由 devices 拍摄域直推浮层窗，不在注册面。
- * 拍摄系统未装配时以错误拒绝（bootstrap 未配置 capture 属配置错误，渲染层按码提示）。
+ * captureDialog 域注册：拍摄浮层会话（编排见 ../capture-dialog.ts）——发起方身份从账本反查，
+ * 浮层内操作按窗口归属校验。frame 推送由壳编排直推浮层窗，不在注册面。
+ * 拍摄编排未装配时以错误拒绝（bootstrap 未配置 capture 属配置错误，渲染层按码提示）。
  */
 export function registerCaptureDialogIpc(deps: CaptureDialogIpcDeps): void {
   const confirmResults = (input: unknown): CaptureResult[] => {
@@ -25,9 +26,8 @@ export function registerCaptureDialogIpc(deps: CaptureDialogIpcDeps): void {
     })
   }
   const dialog = () => {
-    const captureDialog = deps.devices.captureDialog
-    if (!captureDialog) { throw new Error('拍摄系统未装配（bootstrap 未配置 capture）') }
-    return captureDialog
+    if (!deps.dialog) { throw new Error('拍摄系统未装配（bootstrap 未配置 capture）') }
+    return deps.dialog
   }
   registerIpcDomain(captureDialogDomain, {
     open: (event, input) => {

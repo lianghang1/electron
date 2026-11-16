@@ -1,12 +1,24 @@
+import type { CaptureSystem } from '@shell/devices'
 import type { CaptureCameraInfo, CaptureDevice, CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSession, CaptureResult, DomainIpcSender } from '@shell/shared'
 import type { WebContents } from 'electron'
-import type { CaptureSystem } from './index'
-import type { CaptureOverlayHost } from './overlay-host'
+import { captureError } from '@shell/devices'
 import { PlatformError } from '@shell/shared'
-import { captureError } from './errors'
 
 /** 确认回传后的浮层宽限收场时长（ms）：发起页拿到结果并渲染后再关浮层 */
 const CONFIRM_SETTLE_MS = 300
+
+/**
+ * 拍摄浮层宿主面：浮层中枢（OverlayCenter）的会话编排子集，组合根接线注入。
+ * 设备域只出采集原语，「浮层怎么开、结果怎么交付」是平台编排决策，全部归壳。
+ */
+export interface CaptureDialogOverlayHost {
+  /** 打开拍摄表面（OverlayCenter.present 的业务入口） */
+  pushCaptureSession: (session: CaptureDialogSession) => void
+  /** 拍摄表面宿主窗（预览帧推送与浮层内动作身份校验的锚点） */
+  getCaptureWindow: () => { webContents: WebContents } | null
+  /** 关闭拍摄表面并回传收场 */
+  dismissCaptureSession: () => void
+}
 
 /** 拍摄浮层发起方身份（Main 侧从 CallerContext 提取，渲染层无法伪造） */
 export interface CaptureDialogOrigin {
@@ -19,20 +31,20 @@ export interface CaptureDialogOrigin {
 export interface CaptureDialogSessionDeps {
   /** 采集系统（SDK 拍摄走统一采集 API，UVC 抽帧走落盘通道） */
   capture: CaptureSystem
-  overlay: CaptureOverlayHost
+  overlay: CaptureDialogOverlayHost
 }
 
-/** openCaptureDialog 的结果交付句柄：浮层结束时兑现发起页的 invoke Promise */
+/** captureDialog.open 的结果交付句柄：浮层结束时兑现发起页的 invoke Promise */
 interface CaptureDialogPending {
   resolve: (results: CaptureResult[]) => void
   reject: (err: Error) => void
 }
 
 /**
- * 拍摄浮层会话服务：管理「发起 tab ↔ 拍摄浮层窗」的一次拍摄会话。
+ * 拍摄浮层会话编排（壳层）：管理「发起 tab ↔ 拍摄浮层表面」的一次拍摄会话。
  * 全局互斥（同一时刻至多一个浮层，占用中拒绝 DEVICE_BUSY）；预览帧与拍摄数据
- * 在浮层窗内闭环（高帧率数据永不推给业务页面）；确认回传的结果数组即 openCaptureDialog
- * 的 resolve 值（取消=空数组，异常=reject），发起 tab 销毁自动作废，关闭时回收 ws 预览连接。
+ * 在浮层窗内闭环（高帧率数据永不推给业务页面）；确认回传的结果数组即 open 的
+ * resolve 值（取消=空数组，异常=reject），发起 tab 销毁自动作废，关闭时回收 ws 预览连接。
  */
 export class CaptureDialogSessionService {
   private session: CaptureDialogSession | null = null
@@ -70,7 +82,7 @@ export class CaptureDialogSessionService {
     const session = this.session
     return new Promise<CaptureResult[]>((resolve, reject) => {
       this.pending = { resolve, reject }
-      // 发起 tab 关闭 → 会话作废（浮层窗随之隐藏）；发起进程已死，交付去向无所谓
+      // 发起 tab 关闭 → 会话作废（浮层随之关闭）；发起进程已死，交付去向无所谓
       origin.wc.once('destroyed', () => {
         if (this.origin?.wc === origin.wc) {
           this.finish('tabClosed')
@@ -156,7 +168,7 @@ export class CaptureDialogSessionService {
   }
 
   /**
-   * 浮层内确认回传：校验结果非空后立即兑现 openCaptureDialog 的 Promise（发起页先拿到结果渲染），
+   * 浮层内确认回传：校验结果非空后立即兑现 open 的 Promise（发起页先拿到结果渲染），
    * 浮层「回传中」保持片刻再收场——回传可见、结果先落，避免浮层秒关而结果滞后的割裂感。
    */
   confirm(sender: WebContents, results: CaptureResult[]): void {
@@ -185,7 +197,7 @@ export class CaptureDialogSessionService {
   }
 
   /**
-   * 会话收尾（取消/发起 tab 关闭/异常路径）：回收预览连接、隐藏浮层，兑现 openCaptureDialog
+   * 会话收尾（取消/发起 tab 关闭/异常路径）：回收预览连接、关闭浮层，兑现 open
    * 的 Promise——取消=resolve 空数组（正常流程分支，不污染调用方 catch），tabClosed/error=reject。
    * 确认回传不走本方法（见 confirm 的先交付后宽限收场）。pending 缺失（发起进程已死）时交付自然消失。
    */

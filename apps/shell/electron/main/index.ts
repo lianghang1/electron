@@ -45,6 +45,7 @@ import {
 } from '@shell/update'
 import { OverlayCenter, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
 import { app, screen, session } from 'electron'
+import { CaptureDialogSessionService } from './capture-dialog'
 import { createInfoDomain, INFO_DOMAIN_ID } from './ipc/info-domain'
 import { registerShellIpc } from './shell-ipc'
 
@@ -167,7 +168,8 @@ interface Assembly {
   appSessions?: AppSessionRegistry
   apps?: AppService
   router?: DomainRouter
-  cancelCaptureDialog?: () => void
+  /** 壳层拍摄浮层会话编排（拍摄能力未启用时缺省） */
+  captureDialog?: CaptureDialogSessionService
 }
 
 /** 基础件：路径 / 版本 / 主题主色 / 窗口系统 / 内核与身份账本 */
@@ -277,7 +279,7 @@ function setupPlatformSystems(a: Assembly): void {
     windows: a.windows,
     events: a.events,
     notifications,
-    onCaptureClose: () => a.cancelCaptureDialog?.(),
+    onCaptureClose: () => a.captureDialog?.cancelByOverlay(),
   })
   void a.kernel.register(a.overlays)
 
@@ -334,15 +336,21 @@ function setupDevices(a: Assembly): void {
     platformId: a.capability.platform,
     availableDomains: a.capability.availableDomains,
     getParent: () => a.windows.shellWindow,
-    captureOverlay: {
-      pushCaptureSession: session => a.overlays!.pushCaptureDialog(session),
-      getCaptureWindow: () => a.overlays!.captureSurfaceWindow(),
-      dismissCaptureSession: () => a.overlays!.closeCapture(),
-    },
   })
   a.telemetry = createDeviceTelemetry()
 
-  a.cancelCaptureDialog = () => a.devices?.captureDialog?.cancelByOverlay()
+  // 壳层拍摄浮层会话编排：采集原语来自设备网关，浮层操作直调 OverlayCenter
+  // （互斥/交付/校验是平台编排决策，归壳；设备域只出采集原语）
+  a.captureDialog = a.devices?.capture && a.overlays
+    ? new CaptureDialogSessionService({
+        capture: a.devices.capture,
+        overlay: {
+          pushCaptureSession: session => a.overlays!.pushCaptureDialog(session),
+          getCaptureWindow: () => a.overlays!.captureSurfaceWindow(),
+          dismissCaptureSession: () => a.overlays!.closeCapture(),
+        },
+      })
+    : undefined
 
   // 设备系统并入内核生命周期：start = 守护进程预热（打 t2 并广播 ready），stop = 全域 dispose
   void a.kernel.register({
@@ -533,6 +541,7 @@ function setupIpc(a: Assembly): void {
     forceGate: a.forceGate,
     capability: a.capability!,
     devices: a.devices!,
+    captureDialog: a.captureDialog,
     telemetry: a.telemetry!,
     flavor: a.flavor,
     version: a.version,

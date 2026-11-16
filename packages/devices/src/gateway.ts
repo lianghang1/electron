@@ -5,7 +5,6 @@ import type { BrowserWindow } from 'electron'
 import type { DeviceCapabilitySpec, DeviceConfigCenter, StoredConfigDocument } from './config-center'
 import type { DomainDeps } from './domain-kit'
 import type { CaptureSystem } from './domains/capture'
-import type { CaptureOverlayHost } from './domains/capture/overlay-host'
 import type { DriverResolver } from './drivers'
 import type { ChannelDescriptor } from './runtime/channel'
 import type { DeviceStatus } from './runtime/device-state'
@@ -18,7 +17,6 @@ import { overridesStore } from './domain-kit'
 import { createCaptureSystem } from './domains/capture'
 import { CAPTURE_CHANNELS } from './domains/capture/channels/registry'
 import { BUILT_IN_CAPTURE_CONFIGS } from './domains/capture/configs'
-import { CaptureDialogSessionService } from './domains/capture/dialog-session'
 import { createCaptureDomain } from './domains/capture/domain'
 import { createIcCardSystem } from './domains/iccard'
 import { ICCARD_CHANNELS } from './domains/iccard/channels/registry'
@@ -76,8 +74,6 @@ export interface DeviceGatewayOptions {
   availableDomains: readonly string[]
   /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁，避免进程常驻 */
   getParent?: () => BrowserWindow | undefined
-  /** 拍摄浮层宿主：由组合根注入窗口系统实现，域内不认识 BrowserWindow 归属 */
-  captureOverlay?: CaptureOverlayHost
 }
 
 export interface DeviceGateway {
@@ -90,8 +86,8 @@ export interface DeviceGateway {
   applyConfig: (capabilityId: string, deviceProfileId: string, patch: Record<string, unknown>) => Promise<void>
   /** 恢复出厂：清覆盖并把出厂值写回域运行时 */
   resetConfig: (capabilityId?: string) => Promise<void>
-  /** 拍摄浮层会话服务：注入宿主后才创建，组合根据此注册会话通道 */
-  captureDialog?: CaptureDialogSessionService
+  /** 拍摄采集原语（发现/预览/拍摄/落盘）：拍摄浮层会话编排由壳层负责，原语面供其直调 */
+  capture?: CaptureSystem
   /** 预热守护进程（含 koffi 加载）；完成即打 t2DeviceHostReady */
   warmup: (onReady: () => void) => Promise<void>
   /** 工作台窗口就绪后调用：scanner 键盘观察挂到窗口（域方法不依赖窗口时序） */
@@ -115,9 +111,6 @@ interface AssemblyContext {
   /** 现场追加的打印 URL 白名单：配置中心 urlOrigins 覆盖项，打印系统每次提交时读取 */
   printOrigins: { site: readonly string[] }
   getParent?: () => BrowserWindow | undefined
-  captureOverlay?: CaptureOverlayHost
-  /** 拍摄浮层会话延迟取用：对话框服务晚于域装配创建，域方法调用时经此解析 */
-  captureDialogRef?: { current?: CaptureDialogSessionService }
 }
 
 interface AssembledDomain {
@@ -126,7 +119,7 @@ interface AssembledDomain {
   readonly dispose: () => void
   /** 需要接工作台窗口的域（scanner 键盘观察） */
   readonly attachWindow?: (win: BrowserWindow) => void
-  /** 需要浮层会话的域（capture 拍摄对话框） */
+  /** 拍摄采集原语系统（壳层浮层会话编排直调） */
   readonly capture?: CaptureSystem
 }
 
@@ -212,7 +205,7 @@ export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
       })
       return {
         id: 'capture',
-        definition: createCaptureDomain(system, domainDeps(ctx), () => ctx.captureDialogRef?.current),
+        definition: createCaptureDomain(system, domainDeps(ctx)),
         dispose: () => system.destroy(),
         capture: system,
       }
@@ -305,18 +298,12 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     printDefaults,
     printOrigins,
     getParent: options.getParent,
-    captureOverlay: options.captureOverlay,
   }
 
   // 查表装配：平台代码零分支，能力清单由 DEVICE_CAPABILITY_IDS 统一给定
   const assembled = DEVICE_CAPABILITY_IDS.map(id => DOMAIN_SPECS[id].assemble(ctx))
   const domains = assembled.map(a => a.definition)
   const capture = assembled.find(a => a.capture)?.capture
-  const captureDialog = options.captureOverlay && capture
-    ? new CaptureDialogSessionService({ capture, overlay: options.captureOverlay })
-    : undefined
-  // 域定义在装配期已固化，openCaptureDialog 经此引用调用期解析浮层会话
-  ctx.captureDialogRef = { current: captureDialog }
 
   // 三维注册表与平台档案求交，产出各能力状态与原因码；诊断台读同一份结果
   const deviceRegistry = createDeviceRegistry(createChannelRegistry())
@@ -368,7 +355,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     domains,
     deviceStatuses,
     configCenter,
-    captureDialog,
+    capture,
 
     async applyConfig(capabilityId, deviceProfileId, patch) {
       configCenter.setOverrides(capabilityId, deviceProfileId, patch)

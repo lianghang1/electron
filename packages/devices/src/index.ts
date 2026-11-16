@@ -1,3 +1,5 @@
+export type { CaptureSystem } from './domains/capture'
+export { captureError } from './domains/capture/errors'
 export { detectDevicePlatform } from './domains/platform'
 export type { DevicePlatform, DevicePlatformId } from './domains/platform'
 export {

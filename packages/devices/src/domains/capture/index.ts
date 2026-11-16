@@ -15,7 +15,7 @@ export interface CaptureSystem {
   setDefaultDevice: (id: string | undefined) => void
   /**
    * 默认设备解析：配置的默认设备且就绪才返回其 id，否则 undefined
-   * （snap/openCaptureDialog 缺省定位共用，失败静默回落）
+   * （snap/拍摄浮层缺省定位共用，失败静默回落）
    */
   findDefaultDevice: () => Promise<string | undefined>
   captureImage: (req: CaptureRequest) => Promise<CaptureResult>

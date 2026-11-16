@@ -7,6 +7,7 @@ import type { AppSessionRegistry } from '@shell/kernel/session'
 import type { CallerRegistry, FlavorManifest, PlatformCapability } from '@shell/shared'
 import type { ForceUpdateGate, UpdateCenter } from '@shell/update'
 import type { OverlayCenter, WindowSystem } from '@shell/window'
+import type { CaptureDialogSessionService } from './capture-dialog'
 import { attachShellHandleLogger } from '@shell/bridge/handle'
 import { registerSettingsIpc } from '@shell/kernel/settings'
 import { ipcMain } from 'electron'
@@ -49,6 +50,8 @@ export interface ShellIpcDeps {
   forceGate: ForceUpdateGate | undefined
   capability: PlatformCapability
   devices: DeviceGateway
+  /** 壳层拍摄浮层会话编排（拍摄能力未启用时缺省） */
+  captureDialog?: CaptureDialogSessionService
   telemetry: DeviceTelemetry
   flavor: FlavorManifest
   version: () => string
@@ -80,7 +83,7 @@ export function registerShellIpc(deps: ShellIpcDeps): void {
   registerUpdateIpc({ callers: deps.callers, updateCenter: deps.updateCenter, markGracefulExit: deps.markGracefulExit })
   registerPermissionsIpc({ callers: deps.callers, permissions: deps.permissions })
   registerDeviceConfigIpc({ callers: deps.callers, permissions: deps.permissions, devices: deps.devices })
-  registerCaptureDialogIpc({ callers: deps.callers, apps: deps.apps, devices: deps.devices })
+  registerCaptureDialogIpc({ callers: deps.callers, apps: deps.apps, dialog: deps.captureDialog })
   registerRouterIpc({
     callers: deps.callers,
     logger: deps.logger,
