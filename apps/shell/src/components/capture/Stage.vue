@@ -35,36 +35,12 @@ defineExpose({ videoEl })
 </script>
 
 <template>
-  <div class="cu-stage">
-    <video v-if="stream" ref="videoEl" class="cu-stage__media" playsinline muted :style="{ transform }" />
-    <img v-else-if="frameSrc" class="cu-stage__media" :src="frameSrc" alt="实时预览" :style="{ transform }">
-    <span v-else class="cu-stage__empty">{{ props.emptyText || '开启预览后拍摄' }}</span>
+  <!-- 取景面：黑底衬画面（视频面惯例，非品牌样式） -->
+  <div class="relative flex h-full w-full items-center justify-center overflow-hidden rounded-lg border border-border bg-black">
+    <video v-if="stream" ref="videoEl" class="max-h-full max-w-full bg-white object-contain" playsinline muted :style="{ transform }" />
+    <img v-else-if="frameSrc" class="max-h-full max-w-full bg-white object-contain" :src="frameSrc" alt="实时预览" :style="{ transform }">
+    <span v-else class="text-xs text-muted-foreground select-none">
+      {{ props.emptyText || '开启预览后拍摄' }}
+    </span>
   </div>
 </template>
-
-<style scoped>
-.cu-stage {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  border: 1px solid #2a3040;
-  border-radius: 10px;
-  background: #10141c;
-  overflow: hidden;
-}
-
-.cu-stage__media {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  background: #fff;
-}
-
-.cu-stage__empty {
-  color: #6b7688;
-  font-size: 12px;
-  user-select: none;
-}
-</style>

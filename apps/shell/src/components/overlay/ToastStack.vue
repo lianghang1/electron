@@ -4,6 +4,7 @@ import type { Component } from 'vue'
 import type { NotificationItem } from '../../overlay/types'
 import { AlertCircle, AlertTriangle, Bell, Check, Download, FileText, X } from '@lucide/vue'
 import { formatBytes } from '@shell/shared'
+import { Button, Progress } from '@ui/components'
 
 /**
  * 通知/下载 toast 堆叠：右上角顶栏之下，kernel 上限封顶，不内部滚动。
@@ -32,12 +33,12 @@ const statusText: Record<string, string> = {
   failed: '已失败',
 }
 
-/** 通知级别章：软色底 + 语义图标，未识别级别回退 info */
+/** 通知级别章：软色底 + 语义图标，未识别级别回退 info（状态色走 Tailwind 默认色阶） */
 const chipInfo = { icon: Bell, class: 'bg-accent text-accent-foreground' } as const
 const levelChip: Record<string, { icon: Component, class: string }> = {
   info: chipInfo,
-  success: { icon: Check, class: 'bg-emerald-500/15 text-ok' },
-  warning: { icon: AlertTriangle, class: 'bg-warn/15 text-warn' },
+  success: { icon: Check, class: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' },
+  warning: { icon: AlertTriangle, class: 'bg-amber-500/15 text-amber-600 dark:text-amber-400' },
   error: { icon: AlertCircle, class: 'bg-destructive/15 text-destructive' },
 }
 
@@ -81,22 +82,22 @@ function relativeTime(ts?: number): string {
         </div>
         <div
           v-if="task.status === 'progressing' && task.percent >= 0"
-          class="mt-1.5 h-0.5 overflow-hidden rounded-full bg-accent"
+          class="mt-1.5 h-0.5"
         >
-          <div class="h-full rounded-full bg-primary transition-[width] duration-200" :style="{ width: `${task.percent}%` }" />
+          <Progress :model-value="task.percent" class="h-0.5" />
         </div>
         <div v-if="task.status === 'completed'" class="mt-1.5 flex gap-1">
-          <button class="rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-accent" @click="$emit('openDownload', task.id)">
+          <Button variant="ghost" size="xs" class="h-auto px-1.5 py-0.5 text-xs text-primary" @click="$emit('openDownload', task.id)">
             打开
-          </button>
-          <button class="rounded-md px-1.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-accent" @click="$emit('revealDownload', task.id)">
+          </Button>
+          <Button variant="ghost" size="xs" class="h-auto px-1.5 py-0.5 text-xs text-primary" @click="$emit('revealDownload', task.id)">
             文件夹
-          </button>
+          </Button>
         </div>
       </div>
-      <button class="absolute right-2 top-2 text-muted-foreground opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100" aria-label="关闭下载卡" @click="$emit('dismissDownload', task.id)">
-        <X :size="12" />
-      </button>
+      <Button variant="ghost" size="icon-xs" class="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭下载卡" @click="$emit('dismissDownload', task.id)">
+        <X />
+      </Button>
     </div>
     <div
       v-for="item in notifications"
@@ -119,9 +120,9 @@ function relativeTime(ts?: number): string {
           </template>{{ item.body }}
         </div>
       </div>
-      <button class="absolute right-2 top-2 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭通知" @click="$emit('dismissNotification', item.id)">
-        <X :size="12" />
-      </button>
+      <Button variant="ghost" size="icon-xs" class="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭通知" @click="$emit('dismissNotification', item.id)">
+        <X />
+      </Button>
     </div>
     <div
       v-if="notifications.length > 1"
@@ -130,9 +131,9 @@ function relativeTime(ts?: number): string {
       @mouseenter="$emit('hover', true)"
       @mouseleave="$emit('hover', false)"
     >
-      <button class="rounded-md bg-popover px-2 py-1 text-xs font-medium text-primary shadow-lg transition-colors hover:bg-accent" @click="$emit('clearNotifications')">
+      <Button variant="outline" size="xs" class="bg-popover shadow-lg" @click="$emit('clearNotifications')">
         全部清除
-      </button>
+      </Button>
     </div>
   </TransitionGroup>
 </template>

@@ -92,7 +92,6 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     surface: 'app-center',
     mode: 'dialog',
     component: AppCenter,
-    mapProps: () => ({ open: true }),
     wire: {
       openApp: async (ctx, appId) => {
         await shell().apps.open(appId as string)
@@ -105,13 +104,13 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     surface: 'command-palette',
     mode: 'command',
     component: CommandPalette,
-    mapProps: () => ({ open: true }),
+    mapProps: payload => ({ ...payload as { recentIds?: string[] } }),
     wire: {
-      'select': async (ctx, appId) => {
+      select: async (ctx, appId) => {
         await shell().apps.open(appId as string)
         ctx.dismiss('command-palette')
       },
-      'update:open': ctx => ctx.dismiss('command-palette'),
+      close: ctx => ctx.dismiss('command-palette'),
     },
   },
   {
@@ -137,9 +136,9 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     surface: 'settings',
     mode: 'dialog',
     component: SettingsDialog,
-    mapProps: () => ({ open: true }),
+    mapProps: payload => ({ ...payload as { isKiosk?: boolean } }),
     wire: {
-      'update:open': ctx => ctx.dismiss('settings'),
+      close: ctx => ctx.dismiss('settings'),
     },
   },
   {

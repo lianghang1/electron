@@ -10,17 +10,17 @@ interface PaletteItem {
   kind: string
 }
 
+/** 最近使用：由发起方经 payload 传入（present({ surface: 'command-palette', payload: { recentIds } })） */
 const props = defineProps<{
-  open: boolean
   recentIds?: string[]
 }>()
 
 const emit = defineEmits<{
-  'update:open': [value: boolean]
-  'select': [id: string]
+  close: []
+  select: [id: string]
 }>()
 
-/** 应用清单自取：命令面板是自包含表面，打开时按需拉取（业务只管内容） */
+/** 应用清单自取：命令面板是自包含表面，挂载即呈现并按需拉取（业务只管内容） */
 const items = ref<PaletteItem[]>([])
 
 const query = ref('')
@@ -31,8 +31,7 @@ const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
   if (!q) { return items.value }
   return items.value.filter(i =>
-    i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q),
-  )
+    i.name.toLowerCase().includes(q) || i.id.toLowerCase().includes(q))
 })
 
 const recentItems = computed<PaletteItem[]>(() => {
@@ -51,7 +50,7 @@ const restItems = computed<PaletteItem[]>(() => {
 const flat = computed(() => [...recentItems.value, ...restItems.value])
 
 function close(): void {
-  emit('update:open', false)
+  emit('close')
 }
 
 function choose(id: string): void {
@@ -60,7 +59,6 @@ function choose(id: string): void {
 }
 
 function onWindowKeydown(e: KeyboardEvent): void {
-  if (!props.open) { return }
   switch (e.key) {
     case 'Escape':
       e.preventDefault()
@@ -89,11 +87,8 @@ function onWindowKeydown(e: KeyboardEvent): void {
   }
 }
 
-watch(() => props.open, async (open) => {
-  if (!open) { return }
-  query.value = ''
-  highlighted.value = 0
-  // 打开时按需拉取应用清单（AppCenter 同款自取模式）；拉取失败清空不阻塞面板
+onMounted(async () => {
+  window.addEventListener('keydown', onWindowKeydown, true)
   try {
     const list = await shell().apps.list() as { manifest: { id: string, name: string } }[]
     items.value = list.map(a => ({ id: a.manifest.id, name: a.manifest.name, kind: 'app' }))
@@ -105,22 +100,20 @@ watch(() => props.open, async (open) => {
   inputEl.value?.focus()
 })
 
+onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, true))
+
 watch([query, () => items.value.length], () => {
   highlighted.value = 0
 })
-
-onMounted(() => window.addEventListener('keydown', onWindowKeydown, true))
-onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, true))
 </script>
 
 <template>
   <div
-    v-if="open"
-    class="cp-overlay fixed inset-0 z-[60] flex items-start justify-center bg-black/35"
+    class="fixed inset-0 z-[60] flex items-start justify-center bg-black/35"
     @click.self="close"
   >
     <div
-      class="cp-panel mt-[14vh] w-[560px] max-w-[92vw] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
+      class="mt-[14vh] w-[560px] max-w-[92vw] overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg"
       role="dialog"
       aria-modal="true"
       aria-label="打开应用"
@@ -130,7 +123,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
         <input
           ref="inputEl"
           v-model="query"
-          class="cp-input min-w-0 flex-1 bg-transparent text-lg text-foreground outline-none"
+          class="min-w-0 flex-1 bg-transparent text-lg text-foreground outline-none placeholder:text-muted-foreground"
           placeholder="搜索应用…"
           aria-label="搜索应用"
           autocomplete="off"
@@ -139,7 +132,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
         <Kbd>Esc</Kbd>
       </div>
 
-      <div class="cp-list max-h-[46vh] overflow-y-auto py-1.5" role="listbox" aria-label="应用列表">
+      <div class="max-h-[46vh] overflow-y-auto py-1.5" role="listbox" aria-label="应用列表">
         <template v-if="recentItems.length">
           <p class="px-4 py-1.5 text-sm font-medium text-muted-foreground">
             最近使用
@@ -201,11 +194,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onWindowKeydown, tru
 </template>
 
 <style scoped>
-.cp-input::placeholder {
-  color: var(--muted-foreground);
-}
 .cp-row-active {
-  background: var(--hover);
+  background: var(--accent);
   box-shadow: inset 2px 0 0 var(--ring);
 }
 .cp-row-active :deep(svg) {

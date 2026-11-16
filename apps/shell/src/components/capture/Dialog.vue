@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { CaptureDialogSession } from '@shell/shared'
+import { X } from '@lucide/vue'
+import { Alert, AlertDescription, Badge, Button, Label, NativeSelect } from '@ui/components'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useCaptureSession } from '../../composables/use-capture-session'
 import CaptureStage from './Stage.vue'
@@ -111,13 +113,14 @@ function exitViewing(): void {
 
 // ---- 动作包装：统一收敛查看态退出 ----
 
-async function onChangeDevice(value: string): Promise<void> {
+async function onChangeDevice(event: Event): Promise<void> {
   exitViewing()
-  await changeDevice(value)
+  await changeDevice((event.target as HTMLSelectElement).value)
 }
 
-async function onResolutionChange(value: string): Promise<void> {
+async function onResolutionChange(event: Event): Promise<void> {
   exitViewing()
+  const value = (event.target as HTMLSelectElement).value
   await changeResolution(value === RESOLUTION_DEFAULT ? '' : value)
 }
 
@@ -164,28 +167,33 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="cu-dialog">
-    <header class="cu-dialog__head">
-      <div class="cu-dialog__head-text">
-        <div class="cu-dialog__title-row">
-          <h3 class="cu-dialog__title">
+  <!-- dialog 表面面板本体：遮罩/居中/外点关闭由 SurfaceOutlet 容器配对 -->
+  <div class="flex h-[644px] max-h-full w-[824px] max-w-full flex-col gap-4 overflow-hidden rounded-xl border border-border bg-popover p-5 text-popover-foreground shadow-lg">
+    <header class="flex items-start justify-between gap-3">
+      <div>
+        <div class="flex items-center gap-2">
+          <h2 class="text-base leading-none font-semibold">
             {{ session.title }}
-          </h3>
-          <span v-if="maxCount > 1" class="cu-dialog__count">{{ countLabel }}</span>
-          <span v-else-if="results.length" class="cu-dialog__count">已拍</span>
+          </h2>
+          <Badge v-if="maxCount > 1" variant="secondary">
+            {{ countLabel }}
+          </Badge>
+          <Badge v-else-if="results.length" variant="secondary">
+            已拍
+          </Badge>
         </div>
-        <p class="cu-dialog__sub">
+        <p class="mt-1.5 text-xs text-muted-foreground">
           来自 {{ session.appName }} · 完成后结果回传页面
         </p>
       </div>
-      <button class="cu-dialog__close" title="取消拍摄" @click="onClose">
-        ×
-      </button>
+      <Button variant="ghost" size="icon-sm" aria-label="取消拍摄" @click="onClose">
+        <X />
+      </Button>
     </header>
 
     <!-- 左预览 + 右控制栏：操作动线自上而下（选设备 → 分辨率 → 预览 → 拍摄） -->
-    <div class="cu-dialog__body">
-      <div class="cu-dialog__stage">
+    <div class="flex min-h-0 flex-1 items-stretch gap-3.5">
+      <div class="relative min-w-0 flex-1">
         <CaptureStage
           ref="stageRef"
           :stream="viewing ? null : stream"
@@ -194,28 +202,34 @@ onBeforeUnmount(() => {
           :mirror="viewing ? false : mirror"
           :empty-text="stageEmptyText"
         />
-        <span class="cu-dialog__chip" :class="{ 'cu-dialog__chip--live': live && !viewing }">
-          <i class="cu-dialog__chip-dot" />{{ viewing ? '查看记录' : previewLabel }}
+        <span class="pointer-events-none absolute top-2.5 left-2.5 z-10 inline-flex items-center gap-1.5 rounded-full bg-black/70 px-2.5 py-0.5 text-xs text-zinc-200 backdrop-blur-sm">
+          <i class="size-1.5 rounded-full" :class="live && !viewing ? 'bg-emerald-400' : 'bg-zinc-500'" />{{ viewing ? '查看记录' : previewLabel }}
         </span>
         <!-- 快门反馈：拍摄瞬间白闪一帧 -->
-        <div v-if="capturing" class="cu-dialog__flash" />
+        <div v-if="capturing" class="cu-flash" />
         <!-- 浮动错误提示：覆盖在预览区顶部，不挤占布局，4s 自动消失 -->
-        <div v-if="error" class="cu-dialog__toast">
-          <span class="cu-dialog__toast-text">{{ error }}</span>
-          <button class="cu-dialog__toast-close" title="忽略" @click="clearError">
-            ×
-          </button>
-        </div>
+        <Alert
+          v-if="error"
+          variant="destructive"
+          class="absolute top-2.5 left-1/2 z-20 w-max max-w-[calc(100%-20px)] -translate-x-1/2 py-2 shadow-lg backdrop-blur-sm"
+        >
+          <AlertDescription class="flex items-center gap-2 text-xs">
+            <span class="min-w-0 truncate">{{ error }}</span>
+            <Button variant="ghost" size="icon-xs" class="size-4 shrink-0 text-current hover:bg-transparent" aria-label="忽略" @click="clearError">
+              <X class="!size-3" />
+            </Button>
+          </AlertDescription>
+        </Alert>
       </div>
 
-      <aside class="cu-dialog__panel">
-        <label class="cu-dialog__field">
-          <span class="cu-dialog__label">设备</span>
-          <select
-            class="cu-dialog__select"
+      <aside class="flex w-56 flex-none flex-col gap-2.5">
+        <div class="space-y-1.5">
+          <Label class="text-xs text-muted-foreground">设备</Label>
+          <NativeSelect
+            class="w-full text-xs"
             :disabled="!hasDevices"
-            :value="deviceId"
-            @change="onChangeDevice(($event.target as HTMLSelectElement).value)"
+            :model-value="deviceId"
+            @change="onChangeDevice"
           >
             <option v-if="!hasDevices" value="">
               {{ loadingDevices ? '正在检测设备…' : '未检测到设备' }}
@@ -229,202 +243,63 @@ onBeforeUnmount(() => {
                 {{ item.label }}
               </option>
             </optgroup>
-          </select>
-        </label>
-        <label v-if="resolutions.length" class="cu-dialog__field">
-          <span class="cu-dialog__label">分辨率<template v-if="switching">（切换中…）</template></span>
-          <select
-            class="cu-dialog__select"
+          </NativeSelect>
+        </div>
+        <div v-if="resolutions.length" class="space-y-1.5">
+          <Label class="text-xs text-muted-foreground">分辨率<template v-if="switching">（切换中…）</template></Label>
+          <NativeSelect
+            class="w-full text-xs"
             :disabled="switching"
-            :value="resolutionModelValue"
-            @change="onResolutionChange(($event.target as HTMLSelectElement).value)"
+            :model-value="resolutionModelValue"
+            @change="onResolutionChange"
           >
             <option v-for="item in resolutionOptions" :key="item.value" :value="item.value">
               {{ item.label }}
             </option>
-          </select>
-        </label>
-        <button class="cu-dialog__btn" @click="onToggleLive">
+          </NativeSelect>
+        </div>
+        <Button variant="outline" @click="onToggleLive">
           {{ live ? '停止预览' : '开启预览' }}
-        </button>
-        <div class="cu-dialog__fx">
-          <button class="cu-dialog__btn" :disabled="viewing" title="旋转实时画面" @click="rotateOnce">
+        </Button>
+        <div class="flex gap-2">
+          <Button variant="outline" class="flex-1" :disabled="viewing" title="旋转实时画面" @click="rotateOnce">
             旋转
-          </button>
-          <button
-            class="cu-dialog__btn"
-            :class="{ 'cu-dialog__btn--active': mirror && !viewing }"
+          </Button>
+          <Button
+            class="flex-1"
+            :variant="mirror && !viewing ? 'default' : 'outline'"
             :disabled="viewing"
             title="镜像实时画面"
             @click="toggleMirror"
           >
             镜像
-          </button>
+          </Button>
         </div>
-        <button
-          class="cu-dialog__btn cu-dialog__btn--primary"
-          :disabled="capturing || full"
-          @click="onShoot"
-        >
+        <Button :disabled="capturing || full" @click="onShoot">
           {{ capturing ? '拍摄中…' : full ? '已拍满' : '拍摄' }}
-        </button>
-        <span class="cu-dialog__panel-hint">
+        </Button>
+        <p class="text-xs leading-relaxed text-muted-foreground">
           {{ maxCount > 1 ? `可拍 ${maxCount} 张，拍完点击右下角「完成」` : '拍好后点击右下角「完成」' }}
-        </span>
+        </p>
       </aside>
     </div>
 
     <CaptureThumbStrip :items="thumbs" :active-index="viewingIndex" @view="onView" @remove="onRemove" />
 
-    <footer class="cu-dialog__foot">
-      <button class="cu-dialog__btn" @click="onClose">
+    <footer class="flex items-center justify-end gap-2.5">
+      <Button variant="outline" @click="onClose">
         取消
-      </button>
-      <button class="cu-dialog__btn cu-dialog__btn--primary" :disabled="!canConfirm || confirming" @click="confirm">
+      </Button>
+      <Button :disabled="!canConfirm || confirming" @click="confirm">
         {{ confirmLabel }}
-      </button>
+      </Button>
     </footer>
   </div>
 </template>
 
 <style scoped>
-/* 颜色全部走语义层变量（tokens 随浮层页加载）：与权限/应用中心等浮层卡同一配色体系，
-   禁止出现组件自带的品牌色——主色由 flavor 注入，浮层间保持一致 */
-.cu-dialog {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  /* plane 内 dialog 表面：自然尺寸居中（容器 grid 落位），小窗内自适应收缩 */
-  width: min(824px, 100%);
-  height: min(644px, 100%);
-  padding: 18px;
-  border-radius: 14px;
-  background: var(--popover);
-  color: var(--popover-foreground);
-  box-shadow: 0 18px 60px rgba(2, 8, 20, 0.35);
-  font-family: system-ui, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  user-select: none;
-}
-
-/* ---- 头部 ---- */
-.cu-dialog__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  /* 拖动把手：窗口 movable 时 header 整条拖动（OS 级移动，零几何计算） */
-  -webkit-app-region: drag;
-}
-
-.cu-dialog__title-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cu-dialog__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.cu-dialog__count {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--accent);
-  color: var(--accent-foreground);
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.cu-dialog__sub {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-
-.cu-dialog__close {
-  border: none;
-  background: transparent;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  font-size: 17px;
-  line-height: 26px;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  border-radius: 7px;
-  flex-shrink: 0;
-  transition: background-color 0.12s, color 0.12s;
-  /* 拖动把手内的交互元素豁免（否则点击落进窗口拖动） */
-  -webkit-app-region: no-drag;
-}
-
-.cu-dialog__close:hover {
-  color: var(--foreground);
-  background: var(--muted);
-}
-
-/* ---- 浮动错误提示（覆盖预览区顶部，不占布局，4s 自动消失） ---- */
-.cu-dialog__toast {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  max-width: calc(100% - 20px);
-  padding: 7px 12px;
-  border-radius: 8px;
-  background: var(--destructive);
-  color: var(--destructive-foreground);
-  font-size: 12px;
-  box-shadow: 0 8px 24px rgba(2, 8, 20, 0.28);
-  animation: cu-toast-in 0.16s ease-out;
-  backdrop-filter: blur(4px);
-  pointer-events: auto;
-}
-
-.cu-dialog__toast-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cu-dialog__toast-close {
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: 16px;
-  height: 16px;
-  line-height: 16px;
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.85);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.cu-dialog__toast-close:hover {
-  color: #fff;
-}
-
-@keyframes cu-toast-in {
-  from {
-    opacity: 0;
-    transform: translateX(-50%) translateY(-6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-}
-
-/* ---- 快门闪光 ---- */
-.cu-dialog__flash {
+/* 快门闪光：拍摄瞬间的物理反馈动画（非样式体系范畴） */
+.cu-flash {
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -441,146 +316,5 @@ onBeforeUnmount(() => {
   to {
     opacity: 0;
   }
-}
-
-/* ---- 左预览 + 右控制栏 ---- */
-.cu-dialog__body {
-  display: flex;
-  gap: 14px;
-  align-items: stretch;
-}
-
-.cu-dialog__stage {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-
-.cu-dialog__chip {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(13, 17, 23, 0.72);
-  color: #c9d1d9;
-  font-size: 11px;
-  pointer-events: none;
-  backdrop-filter: blur(4px);
-}
-
-.cu-dialog__chip--live {
-  /* 徽标悬在深色视频面上：主色提亮保证可读，状态语义由文字与圆点表达，不再引入第二品牌色 */
-  color: color-mix(in srgb, var(--primary) 55%, #fff);
-}
-
-.cu-dialog__chip-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #6b7688;
-}
-
-.cu-dialog__chip--live .cu-dialog__chip-dot {
-  background: color-mix(in srgb, var(--primary) 75%, #fff);
-}
-
-/* ---- 控制栏 ---- */
-.cu-dialog__panel {
-  width: 232px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.cu-dialog__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.cu-dialog__label {
-  font-size: 11px;
-  color: var(--muted-foreground);
-}
-
-.cu-dialog__select {
-  height: 32px;
-  padding: 0 8px;
-  border: 1px solid var(--input);
-  border-radius: 8px;
-  background: var(--popover);
-  font-size: 12.5px;
-  color: var(--foreground);
-}
-
-.cu-dialog__select:disabled {
-  color: var(--muted-foreground);
-  background: var(--muted);
-}
-
-.cu-dialog__btn {
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--input);
-  border-radius: 8px;
-  background: var(--popover);
-  font-size: 12.5px;
-  color: var(--foreground);
-  cursor: pointer;
-  transition: background-color 0.12s, border-color 0.12s;
-}
-
-.cu-dialog__btn:hover:not(:disabled) {
-  background: var(--muted);
-}
-
-.cu-dialog__btn:disabled {
-  color: var(--muted-foreground);
-  background: var(--muted);
-  cursor: not-allowed;
-}
-
-.cu-dialog__btn--active {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--accent);
-}
-
-.cu-dialog__btn--primary {
-  border-color: var(--primary);
-  background: var(--primary);
-  color: var(--primary-foreground);
-}
-
-.cu-dialog__btn--primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--primary) 88%, #000);
-}
-
-.cu-dialog__fx {
-  display: flex;
-  gap: 8px;
-}
-
-.cu-dialog__fx button {
-  flex: 1;
-}
-
-.cu-dialog__panel-hint {
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--muted-foreground);
-}
-
-/* ---- 底部 ---- */
-.cu-dialog__foot {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
 }
 </style>

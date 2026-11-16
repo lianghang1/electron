@@ -1,13 +1,13 @@
 import type { AppSummary } from './use-shell-tabs'
 import { shell } from '@shell/bridge/client'
-import { ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 
 /**
  * 应用中心检索态：过滤按名称与 appId，↑↓ 移动选中；打开动作由组件层
- * emit 上抛（组件不直接碰桥）。应用清单与运行态按需拉取：plane 常驻，
- * 不能只在 mounted 拉一次（运行态会过期）。
+ * emit 上抛（组件不直接碰桥）。表面挂载即呈现：清单与运行态在挂载时
+ * 拉取（plane 常驻不能只在构建期取一次），检索态重置与聚焦同点触发。
  */
-export function useAppCenter(isOpen: () => boolean) {
+export function useAppCenter() {
   const apps = ref<AppSummary[]>([])
   const runningIds = ref<string[]>([])
   const searchQuery = ref('')
@@ -23,12 +23,13 @@ export function useAppCenter(isOpen: () => boolean) {
 
   watch(searchQuery, () => { activeIdx.value = 0 })
 
-  /** 应用中心开关都以此为准归零检索态 */
-  watch(isOpen, (isOpenNow) => {
+  /** 呈现准备：重置检索态并聚焦搜索框（组件挂载时调用，下次呈现重新挂载） */
+  async function reset(): Promise<void> {
     searchQuery.value = ''
     activeIdx.value = 0
-    if (isOpenNow) { void nextTick(() => searchInput.value?.focus()) }
-  })
+    await nextTick()
+    searchInput.value?.focus()
+  }
 
   async function loadApps(): Promise<void> {
     try {
@@ -54,5 +55,5 @@ export function useAppCenter(isOpen: () => boolean) {
     return false
   }
 
-  return { apps, runningIds, searchQuery, searchInput, activeIdx, filteredApps, loadApps, navigate }
+  return { apps, runningIds, searchQuery, searchInput, activeIdx, filteredApps, loadApps, reset, navigate }
 }

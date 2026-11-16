@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { SettingField, SettingGroup, SettingsValues, ThemePreference } from '@shell/shared'
+import { X } from '@lucide/vue'
 import { shell } from '@shell/bridge/client'
-import { Button, Input, Switch } from '@ui/components'
+import { Button, Input, ScrollArea, Switch } from '@ui/components'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { applyAccent, applyTheme } from '../../styles/appearance'
 
-const props = defineProps<{ open: boolean, isKiosk?: boolean }>()
-const emit = defineEmits<{ 'update:open': [value: boolean] }>()
+/** isKiosk 由发起方经 payload 传入（present({ surface: 'settings', payload: { isKiosk } })） */
+const props = defineProps<{ isKiosk?: boolean }>()
+const emit = defineEmits<{ close: [] }>()
 
 const ACCENT_RE = /^#[0-9a-f]{6}$/i
 
@@ -20,11 +22,11 @@ const apps = ref<AppSummary[]>([])
 const busy = ref(false)
 const actionError = ref('')
 
-/** 卡片窗 ESC = 关闭（窗口即模态边界，无需遮罩/焦点陷阱） */
+/** 表面挂载即模态边界（容器已配对遮罩），ESC = 关闭 */
 function onKeydown(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     e.preventDefault()
-    emit('update:open', false)
+    emit('close')
   }
 }
 
@@ -83,160 +85,99 @@ function visibleFields(group: SettingGroup) {
 </script>
 
 <template>
-  <!-- plane 内 dialog 表面：容器居中落位，卡片自持自然尺寸（560×600，小窗内收缩） -->
-  <div class="set-card">
-    <header class="set-card__head">
-      <h3 class="set-card__title">
+  <!-- dialog 表面面板本体：遮罩/居中/外点关闭由 SurfaceOutlet 容器配对 -->
+  <div class="flex h-[600px] max-h-full w-[560px] max-w-full flex-col overflow-hidden rounded-xl border border-border bg-popover text-popover-foreground shadow-lg">
+    <header class="flex items-center justify-between gap-3 border-b border-border px-5 py-3.5">
+      <h2 class="text-base leading-none font-semibold">
         设置
-      </h3>
-      <button class="set-card__close" title="关闭设置" @click="emit('update:open', false)">
-        ×
-      </button>
+      </h2>
+      <Button variant="ghost" size="icon-sm" aria-label="关闭设置" @click="emit('close')">
+        <X />
+      </Button>
     </header>
 
-    <div class="set-card__body">
-      <div v-for="group in schema" :key="group.key" class="mb-5 last:mb-0">
-        <p class="mb-2 text-sm font-medium text-muted-foreground">
-          {{ group.label }}
-        </p>
-        <div class="overflow-hidden rounded-md border border-border">
-          <div
-            v-for="field in visibleFields(group)"
-            :key="field.key"
-            class="flex items-center justify-between gap-4 border-b border-border px-3.5 py-3 last:border-b-0"
-          >
-            <div class="min-w-0">
-              <p class="text-sm text-foreground">
-                {{ field.label }}
-              </p>
-              <p v-if="field.description" class="mt-0.5 text-sm text-muted-foreground">
-                {{ field.description }}
-              </p>
+    <ScrollArea class="min-h-0 flex-1">
+      <div class="space-y-5 px-5 py-4">
+        <div v-for="group in schema" :key="group.key">
+          <p class="mb-2 text-sm font-medium text-muted-foreground">
+            {{ group.label }}
+          </p>
+          <div class="overflow-hidden rounded-md border border-border">
+            <div
+              v-for="field in visibleFields(group)"
+              :key="field.key"
+              class="flex items-center justify-between gap-4 border-b border-border px-3.5 py-3 last:border-b-0"
+            >
+              <div class="min-w-0">
+                <p class="text-sm text-foreground">
+                  {{ field.label }}
+                </p>
+                <p v-if="field.description" class="mt-0.5 text-sm text-muted-foreground">
+                  {{ field.description }}
+                </p>
+              </div>
+              <Switch
+                v-if="field.type === 'boolean'"
+                :model-value="fieldValue(group.key, field) === true"
+                @update:model-value="v => setField(group.key, field, v)"
+              />
+              <div v-else-if="field.type === 'enum'" class="flex gap-1">
+                <Button
+                  v-for="opt in field.options ?? []"
+                  :key="opt.value"
+                  size="sm"
+                  :variant="fieldValue(group.key, field) === opt.value ? 'default' : 'outline'"
+                  @click="setField(group.key, field, opt.value)"
+                >
+                  {{ opt.label }}
+                </Button>
+              </div>
+              <Input
+                v-else
+                class="w-40"
+                :model-value="String(fieldValue(group.key, field))"
+                @update:model-value="v => setField(group.key, field, field.type === 'number' ? Number(v) : v)"
+              />
             </div>
-            <Switch
-              v-if="field.type === 'boolean'"
-              :model-value="fieldValue(group.key, field) === true"
-              @update:model-value="v => setField(group.key, field, v)"
-            />
-            <div v-else-if="field.type === 'enum'" class="flex gap-1">
-              <Button
-                v-for="opt in field.options ?? []"
-                :key="opt.value"
-                size="sm"
-                :variant="fieldValue(group.key, field) === opt.value ? 'default' : 'outline'"
-                @click="setField(group.key, field, opt.value)"
-              >
-                {{ opt.label }}
-              </Button>
-            </div>
-            <Input
-              v-else
-              class="w-40"
-              :model-value="String(fieldValue(group.key, field))"
-              @update:model-value="v => setField(group.key, field, field.type === 'number' ? Number(v) : v)"
-            />
           </div>
         </div>
-      </div>
 
-      <div>
-        <p class="mb-2 text-sm font-medium text-muted-foreground">
-          应用数据
-        </p>
-        <div class="overflow-hidden rounded-md border border-border">
-          <div
-            v-for="app in apps"
-            :key="app.manifest.id"
-            class="flex items-center justify-between gap-4 border-b border-border px-3.5 py-3 last:border-b-0"
-          >
-            <div class="min-w-0">
-              <p class="truncate text-sm text-foreground">
-                {{ app.manifest.name }}
-              </p>
-              <p class="mt-0.5 truncate text-xs text-muted-foreground">
-                {{ app.manifest.id }}
-              </p>
+        <div>
+          <p class="mb-2 text-sm font-medium text-muted-foreground">
+            应用数据
+          </p>
+          <div class="overflow-hidden rounded-md border border-border">
+            <div
+              v-for="app in apps"
+              :key="app.manifest.id"
+              class="flex items-center justify-between gap-4 border-b border-border px-3.5 py-3 last:border-b-0"
+            >
+              <div class="min-w-0">
+                <p class="truncate text-sm text-foreground">
+                  {{ app.manifest.name }}
+                </p>
+                <p class="mt-0.5 truncate text-xs text-muted-foreground">
+                  {{ app.manifest.id }}
+                </p>
+              </div>
+              <div class="flex shrink-0 gap-1">
+                <Button size="xs" variant="outline" :disabled="busy" @click="clearAppData(app.manifest.id, 'cache')">
+                  清缓存
+                </Button>
+                <Button size="xs" variant="outline" :disabled="busy" @click="clearAppData(app.manifest.id, 'site-data')">
+                  清站点数据
+                </Button>
+              </div>
             </div>
-            <div class="flex shrink-0 gap-1">
-              <Button size="xs" variant="outline" :disabled="busy" @click="clearAppData(app.manifest.id, 'cache')">
-                清缓存
-              </Button>
-              <Button size="xs" variant="outline" :disabled="busy" @click="clearAppData(app.manifest.id, 'site-data')">
-                清站点数据
-              </Button>
-            </div>
+            <p v-if="apps.length === 0" class="px-3.5 py-3 text-sm text-muted-foreground">
+              暂无已注册应用
+            </p>
           </div>
-          <p v-if="apps.length === 0" class="px-3.5 py-3 text-sm text-muted-foreground">
-            暂无已注册应用
+          <p v-if="actionError" class="mt-1.5 text-xs text-destructive">
+            {{ actionError }}
           </p>
         </div>
-        <p v-if="actionError" class="mt-1.5 text-xs text-destructive">
-          {{ actionError }}
-        </p>
       </div>
-    </div>
+    </ScrollArea>
   </div>
 </template>
-
-<style scoped>
-/* 颜色走语义层变量（tokens 随浮层页加载）：与拍摄卡同一浮层配色体系 */
-.set-card {
-  /* plane 内 dialog 表面：自然尺寸居中（容器 grid 落位），小窗内自适应收缩 */
-  width: 560px;
-  height: min(600px, 100%);
-  display: flex;
-  flex-direction: column;
-  border-radius: 14px;
-  background: var(--popover);
-  color: var(--popover-foreground);
-  box-shadow: 0 18px 60px rgba(2, 8, 20, 0.35);
-  font-family: system-ui, 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
-  user-select: none;
-}
-
-/* 拖动把手：窗口 movable 时 header 整条拖动（OS 级移动，零几何计算） */
-.set-card__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 18px 10px;
-  -webkit-app-region: drag;
-}
-
-.set-card__title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--foreground);
-}
-
-.set-card__close {
-  border: none;
-  background: transparent;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  font-size: 17px;
-  line-height: 26px;
-  color: var(--muted-foreground);
-  cursor: pointer;
-  border-radius: 7px;
-  flex-shrink: 0;
-  transition: background-color 0.12s, color 0.12s;
-  /* 拖动把手内的交互元素豁免（否则点击落进窗口拖动） */
-  -webkit-app-region: no-drag;
-}
-
-.set-card__close:hover {
-  color: var(--foreground);
-  background: var(--muted);
-}
-
-/* 设置内容可滚动：窗口高度固定，超长列表内部滚 */
-.set-card__body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 2px 18px 16px;
-}
-</style>
