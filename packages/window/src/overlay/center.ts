@@ -252,7 +252,7 @@ export class OverlayCenter implements Startable {
     this.pushState()
   }
 
-  /** 拍摄表面的宿主身份：设备域预览帧通道与动作校验都锚在 plane 页（原独立卡片窗） */
+  /** 拍摄表面的宿主身份：设备域预览帧通道与动作校验都锚在 plane 页 */
   captureSurfaceWindow(): { webContents: Electron.WebContents } | null {
     return this.options.windows.planeSurface()
   }

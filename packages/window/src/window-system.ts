@@ -212,8 +212,6 @@ export class WindowSystem implements Startable, ViewHost {
     return this.shellWindowId ? this.windows.get(this.shellWindowId) : undefined
   }
 
-  /** 拍摄/设置等全部浮层表面由 plane 平面承载，独立浮层窗已并入（OverlayCenter 管理） */
-
   get(id: number): BrowserWindow | undefined {
     return this.windows.get(id)
   }
@@ -333,7 +331,7 @@ export class WindowSystem implements Startable, ViewHost {
     return this.plane?.webContents.id === senderId
   }
 
-  /** 浮层宿主身份：设备域预览帧通道与动作校验锚在 plane 页（原独立拍摄卡片窗） */
+  /** 浮层宿主身份：设备域预览帧通道与动作校验锚在 plane 页 */
   planeSurface(): { webContents: Electron.WebContents } | null {
     const plane = this.plane
     if (!plane || plane.isDestroyed()) { return null }

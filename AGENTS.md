@@ -6,7 +6,7 @@
 |---|---|
 | [.agents/devices.md](./.agents/devices.md) | 设备体系（packages/devices）：厂商接入、SDK 资产、守护进程 |
 | [.agents/ipc.md](./.agents/ipc.md) | 壳设施 IPC 契约（packages/shared/src/ipc）：通道形态、命名、身份关卡 |
-| [.agents/design.md](./.agents/design.md) | 设计系统：组件体系、令牌、字号阶梯、形态约束 |
+| [.agents/design.md](./.agents/design.md) | 设计系统：组件体系、令牌、字号档位、形态约束 |
 
 触及相关代码前先读对应领域文件。
 
@@ -39,8 +39,7 @@
 |---|---|---|
 | 壳主窗 | ShellWindow / 工作台 | 主窗、main 窗 |
 | 全屏锁定模式 | KioskMode（行为，不是窗口类型） | kiosk 窗口 |
-| 通知平面 | OverlayPlane（常驻全屏透明子窗：通知/下载/权限/菜单/应用中心/命令面板/更新/配置） | 每种弹层一个窗 |
-| 独立浮层窗 | Overlay（Capture/Settings） | popup |
+| 通知平面 | OverlayPlane（常驻全屏透明子窗：通知/下载/权限/页签菜单/应用中心/命令面板/更新/配置/拍摄/设置——全部浮层表面） | 每种弹层一个窗 |
 | 应用定义 | AppManifest（entry: local/remote 两形态 + permissions 声明） | app config |
 | 运行中应用 | AppInstance | session、context |
 | 应用会话容器 | AppSessionRegistry（`persist:app-<id>` 分区 + cookie 快照） | 每应用一个 session、cookie 垫片 |
@@ -50,7 +49,7 @@
 | 远程应用 | remote entry（origin 白名单 + 受管弹窗） | web app |
 | 构建目标平台 | BuildPlatform（win32 / darwin / linux） | 与 Platform（硬件能力平台）混用 |
 | 整包落地策略 | PackageInstaller（组合根按平台注入） | 通道内写死 `.exe` / `/S` / spawn |
-| 窗口创建 | 目的命名函数（createShellWindow / openCaptureOverlay...） | 裸 new BrowserWindow |
+| 窗口创建 | 目的命名函数（createShellWindow / createPlane...） | 裸 new BrowserWindow |
 
 ## 命名规范
 
@@ -89,7 +88,7 @@
 ## 依赖规则
 
 - `@shell/ui` 只可 import `@shell/bridge` / `@shell/shared`，禁 `@shell/devices` / `electron` / 其他上层包。
-- apps 渲染层（`apps/*/src`，主/preload 代码在 `electron/` 下不受此限）只可 import `@shell/bridge` / `@shell/shared` / `@shell/ui`；壳工作台/浮层页面源码住在 `apps/shell/src/ui/`，不经包门面。
+- apps 渲染层（`apps/*/src`，主/preload 代码在 `electron/` 下不受此限）只可 import `@shell/bridge` / `@shell/shared` / `@shell/ui`；壳源码住在 `apps/shell/src/`（pages / components / overlay / composables），壳内组件可直接消费 `@ui/components`。
 - `@shell/kernel`、`@shell/shared` 禁 import 上层包。
 - `packages/*` 之间只能按"shared ← kernel ← window/app-runtime/devices/update ← apps"方向引用；禁止双向 workspace 声明与声明但零引用的依赖。
 
@@ -98,8 +97,8 @@
 界面约定以 [.agents/design.md](./.agents/design.md) 为单一事实源，本文件不重复颜色/字号数值。
 
 - 组件源码集中在 `packages/ui/src/components/`（按 shadcn-vue 源码分发形态维护，组件目录 `<name>/{<Name>.vue,index.ts}`）；`components.json` 是 CLI 唯一配置，`@ui/*` 别名在 ui tsconfig、apps/shell web tsconfig 与 renderer vite 三处登记。
-- 颜色经「物理层 `--dt-*` → 语义层官方变量 → `@theme inline` 工具类」三层消费；模板禁止直接引用 `var(--dt-*)`。
-- 界面文字只用 `text-ui-*` 阶梯，禁止任意字号；`--ui-font-size` 是唯一缩放输入。
+- 颜色经「语义变量（官方 slate oklch）→ `@theme inline` 工具类」两层消费；模板禁止任意颜色值与自造变量。
+- 界面文字只用官方字号档（`text-xs` / `text-sm` / `text-base` / `text-lg`…），禁止任意字号。
 - 业务侧只经 `@shell/ui` 门面消费组件；壳内组件可用 `@ui/components`。
 - `pnpm check:design` / `pnpm check:design:css` 把设计禁令变成机器退出码，`pnpm verify` 会执行。
 - 调试台方法只从 `DIAGNOSTIC_CATALOG` 取，禁止在 UI 里另写一份方法名（方法名经 zod schema 与真实 `defineDomain` 定义对齐）。

@@ -39,8 +39,8 @@ body {
   opacity: 0;
 }
 
-/* plane 全屏且不可拖动：原卡片窗的拖动热区在 plane 内一律失效（!important 压过
-   组件内的 app-region: drag 把手），避免热区误吞 header 点击 */
+/* plane 全屏且不可拖动：组件内的 drag 把手热区一律失效（!important 压过
+   app-region: drag），避免热区误吞 header 点击 */
 * {
   -webkit-app-region: no-drag !important;
 }
