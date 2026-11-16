@@ -64,12 +64,6 @@ export const flavorManifestSchema = z.object({
    * solo = 容器隐形（单应用直出、全屏 chrome 归零）。kiosk 运行模式强制 solo。
    */
   chrome: z.enum(['platform', 'solo']).default('platform'),
-  /**
-   * 窗口锚定：shell = 锚定工作台（通知平面/浮层窗为主窗子窗，落位与 z 序随父窗）；
-   * screen = 无壳屏锚（agent 服务形态：不建工作台主窗，浮层按主屏工作区落位，
-   * alwaysOnTop 保证盖在用户当前应用之上）。
-   */
-  anchor: z.enum(['shell', 'screen']).default('shell'),
   /** 内置应用清单（apps.json 同构，也可远程下发） */
   apps: z.array(appManifestSchema).default([]),
   branding: z

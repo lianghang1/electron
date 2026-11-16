@@ -4,7 +4,6 @@ import type { EventBus, PlatformKernel } from '@shell/kernel'
 import type { Logger } from '@shell/kernel/logger'
 import type { AppManifest, FlavorManifest } from '@shell/shared'
 import type { PackageInstaller } from '@shell/update'
-import type { TrayEntry } from '@shell/window'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import process from 'node:process'
@@ -183,8 +182,7 @@ function buildAssembly(context: BootContext, flavor: FlavorManifest): Assembly {
     ? settingsSnapshot().values.appearance.accent as string
     : ''
   const accent = /^#[0-9a-f]{6}$/i.test(accentSetting) ? accentSetting : flavor.branding.accent
-  // 锚定档位随 flavor 定型：shell = 工作台子窗体系；screen = 无壳屏锚（agent 服务形态）
-  const windows = new WindowSystem(flavor, join(outDir, 'renderer'), theme, accent, { anchor: flavor.anchor })
+  const windows = new WindowSystem(flavor, join(outDir, 'renderer'), theme, accent)
   const kernel = createKernel(flavor, [windows])
   windows.bindEvents(kernel.ctx.events)
 
@@ -304,11 +302,7 @@ function setupPlatformSystems(a: Assembly): void {
         win.focus()
       }
     }
-    const openSettings = () => a.overlays!.open('settings')
-    const entries: readonly TrayEntry[] = a.flavor.anchor === 'screen'
-      ? [{ label: '打开设置', click: openSettings }]
-      : [{ label: '显示工作台', click: showShell }]
-    void a.kernel.register(new TraySystem(a.events, entries, a.flavor.anchor === 'screen' ? openSettings : showShell))
+    void a.kernel.register(new TraySystem(a.events, [{ label: '显示工作台', click: showShell }], showShell))
   }
 
   // 运行韧性：flavor 声明才启用，全部默认关闭；attach 在主窗创建后调用
@@ -583,22 +577,15 @@ async function main(context: BootContext): Promise<void> {
 
   // 窗口先行：主窗在后台加载启动层，设备预热（守护进程 spawn + koffi 加载）
   // 与内核其余系统并行——暖机耗时不再表现为一段屏幕空窗。
-  // screen 锚（agent 形态）无壳常驻：不建工作台，只建覆盖主屏工作区的通知平面
-  if (a.flavor.anchor === 'screen') { a.windows.createPlane() }
-  else { a.windows.createShellWindow() }
+  a.windows.createShellWindow()
   focusShell = () => {
-    // agent 形态无工作台可聚焦：二次启动即亮出设置卡
-    if (a.flavor.anchor === 'screen') {
-      a.overlays?.open('settings')
-      return
-    }
     const win = a.windows.shellWindow
     if (!win) { return }
     if (win.isMinimized()) { win.restore() }
     win.show()
     win.focus()
   }
-  // 扫码枪键盘观察挂到工作台窗口（agent 形态没有工作台，观察不入位）
+  // 扫码枪键盘观察挂到工作台窗口
   if (a.windows.shellWindow) { a.devices!.attachShellWindow(a.windows.shellWindow) }
   a.kernel.ctx.marks.t3WindowShown = Date.now()
 

@@ -7,7 +7,7 @@ import process from 'node:process'
 import { registerIpcDomain } from '@shell/bridge/handle'
 import { effectiveChrome, isDevLoad, SHELL_APP_ID } from '@shell/shared'
 import { windowDomain } from '@shell/shared/ipc'
-import { app, BrowserWindow, screen, WebContentsView } from 'electron'
+import { app, BrowserWindow, WebContentsView } from 'electron'
 import { createKioskMode, createWindowedMode } from './modes'
 import { DEFAULT_OVERLAY_POLICIES, OverlayHost } from './overlay-host'
 import { overlayBase, shellBase } from './presets'
@@ -43,8 +43,6 @@ export class WindowSystem implements Startable, ViewHost {
   private readonly rendererDir: string
   private readonly initialTheme: 'light' | 'dark' | 'system'
   private readonly initialAccent: string
-  /** 窗口锚定档位：shell = 工作台子窗体系（父窗挂接/内容区落位/z 序随父）；screen = 无壳屏锚（workArea 落位/alwaysOnTop） */
-  private readonly anchor: 'shell' | 'screen'
   /** 独立浮层窗宿主（capture/settings）：其余表面由 plane 平面承载，本类零分发 */
   readonly overlays: OverlayHost<OverlayWindowKind>
 
@@ -58,17 +56,14 @@ export class WindowSystem implements Startable, ViewHost {
     initialTheme: 'light' | 'dark' | 'system' = 'system',
     /** 启动主色：用户设置覆盖（appearance.accent）优先，缺省跟随 flavor 品牌色 */
     initialAccent?: string,
-    /** 锚定档位由组合根从 flavor 读出传入；screen 档不建工作台主窗（agent 服务形态） */
-    options?: { anchor?: 'shell' | 'screen' },
   ) {
     this.flavor = flavor
     this.rendererDir = rendererDir
     this.initialTheme = initialTheme
     this.initialAccent = initialAccent || flavor.branding.accent
-    this.anchor = options?.anchor ?? 'shell'
     this.overlays = new OverlayHost<OverlayWindowKind>((policy, params) => this.createOverlay(policy, params))
     for (const policy of DEFAULT_OVERLAY_POLICIES) {
-      this.overlays.register({ ...policy, parent: this.anchor === 'shell' ? () => this.shellWindow : undefined })
+      this.overlays.register({ ...policy, parent: () => this.shellWindow })
     }
   }
 
@@ -305,10 +300,8 @@ export class WindowSystem implements Startable, ViewHost {
 
   private createOverlay(policy: OverlayPolicy<OverlayWindowKind>, params: Readonly<Record<string, string>>): BrowserWindow {
     const parent = policy.parent?.()
-    // 卡片窗一次落位：shell 锚按父窗内容区居中（一次性计算，非持续锚定），screen 锚无父窗、
-    // 按主屏工作区居中；此后可拖、不随锚定矩形重铺
+    // 卡片窗一次落位：按父窗内容区居中（一次性计算，非持续锚定），此后可拖、不随锚定矩形重铺
     const anchorBounds = parent?.getContentBounds()
-      ?? (this.anchor === 'screen' ? screen.getPrimaryDisplay().workArea : undefined)
     const initial = anchorBounds
       ? centeredIn(anchorBounds, policy.width, policy.height)
       : { x: 0, y: 0, width: policy.width, height: policy.height }
@@ -324,8 +317,6 @@ export class WindowSystem implements Startable, ViewHost {
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
-      // screen 锚无父窗兜 z 序：agent 形态卡片必须盖在用户当前应用之上
-      ...(this.anchor === 'screen' ? { alwaysOnTop: true } : {}),
       ...(parent ? { parent } : {}),
       webPreferences: {
         ...overlayBase.webPreferences,
@@ -351,8 +342,7 @@ export class WindowSystem implements Startable, ViewHost {
     this.installDevToolsShortcut(win)
     // kiosk 钳制：owned 子窗 OS 不限制在父窗内（真机验证：右/下/负坐标三方向 setPosition
     // 均原样落位不被钳制），kiosk 全屏壳下拖出即不可达，moved 事件按父窗内容区回拉。
-    // screen 锚无父窗边界，钳制不适用
-    if (this.anchor === 'shell' && this.flavor.mode === 'kiosk' && policy.movable) { this.installKioskBoundsClamp(win) }
+    if (this.flavor.mode === 'kiosk' && policy.movable) { this.installKioskBoundsClamp(win) }
     return win
   }
 
@@ -417,17 +407,15 @@ export class WindowSystem implements Startable, ViewHost {
   private planeFocusHeld = false
 
   /**
-   * 通知平面：shell 锚随主窗创建（透明全屏子窗，恒在父窗内容含应用视图之上）；
-   * screen 锚由组合根直接创建（无壳 agent 形态：覆盖主屏工作区 + alwaysOnTop）。
-   * 穿透缺省开启。
+   * 通知平面：随主窗创建（透明全屏子窗，恒在父窗内容含应用视图之上）。穿透缺省开启。
    */
   createPlane(): void {
-    const parent = this.anchor === 'shell' ? this.shellWindow : undefined
-    if (this.plane || (this.anchor === 'shell' && !parent)) { return }
-    const area = parent?.getContentBounds() ?? screen.getPrimaryDisplay().workArea
+    const parent = this.shellWindow
+    if (this.plane || !parent) { return }
+    const area = parent.getContentBounds()
     const plane = new BrowserWindow({
       ...overlayBase,
-      ...(parent ? { parent } : { x: area.x, y: area.y, alwaysOnTop: true }),
+      parent,
       width: area.width,
       height: area.height,
       show: false,
@@ -501,9 +489,8 @@ export class WindowSystem implements Startable, ViewHost {
       this.windows.delete(win.id)
       this.callers?.unregister(wcId)
     })
-    // 全部窗口关闭即退出（screen 锚的 agent 形态无壳常驻，生命周期归托盘，
-    // 浮层卡片关窗不等于服务退出）
-    if (this.windows.size === 1 && this.anchor === 'shell') { app.on('window-all-closed', () => app.quit()) }
+    // 全部窗口关闭即退出
+    if (this.windows.size === 1) { app.on('window-all-closed', () => app.quit()) }
   }
 
   // ── ViewHost SPI（packaged/remote 应用视图容器）────────────────
