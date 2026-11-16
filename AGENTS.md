@@ -1,12 +1,12 @@
 # 壳平台 · 工程宪法
 
-本文件是全仓工程约定的唯一入口，任何代码改动都必须遵守。领域规则收敛在根目录 `agents/`：
+本文件是全仓工程约定的唯一入口，任何代码改动都必须遵守。领域规则收敛在根目录 `.agents/`：
 
 | 文件 | 管辖范围 |
 |---|---|
-| [agents/devices.md](./agents/devices.md) | 设备体系（packages/devices）：厂商接入、SDK 资产、守护进程 |
-| [agents/ipc.md](./agents/ipc.md) | 壳设施 IPC 契约（packages/shared/src/ipc）：通道形态、命名、身份关卡 |
-| [agents/design.md](./agents/design.md) | 设计系统：组件体系、令牌、字号阶梯、形态约束 |
+| [.agents/devices.md](./.agents/devices.md) | 设备体系（packages/devices）：厂商接入、SDK 资产、守护进程 |
+| [.agents/ipc.md](./.agents/ipc.md) | 壳设施 IPC 契约（packages/shared/src/ipc）：通道形态、命名、身份关卡 |
+| [.agents/design.md](./.agents/design.md) | 设计系统：组件体系、令牌、字号阶梯、形态约束 |
 
 触及相关代码前先读对应领域文件。
 
@@ -94,7 +94,7 @@
 
 ## 设计纪律
 
-界面约定以 [agents/design.md](./agents/design.md) 为单一事实源，本文件不重复颜色/字号数值。
+界面约定以 [.agents/design.md](./.agents/design.md) 为单一事实源，本文件不重复颜色/字号数值。
 
 - 组件源码集中在 `packages/ui/src/components/ui/`，按 shadcn-vue 源码分发形态维护；`components.json` 是 CLI 唯一配置，`@ui/*` 别名在 ui tsconfig、apps/shell web tsconfig 与 renderer vite 三处登记。
 - 颜色经「物理层 `--dt-*` → 语义层官方变量 → `@theme inline` 工具类」三层消费；模板禁止直接引用 `var(--dt-*)`。
