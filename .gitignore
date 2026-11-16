@@ -36,8 +36,7 @@ packages/*/lib/
 *.sw?
 
 # Auto
-auto-imports.d.ts
-components.d.ts
+# unplugin 生成声明（auto-imports/components/typed-router）在 apps/shell/src/types/ 入库跟踪：
+# verify 干净间先跑 -r typecheck（此刻尚未 build 生成），缺文件会误报
 uni-pages.d.ts
-typed-router.d.ts
 .eslintrc-auto-import.json

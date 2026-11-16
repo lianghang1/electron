@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Kbd, Separator } from '@ui/components/ui'
+import { Kbd, Separator } from '@ui/components'
 import { AppWindow, Search } from 'lucide-vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 

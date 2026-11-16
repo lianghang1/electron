@@ -2,8 +2,9 @@ import { createEslintConfig } from '@shell/config/eslint'
 
 export default createEslintConfig(
   {
-    // 设计文档里的 TS 代码块只是示意，不参与 lint；resources/ 是打包资源，非 lint 对象
-    ignores: ['docs/**', '**/resources/**', 'resources/**'],
+    // 设计文档里的 TS 代码块只是示意，不参与 lint；resources/ 是打包资源，非 lint 对象；
+    // unplugin 生成的声明（auto-imports/components/typed-router）非手写源码，顶部注释会触发 eslint-comments 规则
+    ignores: ['docs/**', '**/resources/**', 'resources/**', 'apps/shell/src/types/*.d.ts'],
   },
   {
     // 这些文件必须保持 type alias 方法签名：interface 的属性函数签名与 zod class 方法

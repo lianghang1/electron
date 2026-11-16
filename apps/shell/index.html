@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>壳平台</title>
+    <!-- 首帧前定色：解析期同步执行，必先于任何绘制。preload 执行时刻 documentElement
+         尚不存在，注入被推迟到 DOMContentLoaded（首帧之后）；这里从桥面同步读 flavor
+         主色写 :root，避免「回退色首帧 → 品牌色翻转」的双蓝竞态 -->
+    <script>
+      try {
+        var boot = window.shell && window.shell.shell && window.shell.shell.appearance()
+        if (boot && document.documentElement) {
+          document.documentElement.style.setProperty('--dt-accent', boot.accent)
+          var dark = boot.theme === 'dark'
+            || (boot.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches)
+          if (dark) { document.documentElement.dataset.theme = 'dark' }
+        }
+      }
+      catch {}
+    </script>
+    <!-- 启动层样式独立入口：先于 bundle 生效，撤层前后不跳色 -->
+    <link rel="stylesheet" href="./src/styles/splash.css" />
+  </head>
+  <body>
+    <!-- 启动层：品牌 logo 弹性入场（样式见 splash.css，门闩见 boot/splash.js） -->
+    <div id="splash">
+      <div class="startup-logo-shell">
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="56"
+          height="56"
+          fill="none"
+          viewBox="0 0 48 48"
+          class="startup-logo"
+          aria-hidden="true"
+        >
+          <!-- 品牌标「上开口」：方形剪影 + 顶部 45° 斜槽（设备插入平台的端口意象） -->
+          <path fill="currentColor" d="M6 6h15l14 14h6L27 6h15v36H6Z" />
+        </svg>
+      </div>
+    </div>
+    <div id="app"></div>
+    <!-- 启动门闩：module 脚本按文档序执行，先于 main.ts 挂好监听（撤层出口依赖此序） -->
+    <script type="module" src="./src/boot/splash.js"></script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

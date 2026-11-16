@@ -1,0 +1,83 @@
+/* 启动层：底透明，透出壳窗磨砂材质（win32 acrylic / darwin vibrancy），只浮 logo；
+   上屏时机由主进程门闩保证（首帧已绘才 show），黑帧不可见；撤层为
+   「磨砂 + logo → 应用界面」的渐变过场。换 logo 只改 index.html 内 .startup-logo 的 SVG。 */
+html,
+body,
+#app {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#app {
+  opacity: 0;
+  transition: opacity 0.16s ease;
+}
+
+body.ready #app {
+  opacity: 1;
+}
+
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.16s ease;
+}
+
+body.ready #splash {
+  pointer-events: none;
+  opacity: 0;
+}
+
+/* logo 与窗口同帧出生：初始就是完整可见形态（不起播也恒在），
+   introBegin 后只播放弹性微缩放——动画是 logo 的点缀，不是 logo 的出现方式，
+   杜绝「窗口先出现、logo 迟到」的脱节观感 */
+.startup-logo-shell {
+  position: relative;
+  display: flex;
+  width: 96px;
+  height: 96px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #000000 0%, #151718 100%);
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.2);
+  /* paused 时停在 0% 帧（scale 1 完整可见）——起播前后画面无跳变 */
+  animation: splash-pop 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-play-state: paused;
+  transform-origin: center;
+}
+
+.startup-logo-shell::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  /* 启动 logo 壳是固定深色底，边框不能跟随浅色主题 token，否则首屏边框过重 */
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: inherit;
+}
+
+.startup-logo {
+  width: 56px;
+  height: auto;
+  color: #ffffff;
+}
+
+@keyframes splash-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.05); }
+  62% { transform: scale(0.985); }
+  82% { transform: scale(1.01); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .startup-logo-shell {
+    animation: none;
+  }
+}

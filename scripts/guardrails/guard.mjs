@@ -32,6 +32,9 @@ const LAYER = {
   '@app/shell': 4,
 }
 const UI_ALLOW = new Set(['@shell/bridge', '@shell/shared'])
+// apps 渲染层（apps/<x>/src，electron 主/preload 不在 src 下天然不命中）：
+// 唯一合法的 @shell 依赖面 = 桥面 + 契约 + UI 门面，越层 import 一律报
+const RENDERER_ALLOW = new Set(['@shell/bridge', '@shell/shared', '@shell/ui'])
 
 // 只登记「机器可精确判定」的过程性/自夸/占位词。领域术语（接入方式/落地/新增厂商）不在此列。
 const COMMENT_RULES = [
@@ -60,7 +63,12 @@ function sourceFiles() {
   for (const root of ['packages', 'apps']) {
     const base = join(ROOT, root)
     if (existsSync(base)) {
-      for (const f of walk(base)) { out.push(f) }
+      for (const f of walk(base)) {
+        // unplugin 生成的 *.d.ts（auto-imports/components/typed-router）虽入库跟踪，
+        // 但属构建产物而非手写源码，生成器写入的 @ts-ignore 会误触 type/escape
+        if (f.endsWith('.d.ts')) { continue }
+        out.push(f)
+      }
     }
   }
   return out
@@ -103,6 +111,10 @@ function scanSource() {
         }
         if (from === '@shell/ui' && !UI_ALLOW.has(target)) {
           push(v, 'boundary/ui-layer', f, i + 1, line)
+        }
+        if (rel(f).startsWith('apps/') && rel(f).includes('/src/') && target.startsWith('@shell/')
+          && !RENDERER_ALLOW.has(target)) {
+          push(v, 'boundary/renderer-import', f, i + 1, line)
         }
       }
     }

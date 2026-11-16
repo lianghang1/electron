@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { CaptureDialogSession } from '@shell/shared'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import CaptureStage from './CaptureStage.vue'
-import CaptureThumbStrip from './CaptureThumbStrip.vue'
-import { useCaptureSession } from './use-capture-session'
+import { useCaptureSession } from '../../composables/use-capture-session'
+import CaptureStage from './Stage.vue'
+import CaptureThumbStrip from './ThumbStrip.vue'
 
 const props = defineProps<{ session: CaptureDialogSession }>()
 const emit = defineEmits<{ close: [] }>()

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { shell } from '@shell/bridge/client'
-import { Button } from '@ui/components/ui'
+import { Button } from '@ui/components'
 import { RefreshCw } from 'lucide-vue-next'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 

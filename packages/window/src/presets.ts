@@ -6,7 +6,11 @@ import type { BrowserWindowConstructorOptions } from 'electron'
 import process from 'node:process'
 import { SECURE_WEB_PREFERENCES } from './security'
 
-/** 主窗底色透明：启动期透出桌面/系统材质；应用根面不透明，材质只在透明处可见。 */
+/**
+ * 主窗平台视觉档位：全程磨砂质感（用户拍板）——启动层与工作台透出系统材质。
+ * 材质初始化与首帧绘制的黑帧间隙由上屏时机消化：createShellWindow 在
+ * ready-to-show（首帧已绘）才 show，黑帧存在于窗口可见之前，屏幕上不可见。
+ */
 function shellVisualOptions(): BrowserWindowConstructorOptions {
   if (process.platform === 'darwin') {
     return {
@@ -18,15 +22,16 @@ function shellVisualOptions(): BrowserWindowConstructorOptions {
   }
   if (process.platform === 'win32') {
     return {
-      backgroundColor: '#00000000',
       // 窗口控制由 renderer 自绘，禁用原生标题栏避免两套按钮。
       frame: false,
+      // 不设 backgroundColor：显式底色（含透明 alpha）会让 acrylic 材质失效露黑帧
+      // （实测 Win11 26H2）；默认底色的求值间隙由 ready-to-show 门闩消化。
       backgroundMaterial: 'acrylic',
     }
   }
   return {
     backgroundColor: '#00000000',
-    // 透明底只负责启动期与根面未覆盖处，应用根面本身不透明。
+    // 透明底负责磨砂观感（linux 无系统材质，透出桌面）。
     transparent: true,
     // 原生标题栏与自绘顶部菜单重复。
     frame: false,
@@ -36,10 +41,9 @@ function shellVisualOptions(): BrowserWindowConstructorOptions {
 }
 
 /**
- * 工作台基础：隐藏系统标题栏（自绘 chrome）+ 平台透明视觉（启动期透出桌面/材质）。
- * show: false 创建后由 createShellWindow 立即 show 上屏（加载/求值间隙 win32 有
- * acrylic 材质打底，不再是「无窗如卡死」）；过场动画由 shell:introBegin（首帧已绘）
- * 驱动，不再依赖 ready-to-show 的 show 时机。
+ * 工作台基础：隐藏系统标题栏（自绘 chrome）+ 全程磨砂视觉。show: false——
+ * 上屏时机见 createShellWindow（首帧已绘才 show）；过场动画由
+ * shell:introBegin（首帧已绘）驱动。
  */
 export const shellBase: BrowserWindowConstructorOptions = {
   show: false,

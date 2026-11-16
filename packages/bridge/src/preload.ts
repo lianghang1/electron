@@ -36,7 +36,8 @@ function readBootAppearance(): { accent: string, theme: 'light' | 'dark' | 'syst
 
 const bootAppearance = readBootAppearance()
 
-/** preload 阶段尽早写 :root：内联 splash 与 Vue 首帧都吃到同一个 flavor 主色 */
+/** 外观注入兜底：head 内联脚本（index.html）是首帧定色第一现场——preload 执行时
+    documentElement 尚不存在，本注入被推迟到 DOMContentLoaded（首帧之后），两处同值冗余 */
 function injectBootAppearance(): void {
   const apply = () => {
     const root = document.documentElement

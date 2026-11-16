@@ -1,17 +1,13 @@
 {
+  "extends": "@shell/config/tsconfig.base.json",
   "compilerOptions": {
     "target": "ES2023",
     "jsx": "preserve",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "paths": {
       "@/*": ["./src/*"],
       "@ui/*": ["../../packages/ui/src/*"]
-    },
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true
+    }
   },
-  "include": ["src"]
+  "include": ["src", "env.d.ts"]
 }

@@ -186,8 +186,10 @@
 ::-webkit-scrollbar-track { background: transparent; }
 
 @layer base {
+  /* body 保持透明：壳窗全程磨砂材质（acrylic/vibrancy）由页面根容器自行铺垫
+     （工作台 bg-background / overlay 刻意透明 / recovery 内联深底），
+     body 涂 page 色会在 bundle 到达时盖死启动期磨砂 */
   body {
-    background: var(--background);
     color: var(--foreground);
     font-size: var(--ui-font-size);
   }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ShellTab } from './use-shell-tabs'
+import type { ShellTab } from '../../composables/use-shell-tabs'
 import { Plus, X } from 'lucide-vue-next'
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 

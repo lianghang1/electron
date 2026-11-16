@@ -9,10 +9,10 @@
 | 项 | 位置 |
 |---|---|
 | CLI 配置 | `packages/ui/components.json`（style / cssVariables / aliases） |
-| 组件源码 | `packages/ui/src/components/ui/*`，每个目录含 `.vue` 与 `index.ts` 出口 |
+| 组件源码 | `packages/ui/src/components/<name>/`，每个目录含 `.vue` 与 `index.ts` 出口 |
 | `cn()` | `packages/ui/src/lib/utils.ts` |
 | `@ui/*` 别名 | `packages/ui/tsconfig.json`、`apps/shell/tsconfig.web.json`、`apps/shell/electron.vite.config.ts` 三处登记（后两者解析跟随 symlink 进入 ui 源码时必需） |
-| 业务侧消费 | 只经 `@shell/ui` 单一门面；壳内组件可直接用 `@ui/components/ui` |
+| 业务侧消费 | 只经 `@shell/ui` 单一门面；壳内组件可直接用 `@ui/components` |
 
 现有组件：`Badge`、`Button`、`Card`、`Dialog`（含 Content/Header/Title/Description/Footer/Close）、`Input`、`Kbd`、`Label`、`Select`、`Separator`、`Switch`、`Tabs`、`Textarea`、`Tooltip`（含 Content/Provider/Trigger）。Button 的 `soft` 变体是项目专属（accent 派生底 + accent 前景），不在官方预设内。
 
@@ -86,7 +86,7 @@
 ## 禁止
 
 - 把颜色数值复制到第二处（含文档）。
-- 新增与 `components/ui` 平行的自建皮肤组件体系。
+- 新增与 `components` 平行的自建皮肤组件体系。
 - 在 `@theme` 里省略 `inline`。
-- 用 reka-ui 裸组件绕过 `components/ui` 的样式约定。
+- 用 reka-ui 裸组件绕过 `components` 的样式约定。
 - 把任意字号、随手颜色、过程性注释带进界面代码。

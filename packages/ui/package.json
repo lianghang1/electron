@@ -11,8 +11,6 @@
     "typecheck": "vue-tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@shell/bridge": "workspace:*",
-    "@shell/shared": "workspace:*",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
     "lucide-vue-next": "catalog:",

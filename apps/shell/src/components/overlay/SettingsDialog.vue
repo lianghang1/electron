@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import type { SettingField, SettingGroup, SettingsValues, ThemePreference } from '@shell/shared'
 import { shell } from '@shell/bridge/client'
-import { Button, Input, Switch } from '@ui/components/ui'
+import { Button, Input, Switch } from '@ui/components'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { applyAccent, applyTheme } from '../styles/appearance'
+import { applyAccent, applyTheme } from '../../styles/appearance'
 
 const props = defineProps<{ open: boolean, isKiosk?: boolean }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
