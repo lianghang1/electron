@@ -352,6 +352,9 @@ code, .mono { font-family: var(--dc-mono); }
   flex: none; height: 200px; border-top: 1px solid var(--dc-border);
   background: var(--dc-terminal); display: flex; flex-direction: column;
   transition: height 0.15s ease;
+  /* 收起高 32px 为 border-box，内含 1px border-top 只剩 31px，而 logbar-head 固定 32px：
+     这 1px 溢出会探出页面底部，撑出整高 document 滚动条，必须裁剪在抽屉内 */
+  overflow: hidden;
 }
 .dc-logbar.collapsed { height: 32px; }
 .dc-logbar-head {
