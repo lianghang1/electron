@@ -280,7 +280,8 @@ export default defineComponent({
         if (!wsLive.value || payload?.deviceId !== deviceSel.value) { return }
         // 新帧到达即回到实时画面（浏览拍摄记录时来新帧 = 自动回直播）
         replaying.value = false
-        if (payload.frame) { frameUrl.value = payload.frame }
+        // WS 通道推裸 JPEG base64，img src 必须拼 dataURL（master capture.js 同款）；mock 帧已是 dataURL 不重复拼
+        if (payload.frame) { frameUrl.value = payload.frame.startsWith('data:') ? payload.frame : `data:image/jpeg;base64,${payload.frame}` }
       })
     }
 
