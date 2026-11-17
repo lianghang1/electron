@@ -331,7 +331,9 @@ export class OverlayCenter implements Startable {
     const interactive = presented.some(s => s.mode === 'dialog' || s.mode === 'command')
     if (interactive) { windows.focusPlane() }
     else { windows.blurPlane() }
-    windows.setPlaneMouseIgnore(!interactive)
+    // 穿透决策走独立输入源（与悬停上报合成），不直接 setPlaneMouseIgnore——
+    // 悬停拦截生效期间快照推送覆盖回穿透会让点击落到下层内容
+    windows.setPlaneInteractive(interactive)
     windows.sendToPlane('overlay:state', this.snapshot())
   }
 

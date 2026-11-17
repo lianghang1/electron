@@ -5,17 +5,18 @@ import type { NotificationItem } from '../../overlay/types'
 import { AlertCircle, AlertTriangle, Bell, Check, Download, FileText, X } from '@lucide/vue'
 import { formatBytes } from '@shell/shared'
 import { Button, Progress } from '@ui/components'
+import { onBeforeUnmount, onMounted, watch } from 'vue'
 
 /**
  * 通知/下载 toast 堆叠：右上角顶栏之下，kernel 上限封顶，不内部滚动。
  * 纯展示：悬停穿透协商与全部动作经事件上抛。
  */
-defineProps<{
+const props = defineProps<{
   notifications: NotificationItem[]
   downloads: DownloadTask[]
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   hover: [hovering: boolean]
   dismissNotification: [id: string]
   clearNotifications: []
@@ -23,6 +24,33 @@ defineEmits<{
   openDownload: [taskId: string]
   revealDownload: [taskId: string]
 }>()
+
+/**
+ * 悬停拦截协商：卡片移除（关闭/TTL/清空）不触发 mouseleave（元素已消失），
+ * 列表变化后用最后指针位置探测——已不在卡片上则归还穿透，防拦截滞留
+ */
+let hoverHeld = false
+let lastPointer: { x: number, y: number } | null = null
+function hover(holding: boolean): void {
+  hoverHeld = holding
+  emit('hover', holding)
+}
+function onPointerTrack(e: MouseEvent): void {
+  lastPointer = { x: e.clientX, y: e.clientY }
+}
+onMounted(() => {
+  document.addEventListener('mousemove', onPointerTrack, { passive: true, capture: true })
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('mousemove', onPointerTrack, true)
+  // 组件卸载（全部卡片离场）时拦截必须归还，否则 plane 永久收全量鼠标
+  if (hoverHeld) { hover(false) }
+})
+watch(() => props.notifications.length + props.downloads.length, () => {
+  if (!hoverHeld || !lastPointer) { return }
+  const el = document.elementFromPoint(lastPointer.x, lastPointer.y)
+  if (!el?.closest('.bg-popover')) { hover(false) }
+}, { flush: 'post' })
 
 /** 下载卡中文状态（master STATUS_TEXT 语义） */
 const statusText: Record<string, string> = {
@@ -68,8 +96,8 @@ function relativeTime(ts?: number): string {
       :key="task.id"
       class="group pointer-events-auto relative flex gap-2 rounded-xl bg-popover p-3 shadow-lg"
       :title="task.path"
-      @mouseenter="$emit('hover', true)"
-      @mouseleave="$emit('hover', false)"
+      @mouseenter="hover(true)"
+      @mouseleave="hover(false)"
     >
       <span class="mt-0.5 flex size-6 flex-none items-center justify-center rounded-lg" :class="task.status === 'completed' ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-accent text-accent-foreground'">
         <component :is="task.status === 'completed' ? FileText : Download" :size="13" />
@@ -104,8 +132,8 @@ function relativeTime(ts?: number): string {
       v-for="item in notifications"
       :key="item.id"
       class="pointer-events-auto group relative flex gap-2 rounded-xl bg-popover p-3 shadow-lg"
-      @mouseenter="$emit('hover', true)"
-      @mouseleave="$emit('hover', false)"
+      @mouseenter="hover(true)"
+      @mouseleave="hover(false)"
     >
       <span class="mt-0.5 flex size-6 flex-none items-center justify-center rounded-lg" :class="levelChipOf(item.level).class">
         <component :is="levelChipOf(item.level).icon" :size="13" />
@@ -129,8 +157,8 @@ function relativeTime(ts?: number): string {
       v-if="notifications.length > 1"
       key="clear-all"
       class="pointer-events-auto flex justify-end"
-      @mouseenter="$emit('hover', true)"
-      @mouseleave="$emit('hover', false)"
+      @mouseenter="hover(true)"
+      @mouseleave="hover(false)"
     >
       <!-- outline 变体的 dark:bg-input/30 近透明底在透明 plane 上成白底白字，
            改用与卡片同语言的 popover 实底芯片承载 ghost 按钮 -->
