@@ -3,9 +3,9 @@ import { join } from 'node:path'
 import { assertSafeSegment } from '@shell/shared'
 
 /**
- * App 隔离 KV（源码依据 master packages/core/src/ipc/storage.ts 的 app-<appId>.json）：
- * 每个应用一个文件，应用之间不共享命名空间。身份由组合根从 CallerRegistry 反查，
- * 页面不能传 appId 读写别人的数据；写入走临时文件 + rename 原子替换。
+ * App 隔离 KV（app-<appId>.json）：每个应用一个文件，应用之间不共享命名空间。
+ * 身份由组合根从 CallerRegistry 反查，页面不能传 appId 读写别人的数据；
+ * 写入走临时文件 + rename 原子替换。
  */
 export class AppKvStore {
   constructor(private readonly dir: string) {}

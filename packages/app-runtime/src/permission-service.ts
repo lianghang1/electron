@@ -90,7 +90,7 @@ export class PermissionService {
 
   /**
    * 应用主动请求运行时授权：绕过策略表，读持久化结论或经浮层询问。
-   * 超时与缺省拒绝由浮层宿主承担（master requestRuntime/respond 的重构表达）。
+   * 超时与缺省拒绝由浮层宿主承担。
    */
   async requestRuntime(request: PermissionRequest): Promise<boolean> {
     const key = decisionKey(request.appId, request.permission)

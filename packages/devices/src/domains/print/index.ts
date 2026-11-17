@@ -49,7 +49,7 @@ export interface PrintSystemOptions {
 }
 
 /**
- * 创建打印系统（print 域通道由 core/src/ipc/print.ts 注册）。宿主 app 退出前调 destroy()。
+ * 创建打印系统。宿主 app 退出前调 destroy()。
  */
 export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
   const windows = new HiddenWindowPool(options.getParent)

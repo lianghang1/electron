@@ -47,8 +47,7 @@ export interface ApplyBundleOptions {
 }
 
 /**
- * 热更包自描述校验（源码依据 master packages/core/src/updater/bundle.ts）：
- * zip 内 update.json 声明版本 / 条目名 / sha256，与外部清单版本一致性比对后，
+ * 热更包自描述校验：zip 内 update.json 声明版本 / 条目名 / sha256，与外部清单版本一致性比对后，
  * 只取声明的固定条目字节做 sha256 强校验，再以版本化终名落盘。
  * 校验通过由调用方写 pending 指针；失败一律清理，不留半更新状态。
  */

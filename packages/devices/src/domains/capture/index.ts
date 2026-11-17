@@ -48,7 +48,7 @@ export interface CaptureSystemOptions {
   defaultSaveDir: string
 }
 
-/** 创建采集系统（与 createPrintSystem 同构，capture 域通道由 core/src/ipc/capture.ts 注册） */
+/** 创建采集系统（与 createPrintSystem 同构） */
 export function createCaptureSystem(options: CaptureSystemOptions): CaptureSystem {
   const log: CaptureLogFn = (level, message, meta) => options.logger?.[level](message, meta)
   const service = new CaptureService({ ...options, logger: log })

@@ -25,7 +25,7 @@ export interface ScannerSystem {
   destroy: () => void
 }
 
-/** 创建扫码枪系统（scanner 域通道由 core/src/ipc/scanner.ts 注册） */
+/** 创建扫码枪系统 */
 export function createScannerSystem(options: ScannerSystemOptions = {}): ScannerSystem {
   const log: ScannerLogFn = (level, message, meta) => options.logger?.[level](message, meta)
   const service = new ScanService(options.initialOverrides, options.persist, log)

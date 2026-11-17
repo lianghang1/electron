@@ -9,8 +9,7 @@ import { downloadFile, verifySha256 } from '../net'
 
 /**
  * dist-hot 通道：应用 dist 资源热更（免重启）。
- * 源码依据 master bundle.ts 的版本化终名思想：产物落 userData 而非安装目录，
- * 避免 Program Files / mac 签名 seal / 国产化不可变系统下不可写或破坏签名；
+ * 产物落 userData 而非安装目录，避免 Program Files / mac 签名 seal / 国产化不可变系统下不可写或破坏签名；
  * apps-current.json 是指针，app:// 协议按 appId 查指针取目录，读写同源。
  */
 export interface DistHotOptions {

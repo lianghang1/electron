@@ -8,7 +8,7 @@ import { assertAllowedUrl, fetchUpdateManifest } from '../manifest'
 import { downloadFile, verifySha256 } from '../net'
 
 /**
- * asar-hot 通道：主进程代码热更（源码依据 master AsarUpdateService + bundle.ts）。
+ * asar-hot 通道：主进程代码热更。
  * 运行中绝不替换 app.asar：下载 zip → 包内 update.json 自描述 + sha256 强校验 →
  * 版本化终名 core-<version>.asar 落 userData → 写 pending.json → 重启由引导层切 current 指针。
  * 首启 60s 判活失败由引导层回滚内置包；加载失败同样自动回退内置包。

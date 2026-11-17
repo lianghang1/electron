@@ -25,8 +25,8 @@ export interface CapturePreviewInput {
 
 /**
  * 拍摄浮层会话域契约：发起方开/关会话，浮层窗内预览与结果回传。
- * 浮层是独立功能面：设备枚举 / 摄像头档位由浮层自取（master CaptureDialog 同款），不依赖发起方状态。
- * push `frame`（channel `captureDialog:frame`）由 devices 拍摄域直推浮层窗 webContents。
+ * 浮层是独立功能面：设备枚举 / 摄像头档位由浮层自取，不依赖发起方状态。
+ * push `frame`（channel `captureDialog:frame`）由壳层拍摄编排直推浮层窗 webContents。
  */
 export const captureDialogDomain = defineIpcDomain('captureDialog', {
   open: invoke<(input: CaptureDialogOpenInput) => unknown>(),

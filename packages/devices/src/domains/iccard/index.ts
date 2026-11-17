@@ -26,7 +26,7 @@ export interface IcCardSystem {
   destroy: () => void
 }
 
-/** 创建 M1 IC 卡读写系统（与 print/capture/idcard 系统同构，iccard 域通道由 core/src/ipc/iccard.ts 注册） */
+/** 创建 M1 IC 卡读写系统（与 print/capture/idcard 系统同构） */
 export function createIcCardSystem(options: IcCardSystemOptions): IcCardSystem {
   const service = new IcCardService(options.resourcesRoot, options.host, options.logger)
   return {

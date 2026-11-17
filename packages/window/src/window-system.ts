@@ -331,7 +331,7 @@ export class WindowSystem implements Startable, ViewHost {
     return this.plane?.webContents.id === senderId
   }
 
-  /** 浮层宿主身份：设备域预览帧通道与动作校验锚在 plane 页 */
+  /** 浮层宿主身份：拍摄预览帧通道与浮层内动作校验锚在 plane 页 */
   planeSurface(): { webContents: Electron.WebContents } | null {
     const plane = this.plane
     if (!plane || plane.isDestroyed()) { return null }

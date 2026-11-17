@@ -159,7 +159,7 @@ export class OverlayCenter implements Startable {
     return promise
   }
 
-  /** 拍摄会话由设备域创建：浮层只承接完整会话描述，不自行生成 sessionId */
+  /** 拍摄会话由壳层编排创建：浮层只承接完整会话描述，不自行生成 sessionId */
   pushCaptureDialog(session: CaptureDialogSession): SurfaceHandle {
     return this.present({ surface: 'capture', payload: session })
   }

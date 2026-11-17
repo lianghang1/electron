@@ -22,7 +22,7 @@ export interface IdCardSystem {
   destroy: () => void
 }
 
-/** 创建身份证阅读系统（与 print/capture/iccard 系统同构，idcard 域通道由 core/src/ipc/idcard.ts 注册） */
+/** 创建身份证阅读系统（与 print/capture/iccard 系统同构） */
 export function createIdCardSystem(options: IdCardSystemOptions): IdCardSystem {
   const service = new IdCardService(options.resourcesRoot, options.host, options.logger)
   return {
