@@ -3,8 +3,8 @@ import type { ButtonVariants } from '@ui/components/button'
 
 import type { PrimitiveProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
-import { CheckIcon, CopyIcon } from '@ui/lib/lucide'
 import { Button } from '@ui/components/button'
+import { CheckIcon, CopyIcon } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { useClipboard } from '@vueuse/core'
 

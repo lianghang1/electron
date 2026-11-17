@@ -2,8 +2,8 @@
 import type { CollapsibleTriggerProps } from 'reka-ui'
 
 import type { HTMLAttributes } from 'vue'
-import { ChevronRightIcon } from '@ui/lib/lucide'
 import { CollapsibleTrigger } from '@ui/components/collapsible'
+import { ChevronRightIcon } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { reactiveOmit } from '@vueuse/core'
 import TraceIcon from './TraceIcon.vue'

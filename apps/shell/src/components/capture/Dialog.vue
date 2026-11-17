@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { CaptureDialogSession } from '@shell/shared'
-import { X } from '@ui/lib/lucide'
 import { Alert, AlertDescription } from '@ui/components/alert'
 import { Badge } from '@ui/components/badge'
 import { Button } from '@ui/components/button'
 import { Label } from '@ui/components/label'
 import { NativeSelect } from '@ui/components/native-select'
+import { X } from '@ui/lib/lucide'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useCaptureSession } from '../../composables/use-capture-session'
 import CaptureStage from './Stage.vue'

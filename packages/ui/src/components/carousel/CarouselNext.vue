@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import type { ButtonVariants } from '@ui/components/button'
 import type { WithClassAsProps } from './interface'
-import { ArrowRight } from '@ui/lib/lucide'
 import { Button } from '@ui/components/button'
+import { ArrowRight } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { useCarousel } from './useCarousel'
 

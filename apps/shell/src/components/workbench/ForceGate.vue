@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { RefreshCw } from '@ui/lib/lucide'
 import { shell } from '@shell/bridge/client'
 import { Button } from '@ui/components/button'
+import { RefreshCw } from '@ui/lib/lucide'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 /**

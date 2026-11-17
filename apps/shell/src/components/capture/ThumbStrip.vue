@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CaptureResult } from '@shell/shared'
-import { X } from '@ui/lib/lucide'
 import { Button } from '@ui/components/button'
+import { X } from '@ui/lib/lucide'
 
 defineProps<{
   /** 缩略条数据：index 为结果数组原始下标，供删除/放大定位 */
