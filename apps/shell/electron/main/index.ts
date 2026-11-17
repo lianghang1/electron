@@ -352,6 +352,19 @@ function setupDevices(a: Assembly): void {
       })
     : undefined
 
+  // 设备域拍摄路由 → 壳层浮层编排：发起方身份从域调用上下文提取（与 shell IPC 同源）
+  a.devices?.setCaptureDialogRoute(a.captureDialog
+    ? (input, ctx) => {
+        if (!ctx.sender) { throw new Error('拍摄浮层发起方缺少窗口身份') }
+        return a.captureDialog!.open(input, {
+          wc: ctx.sender,
+          tabId: ctx.instanceId,
+          appId: ctx.appId,
+          appName: ctx.appName ?? ctx.appId,
+        })
+      }
+    : undefined)
+
   // 设备系统并入内核生命周期：start = 守护进程预热（打 t2 并广播 ready），stop = 全域 dispose
   void a.kernel.register({
     name: 'devices',

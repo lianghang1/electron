@@ -1,5 +1,5 @@
 import type { EventBus } from '@shell/kernel'
-import type { DomainCallContext, DomainDefinition } from '@shell/shared'
+import type { CaptureDialogRequest, DomainCallContext, DomainDefinition } from '@shell/shared'
 import type { DeviceCallRecord, DeviceObservationSink, DeviceTelemetry } from './runtime/telemetry'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -26,6 +26,12 @@ export class DomainRouteError extends Error {
 /** 域工厂共用现场数据：事件总线（流式数据广播）。 */
 export interface DomainDeps {
   events: EventBus
+  /**
+   * 拍摄浮层编排路由（壳层 CaptureDialogSessionService 经组合根挂入）：
+   * 浮层会话编排归壳，设备域只出方法路由；未挂入时 openCaptureDialog 以
+   * DOMAIN_UNAVAILABLE 拒绝（bootstrap 未启用拍摄能力）
+   */
+  captureDialog?: (input: CaptureDialogRequest, ctx: DomainCallContext) => Promise<unknown>
 }
 
 /** 域调用路由："<域>.<方法>" → 能力闸门 → zod 校验 → handler */

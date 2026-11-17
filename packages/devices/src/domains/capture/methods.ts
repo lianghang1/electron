@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { DomainRouteError } from '../../domain-kit'
 import {
   captureConfigInput,
+  captureDialogInput,
   captureRequestInput,
   dataUrlInput,
   noInput,
@@ -89,6 +90,15 @@ export function createCaptureMethods(capture: CaptureSystem, deps: DomainDeps): 
           ?? (await capture.findDefaultDevice() as { id?: string } | undefined)?.id
         if (!resolved) { throw new DomainRouteError('DEVICE_NOT_FOUND', '无可用采集设备') }
         return capture.listDeviceCameras(resolved)
+      },
+    },
+    openCaptureDialog: {
+      // 浮层预览帧与拍摄数据在浮层窗内闭环，不经发起方通道——原语域不参与该会话
+      input: captureDialogInput,
+      output: z.unknown(),
+      handler: (input, ctx) => {
+        if (!deps.captureDialog) { throw new DomainRouteError('DOMAIN_UNAVAILABLE', '拍摄浮层编排未装配（bootstrap 未启用 capture 能力）') }
+        return deps.captureDialog(input, ctx)
       },
     },
   }

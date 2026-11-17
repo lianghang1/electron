@@ -75,6 +75,16 @@ export const captureRequestInput = z.object({
   resolutionIndex: z.number().int().nonnegative().optional(),
 }).passthrough()
 
+/** 拍摄浮层发起请求：业务意图字段可选（发起方身份主进程反查，不经入参） */
+export const captureDialogInput = z.object({
+  deviceId: z.string().optional(),
+  deviceLabel: z.string().optional(),
+  title: z.string().optional(),
+  resolutionNum: z.number().int().nonnegative().optional(),
+  maxCount: z.number().int().positive().optional(),
+  format: z.enum(['jpg', 'png', 'bmp']).optional(),
+}).passthrough()
+
 /** IC 卡读写（deviceId 由域缺省补齐，此处可选透传） */
 const cardDevice = z.string().optional()
 export const iccardReadInput = z.object({

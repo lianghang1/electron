@@ -1,6 +1,6 @@
 import type { EventBus } from '@shell/kernel'
 import type { Logger } from '@shell/kernel/logger'
-import type { DeviceCapabilityId, DomainCallContext, DomainDefinition } from '@shell/shared'
+import type { CaptureDialogRequest, DeviceCapabilityId, DomainCallContext, DomainDefinition } from '@shell/shared'
 import type { BrowserWindow } from 'electron'
 import type { DeviceCapabilitySpec, DeviceConfigCenter, StoredConfigDocument } from './config-center'
 import type { DomainDeps } from './domain-kit'
@@ -88,6 +88,8 @@ export interface DeviceGateway {
   resetConfig: (capabilityId?: string) => Promise<void>
   /** 拍摄采集原语（发现/预览/拍摄/落盘）：拍摄浮层会话编排由壳层负责，原语面供其直调 */
   capture?: CaptureSystem
+  /** 挂入拍摄浮层编排路由（组合根创建壳层会话服务后调用；未启用拍摄能力时传 undefined 显式拒绝） */
+  setCaptureDialogRoute: (route?: (input: CaptureDialogRequest, ctx: DomainCallContext) => Promise<unknown>) => void
   /** 预热守护进程（含 koffi 加载）；完成即打 t2DeviceHostReady */
   warmup: (onReady: () => void) => Promise<void>
   /** 工作台窗口就绪后调用：scanner 键盘观察挂到窗口（域方法不依赖窗口时序） */
@@ -121,6 +123,8 @@ interface AssembledDomain {
   readonly attachWindow?: (win: BrowserWindow) => void
   /** 拍摄采集原语系统（壳层浮层会话编排直调） */
   readonly capture?: CaptureSystem
+  /** 域装配现场（capture 持引用供组合根挂入浮层编排路由） */
+  readonly deps?: DomainDeps
 }
 
 type DomainAssembler = (ctx: AssemblyContext) => AssembledDomain
@@ -203,11 +207,13 @@ export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
         logger: ctx.logger.scope('devices:capture'),
         defaultSaveDir: join(ctx.filesRoot, 'capture'),
       })
+      const deps = domainDeps(ctx)
       return {
         id: 'capture',
-        definition: createCaptureDomain(system, domainDeps(ctx)),
+        definition: createCaptureDomain(system, deps),
         dispose: () => system.destroy(),
         capture: system,
+        deps,
       }
     },
   },
@@ -356,6 +362,11 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     deviceStatuses,
     configCenter,
     capture,
+
+    setCaptureDialogRoute(route) {
+      const captureDeps = assembled.find(a => a.deps)?.deps
+      if (captureDeps) { captureDeps.captureDialog = route }
+    },
 
     async applyConfig(capabilityId, deviceProfileId, patch) {
       configCenter.setOverrides(capabilityId, deviceProfileId, patch)
