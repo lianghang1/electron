@@ -46,15 +46,19 @@ export class DownloadManager implements Startable {
     this.retainMs = options.retainMs ?? 30_000
   }
 
-  /** 静默落盘重名避让：`name (1).ext` 递增（master download-service 无此步，属已知补齐） */
+  /**
+   * 静默落盘重名避让：`name (1).ext` 递增。避让对象含在途任务已占用的落盘路径——
+   * 连续同名下载时首个文件尚未落盘，只查磁盘会同路径覆盖
+   */
   private uniqueSavePath(path: string): string {
-    if (!existsSync(path)) { return path }
+    const taken = new Set([...this.tasks.values()].map(t => t.path))
+    if (!existsSync(path) && !taken.has(path)) { return path }
     const dir = dirname(path)
     const ext = extname(path)
     const stem = basename(path, ext)
     for (let n = 1; ; n++) {
       const candidate = join(dir, `${stem} (${n})${ext}`)
-      if (!existsSync(candidate)) { return candidate }
+      if (!existsSync(candidate) && !taken.has(candidate)) { return candidate }
     }
   }
 

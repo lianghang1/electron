@@ -56,12 +56,14 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     mode: 'toast',
     component: ToastStack,
     wire: {
-      'hover': (ctx, hovering) => ctx.hoverCapture(hovering as boolean),
-      'dismiss-notification': (_c, id) => void shell().notifications.dismiss(id as string),
-      'clear-notifications': () => void shell().notifications.clear(),
-      'dismiss-download': (_c, taskId) => void shell().downloads.dismiss(taskId as string),
-      'open-download': (_c, taskId) => void shell().downloads.open(taskId as string),
-      'reveal-download': (_c, taskId) => void shell().downloads.reveal(taskId as string),
+      // 键与组件 defineEmits 对齐（camelCase）：v-on 对象语法不做 camelize，
+      // kebab 键会被转成 onOpen-download 这类错误监听名，事件全部失联
+      hover: (ctx, hovering) => ctx.hoverCapture(hovering as boolean),
+      dismissNotification: (_c, id) => void shell().notifications.dismiss(id as string),
+      clearNotifications: () => void shell().notifications.clear(),
+      dismissDownload: (_c, taskId) => void shell().downloads.dismiss(taskId as string),
+      openDownload: (_c, taskId) => void shell().downloads.open(taskId as string),
+      revealDownload: (_c, taskId) => void shell().downloads.reveal(taskId as string),
     },
   },
   {

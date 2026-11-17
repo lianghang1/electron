@@ -96,7 +96,7 @@ function relativeTime(ts?: number): string {
           </Button>
         </div>
       </div>
-      <Button variant="ghost" size="icon-xs" class="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭下载卡" @click="$emit('dismissDownload', task.id)">
+      <Button variant="ghost" size="icon-xs" class="absolute top-2 right-2" aria-label="关闭下载卡" @click="$emit('dismissDownload', task.id)">
         <X />
       </Button>
     </div>
@@ -121,7 +121,7 @@ function relativeTime(ts?: number): string {
           </template>{{ item.body }}
         </div>
       </div>
-      <Button variant="ghost" size="icon-xs" class="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100" aria-label="关闭通知" @click="$emit('dismissNotification', item.id)">
+      <Button variant="ghost" size="icon-xs" class="absolute top-2 right-2" aria-label="关闭通知" @click="$emit('dismissNotification', item.id)">
         <X />
       </Button>
     </div>
@@ -132,9 +132,13 @@ function relativeTime(ts?: number): string {
       @mouseenter="$emit('hover', true)"
       @mouseleave="$emit('hover', false)"
     >
-      <Button variant="outline" size="xs" class="bg-popover shadow-lg" @click="$emit('clearNotifications')">
-        全部清除
-      </Button>
+      <!-- outline 变体的 dark:bg-input/30 近透明底在透明 plane 上成白底白字，
+           改用与卡片同语言的 popover 实底芯片承载 ghost 按钮 -->
+      <div class="flex rounded-xl border border-border bg-popover p-1 shadow-lg">
+        <Button variant="ghost" size="xs" @click="$emit('clearNotifications')">
+          全部清除
+        </Button>
+      </div>
     </div>
   </TransitionGroup>
 </template>
