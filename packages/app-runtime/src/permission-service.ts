@@ -27,6 +27,8 @@ export interface PermissionStore {
   set: (key: string, verdict: PermissionVerdict) => Promise<void>
   /** 撤销已持久化的运行时决策 */
   delete?: (key: string) => Promise<void>
+  /** 列举全部已持久化 key（撤销遍历的依据；缺省时只能清内存策略表键） */
+  list?: () => Promise<string[]>
 }
 
 /** 可注入的授权浮层；未注入时 prompt 判定一律拒绝 */
@@ -128,12 +130,13 @@ export class PermissionService {
       .map(([key, verdict]) => ({ permission: key.slice(prefix.length), verdict }))
   }
 
-  /** 撤销运行时授权：清除该权限在所有应用上的持久化结论 */
+  /** 撤销某权限在所有应用上的持久化结论（含策略外运行时授权键，遍历 store 全量） */
   async resetRuntime(permission: string): Promise<void> {
-    const remove = this.options.store?.delete
-    if (!remove) { return }
-    for (const key of [...this.rules.keys()]) {
-      if (key.endsWith(`|${permission}`)) { await remove(key).catch(() => {}) }
+    const store = this.options.store
+    if (!store?.delete) { return }
+    const keys = store.list ? await store.list().catch(() => []) : [...this.rules.keys()]
+    for (const key of keys) {
+      if (key.endsWith(`|${permission}`)) { await store.delete(key).catch(() => {}) }
     }
   }
 

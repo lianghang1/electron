@@ -411,6 +411,10 @@ function setupPermissions(a: Assembly): void {
       },
       set: async (key, verdict) => { a.appKv!.set(SHELL_APP_ID, `permission:${key}`, verdict) },
       delete: async (key) => { a.appKv!.remove(SHELL_APP_ID, `permission:${key}`) },
+      // 撤销遍历依据：平台 KV 里全部 permission: 前缀键（运行时授权键在策略表之外）
+      list: async () => a.appKv!.keys(SHELL_APP_ID)
+        .filter(k => k.startsWith('permission:'))
+        .map(k => k.slice('permission:'.length)),
     },
     prompt: {
       ask: request => a.overlays!.requestPermission({

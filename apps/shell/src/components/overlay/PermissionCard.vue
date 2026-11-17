@@ -2,7 +2,7 @@
 import type { PermissionView } from '../../overlay/types'
 import { ShieldCheck } from '@lucide/vue'
 import { permissionLabel } from '@shell/shared'
-import { Button, Card, CardContent, CardHeader, CardTitle, Progress } from '@ui/components'
+import { Button, Card, CardContent, CardFooter, CardHeader, CardTitle, Progress } from '@ui/components'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { usePermissionCountdown } from '../../composables/use-permission-countdown'
 
