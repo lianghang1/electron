@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Button, Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@ui/components'
+import { Button } from '@ui/components/button'
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@ui/components/card'
 
 /** 设备配置：dialog 表面内容卡（遮罩/居中/外点关闭由 SurfaceOutlet 容器配对） */
 defineProps<{

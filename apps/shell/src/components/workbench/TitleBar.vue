@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ShellTab } from '../../composables/use-shell-tabs'
 import { Minus, Search, Settings, Square, X } from '@lucide/vue'
-import { Kbd, Separator } from '@ui/components'
+import { Kbd } from '@ui/components/kbd'
+import { Separator } from '@ui/components/separator'
 import ShellTabBar from './ShellTabBar.vue'
 
 /**

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Button, Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@ui/components'
+import { Button } from '@ui/components/button'
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from '@ui/components/card'
 
 /** 更新提示：dialog 表面内容卡，重启动作经事件上抛 */
 defineProps<{

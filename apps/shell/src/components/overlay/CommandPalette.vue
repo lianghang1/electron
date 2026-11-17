@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { AppWindow, Search } from '@lucide/vue'
 import { shell } from '@shell/bridge/client'
-import { Kbd, Separator } from '@ui/components'
+import { Kbd } from '@ui/components/kbd'
+import { Separator } from '@ui/components/separator'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 interface PaletteItem {

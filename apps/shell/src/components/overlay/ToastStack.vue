@@ -4,7 +4,8 @@ import type { Component } from 'vue'
 import type { NotificationItem } from '../../overlay/types'
 import { AlertCircle, AlertTriangle, Bell, Check, Download, FileText, X } from '@lucide/vue'
 import { formatBytes } from '@shell/shared'
-import { Button, Progress } from '@ui/components'
+import { Button } from '@ui/components/button'
+import { Progress } from '@ui/components/progress'
 import { onBeforeUnmount, onMounted, watch } from 'vue'
 
 /**

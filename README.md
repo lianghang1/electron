@@ -14,7 +14,7 @@
 | 应用运行时 | `@shell/app-runtime` | 应用清单、两种打开策略（local/remote）、权限策略、`app://` 协议 |
 | 更新 | `@shell/update` | 三通道更新、状态机、清单校验、指针与引导 |
 | 窗口 | `@shell/window` | 工作台窗口、WebContentsView 容器、原生浮层宿主、运行韧性 |
-| 渲染 | `@shell/ui` / `@shell/bridge` | shadcn-vue 组件与唯一 contextBridge 桥面 |
+| 渲染 | `@shell/ui` / `@shell/bridge` | shadcn-vue 组件源码（子路径消费）与唯一 contextBridge 桥面 |
 | 组装 | `apps/shell` | **全仓唯一组装现场** `electron/main/index.ts` + ESM 引导层 + 打包配置 |
 | 形态 | `apps/flavors/*` | 产品清单 `flavor.json` |
 

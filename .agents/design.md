@@ -12,7 +12,7 @@
 | 组件源码 | `packages/ui/src/components/<name>/`，每个目录含 `.vue` 与 `index.ts` 出口；按官方 registry 全量落地 |
 | `cn()` | `packages/ui/src/lib/utils.ts` |
 | `@ui/*` 别名 | `packages/ui/tsconfig.json`、`apps/shell/tsconfig.web.json`、`apps/shell/electron.vite.config.ts` 三处登记（后两者解析跟随 symlink 进入 ui 源码时必需） |
-| 业务侧消费 | 只经 `@shell/ui` 单一门面；壳内组件可直接用 `@ui/components` |
+| 业务侧消费 | 一律子路径导入（`@ui/components/<name>`、`@ui/lib/utils`）；`@ui/components` 桶与 ui 根桶已物理删除，`@shell/ui` 仅保留 `./styles.css` 出口 |
 
 组件只用官方预设，不带项目专属变体：Button 的变体是 `default` / `secondary` / `outline` / `ghost` / `destructive` / `link`。图标统一 `@lucide/vue`（`@lucide/*` 不引入第二套）。进场动画用 `tw-animate-css` 官方约定（`animate-in fade-in zoom-in-95`）。
 

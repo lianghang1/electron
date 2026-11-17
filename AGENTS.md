@@ -88,7 +88,7 @@
 ## 依赖规则
 
 - `@shell/ui` 只可 import `@shell/bridge` / `@shell/shared`，禁 `@shell/devices` / `electron` / 其他上层包。
-- apps 渲染层（`apps/*/src`，主/preload 代码在 `electron/` 下不受此限）只可 import `@shell/bridge` / `@shell/shared` / `@shell/ui`；壳源码住在 `apps/shell/src/`（pages / components / overlay / composables），壳内组件可直接消费 `@ui/components`。
+- apps 渲染层（`apps/*/src`，主/preload 代码在 `electron/` 下不受此限）只可 import `@shell/bridge` / `@shell/shared` / `@shell/ui`；壳源码住在 `apps/shell/src/`（pages / components / overlay / composables），壳内组件一律子路径消费（如 `@ui/components/button`），禁止 `@ui/components` 桶导入（桶已物理删除，导入即编译失败）。
 - `@shell/kernel`、`@shell/shared` 禁 import 上层包。
 - `packages/*` 之间只能按"shared ← kernel ← window/app-runtime/devices/update ← apps"方向引用；禁止双向 workspace 声明与声明但零引用的依赖。
 
@@ -99,6 +99,6 @@
 - 组件源码集中在 `packages/ui/src/components/`（按 shadcn-vue 源码分发形态维护，组件目录 `<name>/{<Name>.vue,index.ts}`）；`components.json` 是 CLI 唯一配置，`@ui/*` 别名在 ui tsconfig、apps/shell web tsconfig 与 renderer vite 三处登记。
 - 颜色经「语义变量（官方 slate oklch）→ `@theme inline` 工具类」两层消费；模板禁止任意颜色值与自造变量。
 - 界面文字只用官方字号档（`text-xs` / `text-sm` / `text-base` / `text-lg`…），禁止任意字号。
-- 业务侧只经 `@shell/ui` 门面消费组件；壳内组件可用 `@ui/components`。
+- 组件一律子路径消费（`@ui/components/button`、`@ui/lib/utils`），`@shell/ui` 仅保留 `./styles.css` 出口供主题令牌导入；`@ui/components` 与 ui 根桶已删除，防止 named import 经桶拉起整张组件模块图（dev 冷启动随桶膨胀、prod 产物随桶携带 @unovis/maplibre 死重）。
 - `pnpm check:design` / `pnpm check:design:css` 把设计禁令变成机器退出码，`pnpm verify` 会执行。
 - 调试台方法只从 `DIAGNOSTIC_CATALOG` 取，禁止在 UI 里另写一份方法名（方法名经 zod schema 与真实 `defineDomain` 定义对齐）。

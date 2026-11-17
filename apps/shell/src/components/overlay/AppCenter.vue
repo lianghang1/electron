@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Search, X } from '@lucide/vue'
-import { Button, Kbd } from '@ui/components'
+import { Button } from '@ui/components/button'
+import { Kbd } from '@ui/components/kbd'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { useAppCenter } from '../../composables/use-app-center'
 import { colorFor } from '../../composables/use-shell-tabs'

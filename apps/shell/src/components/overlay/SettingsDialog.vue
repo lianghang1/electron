@@ -2,7 +2,10 @@
 import type { SettingField, SettingGroup, SettingsValues, ThemePreference } from '@shell/shared'
 import { X } from '@lucide/vue'
 import { shell } from '@shell/bridge/client'
-import { Button, Input, ScrollArea, Switch } from '@ui/components'
+import { Button } from '@ui/components/button'
+import { Input } from '@ui/components/input'
+import { ScrollArea } from '@ui/components/scroll-area'
+import { Switch } from '@ui/components/switch'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { applyAccent, applyTheme } from '../../styles/appearance'
 
