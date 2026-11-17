@@ -11,6 +11,8 @@ const showShell = ref(route.path === '/')
 
 onMounted(() => {
   if (route.path !== '/') {
+    // setup 时刻初始导航可能已就绪（showShell 误为 false），挂载后按真实路径纠正
+    showShell.value = true
     document.getElementById('splash')?.remove()
     document.body.classList.add('ready')
     return

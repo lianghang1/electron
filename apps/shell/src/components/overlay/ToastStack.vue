@@ -58,6 +58,7 @@ function relativeTime(ts?: number): string {
 
 <template>
   <TransitionGroup
+    appear
     tag="div"
     name="plane-toast"
     class="pointer-events-none absolute right-4 top-13 z-10 flex w-80 flex-col gap-2"
