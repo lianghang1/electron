@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue'
-import { CheckIcon } from '@lucide/vue'
+import { CheckIcon } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { computed, onBeforeUnmount, ref, useId, watch } from 'vue'
 import { getAnswerKeyShortcuts, injectQuestionnaireItemContext } from './useQuestionnaire'

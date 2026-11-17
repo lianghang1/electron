@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MenubarCheckboxItemEmits, MenubarCheckboxItemProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
-import { Check } from '@lucide/vue'
+import { Check } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { reactiveOmit } from '@vueuse/core'
 import {

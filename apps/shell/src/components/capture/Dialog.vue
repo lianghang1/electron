@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CaptureDialogSession } from '@shell/shared'
-import { X } from '@lucide/vue'
+import { X } from '@ui/lib/lucide'
 import { Alert, AlertDescription } from '@ui/components/alert'
 import { Badge } from '@ui/components/badge'
 import { Button } from '@ui/components/button'

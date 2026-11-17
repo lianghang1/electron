@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { NumberFieldDecrementProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
-import { Minus } from '@lucide/vue'
+import { Minus } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { reactiveOmit } from '@vueuse/core'
 import { NumberFieldDecrement, useForwardProps } from 'reka-ui'

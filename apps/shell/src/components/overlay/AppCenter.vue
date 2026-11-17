@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Search, X } from '@lucide/vue'
+import { Search, X } from '@ui/lib/lucide'
 import { Button } from '@ui/components/button'
 import { Kbd } from '@ui/components/kbd'
 import { onBeforeUnmount, onMounted } from 'vue'

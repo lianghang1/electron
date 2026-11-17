@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CaptureResult } from '@shell/shared'
-import { X } from '@lucide/vue'
+import { X } from '@ui/lib/lucide'
 import { Button } from '@ui/components/button'
 
 defineProps<{

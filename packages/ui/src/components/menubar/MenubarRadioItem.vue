@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MenubarRadioItemEmits, MenubarRadioItemProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
-import { Circle } from '@lucide/vue'
+import { Circle } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { reactiveOmit } from '@vueuse/core'
 import {

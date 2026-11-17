@@ -2,7 +2,7 @@
 import type { ButtonVariants } from '@ui/components/button'
 import type { PaginationFirstProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
-import { ChevronLeftIcon } from '@lucide/vue'
+import { ChevronLeftIcon } from '@ui/lib/lucide'
 import { buttonVariants } from '@ui/components/button'
 import { cn } from '@ui/lib/utils'
 import { reactiveOmit } from '@vueuse/core'

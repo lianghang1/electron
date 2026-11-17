@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { NavigationMenuTriggerProps } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
-import { ChevronDown } from '@lucide/vue'
+import { ChevronDown } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { reactiveOmit } from '@vueuse/core'
 import {

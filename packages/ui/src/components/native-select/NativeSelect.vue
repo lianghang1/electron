@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { AcceptableValue } from 'reka-ui'
 import type { HTMLAttributes } from 'vue'
-import { ChevronDownIcon } from '@lucide/vue'
+import { ChevronDownIcon } from '@ui/lib/lucide'
 import { cn } from '@ui/lib/utils'
 import { reactiveOmit, useVModel } from '@vueuse/core'
 

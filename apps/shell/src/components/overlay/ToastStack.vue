@@ -2,7 +2,7 @@
 import type { DownloadTask } from '@shell/shared'
 import type { Component } from 'vue'
 import type { NotificationItem } from '../../overlay/types'
-import { AlertCircle, AlertTriangle, Bell, Check, Download, FileText, X } from '@lucide/vue'
+import { AlertCircle, AlertTriangle, Bell, Check, Download, FileText, X } from '@ui/lib/lucide'
 import { formatBytes } from '@shell/shared'
 import { Button } from '@ui/components/button'
 import { Progress } from '@ui/components/progress'

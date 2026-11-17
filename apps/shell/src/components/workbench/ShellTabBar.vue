@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ShellTab } from '../../composables/use-shell-tabs'
-import { Plus, X } from '@lucide/vue'
+import { Plus, X } from '@ui/lib/lucide'
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps<{ tabs: ShellTab[], activeKey: string }>()

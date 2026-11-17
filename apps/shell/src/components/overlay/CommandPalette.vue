@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AppWindow, Search } from '@lucide/vue'
+import { AppWindow, Search } from '@ui/lib/lucide'
 import { shell } from '@shell/bridge/client'
 import { Kbd } from '@ui/components/kbd'
 import { Separator } from '@ui/components/separator'

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SettingField, SettingGroup, SettingsValues, ThemePreference } from '@shell/shared'
-import { X } from '@lucide/vue'
+import { X } from '@ui/lib/lucide'
 import { shell } from '@shell/bridge/client'
 import { Button } from '@ui/components/button'
 import { Input } from '@ui/components/input'
