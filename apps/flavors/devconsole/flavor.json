@@ -1,4 +1,5 @@
 {
+  "$schema": "../flavor.schema.json",
   "id": "devconsole",
   "name": "开发者控制台",
   "mode": "windowed",
