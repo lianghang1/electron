@@ -99,5 +99,5 @@ export function registerShellIpc(deps: ShellIpcDeps): void {
   registerAppEventRelay({ callers: deps.callers, events: deps.kernel.ctx.events })
 
   // 设置通道（schema 驱动）：kernel settings 服务经注入的 ipc 接口注册
-  registerSettingsIpc(ipcMain)
+  registerSettingsIpc(ipcMain, deps.kernel.ctx.events)
 }

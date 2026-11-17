@@ -99,6 +99,19 @@ export class WindowSystem implements Startable, ViewHost {
     })
   }
 
+  /** 启动外观与布局参数：主窗与 plane 共用（preload readBootAppearance 按序解析），缺一份则该窗落缺省主题 */
+  private bootArguments(): string[] {
+    const chrome = effectiveChrome(this.flavor)
+    return [
+      `--shell-accent=${this.initialAccent}`,
+      `--shell-theme=${this.initialTheme}`,
+      // 布局档位同步定型：solo 档无接缝底板，异步获取会让视图容器矩形首报落空
+      `--shell-chrome=${chrome}`,
+      // 启动握手只对 solo 直出（清单恰一个应用）生效：platform 撤层不必等应用，避免门闩悬空
+      ...(chrome === 'solo' && this.flavor.apps.length === 1 ? ['--shell-intro-gate=app'] : []),
+    ]
+  }
+
   /** 工作台主窗：tab 条 + 左导航的产品主体 */
   createShellWindow(): BrowserWindow {
     const mode = this.flavor.mode === 'kiosk' ? createKioskMode() : createWindowedMode()
@@ -113,17 +126,7 @@ export class WindowSystem implements Startable, ViewHost {
         ...shellBase.webPreferences,
         preload: join(this.rendererDir, '../preload/index.cjs'),
         // 启动外观：同步随 preload 抵达，渲染层挂载前即可应用（零闪烁；不走异步 IPC）
-        additionalArguments: (() => {
-          const chrome = effectiveChrome(this.flavor)
-          return [
-            `--shell-accent=${this.initialAccent}`,
-            `--shell-theme=${this.initialTheme}`,
-            // 布局档位同步定型：solo 档无接缝底板，异步获取会让视图容器矩形首报落空
-            `--shell-chrome=${chrome}`,
-            // 启动握手只对 solo 直出（清单恰一个应用）生效：platform 撤层不必等应用，避免门闩悬空
-            ...(chrome === 'solo' && this.flavor.apps.length === 1 ? ['--shell-intro-gate=app'] : []),
-          ]
-        })(),
+        additionalArguments: this.bootArguments(),
       },
     })
     mode.enter(win)
@@ -256,6 +259,8 @@ export class WindowSystem implements Startable, ViewHost {
       for (const win of this.windows.values()) {
         if (!win.isDestroyed()) { win.webContents.send(`event:${name}`, payload) }
       }
+      // plane 不入 windows 账本（独立生命周期管理），广播需显式送达
+      if (this.plane && !this.plane.isDestroyed()) { this.plane.webContents.send(`event:${name}`, payload) }
     })
   }
 
@@ -264,6 +269,9 @@ export class WindowSystem implements Startable, ViewHost {
   private plane?: BrowserWindow
   /** plane 是否持有焦点（权限 ESC / 面板输入依赖它；toast 独占时不持有） */
   private planeFocusHeld = false
+  /** 穿透合成输入源：交互表面在列（快照决策）/ toast 悬停拦截（plane 上报） */
+  private planeInteractive = false
+  private planeHoverHeld = false
 
   /**
    * 通知平面：随主窗创建（透明全屏子窗，恒在父窗内容含应用视图之上）。穿透缺省开启。
@@ -281,12 +289,15 @@ export class WindowSystem implements Startable, ViewHost {
       webPreferences: {
         ...overlayBase.webPreferences,
         preload: join(this.rendererDir, '../preload/index.cjs'),
+        // 与主窗同源的启动外观参数：缺了 preload 落缺省 theme=system，两窗主题源分叉
+        additionalArguments: this.bootArguments(),
         partition: 'persist:overlay-window',
         backgroundThrottling: false,
       },
     })
     this.plane = plane
-    plane.setIgnoreMouseEvents(true, { forward: true })
+    // 初始穿透态经合成落位（空态全穿透），不裸调 setIgnoreMouseEvents
+    this.applyPlaneMouseMode()
     // 恒可见：透明空态 + 穿透是惰性的，显隐只会冻结平面内 CSS 过渡
     // （transitionend 不触发 → 离场元素滞留 DOM → 下次显示叠出旧卡虚影）
     plane.showInactive()
@@ -303,24 +314,37 @@ export class WindowSystem implements Startable, ViewHost {
     const plane = this.plane
     if (!plane || plane.isDestroyed()) { return }
     this.planeFocusHeld = true
-    plane.setIgnoreMouseEvents(false)
+    this.setPlaneInteractive(true)
     plane.focus()
   }
 
   blurPlane(): void {
     if (!this.planeFocusHeld) { return }
     this.planeFocusHeld = false
-    if (this.plane && !this.plane.isDestroyed()) {
-      this.plane.setIgnoreMouseEvents(true, { forward: true })
-    }
+    this.setPlaneInteractive(false)
     this.restoreContentFocus()
   }
 
-  /** toast 卡片悬停切换：穿透态下鼠标进卡片临时拦截，离开即交还（master 同款机制） */
+  /** toast 卡片悬停切换：穿透态下鼠标进卡片临时拦截，离开即交还 */
   setPlaneMouseIgnore(ignore: boolean): void {
-    if (this.plane && !this.plane.isDestroyed()) {
-      this.plane.setIgnoreMouseEvents(ignore, { forward: true })
-    }
+    this.planeHoverHeld = !ignore
+    this.applyPlaneMouseMode()
+  }
+
+  /** 快照穿透决策：交互表面在列恒收鼠标，toast 系穿透 */
+  setPlaneInteractive(interactive: boolean): void {
+    this.planeInteractive = interactive
+    this.applyPlaneMouseMode()
+  }
+
+  /**
+   * 穿透态单点合成：两个输入源（快照决策 / 悬停上报）各自更新、合并生效——
+   * 悬停拦截生效期间任何快照推送（下载进度等高频事件）不得恢复穿透
+   */
+  private applyPlaneMouseMode(): void {
+    const plane = this.plane
+    if (!plane || plane.isDestroyed()) { return }
+    plane.setIgnoreMouseEvents(!this.planeInteractive && !this.planeHoverHeld, { forward: true })
   }
 
   sendToPlane(channel: string, payload: unknown): void {

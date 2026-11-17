@@ -1,4 +1,5 @@
-import type { SettingGroup, SettingsValues } from '@shell/shared'
+import type { SettingGroup, SettingsValues, ThemePreference } from '@shell/shared'
+import type { EventBus } from '../event-bus'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { SETTINGS_SCHEMA } from '@shell/shared'
@@ -84,10 +85,15 @@ export function setSetting(key: string, value: unknown): void {
   applySideEffects(key, value)
 }
 
-/** 组合根调用：接线设置 IPC 通道 */
-export function registerSettingsIpc(ipc: Electron.IpcMain): void {
+/** 组合根调用：接线设置 IPC 通道；events 注入后主题变更广播给全部窗口渲染层 */
+export function registerSettingsIpc(ipc: Electron.IpcMain, events?: EventBus): void {
   ipc.handle('settings:all', () => settingsSnapshot())
-  ipc.handle('settings:set', (_e, key: string, value: unknown) => setSetting(key, value))
+  ipc.handle('settings:set', (_e, key: string, value: unknown) => {
+    setSetting(key, value)
+    if (key === 'appearance.theme' && events) {
+      events.emit('appearance.theme-changed', { theme: value as ThemePreference })
+    }
+  })
 }
 
 /** 启动时应用一次持久化的副作用设置（如开机自启在安装器里可能被重置） */

@@ -1,4 +1,5 @@
 import type { DownloadTask } from './download'
+import type { ThemePreference } from './settings'
 
 /**
  * 平台事件名（过去式，结果导向）。
@@ -100,6 +101,8 @@ export interface PlatformEvents {
     instanceId: string
     action: 'reload' | 'fullscreen' | 'work-area' | 'loading-started' | 'loading-finished' | 'load-failed'
   }
+  // 外观：主题偏好变更广播，各窗口渲染层即时重挂 .dark（启动参数快照只覆盖初始帧）
+  'appearance.theme-changed': { theme: ThemePreference }
 }
 
 export type PlatformEventName = keyof PlatformEvents
