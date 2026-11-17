@@ -4,6 +4,7 @@ import type { EventBus, PlatformKernel } from '@shell/kernel'
 import type { Logger } from '@shell/kernel/logger'
 import type { AppManifest, FlavorManifest } from '@shell/shared'
 import type { PackageInstaller } from '@shell/update'
+import type { NativeImage } from 'electron'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import process from 'node:process'
@@ -44,7 +45,7 @@ import {
   Win32Installer,
 } from '@shell/update'
 import { OverlayCenter, ResilienceSystem, TraySystem, WindowSystem } from '@shell/window'
-import { app, screen, session } from 'electron'
+import { app, nativeImage, screen, session } from 'electron'
 import { CaptureDialogSessionService } from './capture-dialog'
 import { createInfoDomain, INFO_DOMAIN_ID } from './ipc/info-domain'
 import { registerShellIpc } from './shell-ipc'
@@ -128,6 +129,19 @@ if (!app.requestSingleInstanceLock()) {
 else {
   // 第二次启动：聚焦已有主窗（kiosk 全屏锁定同样适用），而不是静默无反应
   app.on('second-instance', () => focusShell?.())
+}
+
+/** 托盘品牌图标：打包由 extraResources 注入 resources/branding；dev 直取 build 资产 */
+function resolveTrayIcon(): NativeImage {
+  const candidates = [
+    join(process.resourcesPath ?? '.', 'branding', 'icon.png'),
+    join(app.getAppPath(), 'build', 'icon.png'),
+  ]
+  for (const path of candidates) {
+    const icon = nativeImage.createFromPath(path)
+    if (!icon.isEmpty()) { return icon }
+  }
+  return nativeImage.createEmpty()
 }
 
 /**
@@ -304,7 +318,7 @@ function setupPlatformSystems(a: Assembly): void {
         win.focus()
       }
     }
-    void a.kernel.register(new TraySystem(a.events, [{ label: '显示工作台', click: showShell }], showShell))
+    void a.kernel.register(new TraySystem(a.events, [{ label: '显示工作台', click: showShell }], showShell, resolveTrayIcon()))
   }
 
   // 运行韧性：flavor 声明才启用，全部默认关闭；attach 在主窗创建后调用

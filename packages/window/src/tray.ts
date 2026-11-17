@@ -1,4 +1,5 @@
 import type { EventBus, Startable } from '@shell/kernel'
+import type { NativeImage } from 'electron'
 import { app, Menu, nativeImage, Tray } from 'electron'
 
 /** 托盘菜单项（退出由本系统统一追加）：组合根按 flavor 查表装配 */
@@ -22,12 +23,12 @@ export class TraySystem implements Startable {
     private readonly entries: readonly TrayEntry[],
     /** 托盘图标左键点击动作（与首项同义，快速入口） */
     private readonly onClick: () => void,
+    /** 品牌图标（组合根解析资产注入）；缺省空图时 Windows 托盘显示系统默认白框 */
+    private readonly icon: NativeImage = nativeImage.createEmpty(),
   ) {}
 
   async start(): Promise<void> {
-    // 空图标：品牌图标由 flavor.branding.icon 注入后替换
-    const icon = nativeImage.createEmpty()
-    this.tray = new Tray(icon)
+    this.tray = new Tray(this.icon)
     this.tray.setToolTip(app.getName())
     this.tray.setContextMenu(Menu.buildFromTemplate([
       ...this.entries.map(entry => ({ label: entry.label, click: () => entry.click() })),

@@ -67,6 +67,8 @@ const config = {
     // 驱动资产：构建期聚合产物注入 resources/devices/，声明 devices/<域>/... 直接命中。
     // system 部署（mac/linux）不携带 DLL，manual 部署（信创）从现场数据目录取，见 docs/driver-packaging.md。
     { from: '../../resources/devices', to: 'devices' },
+    // 托盘品牌图标：组合根打包态从 resources/branding 取（dev 直取 apps/shell/build/）
+    { from: '../../apps/shell/build/icon.png', to: 'branding/icon.png' },
   ],
 
   win: {
