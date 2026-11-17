@@ -77,7 +77,7 @@ function onDragEnd() {
 <template>
   <div
     ref="stripEl"
-    class="tab-strip relative flex min-w-0 shrink-0 items-center gap-1 overflow-x-auto"
+    class="tab-strip relative flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
     :class="{ 'fade-start': fadeStart, 'fade-end': fadeEnd }"
     @scroll="updateFade"
   >

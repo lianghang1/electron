@@ -42,9 +42,7 @@ defineEmits<{
       @open-app-center="$emit('openAppCenter')"
     />
 
-    <!-- tab 条右侧的弹性空白是拖拽区 -->
-    <div class="titlebar-drag min-w-3 flex-1" />
-
+    <!-- tab 条占满剩余宽度（多了内部滚动），右侧控制区固定不被挤压；空白即拖拽区 -->
     <div class="flex shrink-0 items-center">
       <button class="ctrl flex h-8 w-9 items-center justify-center rounded-md text-foreground" aria-label="设置" @click="$emit('openSettings')">
         <Settings :size="15" />
