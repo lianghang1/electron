@@ -53,3 +53,10 @@ export class IpcRemoteError extends Error {
     this.details = payload.details
   }
 }
+
+/**
+ * invoke 信封：preload 不抛远程错误而以信封返回，由 client 在主世界解包重建
+ * IpcRemoteError。原因：contextBridge 会把 preload 隔离世界抛出的 Error 克隆为
+ * 裸 Error（code/details/name 全部剥离），信封是 plain object 可完整穿越沙箱桥。
+ */
+export type IpcInvokeEnvelope<T = unknown> = { ok: true, value: T } | { ok: false, error: IpcErrorPayload }

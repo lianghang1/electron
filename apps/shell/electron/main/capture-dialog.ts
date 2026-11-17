@@ -1,5 +1,6 @@
 import type { CaptureSystem } from '@shell/devices'
 import type { CaptureCameraInfo, CaptureDevice, CaptureDialogClosedReason, CaptureDialogRequest, CaptureDialogSession, CaptureResult, DomainIpcSender } from '@shell/shared'
+import type { CaptureSnapInput } from '@shell/shared/ipc'
 import type { WebContents } from 'electron'
 import { captureError } from '@shell/devices'
 import { PlatformError } from '@shell/shared'
@@ -61,8 +62,11 @@ export class CaptureDialogSessionService {
     if (this.session) {
       throw captureError('DEVICE_BUSY', '拍摄浮层已打开，请先完成或关闭当前拍摄')
     }
-    // 显式预选优先；缺省按域默认设备自动定位（就绪才注入，否则浮层内自选兜底）
-    const preselect = req.deviceId?.trim() || await this.deps.capture.findDefaultDevice()
+    // 显式预选优先；缺省按域默认设备定位，未配置默认时按 findDefaultDevice 契约
+    // 回落「第一个就绪设备」（否则 SDK 路线拍摄时 session.deviceId 落空）
+    const preselect = req.deviceId?.trim()
+      || await this.deps.capture.findDefaultDevice()
+      || (await this.deps.capture.listDevices()).find(d => d.status === 'ready')?.id
     // 解析默认设备存在异步窗口，落位前复检互斥（并发 open 只放行一个）
     if (this.session) {
       throw captureError('DEVICE_BUSY', '拍摄浮层已打开，请先完成或关闭当前拍摄')
@@ -144,10 +148,10 @@ export class CaptureDialogSessionService {
 
   /**
    * 浮层内拍摄：UVC 传 dataUrl（浮层抽帧，落平台默认目录，meta 随结果透传——如成片像素）；
-   * SDK 路线不传，按会话设备走统一采集（保存目录恒为平台 files/capture/，渲染层不可指定）。
-   * 结果由浮层 UI 收集，确认时统一回传。
+   * SDK 路线不传 dataUrl，按浮层当前选中设备/档位走统一采集（显式携带优先，会话预选兜底；
+   * 保存目录恒为平台 files/capture/，渲染层不可指定）。结果由浮层 UI 收集，确认时统一回传。
    */
-  async capture(sender: WebContents, opts?: { dataUrl?: string, meta?: Record<string, unknown> }): Promise<CaptureResult> {
+  async capture(sender: WebContents, opts?: CaptureSnapInput): Promise<CaptureResult> {
     this.assertCaptureWindow(sender)
     const session = this.session
     if (!session) {
@@ -157,12 +161,13 @@ export class CaptureDialogSessionService {
       const imagePath = await this.deps.capture.saveCapturedImage(opts.dataUrl, session.format === 'png' ? 'png' : 'jpg')
       return { imagePath, thumbDataUrl: opts.dataUrl, meta: opts.meta }
     }
-    if (!session.deviceId) {
+    const deviceId = opts?.deviceId?.trim() || session.deviceId
+    if (!deviceId) {
       throw captureError('VALIDATION_FAILED', '未选择采集设备')
     }
     return this.deps.capture.captureImage({
-      deviceId: session.deviceId,
-      resolutionNum: session.resolutionNum,
+      deviceId,
+      resolutionNum: typeof opts?.resolutionNum === 'number' ? opts.resolutionNum : session.resolutionNum,
       format: session.format,
     })
   }

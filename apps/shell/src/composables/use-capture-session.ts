@@ -76,6 +76,8 @@ export function useCaptureSession(
   const loadingDevices = ref(false)
   const switching = ref(false)
   const live = ref(false)
+  /** 开启意图（与落位分离）：开启进行中切换设备/停止时，changeDevice 凭意图决定是否重开预览 */
+  const wantLive = ref(false)
   const frameSrc = ref('')
   const stream = ref<MediaStream | null>(null)
   const rotate = ref(0)
@@ -89,6 +91,8 @@ export function useCaptureSession(
   const full = computed(() => maxCount.value > 1 && results.value.length >= maxCount.value)
   const canConfirm = computed(() => results.value.length > 0)
   let frameUnsub: (() => void) | null = null
+  /** 开启序号：挂起开启完成时若已过期（期间切换/停止）则丢弃结果，不覆盖新状态 */
+  let openSeq = 0
 
   // ---- 设备枚举与选择 ----
 
@@ -132,8 +136,9 @@ export function useCaptureSession(
 
   async function changeDevice(value: string): Promise<void> {
     if (value === deviceId.value) { return }
-    // 切换前预览开启：切到新设备后自动重开预览（失败经 toggleLive 显错，不阻断）
-    const wasLive = live.value
+    // 切换前预览开启：切到新设备后自动重开预览（失败经 toggleLive 显错，不阻断）。
+    // 凭意图判断而非 live：开启尚在挂起时 live 未落位，误判会跳过重开预览
+    const wasLive = wantLive.value
     await stopLive()
     deviceId.value = value
     resolution.value = ''
@@ -177,13 +182,35 @@ export function useCaptureSession(
       showError('请先选择采集设备')
       return
     }
+    // 开启期间设备可能被切换/预览被停止：完成时按序号判过期，UVC 关流、ws 停会话
+    const seq = ++openSeq
+    wantLive.value = true
+    const id = deviceId.value
     try {
-      if (kind.value === 'uvc') { stream.value = await openUvcCamera(deviceId.value, resolution.value) }
-      else { await startWsPreview(deviceId.value) }
+      if (deviceKind(id) === 'uvc') {
+        const opened = await openUvcCamera(id, resolution.value)
+        if (seq !== openSeq) {
+          opened.getTracks().forEach(t => t.stop())
+          wantLive.value = false
+          return
+        }
+        stream.value = opened
+      }
+      else {
+        await startWsPreview(id)
+        if (seq !== openSeq) {
+          void shell().captureDialog.stopPreview().catch(() => {})
+          wantLive.value = false
+          return
+        }
+      }
       live.value = true
     }
     catch (err) {
-      showError(describeError(err, '开启预览失败'))
+      wantLive.value = false
+      if (seq === openSeq) {
+        showError(describeError(err, '开启预览失败'))
+      }
     }
   }
 
@@ -200,6 +227,8 @@ export function useCaptureSession(
   }
 
   async function stopLive(): Promise<void> {
+    openSeq++
+    wantLive.value = false
     stopUvcStream()
     if (deviceKind(deviceId.value) === 'ws' && deviceId.value) {
       try {
@@ -262,7 +291,11 @@ export function useCaptureSession(
         if (thumb) { result = { ...result, thumbDataUrl: thumb } }
       }
       else {
-        result = await shell().captureDialog.snap() as CaptureResult
+        // SDK 路线显式携带浮层当前选择：会话预选只是 open 时刻快照，浮层内切换必须生效
+        result = await shell().captureDialog.snap({
+          deviceId: deviceId.value,
+          resolutionNum: resolution.value === '' ? undefined : Number(resolution.value),
+        }) as CaptureResult
       }
       // maxCount=1：每次拍摄替换前一张；>1：最新在前追加，拍满由 full 拦截
       results.value = maxCount.value === 1 ? [result] : [result, ...results.value]
@@ -380,6 +413,8 @@ export function useCaptureSession(
   }
 
   function dispose(): void {
+    openSeq++
+    wantLive.value = false
     stopUvcStream()
     if (frameUnsub) {
       frameUnsub()

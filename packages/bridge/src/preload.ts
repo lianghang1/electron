@@ -1,11 +1,13 @@
-import { decodeIpcError, IpcRemoteError, shellDomains } from '@shell/shared/ipc'
+import type { IpcErrorPayload, IpcInvokeEnvelope } from '@shell/shared/ipc'
+import { decodeIpcError, shellDomains } from '@shell/shared/ipc'
 import { contextBridge, ipcRenderer } from 'electron'
 
 /**
  * 渲染层唯一桥面：每层之间一个门面。
  * 本文件集中暴露全部 contextBridge 能力——安全审计只看这一处。
  * 壳设施方法由 @shell/shared ipc 域运行时表（shellDomains）通用生成：
- * invoke → Promise 方法 / send → fire-and-forget / push → onXxx 订阅，
+ * invoke → 信封 Promise（client 侧解包重建 throwing Promise）/
+ * send → fire-and-forget / push → onXxx 订阅，
  * 新增壳通道零改动（契约文件 + shellDomains 一行即可）。
  * 设备域不走生成面：invoke('domain.method') 单通道 + onEvent 事件订阅，
  * 运行时校验由主进程侧按 zod schema 执行。
@@ -56,15 +58,24 @@ function injectBootAppearance(): void {
 injectBootAppearance()
 
 /**
- * invoke 统一出口：主进程 shellHandle 抛出的异常已编码进 message，
- * 在此还原为带 code/details 的 IpcRemoteError（业务按错误码分支）；
- * 非平台序列化错误（桥自身/网络层）原样透传。
+ * invoke 统一出口：主进程 shellHandle 抛出的异常已编码进 message，在此还原为
+ * IpcErrorPayload 并以信封返回（不抛）。远程错误不在隔离世界抛出——contextBridge
+ * 会把穿越的 Error 克隆为裸 Error（code/details/name 全部剥离），信封 plain object
+ * 才能完整携带错误码体系；client 侧在主世界解包重建 IpcRemoteError。
+ * 非平台序列化错误（桥自身/网络层）包装为通用 IPC_ERROR 信封。
  */
-function invokeChannel(channel: string, ...args: unknown[]): Promise<unknown> {
-  return ipcRenderer.invoke(channel, ...args).catch((error: unknown) => {
-    const payload = decodeIpcError(error)
-    throw payload ? new IpcRemoteError(payload) : error
-  })
+function invokeChannel(channel: string, ...args: unknown[]): Promise<IpcInvokeEnvelope> {
+  return ipcRenderer.invoke(channel, ...args).then(
+    value => ({ ok: true, value } satisfies IpcInvokeEnvelope),
+    (error: unknown): IpcInvokeEnvelope => {
+      const payload: IpcErrorPayload = decodeIpcError(error) ?? {
+        name: error instanceof Error ? error.name : 'Error',
+        code: 'IPC_ERROR',
+        message: error instanceof Error ? error.message : String(error),
+      }
+      return { ok: false, error: payload }
+    },
+  )
 }
 
 /** 推送订阅包装：剥掉 Electron event 首参只透传契约负载数据，返回取消监听函数 */
