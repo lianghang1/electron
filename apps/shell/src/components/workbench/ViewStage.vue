@@ -21,7 +21,7 @@ const { dockEl } = useViewDock()
 </script>
 
 <template>
-  <main class="relative min-h-0 flex-1 overflow-hidden" :class="chrome === 'solo' ? 'bg-primary' : ''">
+  <main class="relative min-h-0 flex-1 overflow-hidden" :class="chrome === 'solo' ? 'bg-background' : ''">
     <div class="h-full w-full overflow-hidden" :class="chrome === 'platform' ? 'p-1.5' : ''">
       <div
         ref="dockEl"
@@ -34,18 +34,18 @@ const { dockEl } = useViewDock()
     <div v-if="chrome === 'platform' && !activeTab" class="absolute inset-0">
       <EmptyState />
     </div>
-    <!-- 视图垫场/失败兜底：accent 底与 intro、view backgroundColor 同一色源，
-         加载全程不出现第二色；失败不再展开 Chromium 白错误页，重试是交互出口 -->
+    <!-- 视图垫场/失败兜底：中性底色（品牌色大面积铺底过艳），形态与 platform dock
+         卡片同构；失败不再展开 Chromium 白错误页，重试是交互出口 -->
     <div
       v-if="viewState"
       class="absolute inset-0"
       :class="chrome === 'platform' ? 'p-1.5' : ''"
     >
       <div
-        class="grid h-full w-full place-items-center bg-primary"
-        :class="chrome === 'platform' ? 'rounded-xl' : ''"
+        class="grid h-full w-full place-items-center"
+        :class="chrome === 'platform' ? 'rounded-xl border border-border bg-card' : 'bg-background'"
       >
-        <div v-if="viewState === 'loading'" class="flex flex-col items-center gap-3 text-primary-foreground">
+        <div v-if="viewState === 'loading'" class="flex flex-col items-center gap-3 text-muted-foreground">
           <svg viewBox="0 0 24 24" width="28" height="28" class="animate-spin" aria-hidden="true">
             <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="44" />
           </svg>
@@ -53,12 +53,12 @@ const { dockEl } = useViewDock()
             正在加载「{{ activeTab.title }}」…
           </p>
         </div>
-        <div v-else class="flex flex-col items-center gap-4 text-primary-foreground">
-          <p class="text-lg font-medium">
+        <div v-else class="flex flex-col items-center gap-4">
+          <p class="text-lg font-medium text-foreground">
             页面加载失败
           </p>
           <button
-            class="rounded-md bg-primary-foreground px-4 py-1.5 text-sm font-medium text-primary transition-colors hover:bg-accent"
+            class="rounded-md bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             @click="$emit('retry')"
           >
             重试
