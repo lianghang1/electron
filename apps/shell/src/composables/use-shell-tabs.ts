@@ -80,6 +80,8 @@ export function useShellTabs() {
     const existing = tabs.value.find(t => t.instanceId === instanceId || t.appId === appId)
     if (existing) {
       if (existing.instanceId !== instanceId) { existing.instanceId = instanceId }
+      // 复用实例的 open 也补发 app.opened：点已打开的应用 = 激活其页签
+      void activate(existing)
       return
     }
     const manifest = appList.value.find(a => a.manifest.id === appId)?.manifest

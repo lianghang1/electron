@@ -60,11 +60,15 @@ export class AppService implements Startable {
     if (!registered) { throw new AppOpenError('APP_NOT_FOUND', `App not registered: ${appId}`) }
     if (!await this.admit(registered.manifest)) { throw new AppOpenError('APP_NOT_ALLOWED', `App not allowed: ${appId}`) }
 
-    // 同 App 复用活跃实例
+    // 同 App 复用活跃实例：补发 app.opened，让各工作台把既有页签置前（打开语义 = 露出该应用，
+    // 不发事件则「已打开的应用再点一次」在界面上无任何反馈）
     const activeId = this.activeByApp.get(appId)
     if (activeId) {
       const existing = this.instances.get(activeId)
-      if (existing && existing.state !== 'closed') { return existing }
+      if (existing && existing.state !== 'closed') {
+        this.events.emit('app.opened', { appId, instanceId: existing.instanceId })
+        return existing
+      }
     }
 
     const instance: AppInstance = {
