@@ -47,8 +47,6 @@ export default defineConfig({
   },
   renderer: {
     root: '.',
-    // 基础端口避开 vite 默认 5173 与常见本地服务；被占时 vite 自动顺延，主进程
-    // 经 ELECTRON_RENDERER_URL 拿到的永远是实际端口，改端口对链路无感
     server: { port: 51888 },
     build: {
       rollupOptions: {

@@ -39,6 +39,118 @@
       },
       "devices": [],
       "permissions": []
+    },
+    {
+      "id": "dev-doc2",
+      "name": "外链页签2",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.dev",
+        "origins": [
+          "https://vite.dev"
+        ]
+      },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "dev-doc3",
+      "name": "外链页签3",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.dev",
+        "origins": [
+          "https://vite.dev"
+        ]
+      },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "dev-doc4",
+      "name": "外链页签4",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.dev",
+        "origins": [
+          "https://vite.dev"
+        ]
+      },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "dev-doc5",
+      "name": "外链页签5",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.dev",
+        "origins": [
+          "https://vite.dev"
+        ]
+      },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "dev-doc6",
+      "name": "外链页签6",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.dev",
+        "origins": [
+          "https://vite.dev"
+        ]
+      },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "dev-doc7",
+      "name": "外链页签7",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.dev",
+        "origins": [
+          "https://vite.dev"
+        ]
+      },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "dev-doc8",
+      "name": "外链页签8",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.dev",
+        "origins": [
+          "https://vite.dev"
+        ]
+      },
+      "devices": [],
+      "permissions": []
+    },
+    {
+      "id": "dev-doc9",
+      "name": "不可用",
+      "version": "1.0.0",
+      "entry": {
+        "kind": "remote",
+        "url": "https://vite.devsf",
+        "origins": [
+          "https://vite.devsf"
+        ]
+      },
+      "devices": [],
+      "permissions": []
     }
   ],
   "branding": {
