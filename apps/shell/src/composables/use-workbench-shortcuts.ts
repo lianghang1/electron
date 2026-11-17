@@ -7,10 +7,10 @@ interface ShortcutDeps {
   tabs: Ref<ShellTab[]>
   activeKey: Ref<string>
   activate: (tab: ShellTab) => void
-  openPalette: () => void
+  openAppCenter: () => void
 }
 
-/** 工作台全局快捷键（仅 platform 档）：Ctrl+K 命令面板、Ctrl+Tab 循环页签、数字键直达 */
+/** 工作台全局快捷键（仅 platform 档）：Ctrl+K 应用中心、Ctrl+Tab 循环页签、数字键直达 */
 export function useWorkbenchShortcuts(deps: ShortcutDeps) {
   function onGlobalKeydown(e: KeyboardEvent) {
     if (deps.chrome.value !== 'platform') { return }
@@ -19,7 +19,7 @@ export function useWorkbenchShortcuts(deps: ShortcutDeps) {
 
     if (e.key === 'k' || e.key === 'K') {
       e.preventDefault()
-      deps.openPalette()
+      deps.openAppCenter()
       return
     }
     if (e.key === 'Tab' && deps.tabs.value.length > 1) {

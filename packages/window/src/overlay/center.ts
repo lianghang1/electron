@@ -44,7 +44,6 @@ const SURFACE_MODES: Record<string, OverlaySurfaceMode> = {
   'permission': 'dialog',
   'tab-menu': 'dialog',
   'app-center': 'dialog',
-  'command-palette': 'command',
   'update-prompt': 'dialog',
   'config': 'dialog',
   'settings': 'dialog',
@@ -328,7 +327,7 @@ export class OverlayCenter implements Startable {
   private pushState(): void {
     const windows = this.options.windows
     const presented = [...this.surfaces.values()].filter(s => s.phase === 'presented')
-    const interactive = presented.some(s => s.mode === 'dialog' || s.mode === 'command')
+    const interactive = presented.some(s => s.mode === 'dialog')
     if (interactive) { windows.focusPlane() }
     else { windows.blurPlane() }
     // 穿透决策走独立输入源（与悬停上报合成），不直接 setPlaneMouseIgnore——

@@ -1,3 +1,4 @@
+import type { Ref } from 'vue'
 import type { AppSummary } from './use-shell-tabs'
 import { shell } from '@shell/bridge/client'
 import { computed, nextTick, ref, watch } from 'vue'
@@ -5,9 +6,11 @@ import { computed, nextTick, ref, watch } from 'vue'
 /**
  * 应用中心检索态：过滤按名称与 appId，↑↓ 移动选中；打开动作由组件层
  * emit 上抛（组件不直接碰桥）。表面挂载即呈现：清单与运行态在挂载时
- * 拉取（plane 常驻不能只在构建期取一次），检索态重置与聚焦同点触发。
+ * 拉取（plane 常驻不能只在构建期取一次）。最近使用由壳页发起时经
+ * present payload 注入——plane 是独立持久分区（persist:overlay-window），
+ * 读不到壳窗 localStorage，跨分区数据只能走表面载荷。
  */
-export function useAppCenter() {
+export function useAppCenter(recentIds: Ref<string[]>) {
   const apps = ref<AppSummary[]>([])
   const runningIds = ref<string[]>([])
   const searchQuery = ref('')
@@ -20,6 +23,22 @@ export function useAppCenter() {
     return apps.value.filter(a =>
       a.manifest.name.toLowerCase().includes(q) || a.manifest.id.toLowerCase().includes(q))
   })
+
+  /** 最近使用：检索时隐藏，只保留仍在当前清单中的应用 */
+  const recentApps = computed<AppSummary[]>(() => {
+    if (searchQuery.value.trim()) { return [] }
+    return recentIds.value
+      .map(id => apps.value.find(a => a.manifest.id === id))
+      .filter((a): a is AppSummary => a !== undefined)
+  })
+
+  const restApps = computed<AppSummary[]>(() => {
+    const recentSet = new Set(recentApps.value.map(a => a.manifest.id))
+    return filteredApps.value.filter(a => !recentSet.has(a.manifest.id))
+  })
+
+  /** 键盘导航扁平序列：最近使用在前、其余应用在后，与面板分区顺序一致 */
+  const flatApps = computed<AppSummary[]>(() => [...recentApps.value, ...restApps.value])
 
   watch(searchQuery, () => { activeIdx.value = 0 })
 
@@ -41,10 +60,10 @@ export function useAppCenter() {
 
   /** 键盘导航：↑↓ 移动选中；返回是否已消费按键（Enter/Escape 归组件层语义） */
   function navigate(e: KeyboardEvent): boolean {
-    if (!filteredApps.value.length) { return false }
+    if (!flatApps.value.length) { return false }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      activeIdx.value = Math.min(activeIdx.value + 1, filteredApps.value.length - 1)
+      activeIdx.value = Math.min(activeIdx.value + 1, flatApps.value.length - 1)
       return true
     }
     if (e.key === 'ArrowUp') {
@@ -55,5 +74,5 @@ export function useAppCenter() {
     return false
   }
 
-  return { apps, runningIds, searchQuery, searchInput, activeIdx, filteredApps, loadApps, reset, navigate }
+  return { apps, runningIds, searchQuery, searchInput, activeIdx, recentApps, restApps, flatApps, loadApps, reset, navigate }
 }

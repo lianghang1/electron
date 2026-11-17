@@ -3,20 +3,16 @@ import { shell } from '@shell/bridge/client'
 import { onBeforeUnmount, onMounted } from 'vue'
 
 const { chrome, mode, forceRequiredVersion, start, dispose } = useWorkbenchBoot()
-const { tabs, activeKey, activeTab, activate, closeTab, moveTab } = useShellTabs()
+const { tabs, activeKey, activeTab, activate, closeTab, moveTab, recentIds } = useShellTabs()
 const { activeViewState, retryActive } = useViewStates(activeTab)
-
-/** 命令面板：Ctrl+K / 点击 omnibox 唤起 plane 浮层表面——页内渲染会被应用的 WebContentsView 整体遮挡 */
-function openPalette() {
-  void shell().overlay.present({ surface: 'command-palette' })
-}
 
 function openSettings() {
   void shell().overlay.present({ surface: 'settings' })
 }
 
+/** 应用中心：Ctrl+K / tab 条加号 / 设置旁入口唤起 plane 浮层表面——页内渲染会被应用的 WebContentsView 整体遮挡；最近使用随载荷注入（plane 独立分区读不到壳侧 localStorage），IPC structured clone 拒收响应式 Proxy，必须传浅拷贝 */
 function openAppCenter() {
-  void shell().overlay.present({ surface: 'app-center' })
+  void shell().overlay.present({ surface: 'app-center', payload: { recentIds: [...recentIds.value] } })
 }
 
 function minimize() {
@@ -31,7 +27,7 @@ function closeWindow() {
   void shell().window.close()
 }
 
-useWorkbenchShortcuts({ chrome, tabs, activeKey, activate, openPalette })
+useWorkbenchShortcuts({ chrome, tabs, activeKey, activate, openAppCenter })
 
 onMounted(async () => {
   await start()
@@ -51,7 +47,7 @@ onBeforeUnmount(() => {
   <WorkbenchForceGate v-if="forceRequiredVersion !== null" class="h-full w-full" />
   <div v-else class="shell h-screen w-screen overflow-hidden bg-background">
     <div class="shell-window relative flex h-full w-full flex-col rounded-xl bg-background/85 ring-1 ring-border backdrop-blur-xl backdrop-saturate-150">
-      <!-- 平台档：自适应标题栏（logo + tabs + omnibox + 窗口控制） -->
+      <!-- 平台档：自适应标题栏（logo + tabs + 窗口控制） -->
       <WorkbenchTitleBar
         v-if="chrome === 'platform'"
         :tabs="tabs"
@@ -60,7 +56,6 @@ onBeforeUnmount(() => {
         @close="closeTab"
         @move="moveTab"
         @open-app-center="openAppCenter"
-        @open-palette="openPalette"
         @open-settings="openSettings"
         @minimize="minimize"
         @maximize="maximize"

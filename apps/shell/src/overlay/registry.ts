@@ -4,7 +4,6 @@ import type { MenuView, PermissionView } from './types'
 import { shell } from '@shell/bridge/client'
 import CaptureDialog from '../components/capture/Dialog.vue'
 import AppCenter from '../components/overlay/AppCenter.vue'
-import CommandPalette from '../components/overlay/CommandPalette.vue'
 import ConfigCard from '../components/overlay/ConfigCard.vue'
 import PermissionCard from '../components/overlay/PermissionCard.vue'
 import SettingsDialog from '../components/overlay/SettingsDialog.vue'
@@ -100,19 +99,6 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
         ctx.dismiss('app-center')
       },
       close: ctx => ctx.dismiss('app-center'),
-    },
-  },
-  {
-    surface: 'command-palette',
-    mode: 'command',
-    component: CommandPalette,
-    mapProps: payload => ({ ...payload as { recentIds?: string[] } }),
-    wire: {
-      select: async (ctx, appId) => {
-        await shell().apps.open(appId as string)
-        ctx.dismiss('command-palette')
-      },
-      close: ctx => ctx.dismiss('command-palette'),
     },
   },
   {

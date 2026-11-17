@@ -58,7 +58,6 @@ export function useShellTabs() {
     const manifest = appList.value.find(a => a.manifest.id === appId)?.manifest
     const target = tabs.value.find(t => t.instanceId === result.instanceId)
       ?? tabs.value.find(t => t.appId === appId)
-    rememberRecent(appId)
     if (target) {
       activate(target)
       return
@@ -75,8 +74,9 @@ export function useShellTabs() {
     activate(tab)
   }
 
-  /** 浮层/应用中心等其他入口打开应用时同步 tab */
+  /** 浮层/应用中心等其他入口打开应用时同步 tab；最近使用在此统一记账（app.opened 是所有打开入口的汇合点） */
   function ensureTabFromEvent(appId: string, instanceId: string): void {
+    rememberRecent(appId)
     const existing = tabs.value.find(t => t.instanceId === instanceId || t.appId === appId)
     if (existing) {
       if (existing.instanceId !== instanceId) { existing.instanceId = instanceId }

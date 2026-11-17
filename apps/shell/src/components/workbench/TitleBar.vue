@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import type { ShellTab } from '../../composables/use-shell-tabs'
-import { Minus, Search, Settings, Square, X } from '@ui/lib/lucide'
-import { Kbd } from '@ui/components/kbd'
 import { Separator } from '@ui/components/separator'
+import { Minus, Settings, Square, X } from '@ui/lib/lucide'
 import ShellTabBar from './ShellTabBar.vue'
 
 /**
- * 平台档自适应标题栏：logo + 图标化 tabs + omnibox + 设置 + 窗口控制。
+ * 平台档自适应标题栏：logo + tabs + 设置 + 窗口控制。
  * 组件不碰桥面：全部动作经事件上抛，由工作台页执行。
  */
 defineProps<{
@@ -19,7 +18,6 @@ defineEmits<{
   close: [tab: ShellTab]
   move: [fromKey: string, toKey: string]
   openAppCenter: []
-  openPalette: []
   openSettings: []
   minimize: []
   maximize: []
@@ -44,17 +42,7 @@ defineEmits<{
       @open-app-center="$emit('openAppCenter')"
     />
 
-    <!-- omnibox：两侧弹性占位让它视觉居中，剩余空白仍是拖拽区 -->
-    <div class="titlebar-drag min-w-3 flex-1" />
-    <button
-      class="omnibox flex h-6.5 w-72 items-center gap-2 rounded-full bg-accent px-3 text-left text-sm text-muted-foreground transition-colors hover:bg-accent"
-      title="搜索、跳转或执行命令（Ctrl+K）"
-      @click="$emit('openPalette')"
-    >
-      <Search :size="12" class="shrink-0" />
-      <span class="flex-1 truncate">搜索、跳转或执行命令</span>
-      <Kbd>Ctrl K</Kbd>
-    </button>
+    <!-- tab 条右侧的弹性空白是拖拽区 -->
     <div class="titlebar-drag min-w-3 flex-1" />
 
     <div class="flex shrink-0 items-center">
@@ -82,8 +70,7 @@ defineEmits<{
 }
 .titlebar-drag :deep(button),
 .titlebar-drag button,
-.titlebar-drag input,
-.omnibox {
+.titlebar-drag input {
   -webkit-app-region: no-drag;
 }
 
@@ -91,11 +78,6 @@ defineEmits<{
   width: 17px;
   height: 17px;
   color: var(--ring);
-}
-
-.omnibox {
-  transition: background 0.15s ease;
-  user-select: none;
 }
 
 .ctrl {

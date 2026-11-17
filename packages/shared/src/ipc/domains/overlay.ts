@@ -3,7 +3,7 @@ import { defineIpcDomain, invoke, push } from '../contract'
 
 /**
  * 浮层架构（单 plane + 表面模型）：全部浮层 UI（toast/通知/权限/菜单/应用中心/
- * 命令面板/设置/拍摄）渲染在常驻全屏透明子窗（plane）内。主进程 OverlayCenter
+ * 设置/拍摄）渲染在常驻全屏透明子窗（plane）内。主进程 OverlayCenter
  * 持有表面实例状态并单点广播快照；渲染层 registry/engine 按 mode 自动配对容器
  * 行为（穿透/焦点/遮罩/过期），业务组件只见内容 payload。
  *
@@ -11,11 +11,10 @@ import { defineIpcDomain, invoke, push } from '../contract'
  * - toast      角标堆叠瞬态卡（通知/下载），plane 穿透、悬停拦截，TTL 自动离场
  * - notification 持久通知条（带动作按钮），容器行为与 toast 同族，可独立演化
  * - dialog     焦点型模态面板（权限/菜单/应用中心/设置/拍摄），遮罩 + 外点关闭
- * - command    锚定 omnibox 命令面板，遮罩 + 键盘导航 + 外点关闭
  */
 
 /** 表面模式：容器行为由渲染层 engine 按 mode 自动配对 */
-export type OverlaySurfaceMode = 'toast' | 'notification' | 'dialog' | 'command'
+export type OverlaySurfaceMode = 'toast' | 'notification' | 'dialog'
 
 /** 表面运行时状态（Center 实例账本的快照投影） */
 export interface OverlaySurfaceState {

@@ -112,16 +112,4 @@ const maskDismiss = (s: OverlaySurfaceState) => entryOf(s)?.container?.maskClose
       </div>
     </Transition>
   </template>
-
-  <!-- command：omnibox 锚定层（遮罩与键盘导航组件自持） -->
-  <template v-for="s in surfaces" :key="s.id">
-    <Transition v-if="entryOf(s)?.mode === 'command'" name="plane-fade" appear>
-      <component
-        :is="entryOf(s)!.component"
-        v-if="isPresented(s)"
-        v-bind="propsFor(s)"
-        v-on="wiredHandlers(s)"
-      />
-    </Transition>
-  </template>
 </template>

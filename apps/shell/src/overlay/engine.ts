@@ -11,9 +11,9 @@ export function useOverlayEngine() {
   const snapshot = ref<OverlaySnapshot>({ surfaces: [], paused: false })
   /** 在列表面（含 dismissed 离场残留，渲染层按 phase 过滤） */
   const surfaces = computed<OverlaySurfaceState[]>(() => snapshot.value.surfaces)
-  /** 交互表面（dialog/command）是否在列：决定 plane 是否收全量鼠标 */
+  /** 交互表面（dialog）是否在列：决定 plane 是否收全量鼠标 */
   const interactive = computed(() =>
-    snapshot.value.surfaces.some(s => s.phase === 'presented' && (s.mode === 'dialog' || s.mode === 'command')),
+    snapshot.value.surfaces.some(s => s.phase === 'presented' && s.mode === 'dialog'),
   )
 
   let offState: (() => void) | undefined
