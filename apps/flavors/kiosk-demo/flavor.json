@@ -1,4 +1,5 @@
 {
+  "$schema": "../flavor.schema.json",
   "id": "kiosk-demo",
   "name": "自助终端",
   "mode": "kiosk",

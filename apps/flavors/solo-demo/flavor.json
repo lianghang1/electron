@@ -1,4 +1,5 @@
 {
+  "$schema": "../flavor.schema.json",
   "id": "solo-demo",
   "name": "单应用客户端演示",
   "mode": "windowed",

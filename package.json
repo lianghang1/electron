@@ -23,6 +23,7 @@
     "guard:dead": "node scripts/guardrails/guard.mjs dead",
     "guard:list": "node scripts/guardrails/guard.mjs list",
     "guard:devices": "node scripts/guardrails/guard.mjs devices",
+    "gen:flavor-schema": "node scripts/gen-flavor-schema.mjs",
     "check:design": "node scripts/check-design-system.mjs check",
     "check:design:css": "node scripts/check-design-system.mjs css",
     "check:devconsole": "node scripts/devconsole/check.mjs",

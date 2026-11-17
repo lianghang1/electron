@@ -27,7 +27,7 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { AppSessionRegistry } from '@shell/kernel/session'
 import { applySettingsSideEffects, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, cookiesDir, filesDir, logsDir, platformDataRoot } from '@shell/kernel/storage'
-import { assertSafeSegment, CallerRegistry, flavorManifestSchema, isDevLoad, originOf, SHELL_APP_ID } from '@shell/shared'
+import { assertSafeSegment, CallerRegistry, isDevLoad, originOf, parseFlavorManifest, SHELL_APP_ID } from '@shell/shared'
 import {
   AsarHotChannel,
   collectEffectiveAppVersions,
@@ -106,7 +106,7 @@ function loadFlavor() {
   // （pnpm dev -- --flavor=<id> 或 $env:SHELL_FLAVOR='<id>'; pnpm dev）。
   const packaged = join(process.resourcesPath ?? '', 'flavor.json')
   if (existsSync(packaged)) {
-    const manifest = flavorManifestSchema.parse(JSON.parse(readFileSync(packaged, 'utf-8')) as unknown)
+    const manifest = parseFlavorManifest(JSON.parse(readFileSync(packaged, 'utf-8')) as unknown)
     logger.info('flavor 装配', { flavorId: manifest.id, source: 'packaged' })
     return manifest
   }
@@ -116,7 +116,7 @@ function loadFlavor() {
   assertSafeSegment(flavorId, 'flavorId')
   const flavorPath = join(app.getAppPath(), '../../apps/flavors', flavorId, 'flavor.json')
   const raw = JSON.parse(readFileSync(flavorPath, 'utf-8')) as unknown
-  const manifest = flavorManifestSchema.parse(raw)
+  const manifest = parseFlavorManifest(raw)
   logger.info('flavor 装配', { flavorId: manifest.id, source: flavorArg ? 'argv' : envFlavor ? 'env' : 'default' })
   return manifest
 }

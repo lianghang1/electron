@@ -160,6 +160,13 @@ async function main() {
   const results = []
   results.push(['install', run('install', 'pnpm', ['install', '--prefer-offline'], { timeout: 300000 })])
   results.push(['guard', run('guard', 'pnpm', ['guard'], { show: true })])
+  // flavor-schema 校验依赖 Node 原生类型剥离加载 TS 契约；旧 Node 上 schema 文件已入库，跳过即可
+  if (process.features.typescript) {
+    results.push(['flavor-schema', run('flavor-schema', 'node', ['scripts/gen-flavor-schema.mjs', '--check'])])
+  }
+  else {
+    console.log('  SKIP  flavor-schema   Node 无原生类型剥离（<22.18），schema 已入库，跳过漂移检查')
+  }
   results.push(['design', run('design', 'pnpm', ['check:design'], { show: true })])
   results.push(['lint', run('lint', 'pnpm', ['lint'])])
   results.push(['typecheck', run('typecheck', 'pnpm', ['typecheck'])])

@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "产品形态唯一标识（kebab-case），对应 apps/flavors/<id>/ 目录"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "产品形态显示名称"
+    },
+    "mode": {
+      "default": "windowed",
+      "description": "运行模式：windowed = 窗口可调；kiosk = 全屏锁定 + 看门狗自愈",
+      "type": "string",
+      "enum": [
+        "windowed",
+        "kiosk"
+      ]
+    },
+    "chrome": {
+      "default": "platform",
+      "description": "壳 chrome 档位：platform = tab 体系完整壳（多应用可切换）；solo = 容器隐形（单应用直出）。kiosk 运行模式强制 solo",
+      "type": "string",
+      "enum": [
+        "platform",
+        "solo"
+      ]
+    },
+    "apps": {
+      "default": [],
+      "description": "内置应用清单（apps.json 同构，也可远程下发）",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "应用唯一标识（kebab-case）：tab 键、资源目录、IPC 身份都用它"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "显示名称（tab 栏、应用中心、加载垫场）"
+          },
+          "version": {
+            "type": "string",
+            "description": "应用版本号，仅作标记"
+          },
+          "entry": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "local",
+                    "description": "本地应用：仓库构建产物经 app:// 协议服务（app 本地应用）"
+                  },
+                  "dir": {
+                    "description": "产物相对 resources/apps 的目录名，缺省 = appId；kebab-case 杜绝路径穿越",
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]*$"
+                  },
+                  "devUrl": {
+                    "description": "开发态覆盖：dev server 地址（pnpm dev 时本地应用直接加载，与 remote 同一条加载链）",
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "remote",
+                    "description": "远程应用：在线网页（origin 白名单 + 受管弹窗）"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "应用入口地址"
+                  },
+                  "origins": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "允许的页面 origin 白名单；空数组 = 拒绝所有 JSAPI 调用；\"*\" 显式表示全放行"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "url",
+                  "origins"
+                ],
+                "additionalProperties": false
+              }
+            ],
+            "description": "接入形态：local（本地产物）或 remote（在线网页）"
+          },
+          "icon": {
+            "description": "图标文件相对应用目录的路径；缺省用名称首字徽标",
+            "type": "string"
+          },
+          "devices": {
+            "default": [],
+            "description": "声明需要的硬件域（idcard/print/...），运行时经 PermissionService 放行",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "permissions": {
+            "default": [],
+            "description": "声明需要的平台权限（JSAPI 白名单，空 = 该应用零桥面能力）",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "window": {
+            "default": {
+              "closable": true
+            },
+            "description": "remote 页面窗口策略",
+            "type": "object",
+            "properties": {
+              "closable": {
+                "default": true,
+                "description": "tab 栏是否显示关闭按钮（resource 形态固定 false）",
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "entry"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "branding": {
+      "default": {
+        "accent": "#4f46e5"
+      },
+      "description": "品牌外观",
+      "type": "object",
+      "properties": {
+        "icon": {
+          "description": "品牌图标路径（托盘等复用）；缺省用内建 logo",
+          "type": "string"
+        },
+        "accent": {
+          "default": "#4f46e5",
+          "description": "品牌主色（hex）：启动页、加载垫场 spinner 前景色、语义 accent 别名",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "update": {
+      "default": {
+        "allowedOrigins": []
+      },
+      "description": "整包更新通道",
+      "type": "object",
+      "properties": {
+        "manifestUrl": {
+          "description": "更新清单地址；不填 = 禁用远程更新",
+          "type": "string",
+          "format": "uri"
+        },
+        "allowedOrigins": {
+          "default": [],
+          "description": "允许拉取更新清单与安装包的 origin 白名单",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "print": {
+      "default": {
+        "urlOrigins": []
+      },
+      "description": "打印能力",
+      "type": "object",
+      "properties": {
+        "urlOrigins": {
+          "default": [],
+          "description": "打印 URL 负载允许下载的 origin 白名单；\"*\" 放行全部公网（内网仍被 SSRF 防线拦截），空 = 拒绝一切远程下载",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "resilience": {
+      "description": "运行韧性（无人值守形态才配；整段不写 = 全关）",
+      "type": "object",
+      "properties": {
+        "crashReload": {
+          "default": false,
+          "description": "渲染进程崩溃自动重载，指数退避 + 滑动窗口熔断；仅窗口模式生效（kiosk 自带看门狗，互斥）",
+          "type": "boolean"
+        },
+        "autoLaunch": {
+          "default": false,
+          "description": "开机自启，仅打包态生效",
+          "type": "boolean"
+        },
+        "exitGuard": {
+          "default": false,
+          "description": "拦截用户发起的窗口关闭（Alt+F4 等），程序退出不受影响",
+          "type": "boolean"
+        },
+        "scheduledRestart": {
+          "description": "每日定时重启，缺省 03:00；动作按更新状态择优",
+          "type": "object",
+          "properties": {
+            "hour": {
+              "default": 3,
+              "description": "每日定时重启的小时（0-23）",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 23
+            },
+            "minute": {
+              "default": 0,
+              "description": "每日定时重启的分钟（0-59）",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 59
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ],
+  "additionalProperties": false
+}

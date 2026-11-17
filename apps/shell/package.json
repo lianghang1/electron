@@ -18,9 +18,9 @@
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json",
     "typecheck": "pnpm run typecheck:node && pnpm run typecheck:web",
     "build": "electron-vite build && pnpm run typecheck",
-    "build:win": "pnpm run build && electron-builder --win --config electron-builder.config.mjs",
-    "build:mac": "pnpm run build && electron-builder --mac --config electron-builder.config.mjs",
-    "build:linux": "pnpm run build && electron-builder --linux --config electron-builder.config.mjs"
+    "build:win": "node ../../scripts/gen-flavor-schema.mjs --check && pnpm run build && electron-builder --win --config electron-builder.config.mjs",
+    "build:mac": "node ../../scripts/gen-flavor-schema.mjs --check && pnpm run build && electron-builder --mac --config electron-builder.config.mjs",
+    "build:linux": "node ../../scripts/gen-flavor-schema.mjs --check && pnpm run build && electron-builder --linux --config electron-builder.config.mjs"
   },
   "dependencies": {
     "@shell/app-runtime": "workspace:*",
