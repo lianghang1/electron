@@ -2,12 +2,15 @@
 import type { OverlaySurfaceState } from '@shell/shared/ipc'
 import type { OverlaySurfaceCtx } from './registry'
 import type { MenuView } from './types'
-import { computed } from 'vue'
 import { surfaceEntry } from './registry'
 
 /**
  * 表面出口：按 registry 清单把在列表面渲染到对应 mode 容器。
  * 容器行为（遮罩/落位/过渡）全部在此配对——业务组件只见 props 与 emits。
+ *
+ * 过渡契约：v-for 遍历全量快照（含 dismissed 离场残留），Transition 子元素
+ * 按 phase 条件挂载——翻转 dismissed 时 leave 过渡立即播放，主进程
+ * REMOVE_DELAY_MS 宽限到点账本移除后才真正卸载（对齐 react-hot-toast 两态离场）。
  */
 const props = defineProps<{
   surfaces: OverlaySurfaceState[]
@@ -15,9 +18,6 @@ const props = defineProps<{
   dismiss: (surface: string, id?: string) => void
   action: (surface: string, id: string, type: string, data?: Record<string, unknown>) => void
 }>()
-
-/** 只渲染 presented：phase 翻转 dismissed 即卸载，leave 过渡立即播放 */
-const visible = computed(() => props.surfaces.filter(s => s.phase === 'presented'))
 
 function entryOf(s: OverlaySurfaceState) {
   return surfaceEntry(s.surface)
@@ -61,13 +61,17 @@ function anchorStyle(s: OverlaySurfaceState): Record<string, string> {
 }
 
 const isStack = (mode: string) => mode === 'toast' || mode === 'notification'
+const isPresented = (s: OverlaySurfaceState) => s.phase === 'presented'
+const isAnchor = (s: OverlaySurfaceState) => entryOf(s)?.container?.placement === 'anchor'
+/** 遮罩点击是否收场：maskClose=false（如拍摄）不关，其余 mask 外点按关闭 */
+const maskDismiss = (s: OverlaySurfaceState) => entryOf(s)?.container?.maskClose !== false
 </script>
 
 <template>
   <!-- toast / notification：角标堆叠层（组件自持布局；plane 穿透时悬停拦截由卡片上报） -->
-  <template v-for="s in visible" :key="s.id">
+  <template v-for="s in surfaces" :key="s.id">
     <Transition v-if="entryOf(s) && isStack(entryOf(s)!.mode)" name="plane-fade" appear>
-      <div class="pointer-events-none fixed inset-0 z-40">
+      <div v-if="isPresented(s)" class="pointer-events-none fixed inset-0 z-40">
         <component
           :is="entryOf(s)!.component"
           v-bind="propsFor(s)"
@@ -78,10 +82,10 @@ const isStack = (mode: string) => mode === 'toast' || mode === 'notification'
   </template>
 
   <!-- dialog：遮罩 + 居中面板（外点按 maskClose 收场）；anchor 落位无遮罩 -->
-  <template v-for="s in visible" :key="s.id">
+  <template v-for="s in surfaces" :key="s.id">
     <Transition v-if="entryOf(s)?.mode === 'dialog'" name="plane-fade" appear>
       <div
-        v-if="entryOf(s)!.container?.placement === 'anchor'"
+        v-if="isAnchor(s) && isPresented(s)"
         class="fixed inset-0 z-50"
         @click="props.dismiss(s.surface, s.id)"
       >
@@ -95,10 +99,10 @@ const isStack = (mode: string) => mode === 'toast' || mode === 'notification'
         </div>
       </div>
       <div
-        v-else
+        v-else-if="!isAnchor(s) && isPresented(s)"
         class="fixed inset-0 z-50 grid place-items-center p-6"
         :class="entryOf(s)!.container?.mask === false ? '' : 'bg-black/35'"
-        @click.self="entryOf(s)!.container?.maskClose === false ? undefined : props.dismiss(s.surface, s.id)"
+        @click.self="maskDismiss(s) ? props.dismiss(s.surface, s.id) : undefined"
       >
         <component
           :is="entryOf(s)!.component"
@@ -110,10 +114,11 @@ const isStack = (mode: string) => mode === 'toast' || mode === 'notification'
   </template>
 
   <!-- command：omnibox 锚定层（遮罩与键盘导航组件自持） -->
-  <template v-for="s in visible" :key="s.id">
+  <template v-for="s in surfaces" :key="s.id">
     <Transition v-if="entryOf(s)?.mode === 'command'" name="plane-fade" appear>
       <component
         :is="entryOf(s)!.component"
+        v-if="isPresented(s)"
         v-bind="propsFor(s)"
         v-on="wiredHandlers(s)"
       />
