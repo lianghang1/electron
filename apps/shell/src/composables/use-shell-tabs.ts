@@ -29,13 +29,15 @@ export function colorFor(appId: string): string {
 /**
  * tab 会话状态：开/切/关/排序/事件同步/最近使用，纯状态零 DOM。
  * 应用打开/关闭全量以 app.opened/closed 事件为准，本地 openApp 的重复事件靠 instanceId 去重。
+ * 状态必须模块级单例：boot 编排（订阅事件推 tab）与工作台页面（渲染 tab）是两个调用方，
+ * 各持一份状态会让事件进了一份、模板读另一份，tab 条永远空。
  */
-export function useShellTabs() {
-  const tabs = ref<ShellTab[]>([])
-  const activeKey = ref('')
-  const recentIds = ref<string[]>([])
-  const appList = ref<AppSummary[]>([])
+const tabs = ref<ShellTab[]>([])
+const activeKey = ref('')
+const recentIds = ref<string[]>([])
+const appList = ref<AppSummary[]>([])
 
+export function useShellTabs() {
   const activeTab = computed(() => tabs.value.find(t => t.key === activeKey.value))
 
   function rememberRecent(appId: string) {
