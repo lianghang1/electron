@@ -103,8 +103,7 @@ function onDragEnd() {
         <img v-if="tab.icon" :src="tab.icon" alt="" class="size-3.5 object-cover">
         <span v-else class="text-xs leading-none font-semibold text-white">{{ tab.title.slice(0, 1) }}</span>
       </span>
-      <span v-if="tab.key === activeKey" class="max-w-32 truncate">{{ tab.title }}</span>
-      <span v-else class="sr-only">{{ tab.title }}</span>
+      <span class="max-w-32 truncate">{{ tab.title }}</span>
       <button class="tab-close" :title="`关闭 ${tab.title}`" aria-label="关闭标签" @click.stop="emit('close', tab)">
         <X :size="11" />
       </button>
