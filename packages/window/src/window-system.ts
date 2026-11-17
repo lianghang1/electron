@@ -410,10 +410,10 @@ export class WindowSystem implements Startable, ViewHost {
     this.installDevToolsShortcut(webContents, false)
     this.callers?.register(webContents.id, { appId: spec.appId, instanceId: spec.instanceId, kind: 'view' })
     this.applySessionGuards(webContents.session, spec.permissions ?? [])
-    void webContents.loadURL(spec.url)
 
     // 加载状态广播：渲染层据此切换垫场（loading）与失败兜底（failed），垫场底色与
-    // view backgroundColor 同源；失败不再展开 Chromium 白错误页，交互出口由渲染层重试承接
+    // view backgroundColor 同源；失败不再展开 Chromium 白错误页，交互出口由渲染层重试承接。
+    // 必须先挂监听再 loadURL——did-start-loading 在 loadURL 调用内即刻触发，后挂监听永远错过
     webContents.on('did-start-loading', () => {
       this.failedViews.delete(spec.instanceId)
       this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'loading-started' })
@@ -426,6 +426,7 @@ export class WindowSystem implements Startable, ViewHost {
       this.failedViews.add(spec.instanceId)
       this.events?.emit('tabs.state-changed', { instanceId: spec.instanceId, action: 'load-failed' })
     })
+    void webContents.loadURL(spec.url)
 
     // 导航/新窗策略：白名单内跳转放行，window.open 升级为平台受管弹窗；白名单外转系统浏览器
     applyNavigationGuards(webContents, spec.allowedOrigins, (url, features) =>
