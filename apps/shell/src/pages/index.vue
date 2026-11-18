@@ -72,6 +72,8 @@ onBeforeUnmount(() => {
       <WorkbenchSoloTitleBar
         v-else-if="mode === 'windowed'"
         :title="activeTab?.title ?? null"
+        :icon="activeTab?.icon ?? null"
+        :icon-color="activeTab?.iconColor ?? null"
         @reload="reloadActive"
         @open-settings="openSettings"
         @minimize="minimize"

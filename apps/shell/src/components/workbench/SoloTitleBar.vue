@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Minus, RefreshCw, Settings, Square, X } from '@ui/lib/lucide'
 
-/** solo 窗口控制条（仅桌面形态）：拖拽区 + 当前应用名 + 刷新/设置/三控制键，纯展示组件 */
+/** solo 窗口控制条（仅桌面形态）：徽标 + 应用名贴左缘，中部纯拖拽，右侧刷新/设置/三控制键 */
 defineProps<{
   title: string | null
+  icon?: string | null
+  iconColor?: string | null
 }>()
 
 defineEmits<{
@@ -16,9 +18,17 @@ defineEmits<{
 </script>
 
 <template>
-  <header class="flex h-chrome-solo items-center border-b border-border bg-background/85">
-    <span class="titlebar-drag h-full min-w-3 flex-1" />
-    <!-- solo 直出态：名称跟平台单应用态同语义（窗口框里显示当前应用名） -->
+  <header class="flex h-chrome-solo items-center gap-2 border-b border-border bg-background/85 pl-3">
+    <!-- 徽标与应用名贴左缘：徽标与页签条 tab-mark 同构（图标优先，缺省首字 + 哈希色底） -->
+    <span
+      v-if="title"
+      class="mark grid size-4 shrink-0 place-items-center overflow-hidden rounded-sm"
+      :style="{ background: iconColor ?? 'var(--muted-foreground)' }"
+      aria-hidden="true"
+    >
+      <img v-if="icon" :src="icon" alt="" class="size-4 object-cover">
+      <span v-else class="text-xs leading-none font-semibold text-white">{{ title.slice(0, 1) }}</span>
+    </span>
     <span v-if="title" class="truncate text-sm font-medium text-foreground">
       {{ title }}
     </span>
