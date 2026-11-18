@@ -5,6 +5,7 @@ import type { PrintChannel } from './channels/print-channel'
 import type { PrintChannelRegistry } from './channels/print-channel-registry'
 import type { HiddenWindowPool } from './hidden-window'
 import type { PrinterRegistry } from './printer-registry'
+import type { RasterizeWorker } from './rasterize/service'
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { createTaskQueue } from '../../runtime/queue'
@@ -39,6 +40,8 @@ export class PrintService {
   private readonly allowedOrigins: readonly string[]
   /** 设备配置现场追加的源站（配置中心写入后即时生效） */
   private readonly siteOrigins: () => readonly string[]
+  /** PDF 栅格化执行器（懒启动守护进程）；未装配时显式 rasterize 参数被拒绝 */
+  private readonly rasterizeWorker?: RasterizeWorker
 
   /** 装配注入的依赖与现场数据（文件路径/打印机），设备层不自行寻址 */
   constructor(
@@ -55,6 +58,8 @@ export class PrintService {
       allowedOrigins?: readonly string[]
       /** 现场追加源站的读取器（配置中心 urlOrigins 覆盖项） */
       siteOrigins?: () => readonly string[]
+      /** PDF 栅格化守护进程管理器（entryPath 缺省 = 不启用栅格化） */
+      rasterizeWorker?: RasterizeWorker
       logger?: PrintLogFn
     },
   ) {
@@ -62,6 +67,7 @@ export class PrintService {
     this.archiveDir = deps.archiveDir
     this.allowedOrigins = deps.allowedOrigins ?? []
     this.siteOrigins = deps.siteOrigins ?? (() => [])
+    this.rasterizeWorker = deps.rasterizeWorker
     this.jobs = new JobStore(deps.jobsFile, deps.archiveDir)
     this.channels = createPrintChannelRegistry()
     for (const channel of buildPrintChannels({
@@ -190,16 +196,18 @@ export class PrintService {
     }
     const p = rec.request.payload
     const archived = rec.result?.archivedPdfPath
+    // 重打面向已定稿的归档内容：栅格化是首打的内容转换步骤，不重复执行（避免产物二次转码劣化）
+    const withoutRasterize = { ...rec.request.options, rasterize: undefined }
     if (p.kind === 'html' && archived && existsSync(archived)) {
       return this.submitPrintJob({
         payload: { kind: 'file', path: archived },
         options: {
-          ...rec.request.options,
+          ...withoutRasterize,
           channel: rec.result?.channel ?? rec.request.options.channel,
         },
       })
     }
-    return this.submitPrintJob(rec.request)
+    return this.submitPrintJob({ ...rec.request, options: withoutRasterize })
   }
 
   /** 确定性通道路由：显式 channel > preview > dryRun > auto；业务代码零平台/通道分支。 */
@@ -235,6 +243,10 @@ export class PrintService {
       paper,
       log: this.log.bind(this),
       allowedOrigins: this.effectiveOrigins,
+      rasterize: req.options.rasterize,
+      rasterizeToPdf: this.rasterizeWorker
+        ? (bytes, config) => this.rasterizeWorker!.toPdf(bytes, config)
+        : undefined,
     })
   }
 

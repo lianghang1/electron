@@ -5,9 +5,12 @@ packages:
 catalog:
   '@antfu/eslint-config': 5.4.1
   '@electron-toolkit/utils': 4.0.0
+  '@hyzyla/pdfium': ^3.0.0
   '@lucide/vue': ^1.73.0
   '@tailwindcss/vite': ^4.3.0
+  '@types/jpeg-js': ^0.3.7
   '@types/node': 24.13.3
+  '@types/pngjs': ^6.0.5
   '@types/ws': ^8.18.2
   '@unovis/vue': ^1.8.1
   '@vee-validate/zod': ^4.15.1
@@ -21,7 +24,10 @@ catalog:
   electron-vite: ^6.0.0
   embla-carousel-vue: ^8.6.0
   eslint: 9.39.5
+  jpeg-js: ^0.4.4
   koffi: ^3.3.3
+  pdf-lib: ^1.17.1
+  pngjs: ^7.0.0
   reka-ui: ^2.10.5
   shiki: ^4.6.0
   tailwind-merge: ^3.7.0

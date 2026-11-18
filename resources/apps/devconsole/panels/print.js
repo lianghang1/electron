@@ -70,6 +70,9 @@ export default defineComponent({
       subset: '',
       scale: '',
       bin: '',
+      rasterizeEnabled: false,
+      rasterizeDpi: 300,
+      rasterizeFormat: 'png',
     })
 
     const activeKind = computed(() => KINDS.find(k => k.id === form.kind))
@@ -212,6 +215,13 @@ export default defineComponent({
         options.subset = form.subset || undefined
         options.scale = form.scale || undefined
         options.bin = form.bin.trim() || undefined
+      }
+      // PDF 栅格化（防丢字，file/url 负载生效）：开启后先渲染为图像再重建 PDF
+      if ((form.kind === 'pdf' || form.kind === 'pdfurl') && form.rasterizeEnabled) {
+        options.rasterize = {
+          dpi: Math.max(72, Math.min(1200, Math.round(Number(form.rasterizeDpi) || 300))),
+          outputFormat: form.rasterizeFormat,
+        }
       }
       return options
     }

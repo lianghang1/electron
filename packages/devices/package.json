@@ -19,15 +19,21 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hyzyla/pdfium": "catalog:",
     "@shell/kernel": "workspace:*",
     "@shell/shared": "workspace:*",
     "electron-store": "catalog:",
+    "jpeg-js": "catalog:",
     "koffi": "catalog:",
+    "pdf-lib": "catalog:",
+    "pngjs": "catalog:",
     "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/jpeg-js": "catalog:",
     "@types/node": "catalog:",
+    "@types/pngjs": "catalog:",
     "@types/ws": "catalog:",
     "typescript": "catalog:"
   }

@@ -23,6 +23,7 @@ export default defineConfig({
         input: {
           'index': fileURLToPath(new URL('./electron/main/index.ts', import.meta.url)),
           'device-host': fileURLToPath(new URL('../../packages/devices/src/host/entry.ts', import.meta.url)),
+          'rasterize-worker': fileURLToPath(new URL('../../packages/devices/src/domains/print/rasterize/worker.ts', import.meta.url)),
         },
       },
     },

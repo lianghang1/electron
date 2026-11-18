@@ -23,4 +23,12 @@ export default createEslintConfig(
       'node/prefer-global/process': 'off',
     },
   },
+  {
+    // 测试基建是 node:test + --experimental-strip-types（零测试框架依赖），
+    // antfu 的 test/no-import-node-test 默认强制 vitest，对本仓不适用
+    files: ['packages/devices/test/**'],
+    rules: {
+      'test/no-import-node-test': 'off',
+    },
+  },
 )

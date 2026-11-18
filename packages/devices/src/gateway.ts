@@ -9,7 +9,7 @@ import type { DriverResolver } from './drivers'
 import type { ChannelDescriptor } from './runtime/channel'
 import type { DeviceStatus } from './runtime/device-state'
 import { existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { DEVICE_CAPABILITIES, DEVICE_CAPABILITY_IDS } from '@shell/shared'
 import { createDeviceConfigCenter } from './config-center'
@@ -105,6 +105,8 @@ interface AssemblyContext {
   /** 驱动资产根（declared devices/<域>/... 直接拼接即命中） */
   resourcesRoot: string
   sumatraPath: string
+  /** 栅格化 worker 入口 js（与守护进程入口同目录的构建产物） */
+  rasterizeWorkerPath: string
   storageRoot: string
   filesRoot: string
   allowedOrigins: readonly string[]
@@ -183,6 +185,7 @@ export const DOMAIN_SPECS: Readonly<Record<DeviceCapabilityId, DomainSpec>> = {
         jobsFile: join(ctx.storageRoot, 'print-jobs.json'),
         archiveDir: join(ctx.filesRoot, 'print'),
         sumatraPath: ctx.sumatraPath,
+        rasterizeWorkerPath: ctx.rasterizeWorkerPath,
         host: ctx.host,
         getParent: ctx.getParent,
         allowedOrigins: ctx.allowedOrigins,
@@ -298,6 +301,7 @@ export function createDeviceGateway(options: DeviceGatewayOptions): DeviceGatewa
     host,
     resourcesRoot: options.driver.assetRoot,
     sumatraPath: options.driver.resolve(sumatraFile),
+    rasterizeWorkerPath: join(dirname(options.hostEntryPath), 'rasterize-worker.js'),
     storageRoot: options.paths.storageRoot,
     filesRoot: options.paths.filesRoot,
     allowedOrigins: options.allowedOrigins,

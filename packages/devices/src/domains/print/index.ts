@@ -5,9 +5,16 @@ import type { DeviceHost } from '../../host/device-host'
 import { HiddenWindowPool } from './hidden-window'
 import { mergePrintDefaults } from './print-defaults'
 import { PrinterRegistry } from './printer-registry'
+import { RasterizeWorker } from './rasterize/service'
 import { PrintService } from './service'
 
 export * from './paper'
+
+/** 无 Logger 装配现场的静默日志（RasterizeLogger 结构子集） */
+const silentRasterizeLogger = {
+  info: () => {},
+  error: () => {},
+}
 
 /** 打印系统句柄：平台与打印模块的唯一交互面 */
 export interface PrintSystem {
@@ -34,6 +41,8 @@ export interface PrintSystemOptions {
   archiveDir: string
   /** SumatraPDF 绝对路径（未传/未就位时 PDF 直通回退 Chromium 窗口） */
   sumatraPath?: string
+  /** 栅格化 worker 入口 js（out/main/rasterize-worker.js，与主进程 bundle 同目录）；缺省 = 不启用栅格化 */
+  rasterizeWorkerPath?: string
   /** 主窗口引用：打印隐藏窗挂 parent，主窗销毁时级联销毁（无主隐藏窗会让 window-all-closed 永不触发，进程常驻） */
   getParent?: () => BrowserWindow | undefined
   /** 设备守护进程：winspool 同步探测经此进 utility 进程，避免阻塞主进程事件循环 */
@@ -55,12 +64,17 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
   const windows = new HiddenWindowPool(options.getParent)
   const registry = new PrinterRegistry(windows, options.host)
   const log: PrintLogFn = (level, message, meta) => options.logger?.[level](message, meta)
+  // 栅格化守护进程：懒启动，未装配 entryPath 时 options.rasterize 参数在内容准备阶段被拒绝
+  const rasterizeWorker = options.rasterizeWorkerPath
+    ? new RasterizeWorker(options.logger?.scope('devices:print:rasterize') ?? silentRasterizeLogger, options.rasterizeWorkerPath)
+    : undefined
   const service = new PrintService(windows, registry, {
     archiveDir: options.archiveDir,
     jobsFile: options.jobsFile,
     sumatraPath: options.sumatraPath,
     allowedOrigins: options.allowedOrigins ?? [],
     siteOrigins: options.siteOrigins,
+    rasterizeWorker,
     logger: log,
   })
 
@@ -73,7 +87,10 @@ export function createPrintSystem(options: PrintSystemOptions): PrintSystem {
     clearPrintJobs: () => service.clearPrintJobs(),
     reprintJob: jobId => service.reprintJob(jobId),
     cleanupArchive: () => service.cleanupArchive(),
-    destroy: () => windows.destroyAll(),
+    destroy: () => {
+      windows.destroyAll()
+      rasterizeWorker?.dispose()
+    },
   }
 
   // 启动清扫过期孤儿归档（fire-and-forget；retentionDays=0 关闭）

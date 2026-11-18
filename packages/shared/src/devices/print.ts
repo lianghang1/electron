@@ -38,6 +38,34 @@ export interface HtmlPayload {
 }
 export type PrintPayload = FilePayload | UrlPayload | HtmlPayload
 
+/**
+ * PDF 栅格化参数（防丢字：PDF 先渲染成图像再重建送打）。
+ * 仅对 PDF 负载（file/url）生效，HTML/图片负载忽略；缺省不栅格化。
+ * 字段语义与校验规则见 devices 打印域 rasterize 契约（与 conflux PdfImageConverter 对齐）。
+ */
+export interface PrintRasterizeOptions {
+  /** 目标纸型；缺省 = 保持每页原始尺寸不缩放（须为固定纸：heightMm > 0） */
+  paper?: PaperSpec
+  /** 目标方向，仅 paper 非空时生效；auto = 按每页宽高比自动选横/竖 */
+  orientation?: 'portrait' | 'landscape' | 'auto'
+  /** 内容在画布中的垂直对齐（水平恒居中） */
+  alignment?: 'top' | 'center' | 'bottom'
+  /** 页边距（mm，≥0） */
+  marginMM?: number
+  /** 内容区宽（mm）：与 contentHeightMM 必须同时设置或同时缺省 */
+  contentWidthMM?: number
+  /** 内容区高（mm）：与 contentWidthMM 必须同时设置或同时缺省 */
+  contentHeightMM?: number
+  /** 内容区尺寸不匹配时是否拉伸填满（默认等比缩放） */
+  contentStretch?: boolean
+  /** 渲染 DPI（72-1200 整数，默认 300） */
+  dpi?: number
+  /** 编码格式（默认 png 无损） */
+  outputFormat?: 'png' | 'jpeg'
+  /** JPEG 质量 (0, 1]（默认 0.9），仅 outputFormat = jpeg 时生效 */
+  jpegQuality?: number
+}
+
 /** 纸张 —— 物理尺寸（mm），各通道自行翻译；heightMm = 0 表示连续卷纸（高度由纸卷决定） */
 export interface PaperSpec {
   /** 纸宽（mm） */
@@ -70,6 +98,11 @@ export interface PrintOptions {
   duplex?: 'simplex' | 'duplex' | 'duplexshort' | 'duplexlong'
   /** 横向打印（默认纵向） */
   landscape?: boolean
+  /**
+   * PDF 栅格化（防丢字）：仅 PDF 负载生效，HTML/图片负载忽略。
+   * 设置后 PDF 先逐页渲染为图像再重建送打，页尺寸/缩放由本参数决定（options.paper 不再作用于 PDF 直通）。
+   */
+  rasterize?: PrintRasterizeOptions
   /**
    * 页边距（默认 'default' 跟随驱动）：
    * - 'none' 零边距
