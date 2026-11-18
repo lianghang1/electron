@@ -18,9 +18,17 @@ if (!process.features.typescript) {
 
 const { flavorJsonSchema, parseFlavorManifest } = await import('../packages/shared/src/manifest.ts')
 
+const flavorSchema = flavorJsonSchema()
+// $schema 是编辑器关联元键（运行时经 parseFlavorManifest 剥除）：声明为合法属性，
+// 否则 IDEA 对 additionalProperties: false 的契约报「不允许属性 $schema」
+flavorSchema.properties = {
+  $schema: { type: 'string', description: '编辑器关联元键：固定 ../flavor.schema.json，运行时剥除不进契约' },
+  ...flavorSchema.properties,
+}
+
 const rendered = `${JSON.stringify({
   $schema: 'https://json-schema.org/draft/2020-12/schema',
-  ...flavorJsonSchema(),
+  ...flavorSchema,
 }, null, 2)}\n`
 
 const flavorsDir = join(ROOT, 'apps/flavors')

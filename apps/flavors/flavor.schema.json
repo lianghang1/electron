@@ -2,6 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "编辑器关联元键：固定 ../flavor.schema.json，运行时剥除不进契约"
+    },
     "id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
