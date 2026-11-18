@@ -1,0 +1,29 @@
+# 行尾单一事实源：文本一律 LF 入库、LF 检出，规则随仓库走、与各人 core.autocrlf 解耦，
+# 杜绝「status 标 M 而 diff 为空」的行尾假性脏状态
+* text=auto eol=lf
+
+# Windows 专用脚本保持 CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# 二进制资产禁止归一化
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.exe binary
+*.dll binary
+*.node binary
+*.zip binary
+*.7z binary
+*.asar binary
+*.pdf binary
