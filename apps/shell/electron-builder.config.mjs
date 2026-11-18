@@ -55,6 +55,10 @@ const config = {
   },
 
   files: ['out/**'],
+  // 不跑 @electron/rebuild：壳无源码编译需求（koffi 是 NAPI 模块，经 afterPack 拆包落
+  // resources/，无需 ABI rebuild）；且 pnpm 符号链接 node_modules 会让 rebuild 的依赖
+  // 树计算撞上仅存在于 .pnpm 虚拟存储的传递依赖（stat ENOENT，如 @quansync/fs）
+  npmRebuild: false,
   // 拆包钩子：app.asar 重写为 KB 级 ESM 引导器，完整产物改名 app.core.asar；
   // koffi 原生依赖与 resources 版本标记随整包落 resources/（热更包禁止携带 .node）
   afterPack: './scripts/after-pack.cjs',
