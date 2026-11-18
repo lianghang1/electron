@@ -109,24 +109,7 @@ export class OverlayCenter implements Startable {
       this.notifications = items
       this.syncToastStack()
     }))
-    this.unsubscribers.push(this.options.events.on('download.tasks-changed', ({ tasks }) => {
-      const now = Date.now()
-      for (const task of tasks) {
-        if (task.status !== 'progressing' && !this.downloadDeadlines.has(task.id)) {
-          this.downloadDeadlines.set(task.id, now + DOWNLOAD_TTL_MS)
-        }
-      }
-      this.downloads = tasks.filter((task) => {
-        if (this.dismissedDownloads.has(task.id)) { return false }
-        const deadline = this.downloadDeadlines.get(task.id)
-        if (deadline !== undefined && task.status !== 'progressing' && now >= deadline) {
-          this.dismissedDownloads.add(task.id)
-          return false
-        }
-        return true
-      })
-      this.syncToastStack()
-    }))
+    this.unsubscribers.push(this.options.events.on('download.tasks-changed', ({ tasks }) => this.settleDownloads(tasks)))
   }
 
   async stop(): Promise<void> {
@@ -134,12 +117,50 @@ export class OverlayCenter implements Startable {
     this.unsubscribers.length = 0
     for (const { timer } of this.ttlTimers.values()) { clearTimeout(timer) }
     this.ttlTimers.clear()
+    for (const timer of this.downloadTtlTimers.values()) { clearTimeout(timer) }
+    this.downloadTtlTimers.clear()
     for (const timer of this.removeTimers.values()) { clearTimeout(timer) }
     this.removeTimers.clear()
     this.surfaces.clear()
   }
 
   // ── 主进程业务入口（组合根 / 设备域调用）────────────────────────
+
+  /** 终态下载卡到期计时：kernel 只在任务变化时推快照，到期必须主动结算，否则卡死到下一次巧合推送 */
+  private readonly downloadTtlTimers = new Map<string, NodeJS.Timeout>()
+
+  /** 下载卡快照结算：终态任务落 8s 消失截止，到点主动重结算移除 */
+  private settleDownloads(tasks: readonly DownloadTask[]): void {
+    const now = Date.now()
+    for (const task of tasks) {
+      if (task.status !== 'progressing' && !this.downloadDeadlines.has(task.id)) {
+        this.downloadDeadlines.set(task.id, now + DOWNLOAD_TTL_MS)
+        this.armDownloadTtl(task.id, DOWNLOAD_TTL_MS)
+      }
+    }
+    this.downloads = tasks.filter((task) => {
+      if (this.dismissedDownloads.has(task.id)) { return false }
+      const deadline = this.downloadDeadlines.get(task.id)
+      if (deadline !== undefined && task.status !== 'progressing' && now >= deadline) {
+        this.dismissedDownloads.add(task.id)
+        return false
+      }
+      return true
+    })
+    this.syncToastStack()
+  }
+
+  /** 到点重挂裁决：hover 冻结平移过截止时顺延，其余到点即重结算（此轮无任务则推送空快照收场） */
+  private armDownloadTtl(taskId: string, delayMs: number): void {
+    const timer = setTimeout(() => {
+      this.downloadTtlTimers.delete(taskId)
+      const deadline = this.downloadDeadlines.get(taskId)
+      const rest = deadline === undefined ? 0 : deadline - Date.now()
+      if (rest > 0) { this.armDownloadTtl(taskId, rest) }
+      else { this.settleDownloads(this.downloads) }
+    }, delayMs)
+    this.downloadTtlTimers.set(taskId, timer)
+  }
 
   /** PermissionPrompt.ask 实现：请求入队逐条决策，等待用户决策 / 超时（缺省拒绝） */
   requestPermission(request: Omit<PermissionRequestView, 'requestId'>): Promise<boolean> {
