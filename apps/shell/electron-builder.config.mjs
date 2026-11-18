@@ -5,8 +5,9 @@
  * 默认只发现 electron-builder.{yml,yaml,json,json5,toml,js,cjs,ts}，不认 .mjs，
  * 故由 build:* 脚本显式 --config 传入。
  *
- * 用法：FLAVOR=<id> pnpm build:linux（不设 FLAVOR 默认 solo-demo）
- * 打包态组合根读取 <resources>/flavor.json（extraResources 注入，见 main/index.ts loadFlavor）
+ * 用法：FLAVOR=<id> pnpm build:win（不设 FLAVOR 默认 solo-demo）
+ * flavor 清单经 electron-vite main define 编译进 bundle（见 electron.vite.config.ts），
+ * resources/ 不携带 flavor.json——打包配置与内嵌值的一致性由构建标记机器校验，见下方 fail-fast
  */
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -16,6 +17,16 @@ import { ensureDriverAssets } from '../../scripts/prepare-driver-assets.mjs'
 
 const flavorId = process.env.FLAVOR ?? 'solo-demo'
 const flavor = JSON.parse(readFileSync(new URL(`../../apps/flavors/${flavorId}/flavor.json`, import.meta.url), 'utf-8'))
+
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
+
+// 一致性闸门：bundle 内嵌的 flavor（electron.vite build 时落标记）与打包配置的 FLAVOR 相同才放行。
+// 忘设 FLAVOR 时 vite 侧内嵌 devconsole、builder 缺省 solo-demo——在此拦截而不是装出错配包。
+const markerPath = join(repoRoot, 'apps/shell/out/flavor-build-marker.json')
+const marker = existsSync(markerPath) ? JSON.parse(readFileSync(markerPath, 'utf-8')) : null
+if (marker?.flavorId !== flavorId) {
+  throw new Error(`FLAVOR=${flavorId} 与 bundle 内嵌 flavor（${marker?.flavorId ?? '无构建标记，先跑 pnpm build'}）不一致：以同一 FLAVOR 重跑 build:win`)
+}
 
 /**
  * 构建目标矩阵（update/<platform>/<arch> 契约）：win/mac/linux × x64/arm64 共 6 端，
@@ -37,7 +48,6 @@ const arch = [targetArch]
 // 构建期把源码树 assets 按同一套规则聚合成 resources/devices/<域>/<厂商>/<平台>/<文件>，
 // 使 bundled 策略的 <resources>/devices/... 与域内声明一一对应（不在 asar 内散落携带 DLL）。
 // 按目标平台裁剪：Windows 产物不携带非 win 资产，mac/linux 产物不携带 win 系列 DLL/exe。
-const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 await ensureDriverAssets(repoRoot, targetOs)
 
 // rpm 需 rpmbuild，逐端构建时由 TARGET_RPM=1 显式启用；默认 deb + AppImage 保证任意
@@ -71,8 +81,6 @@ const config = {
   afterPack: './scripts/after-pack.cjs',
 
   extraResources: [
-    // 产品形态清单：组合根打包态读取 resources/flavor.json
-    { from: `../../apps/flavors/${flavorId}/flavor.json`, to: 'flavor.json' },
     // 应用 dist（packaged 形态）：按 flavor 声明裁剪，仅打包 flavors 声明的应用目录
     ...appResourceEntries,
     // 驱动资产：构建期聚合产物注入 resources/devices/，声明 devices/<域>/... 直接命中。

@@ -5,7 +5,7 @@ import type { Logger } from '@shell/kernel/logger'
 import type { AppManifest, FlavorManifest } from '@shell/shared'
 import type { PackageInstaller } from '@shell/update'
 import type { NativeImage } from 'electron'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import process from 'node:process'
 import {
@@ -27,7 +27,7 @@ import { createRootLogger } from '@shell/kernel/logger'
 import { AppSessionRegistry } from '@shell/kernel/session'
 import { applySettingsSideEffects, settingsSnapshot } from '@shell/kernel/settings'
 import { configDir, cookiesDir, filesDir, logsDir, platformDataRoot } from '@shell/kernel/storage'
-import { assertSafeSegment, CallerRegistry, isDevLoad, originOf, parseFlavorManifest, SHELL_APP_ID } from '@shell/shared'
+import { CallerRegistry, isDevLoad, originOf, parseFlavorManifest, SHELL_APP_ID } from '@shell/shared'
 import {
   AsarHotChannel,
   collectEffectiveAppVersions,
@@ -101,23 +101,10 @@ const PLATFORM_SELF_PERMISSIONS: readonly PermissionRule[] = [
 registerAppScheme()
 
 function loadFlavor() {
-  // 打包：构建期把 flavor.json 注入 resources/（见 electron-builder.config.mjs extraResources）；
-  // dev：flavor 来源优先级 argv --flavor=<id> → 环境变量 SHELL_FLAVOR → 缺省 devconsole
-  // （pnpm dev -- --flavor=<id> 或 $env:SHELL_FLAVOR='<id>'; pnpm dev）。
-  const packaged = join(process.resourcesPath ?? '', 'flavor.json')
-  if (existsSync(packaged)) {
-    const manifest = parseFlavorManifest(JSON.parse(readFileSync(packaged, 'utf-8')) as unknown)
-    logger.info('flavor 装配', { flavorId: manifest.id, source: 'packaged' })
-    return manifest
-  }
-  const flavorArg = process.argv.find(a => a.startsWith('--flavor='))
-  const envFlavor = process.env.SHELL_FLAVOR
-  const flavorId = flavorArg?.split('=')[1] ?? envFlavor ?? 'devconsole'
-  assertSafeSegment(flavorId, 'flavorId')
-  const flavorPath = join(app.getAppPath(), '../../apps/flavors', flavorId, 'flavor.json')
-  const raw = JSON.parse(readFileSync(flavorPath, 'utf-8')) as unknown
-  const manifest = parseFlavorManifest(raw)
-  logger.info('flavor 装配', { flavorId: manifest.id, source: flavorArg ? 'argv' : envFlavor ? 'env' : 'default' })
+  // flavor 编译期注入 bundle（electron.vite.config main define）：打包态 resources/ 无配置文件
+  // 可篡改；dev 切换 flavor = --flavor=<id> 或 SHELL_FLAVOR 后重启 dev（与打包同一注入链）
+  const manifest = parseFlavorManifest(JSON.parse(__SHELL_FLAVOR__) as unknown)
+  logger.info('flavor 装配', { flavorId: manifest.id, source: 'embedded' })
   return manifest
 }
 

@@ -1,4 +1,5 @@
 /* eslint-disable node/prefer-global/process */
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
@@ -15,8 +16,23 @@ import VueRouter from 'vue-router/vite'
  */
 const externalizeDeps = false
 
+/**
+ * flavor 编译期注入：主进程 bundle 内嵌清单，打包态 resources/ 不再有可篡改的配置文件。
+ * 解析优先级 --flavor=<id> argv → SHELL_FLAVOR → FLAVOR → devconsole；与 electron-builder.config
+ * 的打包解析相互独立，一致性由 out/flavor-build-marker.json 在 builder 侧机器校验，不一致 fail-fast。
+ */
+const flavorId = process.argv.find(a => a.startsWith('--flavor='))?.split('=')[1]
+  ?? process.env.SHELL_FLAVOR ?? process.env.FLAVOR ?? 'devconsole'
+const flavorRaw = readFileSync(fileURLToPath(new URL(`../../apps/flavors/${flavorId}/flavor.json`, import.meta.url)), 'utf-8')
+// 构建标记：electron-builder 读它比对打包 flavor，防「内嵌 A 打包 B」的错装事故
+mkdirSync(join(process.cwd(), 'out'), { recursive: true })
+writeFileSync(join(process.cwd(), 'out', 'flavor-build-marker.json'), JSON.stringify({ flavorId }), 'utf-8')
+
 export default defineConfig({
   main: {
+    define: {
+      __SHELL_FLAVOR__: JSON.stringify(flavorRaw),
+    },
     build: {
       externalizeDeps,
       rollupOptions: {
