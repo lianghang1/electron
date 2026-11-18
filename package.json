@@ -12,6 +12,7 @@
     "dev:solo-demo": "cross-env SHELL_FLAVOR=solo-demo pnpm --filter @app/shell dev",
     "dev:kiosk-demo": "cross-env SHELL_FLAVOR=kiosk-demo pnpm --filter @app/shell dev",
     "build": "pnpm --filter @app/shell build",
+    "package": "pnpm --filter @app/shell package",
     "build:win": "pnpm --filter @app/shell build:win",
     "build:mac": "pnpm --filter @app/shell build:mac",
     "build:linux": "pnpm --filter @app/shell build:linux",
