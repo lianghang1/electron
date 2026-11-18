@@ -31,6 +31,8 @@ export class DownloadManager implements Startable {
   readonly name = 'downloads'
   private readonly tasks = new Map<string, DownloadTask>()
   private readonly items = new Map<string, Electron.DownloadItem>()
+  /** 门控悬决中的任务：不进快照、终态不广播，决策落地经 revealPending 补发 */
+  private readonly pendingGate = new Set<string>()
   private readonly attached = new WeakSet<Electron.Session>()
   private readonly lastPush = new Map<string, number>()
   private readonly now: () => number
@@ -80,14 +82,29 @@ export class DownloadManager implements Startable {
         return
       }
       if (decision !== 'allow') {
-        // 异步决策期间不 pause：首包未落地时 resume 可能不续传，页面也可能已放弃 blob URL
+        // 异步决策期间不 pause：首包未落地时 resume 可能不续传，页面也可能已放弃 blob URL。
+        // 下载继续但不进快照、终态押后到决策落地：权限弹窗悬决时不出现「下载成功」虚报
+        this.pendingGate.add(task.id)
         void decision
           .then((d) => {
+            this.pendingGate.delete(task.id)
             if (d === 'deny') { this.deny(item, task) }
+            else { this.revealPending(task.id) }
           })
-          .catch(() => this.deny(item, task))
+          .catch(() => {
+            this.pendingGate.delete(task.id)
+            this.deny(item, task)
+          })
       }
     })
+  }
+
+  /** 决策放行后补发押后的快照与终态：决策期间下载可能已跑到终态 */
+  private revealPending(taskId: string): void {
+    const task = this.tasks.get(taskId)
+    if (!task) { return }
+    this.push()
+    if (task.status !== 'progressing') { this.emitTerminal(task) }
   }
 
   list(): DownloadTask[] {
@@ -173,7 +190,7 @@ export class DownloadManager implements Startable {
       if (!shouldPushProgress(this.lastPush.get(id) ?? 0, at, this.throttleMs)) { return }
       this.lastPush.set(id, at)
       this.tasks.set(id, applyProgress(current, item.getReceivedBytes(), item.getTotalBytes()))
-      this.push()
+      if (!this.pendingGate.has(id)) { this.push() }
     })
 
     item.once('done', (_e, state) => {
@@ -188,6 +205,8 @@ export class DownloadManager implements Startable {
         default: next = resolveTerminal(current, 'failed', at, state)
       }
       this.tasks.set(id, next)
+      // 门控悬决期的终态只记账：批准后经 revealPending 补发，拒绝走 deny 清场
+      if (this.pendingGate.has(id)) { return }
       this.push()
       this.emitTerminal(next)
     })
@@ -228,9 +247,11 @@ export class DownloadManager implements Startable {
 
   private push(): void {
     const kept = pruneTasks([...this.tasks.values()], this.now(), this.maxTasks, this.retainMs)
+      .filter(t => !this.pendingGate.has(t.id))
     const keep = new Set(kept.map(t => t.id))
     for (const id of this.tasks.keys()) {
-      if (!keep.has(id)) { this.forget(id) }
+      // 门控悬决任务不在快照里但账必须保留：决策落地还要补发终态/清场
+      if (!keep.has(id) && !this.pendingGate.has(id)) { this.forget(id) }
     }
     this.options.events.emit('download.tasks-changed', { tasks: kept.sort((a, b) => b.startedAt - a.startedAt) })
   }
