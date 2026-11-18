@@ -10,6 +10,12 @@ function openSettings() {
   void shell().overlay.present({ surface: 'settings' })
 }
 
+/** 强制刷新当前应用容器：该视图 webContents 整页重载（登录态保留），容器内页面自身无刷新入口时的兜底 */
+function reloadActive() {
+  const id = activeTab.value?.instanceId
+  if (id) { void shell().tabs.reload(id) }
+}
+
 /** 应用中心：Ctrl+K / tab 条加号 / 设置旁入口唤起 plane 浮层表面——页内渲染会被应用的 WebContentsView 整体遮挡；最近使用随载荷注入（plane 独立分区读不到壳侧 localStorage），IPC structured clone 拒收响应式 Proxy，必须传浅拷贝 */
 function openAppCenter() {
   void shell().overlay.present({ surface: 'app-center', payload: { recentIds: [...recentIds.value] } })
@@ -56,6 +62,7 @@ onBeforeUnmount(() => {
         @close="closeTab"
         @move="moveTab"
         @open-app-center="openAppCenter"
+        @reload="reloadActive"
         @open-settings="openSettings"
         @minimize="minimize"
         @maximize="maximize"

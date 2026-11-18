@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { ShellTab } from '../../composables/use-shell-tabs'
 import { Separator } from '@ui/components/separator'
-import { Minus, Settings, Square, X } from '@ui/lib/lucide'
+import { Minus, RefreshCw, Settings, Square, X } from '@ui/lib/lucide'
 import ShellTabBar from './ShellTabBar.vue'
 
 /**
@@ -18,6 +18,7 @@ defineEmits<{
   close: [tab: ShellTab]
   move: [fromKey: string, toKey: string]
   openAppCenter: []
+  reload: []
   openSettings: []
   minimize: []
   maximize: []
@@ -44,6 +45,9 @@ defineEmits<{
 
     <!-- tab 条占满剩余宽度（多了内部滚动），右侧控制区固定不被挤压；空白即拖拽区 -->
     <div class="flex shrink-0 items-center">
+      <button class="ctrl flex h-8 w-9 items-center justify-center rounded-md text-foreground" aria-label="刷新当前应用" title="刷新当前应用" @click="$emit('reload')">
+        <RefreshCw :size="14" />
+      </button>
       <button class="ctrl flex h-8 w-9 items-center justify-center rounded-md text-foreground" aria-label="设置" @click="$emit('openSettings')">
         <Settings :size="15" />
       </button>

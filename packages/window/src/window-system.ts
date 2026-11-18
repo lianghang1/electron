@@ -306,9 +306,11 @@ export class WindowSystem implements Startable, ViewHost {
     this.applySessionGuards(plane.webContents.session, 'all')
   }
 
-  /** plane 几何校准为恒等于主窗内容区：resize 跟随之外的兜底——跨显示器 DPI 缩放不同的
-      拖动/最大化/还原序列里，DPI 过渡时序可能让 resize 期的 setBounds 落在过渡值上，
-      plane 视口从此与内容区错位；交互表面接焦前强制对齐，弹窗几何不依赖历史时序 */
+  /**
+   * plane 几何校准为恒等于主窗内容区：resize 跟随之外的兜底——跨显示器 DPI 缩放不同的
+   * 拖动/最大化/还原序列里，DPI 过渡时序可能让 resize 期的 setBounds 落在过渡值上，
+   * plane 视口从此与内容区错位；交互表面接焦前强制对齐，弹窗几何不依赖历史时序
+   */
   private syncPlaneBounds(): void {
     const win = this.shellWindow
     const plane = this.plane
