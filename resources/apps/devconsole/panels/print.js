@@ -71,8 +71,16 @@ export default defineComponent({
       scale: '',
       bin: '',
       rasterizeEnabled: false,
+      rasterizePaper: '',
+      rasterizeOrientation: 'portrait',
+      rasterizeAlignment: 'center',
+      rasterizeMarginMM: '',
+      rasterizeContentWidth: '',
+      rasterizeContentHeight: '',
+      rasterizeStretch: false,
       rasterizeDpi: 300,
       rasterizeFormat: 'png',
+      rasterizeJpegQuality: 0.9,
     })
 
     const activeKind = computed(() => KINDS.find(k => k.id === form.kind))
@@ -97,6 +105,18 @@ export default defineComponent({
     // 打印机切换/刷新后保留仍有效的纸型选中项，失效则清空（提交时回落 a4）
     watch(paperOptions, (opts) => {
       if (form.paper && !opts.some(o => o.value === form.paper && !o.disabled)) { form.paper = '' }
+    })
+
+    /** 栅格化目标纸型下拉：契约要求固定纸（heightMm > 0），连续卷纸不适用，直接不进选项 */
+    const rasterPaperOptions = computed(() => {
+      const forms = selectedPrinter.value?.capabilities?.paperList ?? []
+      return forms
+        .filter(f => f.widthMm > 0 && f.heightMm > 0)
+        .map(f => ({ value: `custom:${f.widthMm}x${f.heightMm}`, label: `${f.name}（${f.widthMm}×${f.heightMm}mm）` }))
+    })
+
+    watch(rasterPaperOptions, (opts) => {
+      if (form.rasterizePaper && !opts.some(o => o.value === form.rasterizePaper)) { form.rasterizePaper = '' }
     })
 
     function capsText(p) {
@@ -216,12 +236,34 @@ export default defineComponent({
         options.scale = form.scale || undefined
         options.bin = form.bin.trim() || undefined
       }
-      // PDF 栅格化（防丢字，file/url 负载生效）：开启后先渲染为图像再重建 PDF
+      // PDF 栅格化（防丢字，file/url 负载生效）：开启后先渲染为图像再重建 PDF。
+      // 字段语义与缺省值对齐 rasterize 契约（packages/devices/.../rasterize/contract.ts），
+      // 缺省项显式发送便于测试面板核对实际生效值
       if ((form.kind === 'pdf' || form.kind === 'pdfurl') && form.rasterizeEnabled) {
-        options.rasterize = {
+        const rasterize = {
           dpi: Math.max(72, Math.min(1200, Math.round(Number(form.rasterizeDpi) || 300))),
           outputFormat: form.rasterizeFormat,
+          orientation: form.rasterizeOrientation,
+          alignment: form.rasterizeAlignment,
+          contentStretch: form.rasterizeStretch,
         }
+        // paper：空 = 保持每页原始尺寸不缩放；custom:WxH = 固定纸（契约拒绝连续卷纸）
+        const paper = /^custom:(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$/.exec(form.rasterizePaper ?? '')
+        if (paper) { rasterize.paper = { widthMm: Number(paper[1]), heightMm: Number(paper[2]) } }
+        if (form.rasterizeMarginMM !== '' && form.rasterizeMarginMM != null) {
+          rasterize.marginMM = Math.max(0, Number(form.rasterizeMarginMM) || 0)
+        }
+        // 内容区成对生效：一正一零会被契约拒绝，UI 层先保证成对
+        const cw = Number(form.rasterizeContentWidth)
+        const ch = Number(form.rasterizeContentHeight)
+        if (cw > 0 && ch > 0) {
+          rasterize.contentWidthMM = cw
+          rasterize.contentHeightMM = ch
+        }
+        if (form.rasterizeFormat === 'jpeg') {
+          rasterize.jpegQuality = Math.min(1, Math.max(0.05, Number(form.rasterizeJpegQuality) || 0.9))
+        }
+        options.rasterize = rasterize
       }
       return options
     }
@@ -302,7 +344,7 @@ export default defineComponent({
     return {
       KINDS, CHANNELS, SOURCE_LABEL, PRINTER_STATE, STATE_TONE, STATE_LABEL,
       printers, jobs, loaded, result, resultOk, submitting, form,
-      activeKind, selectedPrinter, paperOptions, capsText, printerTone,
+      activeKind, selectedPrinter, paperOptions, rasterPaperOptions, capsText, printerTone,
       switchKind, loadPrinters, loadJobs, submitPrint, submitTestPage, reprint, removeJob, clearJobs,
       fmtTime,
     }
