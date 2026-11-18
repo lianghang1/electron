@@ -162,10 +162,7 @@ export class WindowSystem implements Startable, ViewHost {
     win.on('restore', () => this.replayContentRect())
     win.on('show', () => this.replayContentRect())
     // plane 几何恒等于内容区：窗口尺寸变化即跟随（零计算，无锚定测量）
-    win.on('resize', () => {
-      const w = this.shellWindow
-      if (w) { this.plane?.setBounds(w.getContentBounds()) }
-    })
+    win.on('resize', () => { this.syncPlaneBounds() })
     this.shellWindowId = win.id
     this.createPlane()
     if (this.flavor.mode === 'kiosk') { this.installKioskWatchdog(win) }
@@ -309,10 +306,21 @@ export class WindowSystem implements Startable, ViewHost {
     this.applySessionGuards(plane.webContents.session, 'all')
   }
 
+  /** plane 几何校准为恒等于主窗内容区：resize 跟随之外的兜底——跨显示器 DPI 缩放不同的
+      拖动/最大化/还原序列里，DPI 过渡时序可能让 resize 期的 setBounds 落在过渡值上，
+      plane 视口从此与内容区错位；交互表面接焦前强制对齐，弹窗几何不依赖历史时序 */
+  private syncPlaneBounds(): void {
+    const win = this.shellWindow
+    const plane = this.plane
+    if (!win || win.isDestroyed() || !plane || plane.isDestroyed()) { return }
+    plane.setBounds(win.getContentBounds())
+  }
+
   /** plane 恒全屏（几何零计算）；交互表面在列时接手键盘（权限 ESC / 面板检索） */
   focusPlane(): void {
     const plane = this.plane
     if (!plane || plane.isDestroyed()) { return }
+    this.syncPlaneBounds()
     this.planeFocusHeld = true
     this.setPlaneInteractive(true)
     plane.focus()
