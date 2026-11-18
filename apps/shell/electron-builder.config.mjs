@@ -8,7 +8,8 @@
  * 用法：FLAVOR=<id> pnpm build:linux（不设 FLAVOR 默认 solo-demo）
  * 打包态组合根读取 <resources>/flavor.json（extraResources 注入，见 main/index.ts loadFlavor）
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { ensureDriverAssets } from '../../scripts/prepare-driver-assets.mjs'
@@ -43,6 +44,12 @@ await ensureDriverAssets(repoRoot, targetOs)
 // 干净的 Linux 环境都能完成打包，国产化 rpm 产物在装有 rpmbuild 的机器上产出
 const linuxTargets = process.env.TARGET_RPM === '1' ? ['deb', 'AppImage', 'rpm'] : ['deb', 'AppImage']
 
+// 应用目录按 flavor 声明裁剪：只有 flavor.apps 列出的应用入包——调试台/测试页签只属于
+// 对应 dev flavor，生产 flavor（solo/kiosk）天然不携带；远程应用无本地目录，存在性过滤
+const appResourceEntries = flavor.apps
+  .filter(app => existsSync(join(repoRoot, 'resources/apps', app.id)))
+  .map(app => ({ from: join(repoRoot, 'resources/apps', app.id), to: `apps/${app.id}` }))
+
 const config = {
   appId: `cn.shellplatform.${flavor.id}`,
   productName: flavor.name,
@@ -66,8 +73,8 @@ const config = {
   extraResources: [
     // 产品形态清单：组合根打包态读取 resources/flavor.json
     { from: `../../apps/flavors/${flavorId}/flavor.json`, to: 'flavor.json' },
-    // 应用 dist（packaged 形态）：各应用产物放 resources/apps/<appId>/
-    { from: '../../resources/apps', to: 'apps' },
+    // 应用 dist（packaged 形态）：按 flavor 声明裁剪，仅打包 flavors 声明的应用目录
+    ...appResourceEntries,
     // 驱动资产：构建期聚合产物注入 resources/devices/，声明 devices/<域>/... 直接命中。
     // system 部署（mac/linux）不携带 DLL，manual 部署（信创）从现场数据目录取，见 docs/driver-packaging.md。
     { from: '../../resources/devices', to: 'devices' },
