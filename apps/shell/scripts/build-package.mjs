@@ -49,6 +49,8 @@ const hasPlatform = builderArgs.some(a => ['--win', '--mac', '--linux', '-w', '-
 function pick(title, options) {
   readline.emitKeypressEvents(process.stdin)
   if (process.stdin.isTTY) { process.stdin.setRawMode(true) }
+  // 连续两次 pick：上一次结束时不再 pause 流（pause 后 keypress 停发，第二次菜单会悬死等待）
+  process.stdin.resume()
   let index = 0
   let drawn = 0
   return new Promise((resolve) => {
@@ -79,7 +81,6 @@ function pick(title, options) {
     function finish() {
       process.stdin.removeListener('keypress', onKeypress)
       if (process.stdin.isTTY) { process.stdin.setRawMode(false) }
-      process.stdin.pause()
       process.stdout.write('\x1B[?25h')
     }
     process.stdin.on('keypress', onKeypress)
