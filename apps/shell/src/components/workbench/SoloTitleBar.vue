@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { Minus, Square, X } from '@ui/lib/lucide'
+import { Minus, RefreshCw, Settings, Square, X } from '@ui/lib/lucide'
 
-/** solo 窗口控制条（仅桌面形态）：拖拽区 + 当前应用名 + 三控制键，纯展示组件 */
+/** solo 窗口控制条（仅桌面形态）：拖拽区 + 当前应用名 + 刷新/设置/三控制键，纯展示组件 */
 defineProps<{
   title: string | null
 }>()
 
 defineEmits<{
+  reload: []
+  openSettings: []
   minimize: []
   maximize: []
   closeWindow: []
@@ -22,6 +24,12 @@ defineEmits<{
     </span>
     <span class="titlebar-drag h-full min-w-3 flex-1" />
     <div class="flex h-full items-center">
+      <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="刷新当前应用" title="刷新当前应用" @click="$emit('reload')">
+        <RefreshCw :size="14" />
+      </button>
+      <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="设置" title="设置" @click="$emit('openSettings')">
+        <Settings :size="14" />
+      </button>
       <button class="ctrl flex h-full w-11 items-center justify-center text-foreground" aria-label="最小化" @click="$emit('minimize')">
         <Minus :size="13" />
       </button>
