@@ -34,7 +34,7 @@ export interface OverlaySurfaceEntry {
   container?: {
     /** 是否绘制遮罩（缺省 true；toast/notification 系不适用） */
     mask?: boolean
-    /** 点击遮罩关闭表面（缺省 true；必须显式决策的权限卡为 false） */
+    /** 点击遮罩关闭表面（缺省 false：显式决策流程防误触；轻量面板显式 opt-in） */
     maskClose?: boolean
     /** 落位：居中（缺省）或锚点（payload.x/y） */
     placement?: 'center' | 'anchor'
@@ -69,7 +69,6 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     surface: 'permission',
     mode: 'dialog',
     component: PermissionCard,
-    container: { maskClose: false },
     mapProps: payload => ({ permission: payload as PermissionView }),
     wire: {
       resolve: (ctx, granted) => {
@@ -93,6 +92,7 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     surface: 'app-center',
     mode: 'dialog',
     component: AppCenter,
+    container: { maskClose: true },
     wire: {
       openApp: async (ctx, appId) => {
         await shell().apps.open(appId as string)
@@ -105,6 +105,7 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     surface: 'update-prompt',
     mode: 'dialog',
     component: UpdatePromptCard,
+    container: { maskClose: true },
     mapProps: payload => ({ version: (payload as { version: string }).version }),
     wire: {
       close: ctx => ctx.dismiss('update-prompt'),
@@ -115,6 +116,7 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     surface: 'config',
     mode: 'dialog',
     component: ConfigCard,
+    container: { maskClose: true },
     mapProps: payload => ({ category: (payload as { category: string }).category }),
     wire: {
       close: ctx => ctx.dismiss('config'),
@@ -124,6 +126,7 @@ export const overlayRegistry: OverlaySurfaceEntry[] = [
     surface: 'settings',
     mode: 'dialog',
     component: SettingsDialog,
+    container: { maskClose: true },
     mapProps: payload => ({ ...payload as { isKiosk?: boolean } }),
     wire: {
       close: ctx => ctx.dismiss('settings'),

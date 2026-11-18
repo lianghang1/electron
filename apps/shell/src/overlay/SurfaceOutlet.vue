@@ -63,8 +63,8 @@ function anchorStyle(s: OverlaySurfaceState): Record<string, string> {
 const isStack = (mode: string) => mode === 'toast' || mode === 'notification'
 const isPresented = (s: OverlaySurfaceState) => s.phase === 'presented'
 const isAnchor = (s: OverlaySurfaceState) => entryOf(s)?.container?.placement === 'anchor'
-/** 遮罩点击是否收场：maskClose=false（如拍摄）不关，其余 mask 外点按关闭 */
-const maskDismiss = (s: OverlaySurfaceState) => entryOf(s)?.container?.maskClose !== false
+/** 遮罩点击是否收场：缺省不关（显式决策流程防误触）；轻量面板在注册表声明 maskClose: true opt-in */
+const maskDismiss = (s: OverlaySurfaceState) => entryOf(s)?.container?.maskClose === true
 </script>
 
 <template>
