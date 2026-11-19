@@ -119,3 +119,5 @@ for (const [command, args] of steps) {
   const result = spawnSync(command, args, { stdio: 'inherit', shell: process.platform === 'win32' })
   if (result.status !== 0) { process.exit(result.status ?? 1) }
 }
+// 交互菜单 resume 过 stdin：flowing 的 stdin 是活跃 handle，事件循环不会自然结束，显式退出
+process.exit(0)
